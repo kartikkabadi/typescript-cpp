@@ -19,6 +19,8 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 add_library(tsc STATIC
 	internal/ast/ast.cpp
+	internal/ast/utilities.cpp
+	internal/binder/binder.cpp
 	internal/jsnum/jsnum.cpp
 	internal/scanner/scanner.cpp
 	internal/scanner/regexp.cpp

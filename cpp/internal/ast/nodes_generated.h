@@ -1129,6 +1129,7 @@ struct SourceFile : Node {
 	::tsc::ContentMapperSourceFileInfo* contentMapperInfo{};
 	::tsc::NodeList* Statements{};
 	::tsc::Node* EndOfFileToken{};
+	::tsc::Arena nodeArena;
 	std::mutex dataMu;
 	std::vector<::tsc::Diagnostic*> diagnostics;
 	std::vector<::tsc::Diagnostic*> jsDiagnostics;
@@ -6505,7 +6506,12 @@ inline bool isWriteAccess(const Node*) { return false; /* TODO: IsWriteAccess */
 inline bool isWriteAccessForReference(const Node*) { return false; /* TODO: IsWriteAccessForReference */ }
 inline bool isArrayLiteralOrObjectLiteralDestructuringPattern(const Node*) { return false; /* TODO: IsArrayLiteralOrObjectLiteralDestructuringPattern */ }
 inline bool isDeclarationNode(const Node*) { return false; /* TODO: IsDeclarationNode */ }
-inline bool isLocalsContainer(const Node*) { return false; /* TODO: IsLocalsContainer */ }
+inline bool isLocalsContainer(Node* n) {
+	return n->localsContainerData().locals != nullptr;
+}
+inline bool isLocalsContainer(const Node* n) {
+	return const_cast<Node*>(n)->localsContainerData().locals != nullptr;
+}
 inline bool isTypeOrJSTypeAliasDeclaration(const Node* n) { return n->kind == Kind::TypeAliasDeclaration || n->kind == Kind::JSTypeAliasDeclaration; }
 inline bool isImportDeclarationOrJSImportDeclaration(const Node* n) { return n->kind == Kind::ImportDeclaration || n->kind == Kind::JSImportDeclaration; }
 inline bool isAnyExportAssignment(const Node* n) { return n->kind == Kind::ExportAssignment; }

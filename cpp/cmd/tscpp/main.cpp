@@ -18,7 +18,11 @@
 #include <thread>
 #include <vector>
 
+#include <algorithm>
+
 #include "internal/ast/ast.h"
+#include "internal/ast/flow.h"
+#include "internal/binder/binder.h"
 #include "internal/diagnostics/diagnostics.h"
 #include "internal/parser/parser.h"
 #include "internal/scanner/scanner.h"
@@ -151,6 +155,153 @@ static void dumpDiags(char tag, const std::vector<Diagnostic*>& ds,
 	}
 }
 
+static void dumpSymbol(const Symbol* s, std::string& out) {
+	int vpos = -1, vend = -1;
+	if (s->valueDeclaration) {
+		vpos = s->valueDeclaration->pos();
+		vend = s->valueDeclaration->end();
+	}
+	std::string pname = "-";
+	uint32_t pflags = 0;
+	if (s->parent) {
+		pname = escapeAllInternalSymbolNames(symbolName(s->parent));
+		pflags = static_cast<uint32_t>(s->parent->flags);
+	}
+	char buf[128];
+	out += "S ";
+	out += escapeAllInternalSymbolNames(symbolName(s));
+	std::snprintf(buf, sizeof(buf), " %u %zu %d:%d ",
+	              static_cast<unsigned>(s->flags), s->declarations.size(),
+	              vpos, vend);
+	out += buf;
+	out += pname;
+	std::snprintf(buf, sizeof(buf), ":%u\n", static_cast<unsigned>(pflags));
+	out += buf;
+}
+
+static void dumpBindNode(Node* n, std::string& out) {
+	char buf[128];
+	std::snprintf(buf, sizeof(buf), "N %.*s %d %d %u\n",
+	              static_cast<int>(kindToString(n->kind).size()),
+	              kindToString(n->kind).data(), n->pos(), n->end(),
+	              static_cast<unsigned>(n->flags));
+	out += buf;
+	if (n->symbol()) dumpSymbol(n->symbol(), out);
+	auto e = n->exportableData();
+	if (e.localSymbol && *e.localSymbol) {
+		out += "X ";
+		out += escapeAllInternalSymbolNames(symbolName(*e.localSymbol));
+		char xbuf[32];
+		std::snprintf(xbuf, sizeof(xbuf), " %u\n",
+		              static_cast<unsigned>((*e.localSymbol)->flags));
+		out += xbuf;
+	}
+	auto f = n->flowNodeData();
+	if (f.flowNode && *f.flowNode) {
+		FlowNode* fn = *f.flowNode;
+		if (fn->node) {
+			std::snprintf(buf, sizeof(buf), "F %u %.*s %d %d\n",
+			              static_cast<unsigned>(fn->flags),
+			              static_cast<int>(kindToString(fn->node->kind).size()),
+			              kindToString(fn->node->kind).data(), fn->node->pos(),
+			              fn->node->end());
+		} else {
+			std::snprintf(buf, sizeof(buf), "F %u -\n",
+			              static_cast<unsigned>(fn->flags));
+		}
+		out += buf;
+	}
+	auto b = n->bodyData();
+	if (b.endFlowNode && *b.endFlowNode) {
+		std::snprintf(buf, sizeof(buf), "E %u\n",
+		              static_cast<unsigned>((*b.endFlowNode)->flags));
+		out += buf;
+	}
+	FlowNode* ret = nullptr;
+	switch (n->kind) {
+	case Kind::Constructor:
+		ret = n->as<ConstructorDeclaration>()->ReturnFlowNode;
+		break;
+	case Kind::FunctionDeclaration:
+		ret = n->as<FunctionDeclaration>()->ReturnFlowNode;
+		break;
+	case Kind::FunctionExpression:
+		ret = n->as<FunctionExpression>()->ReturnFlowNode;
+		break;
+	case Kind::ClassStaticBlockDeclaration:
+		ret = n->as<ClassStaticBlockDeclaration>()->ReturnFlowNode;
+		break;
+	default:
+		break;
+	}
+	if (ret) {
+		std::snprintf(buf, sizeof(buf), "R %u\n",
+		              static_cast<unsigned>(ret->flags));
+		out += buf;
+	}
+	auto c = n->localsContainerData();
+	if (c.locals && !c.locals->empty()) {
+		std::vector<std::string> keys;
+		for (auto& [k, v] : *c.locals) keys.push_back(k);
+		std::sort(keys.begin(), keys.end());
+		out += "L ";
+		for (auto& k : keys) {
+			char fbuf[512];
+			std::snprintf(fbuf, sizeof(fbuf), "%s:%u;",
+			              escapeAllInternalSymbolNames(k).c_str(),
+			              static_cast<unsigned>((*c.locals)[k]->flags));
+			out += fbuf;
+		}
+		out.pop_back();
+		out += "\n";
+	}
+	if (c.nextContainer && *c.nextContainer) {
+		std::snprintf(buf, sizeof(buf), "Q %d %d\n",
+		              (*c.nextContainer)->pos(), (*c.nextContainer)->end());
+		out += buf;
+	}
+	n->forEachChild([&](Node* ch) {
+		dumpBindNode(ch, out);
+		return false;
+	});
+}
+
+static void bindFile(const char* path, const std::string& src) {
+	SourceFileParseOptions opts;
+	opts.FileName = path;
+	opts.Path = path;
+	SourceFile* file = parseSourceFile(opts, src, scriptKindFromFileName(path));
+	bindSourceFile(file);
+	std::string out;
+	dumpBindNode(file->asNode(), out);
+	char buf[64];
+	std::snprintf(buf, sizeof(buf), "M %d %d\n",
+	              file->CommonJSModuleIndicator != nullptr ? 1 : 0,
+	              file->ExternalModuleIndicator != nullptr ? 1 : 0);
+	out += buf;
+	std::snprintf(buf, sizeof(buf), "K %d\n", file->SymbolCount);
+	out += buf;
+	for (auto* p : file->PatternAmbientModules) {
+		char pbuf[1024];
+		std::snprintf(pbuf, sizeof(pbuf), "P %s %s:%u\n", p->pattern.c_str(),
+		              escapeAllInternalSymbolNames(symbolName(p->symbol)).c_str(),
+		              static_cast<unsigned>(p->symbol->flags));
+		out += pbuf;
+	}
+	std::vector<std::string> gkeys;
+	for (auto& [k, v] : file->GlobalExports) gkeys.push_back(k);
+	std::sort(gkeys.begin(), gkeys.end());
+	for (auto& k : gkeys) {
+		char gbuf[512];
+		std::snprintf(gbuf, sizeof(gbuf), "G %s %u\n",
+		              escapeAllInternalSymbolNames(k).c_str(),
+		              static_cast<unsigned>(file->GlobalExports[k]->flags));
+		out += gbuf;
+	}
+	dumpDiags('B', file->bindDiagnostics, out);
+	std::fwrite(out.data(), 1, out.size(), stdout);
+}
+
 static void parseFile(const char* path, const std::string& src) {
 	SourceFileParseOptions opts;
 	opts.FileName = path;
@@ -270,12 +421,13 @@ int main(int argc, char** argv) {
 	if (argc < 3) {
 		std::fprintf(
 			stderr,
-			"usage: tscpp <lex|lex-json|bench|parse|bench-parse|parse-all> <file|dir> [iters|workers]\n");
+			"usage: tscpp <lex|lex-json|bench|parse|bench-parse|parse-all|bind> <file|dir> [iters|workers]\n");
 		return 2;
 	}
 	std::string mode = argv[1];
 	if (mode != "lex" && mode != "lex-json" && mode != "bench" &&
-	    mode != "parse" && mode != "bench-parse" && mode != "parse-all") {
+	    mode != "parse" && mode != "bench-parse" && mode != "parse-all" &&
+	    mode != "bind") {
 		std::fprintf(stderr, "tscpp: unknown mode %s\n", mode.c_str());
 		return 2;
 	}
@@ -294,6 +446,8 @@ int main(int argc, char** argv) {
 		benchLex(src, iters);
 	} else if (mode == "parse") {
 		parseFile(argv[2], src);
+	} else if (mode == "bind") {
+		bindFile(argv[2], src);
 	} else if (mode == "bench-parse") {
 		int iters = argc > 3 ? std::atoi(argv[3]) : 5;
 		benchParse(argv[2], src, iters);

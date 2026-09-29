@@ -21,7 +21,7 @@ oracle.
 | Parser | `parser/parser.go` | `cpp/internal/parser/parser.cpp` | complete |
 | JSDoc parser | `parser/jsdoc.go` | `cpp/internal/parser/jsdoc.cpp` | complete |
 | Reparser (JSDoc→declarations) | `parser/reparser.go` | `cpp/internal/parser/reparser.cpp` | complete |
-| Binder | `binder/` | — | not started |
+| Binder | `binder/` | `cpp/internal/binder` | complete |
 | Checker | `checker/` | — | not started |
 | Emitter | `printer/`, `transformers/` | — | not started |
 
@@ -37,6 +37,15 @@ two implementations can be diffed file-by-file with zero tolerance.
 output** (every `.ts/.tsx/.js/.jsx/.mts/.cts/.mjs/.cjs` file outside
 `node_modules` fixtures, including the entire conformance corpus, all JS
 baselines with JSDoc, and error-recovery torture cases).
+
+`tscpp bind` runs the full binder and emits, per node, the post-bind flags,
+the symbol record (`S name flags ndecls valueDeclPos parentName`), the
+export localSymbol (`X`), the flow-node flags (`F`/`E`/`R`), the sorted
+locals table (`L`), the container chain (`Q`), and file-level bind state
+(`M`/`K`/`P`/`G`), then bind diagnostics (`B`). `tsc/cmd/bindump` is the
+matching Go oracle.
+
+**Result: 26,002 / 26,002 files produce byte-identical bind output.**
 
 ```sh
 # single file
@@ -59,7 +68,7 @@ performs no per-node refcount/GC work.
 ```
 cpp/
   CMakeLists.txt          cmake+ninja build (Apple clang / GCC / MSVC)
-  cmd/tscpp/main.cpp      lex|lex-json|bench|parse|bench-parse driver
+  cmd/tscpp/main.cpp      lex|lex-json|bench|parse|bench-parse|parse-all|bind driver
   internal/
     ast/                  Node model; nodes_generated.h is generated
     core/                 arena allocator, text/span types

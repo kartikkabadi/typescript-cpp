@@ -976,4 +976,88 @@ inline bool tagNamesAreEquivalent(Node* lhs, Node* rhs) {
 	TSC_UNREACHABLE("Unhandled case in tagNamesAreEquivalent");
 }
 
+// --- Binder-facing utilities (utilities.cpp) ---
+
+NodeId getNodeId(Node* node);
+SymbolId getSymbolId(Symbol* symbol);
+SymbolTable& getMembers(Symbol* symbol);
+SymbolTable& getExports(Symbol* symbol);
+SymbolTable& getLocals(Node* container);
+Node* getRootDeclaration(Node* node);
+NodeFlags getCombinedNodeFlags(Node* node);
+ModifierFlags getCombinedModifierFlags(Node* node);
+bool isDeclarationStatementKind(Kind kind);
+bool isStatementKindButNotDeclarationKind(Kind kind);
+bool isBlockStatement(Node* node);
+bool isStatement(Node* node);
+bool isDeclarationStatement(Node* node);
+bool isClassElement(Node* node);
+bool isClassLike(Node* node);
+bool isFunctionExpressionOrArrowFunction(Node* node);
+bool isObjectLiteralOrClassExpressionMethodOrAccessor(Node* node);
+bool isObjectLiteralMethod(Node* node);
+bool isEnumConst(Node* node);
+bool isAutoAccessorPropertyDeclaration(Node* node);
+bool isStatic(Node* node);
+Node* getThisContainer(Node* node, bool includeArrowFunctions,
+                       bool includeClassComputedPropertyName);
+bool isInTopLevelContext(Node* node);
+bool isIdentifierName(Node* node);
+Node* findAncestor(Node* node, const std::function<bool(Node*)>& callback);
+bool isPrologueDirective(Node* node);
+bool isDottedName(Node* node);
+bool isPushOrUnshiftIdentifier(Node* node);
+bool isDestructuringAssignment(Node* node);
+bool isExpressionOfOptionalChainRoot(Node* node);
+bool isNullishCoalesce(Node* node);
+bool isDynamicName(Node* name);
+bool hasDynamicName(Node* declaration);
+bool isPropertyNameLiteral(Node* node);
+Node* getPropertyNameForPropertyOrComputedPropertyName(Node* name);
+bool isLogicalOrCoalescingBinaryOperator(Kind token);
+bool isLogicalOrCoalescingBinaryExpression(Node* expr);
+bool isLogicalExpression(Node* node);
+bool isLogicalOrCoalescingAssignmentOperator(Kind token);
+bool isLogicalOrCoalescingAssignmentExpression(Node* expr);
+bool isBooleanLiteral(Node* node);
+Node* getImmediatelyInvokedFunctionExpression(Node* fn);
+bool isExpandoInitializer(Node* declaration, Node* initializer);
+bool isVariableDeclarationInitializedToRequire(Node* node);
+bool isVariableDeclarationInitializedWithRequireHelper(Node* node,
+                                                       bool allowAccessedRequire);
+bool isPotentiallyExecutableNode(Node* node);
+bool isCatchClauseVariableDeclarationOrBindingElement(Node* declaration);
+bool isBlockOrCatchScoped(Node* declaration);
+bool isPartOfParameterDeclaration(Node* node);
+bool isParameterPropertyDeclaration(Node* node, Node* parent);
+bool isAsyncFunction(Node* node);
+bool isBindingPattern(Node* node);
+bool isForInOrOfStatement(Node* node);
+Node* getAssignmentTarget(Node* node);
+bool isAssignmentTarget(Node* node);
+Node* skipPartiallyEmittedExpressions(Node* node);
+bool isLeftHandSideExpression(Node* node);
+std::pair<std::string, bool> tryGetAmbientModuleNameFromSymbolName(
+	const std::string& s);
+bool isAmbientModuleSymbolName(const std::string& s);
+bool isExternalOrCommonJSModule(SourceFile* file);
+bool isJsonSourceFile(SourceFile* file);
+bool nodeHasName(Node* statement, Node* id);
+ModuleInstanceState getModuleInstanceState(Node* node);
+bool isInstantiatedModule(Node* node, bool preserveConstEnums);
+bool canHaveSymbol(Node* node);
+bool hasQuestionToken(Node* node);
+bool hasAccessorModifier(Node* node);
+bool hasStaticModifier(Node* node);
+bool isPartOfTypeQuery(Node* node);
+Node* getContainingClass(Node* node);
+bool isModuleAugmentationExternal(Node* node);
+bool isImplicitlyExportedJSDocDeclaration(Node* node);
+bool moduleExportNameIsDefault(Node* node);
+bool expressionIsAlias(Node* node);
+bool isMethodOrAccessor(Node* node);
+bool isPrivateIdentifierClassElementDeclaration(Node* node);
+Node* getLeftmostAccessExpression(Node* expr);
+bool isLogicalBinaryOperator(Kind token);
+
 }  // namespace tsc

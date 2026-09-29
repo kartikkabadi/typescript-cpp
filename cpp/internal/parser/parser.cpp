@@ -126,6 +126,9 @@ SourceFile* parseSourceFile(SourceFileParseOptions opts,
 	} else {
 		result = p->parseSourceFileWorker();
 	}
+	// The parser is pooled and reconstructed on return; hand its node arena
+	// to the SourceFile so the AST survives the parser.
+	result->nodeArena = std::move(p->factory.arena());
 	putParser(p);
 	return result;
 }

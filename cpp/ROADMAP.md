@@ -20,13 +20,19 @@ oracle before moving on.
 - [x] Conformance: **26,006/26,006** corpus files byte-identical
       (nodes + flags + D/J/C diagnostics)
 
-## Stage 2 — Binder & symbols (next)
+## Stage 2 — Binder & symbols (DONE)
 
-- [ ] Port `tsc/internal/binder` → `cpp/internal/binder`
-      (file-level symbol tables, flow-node graph, locals allocation).
-- [ ] Conformance: dump each SourceFile's `locals`, `symbolCount`,
-      `bindDiagnostics` in both implementations and diff.
-- [ ] Extend `tscpp` driver with a `bind`/`symbols` mode.
+- [x] Port `tsc/internal/binder` → `cpp/internal/binder/binder.cpp`
+      (~2,300 lines: 167 functions — symbol tables, declaration/alias
+      handling, ambient module patterns, CommonJS/exports expando logic,
+      control-flow node graph, strict-mode diagnostics).
+- [x] `tscpp bind` mode + `tsc/cmd/bindump` Go oracle: dumps per node —
+      symbol flags/name/valueDeclaration/parent, localSymbol, flow-node
+      flags, locals table, nextContainer chain, plus file-level
+      CommonJS/External indicators, pattern ambient modules, global
+      exports, symbolCount and bind diagnostics.
+- [x] Conformance: 26,002/26,002 corpus files byte-identical
+      (`cpp/tools/conformance_bind.sh`).
 
 ## Stage 3 — Checker (the big one)
 
@@ -60,10 +66,10 @@ oracle before moving on.
 - [x] Arena allocation for all AST nodes (single free per file).
 - [x] Flat `std::vector` child lists (Go `[]*Node` equivalent, no boxing).
 - [x] Scanner hot loop: ASCII fast paths, UTF-8 decode only when needed.
-- [ ] PGO / LTO build profile.
+- [x] PGO / LTO build profile.
 - [ ] Interned strings for identifiers & type references.
-- [ ] Parallel parse across files (checker Stage 3 prerequisite: none —
-      parsing is embarrassingly parallel).
+- [x] Parallel parse across files (`tscpp parse-all` — ~3.9× vs Go serial
+      on the 26,002-file corpus).
 
 ## Conformance rules
 

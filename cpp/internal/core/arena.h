@@ -19,6 +19,22 @@ public:
 	explicit Arena(size_t blockSize = 1 << 20) : blockSize_(blockSize) {}
 	Arena(const Arena&) = delete;
 	Arena& operator=(const Arena&) = delete;
+	Arena(Arena&& o) noexcept
+	    : blockSize_(o.blockSize_), capacity_(o.capacity_),
+	      offset_(o.offset_), cur_(o.cur_), blocks_(std::move(o.blocks_)) {
+		o.capacity_ = o.offset_ = 0;
+		o.cur_ = nullptr;
+	}
+	Arena& operator=(Arena&& o) noexcept {
+		blockSize_ = o.blockSize_;
+		capacity_ = o.capacity_;
+		offset_ = o.offset_;
+		cur_ = o.cur_;
+		blocks_ = std::move(o.blocks_);
+		o.capacity_ = o.offset_ = 0;
+		o.cur_ = nullptr;
+		return *this;
+	}
 
 	template <class T, class... Args>
 	T* alloc(Args&&... args) {
