@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <deque>
 
 #include "internal/scanner/regexp.h"
 
@@ -1400,8 +1401,12 @@ Kind Scanner::scanTemplateAndSetTokenValue(bool shouldEmitInvalidEscapeError) {
 	bool startedWithBacktick = char_() == '`';
 	st.pos++;
 	int start = st.pos;
-	std::vector<std::string> parts;
+	// Parts are views into the source text (zero-copy); escape outputs are
+	// owned strings kept stable in ownedParts so views stay valid.
+	std::vector<std::string_view> parts;
 	parts.reserve(4);
+	std::deque<std::string> ownedParts;
+	size_t partsLen = 0;
 	Kind token;
 	for (;;) {
 		scanASCIIWhile([](uint8_t b) {
@@ -1409,7 +1414,7 @@ Kind Scanner::scanTemplateAndSetTokenValue(bool shouldEmitInvalidEscapeError) {
 		});
 		char32_t ch = char_();
 		if (ch == static_cast<char32_t>(-1) || ch == '`') {
-			parts.emplace_back(text.substr(start, st.pos - start));
+			parts.push_back(text.substr(start, st.pos - start));
 			if (ch == '`') {
 				st.pos++;
 			} else {
@@ -1421,34 +1426,38 @@ Kind Scanner::scanTemplateAndSetTokenValue(bool shouldEmitInvalidEscapeError) {
 			break;
 		}
 		if (ch == '$' && charAt(1) == '{') {
-			parts.emplace_back(text.substr(start, st.pos - start));
+			parts.push_back(text.substr(start, st.pos - start));
 			st.pos += 2;
 			token = startedWithBacktick ? Kind::TemplateHead
 			                            : Kind::TemplateMiddle;
 			break;
 		}
 		if (ch == '\\') {
-			parts.emplace_back(text.substr(start, st.pos - start));
-			parts.push_back(scanEscapeSequence(
+			parts.push_back(text.substr(start, st.pos - start));
+			ownedParts.push_back(scanEscapeSequence(
 				EscapeSequenceScanningFlags::String |
 				(shouldEmitInvalidEscapeError
 				     ? EscapeSequenceScanningFlags::ReportErrors
 				     : EscapeSequenceScanningFlags{})));
+			parts.push_back(ownedParts.back());
 			start = st.pos;
 			continue;
 		}
 		if (ch == '\r') {
-			parts.emplace_back(text.substr(start, st.pos - start));
+			parts.push_back(text.substr(start, st.pos - start));
 			st.pos++;
 			if (char_() == '\n')
 				st.pos++;
-			parts.emplace_back("\n");
+			parts.push_back("\n");
 			start = st.pos;
 			continue;
 		}
 		st.pos++;
 	}
+	for (auto p : parts)
+		partsLen += p.size();
 	std::string joined;
+	joined.reserve(partsLen);
 	for (auto p : parts)
 		joined += p;
 	st.tokenValue = joined;

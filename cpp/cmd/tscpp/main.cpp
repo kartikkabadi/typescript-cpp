@@ -4,13 +4,19 @@
 //   tscpp bench <file> [n]     lex the file n times, report throughput
 //   tscpp parse <file>         parse and dump AST + diagnostics
 //   tscpp bench-parse <file> [n] parse the file n times, report throughput
+//   tscpp parse-all <dir|list> [workers]  parse many files in parallel,
+//        report aggregate throughput (source files only, no dumps)
+#include <atomic>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <thread>
+#include <vector>
 
 #include "internal/ast/ast.h"
 #include "internal/diagnostics/diagnostics.h"
@@ -84,6 +90,7 @@ static void benchLex(const std::string& src, int iters) {
 		auto t0 = std::chrono::steady_clock::now();
 		Scanner s;
 		s.setText(src);
+		s.setSkipTrivia(false);
 		s.setScriptTarget(ScriptTarget::LatestStandard);
 		tokens = 0;
 		while (s.scan() != Kind::EndOfFile)
@@ -180,18 +187,102 @@ static void benchParse(const char* path, const std::string& src, int iters) {
 		src.size(), iters, iters, bestMs, mb * 1000.0 / bestMs);
 }
 
+static void parseAll(const char* path, int workers) {
+	namespace fs = std::filesystem;
+	std::vector<std::string> files;
+	fs::path p(path);
+	if (fs::is_directory(p)) {
+		for (auto& e : fs::recursive_directory_iterator(p)) {
+			if (!e.is_regular_file())
+				continue;
+			auto ext = e.path().extension().string();
+			for (auto& c : ext)
+				c = static_cast<char>(std::tolower((unsigned char)c));
+			if (ext == ".ts" || ext == ".tsx" || ext == ".d.ts" ||
+			    ext == ".mts" || ext == ".cts" || ext == ".js" ||
+			    ext == ".jsx" || ext == ".mjs" || ext == ".cjs") {
+				files.push_back(e.path().string());
+			}
+		}
+	} else {
+		// A text file with one path per line.
+		std::ifstream in(path);
+		std::string line;
+		while (std::getline(in, line)) {
+			if (!line.empty())
+				files.push_back(line);
+		}
+	}
+	if (workers <= 0)
+		workers = static_cast<int>(std::thread::hardware_concurrency());
+	std::atomic<size_t> next{0};
+	std::atomic<size_t> totalBytes{0};
+	auto t0 = std::chrono::steady_clock::now();
+	// Worker threads default to small stacks (512KB on macOS); the parser
+	// recurses per AST nesting level, so give each worker a stack sized like
+	// the main thread's to keep deep files safe.
+	struct Work {
+		const std::vector<std::string>* files;
+		std::atomic<size_t>* next;
+		std::atomic<size_t>* totalBytes;
+	};
+	auto workerMain = [](void* ctx) -> void* {
+		auto* work = static_cast<Work*>(ctx);
+		for (;;) {
+			size_t i = work->next->fetch_add(1);
+			if (i >= work->files->size())
+				break;
+			const std::string& path = (*work->files)[i];
+			std::string src = readFile(path.c_str());
+			SourceFileParseOptions opts;
+			opts.FileName = path;
+			opts.Path = path;
+			SourceFile* f = parseSourceFile(
+				opts, src, scriptKindFromFileName(path));
+			(void)f;
+			*work->totalBytes += src.size();
+		}
+		return nullptr;
+	};
+	Work work{&files, &next, &totalBytes};
+	std::vector<pthread_t> pool(static_cast<size_t>(workers));
+	pthread_attr_t attr;
+	pthread_attr_init(&attr);
+	pthread_attr_setstacksize(&attr, size_t{64} << 20);
+	for (int w = 0; w < workers; w++) {
+		pthread_create(&pool[static_cast<size_t>(w)], &attr, workerMain,
+		               &work);
+	}
+	pthread_attr_destroy(&attr);
+	for (auto& t : pool)
+		pthread_join(t, nullptr);
+	double ms =
+		std::chrono::duration<double, std::milli>(
+			std::chrono::steady_clock::now() - t0)
+			.count();
+	double mb = static_cast<double>(totalBytes) / (1024.0 * 1024.0);
+	std::printf(
+		"tscpp parse-all: %zu files, %.1f MB, %d workers: %.1f ms, %.1f MB/s\n",
+		files.size(), mb, workers, ms, mb * 1000.0 / ms);
+}
+
 int main(int argc, char** argv) {
 	if (argc < 3) {
 		std::fprintf(
 			stderr,
-			"usage: tscpp <lex|lex-json|bench|parse|bench-parse> <file> [iters]\n");
+			"usage: tscpp <lex|lex-json|bench|parse|bench-parse|parse-all> <file|dir> [iters|workers]\n");
 		return 2;
 	}
 	std::string mode = argv[1];
 	if (mode != "lex" && mode != "lex-json" && mode != "bench" &&
-	    mode != "parse" && mode != "bench-parse") {
+	    mode != "parse" && mode != "bench-parse" && mode != "parse-all") {
 		std::fprintf(stderr, "tscpp: unknown mode %s\n", mode.c_str());
 		return 2;
+	}
+	if (mode == "parse-all") {
+		int workers = argc > 3 ? std::atoi(argv[3]) : 0;
+		parseAll(argv[2], workers);
+		return 0;
 	}
 	std::string src = readFile(argv[2]);
 	if (mode == "lex") {

@@ -12,6 +12,7 @@ endif()
 add_compile_options(-Wall -Wextra -Wno-unused-parameter)
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
 	add_compile_options(-O3 -DNDEBUG)
+	set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
 endif()
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
