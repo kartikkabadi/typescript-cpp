@@ -1124,6 +1124,8 @@ struct SourceFile : Node {
 	::tsc::Node* NextContainer{};
 	mutable CopyableAtomic<uint32_t> facts{};
 	std::string fileName;
+	const std::string& FileName() const { return fileName; }
+	const std::string& Path() const { return fileName; }
 	::tsc::SourceFileParseOptions parseOptions;
 	std::string text;
 	::tsc::ContentMapperSourceFileInfo* contentMapperInfo{};

@@ -7946,7 +7946,7 @@ void Parser::processPragmasIntoFields(SourceFile* context) {
 			    noDefaultLib->Value == "true") {
 				// Ignored.
 			} else if (types != nullptr) {
-				ResolutionMode parsed = ResolutionMode::None;
+				ResolutionMode parsed = ResolutionModeNone;
 				if (resolutionMode != nullptr) {
 					parsed = parseResolutionMode(
 						resolutionMode->Value, resolutionMode->pos(),
@@ -7999,14 +7999,14 @@ void Parser::processPragmasIntoFields(SourceFile* context) {
 
 ResolutionMode Parser::parseResolutionMode(std::string_view mode, int pos, int end) {
 	if (mode == "import") {
-		return ResolutionMode::ESM;
+		return ResolutionModeESM;
 	}
 	if (mode == "require") {
-		return ResolutionMode::CommonJS;
+		return ResolutionModeCommonJS;
 	}
 	parseErrorAt(pos, end,
 	             X_resolution_mode_should_be_either_require_or_import);
-	return ResolutionMode::None;
+	return ResolutionModeNone;
 }
 
 void Parser::jsErrorAtRange(TextRange loc, const DiagnosticMessage* message,

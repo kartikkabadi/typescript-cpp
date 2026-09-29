@@ -43,7 +43,7 @@ static bool isStatementCondition(Node* node);
 static bool isSignedNumericLiteralBinder(Node* node); // unused; parity note
 static Node* getParentOfPropertyAssignment(Node* node);
 static Symbol* getInitializerSymbol(Symbol* symbol);
-static void setValueDeclaration(Symbol* symbol, Node* node);
+
 ContainerFlags getContainerFlags(Node* node);
 
 struct ExpandoAssignmentInfo {
@@ -2915,12 +2915,12 @@ void Binder::addDeclarationToSymbol(Symbol* symbol, Node* node,
 	}
 }
 
-static bool isAssignmentDeclaration(Node* decl) {
+bool isAssignmentDeclaration(Node* decl) {
 	return isBinaryExpression(decl) || isAccessExpression(decl) ||
 	       isIdentifier(decl) || isCallExpression(decl);
 }
 
-static bool isEffectiveModuleDeclaration(Node* node) {
+bool isEffectiveModuleDeclaration(Node* node) {
 	return isModuleDeclaration(node) || isIdentifier(node);
 }
 

@@ -3,6 +3,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 #include <string_view>
 
 namespace tsc {
@@ -243,3 +244,210 @@ inline std::string_view removeByteOrderMark(std::string_view text) {
 }
 
 }  // namespace tsc
+
+// ==== js_case.go: JS casing (Unicode 15.1.0, ICU root-locale semantics) ====
+
+#include "internal/stringutil/js_case_generated.h"
+
+namespace tsc::stringutil {
+
+// DecodeJSStringRuneSize — width of one JS-string rune at s[i] (CESU-8 aware).
+inline size_t DecodeJSStringRuneSize(std::string_view s) {
+	int width = 0;
+	decodeJSStringRune(s, 0, &width);
+	return static_cast<size_t>(width);
+}
+
+inline char32_t DecodeJSStringRune(std::string_view s, int* width) {
+	return decodeJSStringRune(s, 0, width);
+}
+
+inline bool IsHighSurrogate(char32_t r) { return isHighSurrogate(r); }
+inline bool IsLowSurrogate(char32_t r) { return isLowSurrogate(r); }
+inline bool IsSurrogate(char32_t r) { return isSurrogate(r); }
+inline char32_t SurrogatePairToCodePoint(char32_t hi, char32_t lo) {
+	return 0x10000 + ((hi - 0xD800) << 10) + (lo - 0xDC00);
+}
+
+// CombineSurrogatePairs canonicalizes a JS-string value produced by
+// concatenation, merging any adjacent high+low surrogate sentinel pair into
+// the single supplementary code point they represent.
+inline std::string CombineSurrogatePairs(std::string_view s) {
+	if (s.find('\xED') == std::string_view::npos) {
+		return std::string(s);
+	}
+	std::string b;
+	b.reserve(s.size());
+	for (size_t i = 0; i < s.size();) {
+		int size = 0;
+		char32_t r = decodeJSStringRune(s, i, &size);
+		if (IsHighSurrogate(r)) {
+			int lowSize = 0;
+			char32_t low = decodeJSStringRune(s, i + size, &lowSize);
+			if (IsLowSurrogate(low)) {
+				char buf[4];
+				int n = encodeUtf8Rune(SurrogatePairToCodePoint(r, low), buf);
+				b.append(buf, n);
+				i += size + lowSize;
+				continue;
+			}
+		}
+		b.append(s.substr(i, size));
+		i += size;
+	}
+	return b;
+}
+
+
+
+inline bool isUnicodeCased(char32_t r) {
+	for (const Range32& rg : unicodeCasedRanges) {
+		if (r < rg.lo) {
+			break;
+		}
+		if (r <= rg.hi && ((r - rg.lo) % rg.stride) == 0) {
+			return true;
+		}
+	}
+	return false;
+}
+
+inline bool isUnicodeCaseIgnorable(char32_t r) {
+	for (const Range32& rg : unicodeCaseIgnorableRanges) {
+		if (r < rg.lo) {
+			break;
+		}
+		if (r <= rg.hi && ((r - rg.lo) % rg.stride) == 0) {
+			return true;
+		}
+	}
+	return false;
+}
+
+inline bool isSigmaCased(char32_t r) { return isUnicodeCased(r); }
+
+inline bool hasSigmaCasedAfter(std::string_view str, size_t start) {
+	for (size_t i = start; i < str.size();) {
+		int width = 0;
+		char32_t r = decodeJSStringRune(str, i, &width);
+		i += width;
+		if (isUnicodeCaseIgnorable(r)) {
+			continue;
+		}
+		return isSigmaCased(r);
+	}
+	return false;
+}
+
+// Final_Sigma context: preceded by a cased code point and not followed by one.
+inline bool isFinalSigmaContext(bool casedBefore, std::string_view str, size_t afterOffset) {
+	return casedBefore && !hasSigmaCasedAfter(str, afterOffset);
+}
+
+inline bool toLowerASCII(std::string_view str, std::string& out) {
+	bool needsMapping = false;
+	for (char ch : str) {
+		if (static_cast<unsigned char>(ch) >= 0x80) {
+			return false;
+		}
+		needsMapping = needsMapping || (ch >= 'A' && ch <= 'Z');
+	}
+	if (!needsMapping) {
+		out = std::string(str);
+		return true;
+	}
+	out = std::string(str);
+	for (char& ch : out) {
+		if (ch >= 'A' && ch <= 'Z') {
+			ch = static_cast<char>(ch + ('a' - 'A'));
+		}
+	}
+	return true;
+}
+
+inline bool toUpperASCII(std::string_view str, std::string& out) {
+	bool needsMapping = false;
+	for (char ch : str) {
+		if (static_cast<unsigned char>(ch) >= 0x80) {
+			return false;
+		}
+		needsMapping = needsMapping || (ch >= 'a' && ch <= 'z');
+	}
+	if (!needsMapping) {
+		out = std::string(str);
+		return true;
+	}
+	out = std::string(str);
+	for (char& ch : out) {
+		if (ch >= 'a' && ch <= 'z') {
+			ch = static_cast<char>(ch - ('a' - 'A'));
+		}
+	}
+	return true;
+}
+
+inline std::string ToLowerJS(std::string_view str) {
+	std::string ascii;
+	if (toLowerASCII(str, ascii)) {
+		return ascii;
+	}
+	std::string builder;
+	builder.reserve(str.size());
+	// casedBefore tracks whether the most recent non-Case_Ignorable code point is
+	// "cased", the backward half of the Final_Sigma context.
+	bool casedBefore = false;
+	for (size_t i = 0; i < str.size();) {
+		int size = 0;
+		char32_t r = decodeJSStringRune(str, i, &size);
+		i += size;
+		if (IsSurrogate(r)) {
+			// A lone surrogate has no case mapping; preserve it verbatim.
+			char buf[4];
+			int n = encodeJSStringRune(r, buf);
+			builder.append(buf, n);
+		} else if (auto it = specialCasingMappings.find(r); it != specialCasingMappings.end()) {
+			const SpecialCasingMapping& mapping = it->second;
+			if (mapping.condition == SpecialCasingCondition::FinalSigma &&
+				isFinalSigmaContext(casedBefore, str, i)) {
+				builder += mapping.conditionalLower;
+			} else {
+				builder += mapping.lower;
+			}
+		} else {
+			char buf[4];
+			int n = encodeUtf8Rune(r, buf);
+			builder.append(buf, n);
+		}
+		if (!isUnicodeCaseIgnorable(r)) {
+			casedBefore = isSigmaCased(r);
+		}
+	}
+	return builder;
+}
+
+inline std::string ToUpperJS(std::string_view str) {
+	std::string ascii;
+	if (toUpperASCII(str, ascii)) {
+		return ascii;
+	}
+	std::string builder;
+	builder.reserve(str.size());
+	for (size_t i = 0; i < str.size();) {
+		int size = 0;
+		char32_t r = decodeJSStringRune(str, i, &size);
+		if (IsSurrogate(r)) {
+			// A lone surrogate has no case mapping; copy the sentinel bytes directly.
+			builder.append(str.substr(i, size));
+		} else if (auto it = specialCasingMappings.find(r); it != specialCasingMappings.end()) {
+			builder += it->second.upper;
+		} else {
+			char buf[4];
+			int n = encodeUtf8Rune(r, buf);
+			builder.append(buf, n);
+		}
+		i += size;
+	}
+	return builder;
+}
+
+}  // namespace tsc::stringutil

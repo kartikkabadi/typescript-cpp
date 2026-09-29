@@ -72,6 +72,12 @@ struct Number {
 	bool operator==(Number o) const { return v == o.v; }
 	bool operator!=(Number o) const { return v != o.v; }
 	bool operator<(Number o) const { return v < o.v; }
+
+	Number operator-() const { return Number(-v); }
+	Number operator+(Number o) const { return Number(v + o.v); }
+	Number operator-(Number o) const { return Number(v - o.v); }
+	Number operator*(Number o) const { return Number(v * o.v); }
+	Number operator/(Number o) const { return Number(v / o.v); }
 };
 
 // ECMA-262 StringToNumber.
@@ -86,6 +92,9 @@ struct PseudoBigInt {
 	std::string string() const;
 	int sign() const;
 	int compare(const PseudoBigInt& other) const;
+	bool operator==(const PseudoBigInt& o) const {
+		return negative == o.negative && base10Value == o.base10Value;
+	}
 };
 
 PseudoBigInt parseValidBigInt(std::string_view text);
