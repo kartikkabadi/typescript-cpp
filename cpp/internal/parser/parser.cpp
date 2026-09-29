@@ -1713,7 +1713,7 @@ Node* Parser::parseVariableStatement(int pos, JSDocScannerInfo jsdoc,
 
 Node* Parser::parseVariableDeclarationList(bool inForStatementInitializer) {
 	int pos = nodePos();
-	NodeFlags flags;
+	NodeFlags flags = NodeFlagsNone;
 	switch (token) {
 	case Kind::VarKeyword:
 		flags = NodeFlagsNone;

@@ -73,7 +73,7 @@ static void lexFile(const std::string& src, bool json) {
 			break;
 	}
 	if (json)
-		out += ']';
+		out += "]\n";
 	std::fwrite(out.data(), 1, out.size(), stdout);
 }
 
@@ -188,6 +188,11 @@ int main(int argc, char** argv) {
 		return 2;
 	}
 	std::string mode = argv[1];
+	if (mode != "lex" && mode != "lex-json" && mode != "bench" &&
+	    mode != "parse" && mode != "bench-parse") {
+		std::fprintf(stderr, "tscpp: unknown mode %s\n", mode.c_str());
+		return 2;
+	}
 	std::string src = readFile(argv[2]);
 	if (mode == "lex") {
 		lexFile(src, false);
