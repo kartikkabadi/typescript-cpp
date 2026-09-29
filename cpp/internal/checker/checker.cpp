@@ -11,9 +11,12 @@
 #include "internal/binder/nameresolver.h"
 #include "internal/checker/mapper.h"
 #include "internal/core/linkstore.h"
+#include "internal/core/nodemodules.h"
+#include "internal/core/pattern.h"
 #include "internal/jsnum/jsnum.h"
 #include "internal/scanner/scanner.h"
 #include "internal/core/spelling.h"
+#include "internal/tspath/tspath.h"
 
 namespace tsc {
 namespace checker {
@@ -4382,12 +4385,6 @@ Type* Checker::getTypeFromTypeNode(Node* node) {
 	TSC_UNREACHABLE("getTypeFromTypeNode — ported with the type-node slice");
 }
 
-Symbol* Checker::resolveEntityName(Node* name, SymbolFlags meaning,
-								   bool ignoreErrors, bool dontResolveAlias,
-								   Node* location) {
-	TSC_UNREACHABLE("resolveEntityName — ported with checker.cpp:16091 slice");
-}
-
 Type* Checker::checkExpression(Node* node) {
 	TSC_UNREACHABLE("checkExpression — ported with the expression-checking slice");
 }
@@ -6597,8 +6594,14 @@ Symbol* Checker::resolveExternalModuleNameWorker(
 	Node* location, Node* moduleReferenceExpression,
 	const DiagnosticMessage* moduleNotFoundError, bool ignoreErrors,
 	bool isForAugmentation, Type* importAttributesType) {
-	TSC_UNREACHABLE(
-		"resolveExternalModuleNameWorker — ported with checker.go:15364 slice");
+	if (isStringLiteralLike(moduleReferenceExpression)) {
+		return resolveExternalModule(
+		    location, std::string(moduleReferenceExpression->text()),
+		    moduleNotFoundError,
+		    !ignoreErrors ? moduleReferenceExpression : nullptr,
+		    isForAugmentation, importAttributesType);
+	}
+	return nullptr;
 }
 
 Symbol* Checker::getPropertyOfType(Type* type, const std::string& name) {
@@ -6641,5 +6644,1158 @@ Ternary Checker::compareTypesAssignableWorker(Type* source, Type* target,
 		"compareTypesAssignableWorker — ported with relater.go:135 slice");
 }
 
+
+// ---------------------------------------------------------------------------
+// External module name resolution — checker.go:15343-15990
+// ---------------------------------------------------------------------------
+
+Symbol* Checker::resolveExternalModuleName(Node* location,
+                                           Node* moduleReferenceExpression,
+                                           bool ignoreErrors,
+                                           Type* importAttributesType) {
+	const DiagnosticMessage* errorMessage =
+	    getCannotResolveModuleNameErrorForSpecificModule(
+	        moduleReferenceExpression);
+	if (errorMessage == nullptr) {
+		errorMessage = Cannot_find_module_0_or_its_corresponding_type_declarations;
+	}
+	ignoreErrors = ignoreErrors || compilerOptions->NoCheck == Tristate::True;
+	return resolveExternalModuleNameWorker(
+	    location, moduleReferenceExpression,
+	    ignoreErrors ? nullptr : errorMessage, ignoreErrors,
+	    false /*isForAugmentation*/, importAttributesType);
+}
+
+const DiagnosticMessage* Checker::
+    getCannotResolveModuleNameErrorForSpecificModule(Node* moduleName) {
+	if (isStringLiteral(moduleName)) {
+		if (nodeCoreModulesContains(moduleName->text())) {
+			if (compilerOptions->UsesWildcardTypes()) {
+				return Cannot_find_name_0_Do_you_need_to_install_type_definitions_for_node_Try_npm_i_save_dev_types_Slashnode;
+			}
+			return Cannot_find_name_0_Do_you_need_to_install_type_definitions_for_node_Try_npm_i_save_dev_types_Slashnode_and_then_add_node_to_the_types_field_in_your_tsconfig;
+		}
+	}
+	return nullptr;
+}
+
+SourceFile* Checker::getExternalModuleFileFromDeclaration(Node* declaration) {
+	Node* specifier = nullptr;
+	if (declaration->kind == Kind::ModuleDeclaration) {
+		if (isStringLiteral(declaration->name())) {
+			specifier = declaration->name();
+		}
+	} else {
+		specifier = getExternalModuleName(declaration);
+	}
+	Type* importAttributesType = nullptr;
+	if (hasImportAttributes(declaration)) {
+		importAttributesType =
+		    getTypeFromImportAttributes(getImportAttributes(declaration));
+	}
+	Symbol* moduleSymbol = resolveExternalModuleNameWorker(
+	    specifier, specifier /*moduleNotFoundError*/, nullptr, false, false,
+	    importAttributesType);  // TODO: GH#18217
+	if (moduleSymbol == nullptr) {
+		return nullptr;
+	}
+	Node* decl = getDeclarationOfKind(moduleSymbol, Kind::SourceFile);
+	if (decl == nullptr) {
+		return nullptr;
+	}
+	return static_cast<SourceFile*>(decl);
+}
+
+// module/util.go: GetResolutionDiagnostic
+static const DiagnosticMessage* getResolutionDiagnostic(
+    const CompilerOptions& options, const ResolvedModule& resolvedModule,
+    SourceFile* file) {
+	auto needJsx = [&]() -> const DiagnosticMessage* {
+		if (options.Jsx != JsxEmit::None) {
+			return nullptr;
+		}
+		return Module_0_was_resolved_to_1_but_jsx_is_not_set;
+	};
+	auto needAllowJs = [&]() -> const DiagnosticMessage* {
+		if (options.GetAllowJS() ||
+		    !options.DefaultIfUnknown(options.NoImplicitAny,
+		                              options.Strict)) {
+			return nullptr;
+		}
+		return Could_not_find_a_declaration_file_for_module_0_1_implicitly_has_an_any_type;
+	};
+	auto needResolveJsonModule = [&]() -> const DiagnosticMessage* {
+		if (options.GetResolveJsonModule()) {
+			return nullptr;
+		}
+		return Module_0_was_resolved_to_1_but_resolveJsonModule_is_not_used;
+	};
+	auto needAllowArbitraryExtensions = [&]() -> const DiagnosticMessage* {
+		if (file->IsDeclarationFile ||
+		    options.AllowArbitraryExtensions == Tristate::True) {
+			return nullptr;
+		}
+		return Module_0_was_resolved_to_1_but_allowArbitraryExtensions_is_not_set;
+	};
+
+	if (resolvedModule.resolvedUsingExtraExtensions) {
+		return nullptr;
+	}
+
+	std::string_view ext = resolvedModule.extension;
+	if (ext == tspath::extensionTs || ext == tspath::extensionDts ||
+	    ext == tspath::extensionMts || ext == tspath::extensionDmts ||
+	    ext == tspath::extensionCts || ext == tspath::extensionDcts) {
+		// These are always allowed.
+		return nullptr;
+	}
+	if (ext == tspath::extensionTsx) {
+		return needJsx();
+	}
+	if (ext == tspath::extensionJsx) {
+		if (const DiagnosticMessage* message = needJsx()) {
+			return message;
+		}
+		return needAllowJs();
+	}
+	if (ext == tspath::extensionJs || ext == tspath::extensionMjs ||
+	    ext == tspath::extensionCjs) {
+		return needAllowJs();
+	}
+	if (ext == tspath::extensionJson) {
+		return needResolveJsonModule();
+	}
+	return needAllowArbitraryExtensions();
+}
+
+// checker.go: resolutionExtensionIsTSOrJson
+static bool resolutionExtensionIsTSOrJson(std::string_view ext) {
+	return tspath::extensionIsTs(ext) || ext == tspath::extensionJson;
+}
+
+// utilities.go: isSideEffectImport
+static bool isSideEffectImport(Node* node) {
+	Node* ancestor = findAncestor(node, isImportDeclaration);
+	return ancestor != nullptr && ancestor->importClause() == nullptr;
+}
+
+// utilities.go: getAliasDeclarationFromName
+static Node* getAliasDeclarationFromName(Node* node) {
+	switch (node->parent->kind) {
+	case Kind::ImportClause:
+	case Kind::ImportSpecifier:
+	case Kind::NamespaceImport:
+	case Kind::ExportSpecifier:
+	case Kind::ExportAssignment:
+	case Kind::ImportEqualsDeclaration:
+	case Kind::NamespaceExport:
+		return node->parent;
+	case Kind::QualifiedName:
+		return getAliasDeclarationFromName(node->parent);
+	default:
+		return nullptr;
+	}
+}
+
+// utilities.go: entityNameToString
+static std::string entityNameToString(Node* name) {
+	Node* current = name;
+	std::vector<std::string_view> parts;
+	for (; current; current = current->kind == Kind::QualifiedName
+	                              ? current->as<QualifiedName>()->Left
+	                              : nullptr) {
+		if (current->kind == Kind::QualifiedName) {
+			parts.push_back(current->as<QualifiedName>()->Right->text());
+		} else {
+			parts.push_back(current->text());
+		}
+	}
+	std::string result;
+	for (auto it = parts.rbegin(); it != parts.rend(); ++it) {
+		if (!result.empty()) result += '.';
+		result += *it;
+	}
+	return result;
+}
+
+// utilities.go: getContainingQualifiedNameNode
+static Node* getContainingQualifiedNameNode(Node* node) {
+	while (isQualifiedName(node->parent)) {
+		node = node->parent;
+	}
+	return node;
+}
+
+Symbol* Checker::resolveExternalModule(
+    Node* location, const std::string& moduleReference,
+    const DiagnosticMessage* moduleNotFoundError, Node* errorNode,
+    bool isForAugmentation, Type* importAttributesType) {
+	if (errorNode != nullptr &&
+	    moduleReference.compare(0, 7, "@types/") == 0) {
+		std::string withoutAtTypePrefix = moduleReference.substr(7);
+		error(errorNode,
+		      Cannot_import_type_declaration_files_Consider_importing_0_instead_of_1,
+		      {withoutAtTypePrefix, moduleReference});
+	}
+	if (importAttributesType == nullptr) {
+		importAttributesType = emptyObjectType;
+	}
+
+	Symbol* ambientModule =
+	    tryFindAmbientModule(moduleReference, true /*withAugmentations*/);
+	if (ambientModule != nullptr) {
+		return tryResolvePatternAmbientModule(ambientModule, moduleReference,
+		                                      importAttributesType);
+	}
+
+	SourceFile* importingSourceFile = getSourceFileOfNode(location);
+	Node* contextSpecifier = nullptr;
+	ResolutionMode mode = ResolutionModeNone;
+
+	if (isStringLiteralLike(location) ||
+	    (location->parent != nullptr &&
+	     isModuleDeclaration(location->parent) &&
+	     location->parent->as<ModuleDeclaration>()->name == location)) {
+		contextSpecifier = location;
+	} else if (isModuleDeclaration(location)) {
+		contextSpecifier = location->as<ModuleDeclaration>()->name;
+	} else if (isLiteralImportTypeNode(location)) {
+		contextSpecifier = location->as<ImportTypeNode>()
+		                       ->Argument->as<LiteralTypeNode>()
+		                       ->Literal;
+	} else if (isVariableDeclarationInitializedToBareOrAccessedRequire(
+	               location)) {
+		contextSpecifier =
+		    getModuleSpecifierOfBareOrAccessedRequire(location);
+	} else {
+		Node* ancestor = findAncestor(location, isImportCall);
+		if (ancestor != nullptr) {
+			contextSpecifier = ancestor->arguments()[0];
+		}
+		if (ancestor == nullptr) {
+			ancestor = findAncestor(
+			    location, isImportDeclarationOrJSImportDeclaration);
+			if (ancestor != nullptr) {
+				contextSpecifier = ancestor->moduleSpecifier();
+			}
+		}
+		if (ancestor == nullptr) {
+			ancestor = findAncestor(location, isExportDeclaration);
+			if (ancestor != nullptr) {
+				contextSpecifier = ancestor->moduleSpecifier();
+			}
+		}
+		if (ancestor == nullptr) {
+			ancestor = findAncestor(location, isImportEqualsDeclaration);
+			if (ancestor != nullptr) {
+				Node* moduleRef =
+				    ancestor->as<ImportEqualsDeclaration>()->ModuleReference;
+				if (moduleRef->kind == Kind::ExternalModuleReference) {
+					contextSpecifier = moduleRef->expression();
+				}
+			}
+		}
+	}
+
+	if (contextSpecifier != nullptr &&
+	    isStringLiteralLike(contextSpecifier)) {
+		mode = program->GetModeForUsageLocation(importingSourceFile,
+		                                        contextSpecifier);
+	} else {
+		mode = program->GetDefaultResolutionModeForFile(importingSourceFile);
+	}
+
+	auto resolvedModuleOpt = program->GetResolvedModule(
+	    importingSourceFile, moduleReference, mode);
+	ResolvedModule resolvedModule =
+	    resolvedModuleOpt ? *resolvedModuleOpt : ResolvedModule{};
+
+	const DiagnosticMessage* resolutionDiagnostic = nullptr;
+	if (errorNode != nullptr && resolvedModule.resolved) {
+		resolutionDiagnostic = getResolutionDiagnostic(
+		    *compilerOptions, resolvedModule, importingSourceFile);
+	}
+
+	SourceFile* sourceFile = nullptr;
+	if (resolvedModule.resolved &&
+	    (resolutionDiagnostic == nullptr ||
+	     resolutionDiagnostic ==
+	         Module_0_was_resolved_to_1_but_jsx_is_not_set)) {
+		sourceFile = program->GetSourceFileForResolvedModule(
+		    resolvedModule.resolvedFileName);
+	}
+
+	if (sourceFile != nullptr) {
+		// If there's a resolutionDiagnostic we need to report it even if a
+		// sourceFile is found.
+		if (resolutionDiagnostic != nullptr) {
+			error(errorNode, resolutionDiagnostic,
+			      {moduleReference, resolvedModule.resolvedFileName});
+		}
+
+		if (errorNode != nullptr) {
+			if (resolvedModule.resolvedUsingTsExtension &&
+			    tspath::isDeclarationFileName(moduleReference)) {
+				if (findAncestor(location, isEmittableImport) != nullptr) {
+					std::string_view tsExtension =
+					    tspath::tryExtractTSExtension(moduleReference);
+					if (tsExtension.empty()) {
+						tscUnreachable(
+						    "should be able to extract TS extension "
+						    "from string that passes "
+						    "IsDeclarationFileName");
+					}
+					error(errorNode,
+					      A_declaration_file_cannot_be_imported_without_import_type_Did_you_mean_to_import_an_implementation_file_0_instead,
+					      {getSuggestedImportSource(
+					          moduleReference, tsExtension, mode)});
+				}
+			} else if (
+			    resolvedModule.resolvedUsingTsExtension &&
+			    !compilerOptions->AllowImportingTsExtensionsFrom(
+			        tspath::isDeclarationFileName(
+			            importingSourceFile->FileName()))) {
+				if (findAncestor(location, isEmittableImport) != nullptr) {
+					std::string_view tsExtension =
+					    tspath::tryExtractTSExtension(moduleReference);
+					if (tsExtension.empty()) {
+						// Fallback: best-effort extraction using
+						// substring match. See checker.go for context.
+						for (auto ext : tspath::supportedTSExtensionsFlat) {
+							if (moduleReference.find(ext) !=
+							    std::string::npos) {
+								tsExtension = ext;
+								break;
+							}
+						}
+					}
+					if (tsExtension.empty()) {
+						tscUnreachable(
+						    "should be able to extract TS extension "
+						    "from string when resolvedUsingTsExtension "
+						    "is true");
+					}
+					error(errorNode,
+					      An_import_path_can_only_end_with_a_0_extension_when_allowImportingTsExtensions_is_enabled,
+					      {std::string(tsExtension)});
+				}
+			} else if (
+			    compilerOptions->RewriteRelativeImportExtensions ==
+			        Tristate::True &&
+			    !(location->flags & NodeFlagsAmbient) &&
+			    !tspath::isDeclarationFileName(moduleReference) &&
+			    !isLiteralImportTypeNode(location) &&
+			    !isPartOfTypeOnlyImportOrExportDeclaration(location)) {
+				bool shouldRewrite =
+				    compilerOptions->RewriteRelativeImportExtensions ==
+				        Tristate::True &&
+				    tspath::pathIsRelative(moduleReference) &&
+				    !tspath::isDeclarationFileName(moduleReference) &&
+				    tspath::hasTSFileExtension(moduleReference);
+				if (!resolvedModule.resolvedUsingTsExtension &&
+				    shouldRewrite) {
+					std::string relativeToSourceFile =
+					    tspath::getRelativePathFromFile(
+					        tspath::getNormalizedAbsolutePath(
+					            importingSourceFile->FileName(),
+					            program->GetCurrentDirectory()),
+					        resolvedModule.resolvedFileName,
+					        {program->UseCaseSensitiveFileNames(),
+					         program->GetCurrentDirectory()});
+					error(errorNode,
+					      This_relative_import_path_is_unsafe_to_rewrite_because_it_looks_like_a_file_name_but_actually_resolves_to_0,
+					      {relativeToSourceFile});
+				} else if (
+				    resolvedModule.resolvedUsingTsExtension &&
+				    !shouldRewrite &&
+				    program->SourceFileMayBeEmitted(sourceFile,
+				                                    false)) {
+					error(errorNode,
+					      This_import_uses_a_0_extension_to_resolve_to_an_input_TypeScript_file_but_will_not_be_rewritten_during_emit_because_it_is_not_a_relative_path,
+					      {std::string(tspath::getAnyExtensionFromPath(
+					          moduleReference, nullptr, false))});
+				} else if (resolvedModule.resolvedUsingTsExtension &&
+				           shouldRewrite) {
+					if (RedirectInfo* redirect =
+					        program->GetRedirectForResolution(
+					            sourceFile)) {
+						std::string ownRootDir =
+						    program->CommonSourceDirectory();
+						std::string otherRootDir =
+						    redirect->CommonSourceDirectory();
+						tspath::ComparePathsOptions compareOptions{
+						    program->UseCaseSensitiveFileNames(),
+						    program->GetCurrentDirectory()};
+						std::string rootDirPath =
+						    tspath::getRelativePathFromDirectory(
+						        ownRootDir, otherRootDir,
+						        compareOptions);
+						std::string ownOutDir =
+						    compilerOptions->OutDir;
+						if (ownOutDir.empty()) {
+							ownOutDir = ownRootDir;
+						}
+						std::string otherOutDir =
+						    redirect->CompilerOptions()->OutDir;
+						if (otherOutDir.empty()) {
+							otherOutDir = otherRootDir;
+						}
+						std::string outDirPath =
+						    tspath::getRelativePathFromDirectory(
+						        ownOutDir, otherOutDir,
+						        compareOptions);
+						if (rootDirPath != outDirPath) {
+							error(errorNode,
+							      This_import_path_is_unsafe_to_rewrite_because_it_resolves_to_another_project_and_the_relative_path_between_the_projects_output_files_is_not_the_same_as_the_relative_path_between_its_input_files,
+							      std::vector<std::string>{});
+						}
+					}
+				}
+			}
+		}
+
+		if (sourceFile->Symbol != nullptr) {
+			if (errorNode != nullptr) {
+				if (resolvedModule.isExternalLibraryImport &&
+				    !resolutionExtensionIsTSOrJson(
+				        resolvedModule.extension)) {
+					errorOnImplicitAnyModule(false /*isError*/, errorNode,
+					                         mode, resolvedModule,
+					                         moduleReference);
+				}
+				if (moduleKind == ModuleKind::Node16 ||
+				    moduleKind == ModuleKind::Node18) {
+					bool isSyncImport =
+					    (program->GetDefaultResolutionModeForFile(
+					         importingSourceFile) ==
+					         ModuleKind::CommonJS &&
+					     findAncestor(location, isImportCall) ==
+					         nullptr) ||
+					    findAncestor(location,
+					                 isImportEqualsDeclaration) != nullptr;
+					Node* overrideHost = findAncestor(
+					    location, isResolutionModeOverrideHost);
+					if (isSyncImport &&
+					    program->GetDefaultResolutionModeForFile(
+					        sourceFile) == ModuleKind::ESNext &&
+					    !hasResolutionModeOverride(overrideHost)) {
+						if (findAncestor(
+						        location,
+						        isImportEqualsDeclaration) != nullptr) {
+							// ImportEquals in an ESM file resolving to
+							// another ESM file
+							error(errorNode,
+							      Module_0_cannot_be_imported_using_this_construct_The_specifier_only_resolves_to_an_ES_module_which_cannot_be_imported_with_require_Use_an_ECMAScript_import_instead,
+							      {moduleReference});
+						} else {
+							// CJS file resolving to an ESM file
+							Diagnostic* diagnosticDetails = nullptr;
+							std::string_view ext =
+							    tspath::tryGetExtensionFromPath(
+							        importingSourceFile->FileName());
+							if (ext == tspath::extensionTs ||
+							    ext == tspath::extensionJs ||
+							    ext == tspath::extensionTsx ||
+							    ext == tspath::extensionJsx) {
+								diagnosticDetails =
+								    createModeMismatchDetails(
+								        importingSourceFile, errorNode);
+							}
+							const DiagnosticMessage* message;
+							if (overrideHost != nullptr &&
+							    overrideHost->kind ==
+							        Kind::ImportDeclaration &&
+							    overrideHost->importClause() !=
+							        nullptr &&
+							    overrideHost->importClause()
+							        ->isTypeOnly()) {
+								message =
+								    Type_only_import_of_an_ECMAScript_module_from_a_CommonJS_module_must_have_a_resolution_mode_attribute;
+							} else if (overrideHost != nullptr &&
+							           overrideHost->kind ==
+							               Kind::ImportType) {
+								message =
+								    Type_import_of_an_ECMAScript_module_from_a_CommonJS_module_must_have_a_resolution_mode_attribute;
+							} else {
+								message =
+								    The_current_file_is_a_CommonJS_module_whose_imports_will_produce_require_calls_however_the_referenced_file_is_an_ECMAScript_module_and_cannot_be_imported_with_require_Consider_writing_a_dynamic_import_0_call_instead;
+							}
+							addDiagnostic(NewDiagnosticChainForNode(
+							    diagnosticDetails, errorNode, message,
+							    {moduleReference}));
+						}
+					}
+				}
+			}
+			return tryResolvePatternAmbientModule(
+			    getMergedSymbol(sourceFile->Symbol), moduleReference,
+			    importAttributesType);
+		}
+		Symbol* patternAmbientModule = tryResolvePatternAmbientModule(
+		    nullptr /*resolvedSymbol*/, moduleReference,
+		    importAttributesType);
+		if (patternAmbientModule != nullptr) {
+			return patternAmbientModule;
+		}
+		if (errorNode != nullptr && moduleNotFoundError != nullptr &&
+		    !isSideEffectImport(errorNode)) {
+			error(errorNode, File_0_is_not_a_module,
+			      {resolvedModule.resolvedFileName});
+		}
+		return nullptr;
+	}
+
+	Symbol* patternAmbientModule = tryResolvePatternAmbientModule(
+	    nullptr /*resolvedSymbol*/, moduleReference, importAttributesType);
+	if (patternAmbientModule != nullptr) {
+		return patternAmbientModule;
+	}
+
+	if (errorNode == nullptr) {
+		return nullptr;
+	}
+
+	if ((resolvedModule.resolved &&
+	     !resolutionExtensionIsTSOrJson(resolvedModule.extension) &&
+	     resolutionDiagnostic == nullptr) ||
+	    resolutionDiagnostic ==
+	        Could_not_find_a_declaration_file_for_module_0_1_implicitly_has_an_any_type) {
+		if (isForAugmentation) {
+			error(errorNode,
+			      Invalid_module_name_in_augmentation_Module_0_resolves_to_an_untyped_module_at_1_which_cannot_be_augmented,
+			      {moduleReference, resolvedModule.resolvedFileName});
+		} else {
+			errorOnImplicitAnyModule(noImplicitAny &&
+			                             moduleNotFoundError != nullptr,
+			                         errorNode, mode, resolvedModule,
+			                         moduleReference);
+		}
+		return nullptr;
+	}
+
+	if (moduleNotFoundError != nullptr) {
+		// See if this was possibly a projectReference redirect
+		if (resolvedModule.resolved) {
+			const ProjectReferenceRedirect* redirect =
+			    program->GetProjectReferenceFromSource(tspath::toPath(
+			        resolvedModule.resolvedFileName,
+			        program->GetCurrentDirectory(),
+			        program->UseCaseSensitiveFileNames()));
+			if (redirect != nullptr && !redirect->outputDts.empty()) {
+				error(errorNode,
+				      Output_file_0_has_not_been_built_from_source_file_1,
+				      {redirect->outputDts,
+				       resolvedModule.resolvedFileName});
+				return nullptr;
+			}
+		}
+
+		if (resolutionDiagnostic != nullptr) {
+			error(errorNode, resolutionDiagnostic,
+			      {moduleReference, resolvedModule.resolvedFileName});
+		} else {
+			bool isExtensionlessRelativePathImport =
+			    tspath::pathIsRelative(moduleReference) &&
+			    !tspath::hasExtension(moduleReference);
+			bool resolutionIsNode16OrNext =
+			    moduleResolutionKind == ModuleResolutionKind::Node16 ||
+			    moduleResolutionKind == ModuleResolutionKind::NodeNext;
+			if (!compilerOptions->GetResolveJsonModule() &&
+			    tspath::fileExtensionIs(moduleReference,
+			                            tspath::extensionJson)) {
+				error(errorNode,
+				      Cannot_find_module_0_Consider_using_resolveJsonModule_to_import_module_with_json_extension,
+				      {moduleReference});
+			} else if (mode == ResolutionModeESM &&
+			           resolutionIsNode16OrNext &&
+			           isExtensionlessRelativePathImport) {
+				std::string absoluteRef =
+				    tspath::getNormalizedAbsolutePath(
+				        moduleReference,
+				        tspath::getDirectoryPath(
+				            importingSourceFile->FileName()));
+				std::string suggestedExt =
+				    getSuggestedImportExtension(absoluteRef);
+				if (!suggestedExt.empty()) {
+					error(errorNode,
+					      Relative_import_paths_need_explicit_file_extensions_in_ECMAScript_imports_when_moduleResolution_is_node16_or_nodenext_Did_you_mean_0,
+					      {moduleReference + suggestedExt});
+				} else {
+					error(errorNode,
+					      Relative_import_paths_need_explicit_file_extensions_in_ECMAScript_imports_when_moduleResolution_is_node16_or_nodenext_Consider_adding_an_extension_to_the_import_path,
+					      std::vector<std::string>{});
+				}
+			} else if (!resolvedModule.alternateResult.empty()) {
+				Diagnostic* errorInfo = createModuleNotFoundChain(
+				    resolvedModule, errorNode, moduleReference, mode,
+				    moduleReference);
+				addDiagnostic(NewDiagnosticChainForNode(
+				    errorInfo, errorNode, moduleNotFoundError,
+				    {moduleReference}));
+			} else {
+				error(errorNode, moduleNotFoundError,
+				      {moduleReference});
+			}
+		}
+	}
+
+	return nullptr;
+}
+
+// Resolves the module reference to a pattern ambient module, if one exists.
+// If a resolved symbol from regular module resolution exists and we have an
+// empty import attributes type, we prefer the resolved symbol.
+Symbol* Checker::tryResolvePatternAmbientModule(
+    Symbol* resolvedSymbol, const std::string& moduleReference,
+    Type* importAttributesType) {
+	if (isEmptyObjectType(importAttributesType) && resolvedSymbol != nullptr) {
+		return resolvedSymbol;
+	}
+	if (!patternAmbientModules.empty()) {
+		std::vector<PatternAmbientModule*> candidates;
+		for (auto& v : patternAmbientModules) {
+			Type* moduleAttributesType =
+			    getTypeOfModuleImportAttributes(v.symbol);
+			if (tryParsePattern(v.pattern).matches(moduleReference) &&
+			    isTypeAssignableTo(importAttributesType,
+			                       moduleAttributesType)) {
+				candidates.push_back(&v);
+			}
+		}
+		if (!candidates.empty()) {
+			Symbol* augmentation = nullptr;
+			if (auto it = patternAmbientModuleAugmentations.find(
+			        moduleReference);
+			    it != patternAmbientModuleAugmentations.end()) {
+				augmentation = it->second;
+			}
+			Symbol* augmentationTarget = nullptr;
+			if (auto it = patternAmbientModuleAugmentationTargets.find(
+			        moduleReference);
+			    it != patternAmbientModuleAugmentationTargets.end()) {
+				augmentationTarget = it->second;
+			}
+
+			if (candidates.size() == 1) {
+				Symbol* mergedCandidate =
+				    getMergedSymbol(candidates[0]->symbol);
+				if (augmentation != nullptr &&
+				    augmentationTarget == mergedCandidate) {
+					return getMergedSymbol(augmentation);
+				}
+				return mergedCandidate;
+			}
+
+			std::vector<PatternAmbientModule*> bestTypeCandidates;
+			for (size_t i = 0; i < candidates.size(); i++) {
+				PatternAmbientModule* candidate = candidates[i];
+				Type* candidateType = getTypeOfModuleImportAttributes(
+				    candidate->symbol);
+				bool dominated = false;
+				for (size_t j = 0; j < candidates.size(); j++) {
+					Type* otherType = getTypeOfModuleImportAttributes(
+					    candidates[j]->symbol);
+					if (i != j &&
+					    isTypeStrictSubtypeOf(otherType,
+					                          candidateType) &&
+					    !isTypeIdenticalTo(otherType, candidateType)) {
+						dominated = true;
+						break;
+					}
+				}
+				if (!dominated) {
+					bestTypeCandidates.push_back(candidate);
+				}
+			}
+			if (bestTypeCandidates.size() == 1) {
+				Symbol* mergedCandidate =
+				    getMergedSymbol(bestTypeCandidates[0]->symbol);
+				if (augmentation != nullptr &&
+				    augmentationTarget == mergedCandidate) {
+					return getMergedSymbol(augmentation);
+				}
+				return mergedCandidate;
+			}
+			PatternAmbientModule* pattern = *findBestPatternMatch(
+			    bestTypeCandidates,
+			    +[](PatternAmbientModule* const& v) -> Pattern {
+				    return tryParsePattern(v->pattern);
+			    },
+			    moduleReference);
+			Symbol* mergedCandidate = getMergedSymbol(pattern->symbol);
+			if (augmentation != nullptr &&
+			    augmentationTarget == mergedCandidate) {
+				return getMergedSymbol(augmentation);
+			}
+			return mergedCandidate;
+		}
+	}
+	return resolvedSymbol;
+}
+
+Symbol* Checker::tryFindAmbientModule(const std::string& moduleReference,
+                                      bool withAugmentations) {
+	if (tspath::isExternalModuleNameRelative(moduleReference)) {
+		return nullptr;
+	}
+	Symbol* symbol = getSymbol(globals, "\"" + moduleReference + "\"",
+	                           SymbolFlagsValueModule);
+	// merged symbol is module declaration symbol combined with all
+	// augmentations
+	if (withAugmentations) {
+		return getMergedSymbol(symbol);
+	}
+	return symbol;
+}
+
+bool Checker::isCommonJSRequire(Node* node) {
+	if (!isRequireCall(node, true /*requireStringLiteralLikeArgument*/)) {
+		return false;
+	}
+	if (!isIdentifier(node->expression())) {
+		tscUnreachable("Expected identifier for require call");
+	}
+	// Make sure require is not a local function
+	Symbol* resolvedRequire =
+	    resolveName(node->expression(), node->expression()->text(),
+	                SymbolFlagsValue, nullptr /*nameNotFoundMessage*/,
+	                true /*isUse*/, false /*excludeGlobals*/);
+	if (resolvedRequire == requireSymbol) {
+		return true;
+	}
+	// project includes symbol named 'require' - make sure that it is
+	// ambient and local non-alias
+	if (resolvedRequire == nullptr ||
+	    resolvedRequire->flags & SymbolFlagsAlias) {
+		return false;
+	}
+
+	Kind targetDeclarationKind = Kind::Unknown;
+	if (resolvedRequire->flags & SymbolFlagsFunction) {
+		targetDeclarationKind = Kind::FunctionDeclaration;
+	} else if (resolvedRequire->flags & SymbolFlagsVariable) {
+		targetDeclarationKind = Kind::VariableDeclaration;
+	}
+	if (targetDeclarationKind != Kind::Unknown) {
+		Node* decl =
+		    getDeclarationOfKind(resolvedRequire, targetDeclarationKind);
+		// function/variable declaration should be ambient
+		return decl != nullptr && decl->flags & NodeFlagsAmbient;
+	}
+	return false;
+}
+
+void Checker::errorOnImplicitAnyModule(bool isError, Node* errorNode,
+                                       ResolutionMode mode,
+                                       const ResolvedModule& resolvedModule,
+                                       const std::string& moduleReference) {
+	if (isSideEffectImport(errorNode)) {
+		return;
+	}
+	Diagnostic* errorInfo = nullptr;
+	if (!tspath::isExternalModuleNameRelative(moduleReference) &&
+	    !resolvedModule.packageId.name.empty()) {
+		errorInfo = createModuleNotFoundChain(
+		    resolvedModule, errorNode, moduleReference, mode,
+		    resolvedModule.packageId.name);
+	}
+	addErrorOrSuggestion(
+	    isError,
+	    NewDiagnosticChainForNode(
+	        errorInfo, errorNode,
+	        Could_not_find_a_declaration_file_for_module_0_1_implicitly_has_an_any_type,
+	        {moduleReference, resolvedModule.resolvedFileName}));
+}
+
+Diagnostic* Checker::createModuleNotFoundChain(
+    const ResolvedModule& resolvedModule, Node* errorNode,
+    const std::string& moduleReference, ResolutionMode mode,
+    const std::string& packageName) {
+	TSC_UNREACHABLE(
+	    "createModuleNotFoundChain — ported with the module-resolution "
+	    "chains (stage 4)");
+}
+
+Diagnostic* Checker::createModeMismatchDetails(SourceFile* sourceFile,
+                                               Node* errorNode) {
+	TSC_UNREACHABLE(
+	    "createModeMismatchDetails — ported with the module-resolution "
+	    "chains (stage 4)");
+}
+
+std::string Checker::getSuggestedImportSource(
+    const std::string& moduleReference, std::string_view tsExtension,
+    ResolutionMode mode) {
+	std::string importSourceWithoutExtension{ tspath::removeExtension(
+	    moduleReference, tsExtension) };
+
+	// Direct users to import source with .js extension if outputting an ES
+	// module. https://github.com/microsoft/TypeScript/issues/42151
+	if ((moduleKind == ModuleKind::ES2015 ||
+	     moduleKind == ModuleKind::ES2020 ||
+	     moduleKind == ModuleKind::ES2022 ||
+	     moduleKind == ModuleKind::ESNext ||
+	     moduleKind == ModuleKind::Node20 ||
+	     moduleKind == ModuleKind::NodeNext ||
+	     moduleKind == ModuleKind::Preserve) ||
+	    mode == ModuleKind::ESNext) {
+		bool preferTs =
+		    tspath::isDeclarationFileName(moduleReference) &&
+		    compilerOptions->GetAllowImportingTsExtensions();
+		const char* ext;
+		if (tsExtension == tspath::extensionMts ||
+		    tsExtension == tspath::extensionDmts) {
+			ext = preferTs ? ".mts" : ".mjs";
+		} else if (tsExtension == tspath::extensionCts ||
+		           tsExtension == tspath::extensionDcts) {
+			ext = preferTs ? ".cts" : ".cjs";
+		} else {
+			ext = preferTs ? ".ts" : ".js";
+		}
+		return importSourceWithoutExtension + ext;
+	}
+
+	return importSourceWithoutExtension;
+}
+
+std::string Checker::getSuggestedImportExtension(
+    const std::string& extensionlessImportPath) {
+	if (program->FileExists(extensionlessImportPath + ".mts")) {
+		return ".mjs";
+	}
+	if (program->FileExists(extensionlessImportPath + ".ts")) {
+		return ".js";
+	}
+	if (program->FileExists(extensionlessImportPath + ".cts")) {
+		return ".cjs";
+	}
+	if (program->FileExists(extensionlessImportPath + ".mjs")) {
+		return ".mjs";
+	}
+	if (program->FileExists(extensionlessImportPath + ".js")) {
+		return ".js";
+	}
+	if (program->FileExists(extensionlessImportPath + ".cjs")) {
+		return ".cjs";
+	}
+	if (program->FileExists(extensionlessImportPath + ".tsx")) {
+		return compilerOptions->Jsx == JsxEmit::Preserve ? ".jsx" : ".js";
+	}
+	if (program->FileExists(extensionlessImportPath + ".jsx")) {
+		return ".jsx";
+	}
+	if (program->FileExists(extensionlessImportPath + ".json")) {
+		return ".json";
+	}
+	return "";
+}
+
+// ---------------------------------------------------------------------------
+// Entity-name resolution — checker.go:16091+
+// ---------------------------------------------------------------------------
+
+Symbol* Checker::resolveEntityName(Node* name, SymbolFlags meaning,
+                                   bool ignoreErrors, bool dontResolveAlias,
+                                   Node* location) {
+	if (nodeIsMissing(name)) {
+		return nullptr;
+	}
+	Symbol* symbol = nullptr;
+	switch (name->kind) {
+	case Kind::Identifier: {
+		const DiagnosticMessage* message = nullptr;
+		if (!ignoreErrors) {
+			if (meaning == SymbolFlagsNamespace ||
+			    nodeIsSynthesized(name)) {
+				message = Cannot_find_namespace_0;
+			} else {
+				message =
+				    getCannotFindNameDiagnosticForName(
+				        getFirstIdentifier(name));
+			}
+		}
+		Node* resolveLocation = location != nullptr ? location : name;
+		if (meaning == SymbolFlagsNamespace) {
+			symbol = getMergedSymbol(resolveName(
+			    resolveLocation, name->text(), meaning, nullptr,
+			    true /*isUse*/, false /*excludeGlobals*/));
+			if (symbol == nullptr) {
+				Symbol* alias = getMergedSymbol(resolveName(
+				    resolveLocation, name->text(),
+				    SymbolFlagsAlias, nullptr, true /*isUse*/,
+				    false /*excludeGlobals*/));
+				if (alias != nullptr &&
+				    alias->name == InternalSymbolNameExportEquals) {
+					// resolve typedefs exported from commonjs,
+					// stored on the module symbol
+					symbol = alias->parent;
+				}
+			}
+			if (symbol == nullptr && message != nullptr) {
+				resolveName(resolveLocation, name->text(), meaning,
+				            message, true /*isUse*/,
+				            false /*excludeGlobals*/);
+			}
+		} else {
+			symbol = getMergedSymbol(resolveName(
+			    resolveLocation, name->text(), meaning, message,
+			    true /*isUse*/, false /*excludeGlobals*/));
+		}
+		break;
+	}
+	case Kind::QualifiedName: {
+		QualifiedName* qualified = name->as<QualifiedName>();
+		symbol = resolveQualifiedName(name, qualified->Left,
+		                              qualified->Right, meaning,
+		                              ignoreErrors, location);
+		break;
+	}
+	case Kind::PropertyAccessExpression: {
+		PropertyAccessExpression* access =
+		    name->as<PropertyAccessExpression>();
+		symbol = resolveQualifiedName(name, access->Expression,
+		                              access->name, meaning, ignoreErrors,
+		                              location);
+		break;
+	}
+	default:
+		tscUnreachable("Unknown entity name kind");
+	}
+	if (symbol != nullptr && symbol != unknownSymbol) {
+		if (!nodeIsSynthesized(name) && isEntityName(name) &&
+		    (symbol->flags & SymbolFlagsAlias ||
+		     (name->parent != nullptr &&
+		      name->parent->kind == Kind::ExportAssignment))) {
+			markSymbolOfAliasDeclarationIfTypeOnly(
+			    getAliasDeclarationFromName(name), nullptr);
+		}
+		// We know a symbol with the given meaning exists along the alias
+		// chain, so resolve until we find it.
+		while (!(symbol->flags & meaning) && !dontResolveAlias &&
+		       symbol->flags & SymbolFlagsAlias) {
+			symbol = resolveAlias(symbol);
+		}
+	}
+	return symbol;
+}
+
+Symbol* Checker::resolveQualifiedName(Node* name, Node* left, Node* right,
+                                      SymbolFlags meaning, bool ignoreErrors,
+                                      Node* location) {
+	Symbol* namespace_ =
+	    resolveEntityName(left, SymbolFlagsNamespace, ignoreErrors,
+	                      false /*dontResolveAlias*/, location);
+	if (namespace_ == nullptr || nodeIsMissing(right)) {
+		return nullptr;
+	}
+	if (namespace_ == unknownSymbol) {
+		return namespace_;
+	}
+	if (namespace_->valueDeclaration != nullptr &&
+	    isInJSFile(namespace_->valueDeclaration) &&
+	    compilerOptions->GetModuleResolutionKind() !=
+	        ModuleResolutionKind::Bundler &&
+	    isVariableDeclaration(namespace_->valueDeclaration) &&
+	    namespace_->valueDeclaration->initializer() != nullptr &&
+	    isCommonJSRequire(
+	        namespace_->valueDeclaration->initializer())) {
+		Node* moduleName =
+		    namespace_->valueDeclaration->initializer()->arguments()[0];
+		Symbol* moduleSym = resolveExternalModuleName(
+		    moduleName, moduleName, false /*ignoreErrors*/, nullptr);
+		if (moduleSym != nullptr) {
+			Symbol* resolvedModuleSymbol = resolveExternalModuleSymbol(
+			    moduleSym, false /*dontResolveAlias*/);
+			if (resolvedModuleSymbol != nullptr) {
+				namespace_ = resolvedModuleSymbol;
+			}
+		}
+	}
+	std::string text{right->text()};
+	SymbolTable exportsOfNamespace = getExportsOfSymbol(namespace_);
+	Symbol* symbol = getMergedSymbol(
+	    getSymbol(exportsOfNamespace, text, meaning));
+	if (symbol == nullptr && namespace_->flags & SymbolFlagsAlias) {
+		// `namespace` can be resolved further if there was a symbol merge
+		// with a re-export
+		SymbolTable exportsOfAlias =
+		    getExportsOfSymbol(resolveAlias(namespace_));
+		symbol =
+		    getMergedSymbol(getSymbol(exportsOfAlias, text, meaning));
+	}
+	if (symbol == nullptr) {
+		if (!ignoreErrors) {
+			std::string namespaceName =
+			    getFullyQualifiedName(namespace_,
+			                          nullptr /*containingLocation*/);
+			std::string declarationName =
+			    declarationNameToString(right);
+			Symbol* suggestionForNonexistentModule =
+			    getSuggestedSymbolForNonexistentModule(right, namespace_);
+			if (suggestionForNonexistentModule != nullptr) {
+				error(right,
+				      X_0_has_no_exported_member_named_1_Did_you_mean_2,
+				      {namespaceName, declarationName,
+				       symbolToString(suggestionForNonexistentModule)});
+				return nullptr;
+			}
+			Node* containingQualifiedName = nullptr;
+			if (isQualifiedName(name)) {
+				containingQualifiedName =
+				    getContainingQualifiedNameNode(name);
+			}
+			bool canSuggestTypeof =
+			    globalObjectType != nullptr &&
+			    meaning & SymbolFlagsType &&
+			    containingQualifiedName != nullptr &&
+			    !isTypeOfExpression(containingQualifiedName->parent) &&
+			    tryGetQualifiedNameAsValue(containingQualifiedName) !=
+			        nullptr;
+			if (canSuggestTypeof) {
+				error(containingQualifiedName,
+				      X_0_refers_to_a_value_but_is_being_used_as_a_type_here_Did_you_mean_typeof_0,
+				      {entityNameToString(
+				          containingQualifiedName)});
+				return nullptr;
+			}
+			if (meaning & SymbolFlagsNamespace) {
+				if (isQualifiedName(name->parent)) {
+					SymbolTable nsExports =
+					    getExportsOfSymbol(namespace_);
+					Symbol* exportedTypeSymbol = getMergedSymbol(
+					    getSymbol(nsExports, text,
+					              SymbolFlagsType));
+					if (exportedTypeSymbol != nullptr) {
+						QualifiedName* qualified =
+						    name->parent->as<QualifiedName>();
+						error(qualified->Right,
+						      Cannot_access_0_1_because_0_is_a_type_but_not_a_namespace_Did_you_mean_to_retrieve_the_type_of_the_property_1_in_0_with_0_1,
+						      {symbolToString(exportedTypeSymbol),
+						       std::string(
+						           qualified->Right->text())});
+						return nullptr;
+					}
+				}
+			}
+			error(right, Namespace_0_has_no_exported_member_1,
+			      {namespaceName, declarationName});
+		}
+	}
+	return symbol;
+}
+
+Symbol* Checker::tryGetQualifiedNameAsValue(Node* node) {
+	Node* id = getFirstIdentifier(node);
+	Symbol* symbol =
+	    resolveName(id, id->text(), SymbolFlagsValue,
+	                nullptr /*nameNotFoundMessage*/, true /*isUse*/,
+	                false /*excludeGlobals*/);
+	if (symbol == nullptr) {
+		return nullptr;
+	}
+	Node* n = id;
+	while (isQualifiedName(n->parent)) {
+		Type* t = getTypeOfSymbol(symbol);
+		symbol = getPropertyOfType(
+		    t, std::string(n->parent->as<QualifiedName>()->Right->text()));
+		if (symbol == nullptr) {
+			return nullptr;
+		}
+		n = n->parent;
+	}
+	return symbol;
+}
+
+Symbol* Checker::getSuggestedSymbolForNonexistentModule(
+    Node* name, Symbol* targetModule) {
+	std::vector<Symbol*> values;
+	SymbolTable exports = getExportsOfModule(targetModule);
+	for (auto& [k, v] : exports) {
+		values.push_back(v);
+	}
+	return getSpellingSuggestionForName(std::string(name->text()), values,
+	                                  SymbolFlagsModuleMember);
+}
+
+bool Checker::markSymbolOfAliasDeclarationIfTypeOnly(
+    Node* aliasDeclaration, Node* exportStarDeclaration) {
+	if (aliasDeclaration == nullptr ||
+	    !isDeclarationNode(aliasDeclaration)) {
+		return false;
+	}
+	// If the declaration itself is type-only, mark it and return. No need
+	// to check what it resolves to.
+	Symbol* sourceSymbol = getSymbolOfDeclaration(aliasDeclaration);
+	AliasSymbolLinks* links = aliasSymbolLinks.Get(sourceSymbol);
+	if (links->typeOnlyDeclaration == nullptr &&
+	    isTypeOnlyImportOrExportDeclaration(aliasDeclaration)) {
+		links->typeOnlyDeclaration = aliasDeclaration;
+		return true;
+	}
+	if (links->typeOnlyDeclaration == nullptr &&
+	    exportStarDeclaration != nullptr) {
+		links->typeOnlyDeclaration = exportStarDeclaration;
+		return true;
+	}
+	return links->typeOnlyDeclaration != nullptr;
+}
+
+const DiagnosticMessage* Checker::getCannotFindNameDiagnosticForName(
+    Node* node) {
+	std::string_view text = node->text();
+	if (text == "document" || text == "console") {
+		return Cannot_find_name_0_Do_you_need_to_change_your_target_library_Try_changing_the_lib_compiler_option_to_include_dom;
+	}
+	if (text == "$") {
+		return compilerOptions->UsesWildcardTypes()
+		           ? Cannot_find_name_0_Do_you_need_to_install_type_definitions_for_jQuery_Try_npm_i_save_dev_types_Slashjquery
+		           : Cannot_find_name_0_Do_you_need_to_install_type_definitions_for_jQuery_Try_npm_i_save_dev_types_Slashjquery_and_then_add_jquery_to_the_types_field_in_your_tsconfig;
+	}
+	if (text == "beforeEach" || text == "describe" || text == "suite" ||
+	    text == "it" || text == "test") {
+		return compilerOptions->UsesWildcardTypes()
+		           ? Cannot_find_name_0_Do_you_need_to_install_type_definitions_for_a_test_runner_Try_npm_i_save_dev_types_Slashjest_or_npm_i_save_dev_types_Slashmocha
+		           : Cannot_find_name_0_Do_you_need_to_install_type_definitions_for_a_test_runner_Try_npm_i_save_dev_types_Slashjest_or_npm_i_save_dev_types_Slashmocha_and_then_add_jest_or_mocha_to_the_types_field_in_your_tsconfig;
+	}
+	if (text == "process" || text == "require" || text == "Buffer" ||
+	    text == "module" || text == "NodeJS") {
+		return compilerOptions->UsesWildcardTypes()
+		           ? Cannot_find_name_0_Do_you_need_to_install_type_definitions_for_node_Try_npm_i_save_dev_types_Slashnode
+		           : Cannot_find_name_0_Do_you_need_to_install_type_definitions_for_node_Try_npm_i_save_dev_types_Slashnode_and_then_add_node_to_the_types_field_in_your_tsconfig;
+	}
+	if (text == "Bun") {
+		return compilerOptions->UsesWildcardTypes()
+		           ? Cannot_find_name_0_Do_you_need_to_install_type_definitions_for_Bun_Try_npm_i_save_dev_types_Slashbun
+		           : Cannot_find_name_0_Do_you_need_to_install_type_definitions_for_Bun_Try_npm_i_save_dev_types_Slashbun_and_then_add_bun_to_the_types_field_in_your_tsconfig;
+	}
+	if (text == "Map" || text == "Set" || text == "Promise" ||
+	    text == "Symbol" || text == "WeakMap" || text == "WeakSet" ||
+	    text == "Iterator" || text == "AsyncIterator" ||
+	    text == "SharedArrayBuffer" || text == "Atomics" ||
+	    text == "AsyncIterable" || text == "AsyncIterableIterator" ||
+	    text == "AsyncGenerator" || text == "AsyncGeneratorFunction" ||
+	    text == "BigInt" || text == "Reflect" || text == "BigInt64Array" ||
+	    text == "BigUint64Array") {
+		return Cannot_find_name_0_Do_you_need_to_change_your_target_library_Try_changing_the_lib_compiler_option_to_1_or_later;
+	}
+	if (text == "await" && isCallExpression(node->parent)) {
+		return Cannot_find_name_0_Did_you_mean_to_write_this_in_an_async_function;
+	}
+	if (node->parent->kind == Kind::ShorthandPropertyAssignment) {
+		return No_value_exists_in_scope_for_the_shorthand_property_0_Either_declare_one_or_provide_an_initializer;
+	}
+	return Cannot_find_name_0;
+}
+
+std::string Checker::getFullyQualifiedName(Symbol* symbol,
+                                           Node* containingLocation) {
+	if (symbol->parent != nullptr) {
+		return getFullyQualifiedName(symbol->parent, containingLocation) +
+		       "." + symbolToString(symbol);
+	}
+	return symbolToStringEx(symbol, containingLocation, SymbolFlagsAll,
+	                        SymbolFormatFlagsDoNotIncludeSymbolChain |
+	                            SymbolFormatFlagsAllowAnyNodeKind);
+}
 }  // namespace checker
 }  // namespace tsc

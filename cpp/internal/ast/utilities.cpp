@@ -1953,3 +1953,158 @@ bool isModuleWithStringLiteralName(Node* node) {
 }
 
 } // namespace tsc
+
+namespace tsc {
+
+// utilities.go: GetFirstIdentifier
+Node* getFirstIdentifier(Node* node) {
+	switch (node->kind) {
+	case Kind::Identifier:
+		return node;
+	case Kind::QualifiedName:
+		return getFirstIdentifier(node->as<QualifiedName>()->Left);
+	case Kind::PropertyAccessExpression:
+		return getFirstIdentifier(
+		    node->as<PropertyAccessExpression>()->Expression);
+	default:
+		tscUnreachable("Unhandled case in GetFirstIdentifier");
+	}
+}
+
+// utilities.go: IsExternalModuleAugmentation
+bool isExternalModuleAugmentation(Node* node) {
+	return isAmbientModule(node) && isModuleAugmentationExternal(node);
+}
+
+// utilities.go: IsEmittableImport
+bool isEmittableImport(Node* node) {
+	switch (node->kind) {
+	case Kind::ImportDeclaration:
+		return node->importClause() != nullptr &&
+		       !node->importClause()->isTypeOnly();
+	case Kind::ExportDeclaration:
+	case Kind::ImportEqualsDeclaration:
+		return !node->isTypeOnly();
+	case Kind::CallExpression:
+		return isImportCall(node);
+	default:
+		return false;
+	}
+}
+
+// utilities.go: GetModuleSpecifierOfBareOrAccessedRequire
+Node* getModuleSpecifierOfBareOrAccessedRequire(Node* node) {
+	if (isVariableDeclarationInitializedWithRequireHelper(node, false)) {
+		return node->initializer()->arguments()[0];
+	}
+	if (isVariableDeclarationInitializedWithRequireHelper(node, true)) {
+		Node* leftmost = getLeftmostAccessExpression(node->initializer());
+		if (isRequireCall(leftmost, true)) {
+			return leftmost->arguments()[0];
+		}
+	}
+	return nullptr;
+}
+
+// ast.go: ImportAttributesNode.GetResolutionModeOverride
+std::pair<ResolutionMode, bool> getResolutionModeOverride(
+    Node* attributes,
+    const std::function<bool(Node*, const DiagnosticMessage*)>& grammarErrorOnNode) {
+	if (attributes == nullptr) {
+		return {ResolutionModeNone, false};
+	}
+	Node* attribute = nullptr;
+	for (Node* attr : attributes->as<ImportAttributes>()->Attributes->nodes) {
+		if (attr->name()->text() == "resolution-mode") {
+			attribute = attr;
+			break;
+		}
+	}
+	if (attribute == nullptr) {
+		return {ResolutionModeNone, false};
+	}
+	ImportAttribute* elem = attribute->as<ImportAttribute>();
+	if (!isStringLiteralLike(elem->Value)) {
+		return {ResolutionModeNone, false};
+	}
+	if (elem->Value->text() != "import" && elem->Value->text() != "require") {
+		if (grammarErrorOnNode) {
+			grammarErrorOnNode(
+			    elem->Value,
+			    X_resolution_mode_should_be_either_require_or_import);
+		}
+		return {ResolutionModeNone, false};
+	}
+	if (elem->Value->text() == "import") {
+		return {ResolutionModeESM, true};
+	}
+	return {ModuleKind::CommonJS, true};
+}
+
+// utilities.go: HasResolutionModeOverride
+bool hasResolutionModeOverride(Node* node) {
+	if (node == nullptr) {
+		return false;
+	}
+	Node* attributes = nullptr;
+	switch (node->kind) {
+	case Kind::ImportType:
+		attributes = node->as<ImportTypeNode>()->Attributes;
+		break;
+	case Kind::ImportDeclaration:
+	case Kind::JSImportDeclaration:
+		attributes = node->as<ImportDeclaration>()->Attributes;
+		break;
+	case Kind::ExportDeclaration:
+		attributes = node->as<ExportDeclaration>()->Attributes;
+		break;
+	}
+	if (attributes != nullptr) {
+		return getResolutionModeOverride(attributes, nullptr).second;
+	}
+	return false;
+}
+
+// utilities.go: IsResolutionModeOverrideHost
+bool isResolutionModeOverrideHost(Node* node) {
+	if (node == nullptr) {
+		return false;
+	}
+	switch (node->kind) {
+	case Kind::ImportType:
+	case Kind::ExportDeclaration:
+	case Kind::ImportDeclaration:
+	case Kind::JSImportDeclaration:
+		return true;
+	default:
+		return false;
+	}
+}
+
+// utilities.go: HasImportAttributes
+bool hasImportAttributes(Node* node) {
+	switch (node->kind) {
+	case Kind::ImportDeclaration:
+	case Kind::JSImportDeclaration:
+	case Kind::ExportDeclaration:
+	case Kind::ImportType:
+		return true;
+	default:
+		return false;
+	}
+}
+
+// utilities.go: IsPartOfTypeOnlyImportOrExportDeclaration
+bool isPartOfTypeOnlyImportOrExportDeclaration(Node* node) {
+	return findAncestor(node, [](Node* n) {
+		       return isTypeOnlyImportOrExportDeclaration(n);
+	       }) != nullptr;
+}
+
+// utilities.go: IsVariableDeclarationInitializedToBareOrAccessedRequire
+bool isVariableDeclarationInitializedToBareOrAccessedRequire(Node* node) {
+	return isVariableDeclarationInitializedWithRequireHelper(
+	    node, true /*allowAccessedRequire*/);
+}
+
+} // namespace tsc

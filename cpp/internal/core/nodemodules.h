@@ -25,4 +25,35 @@ inline const std::unordered_set<std::string> ExclusivelyPrefixedNodeCoreModules 
 	"node:test/reporters",
 };
 
+// NodeCoreModules() — unprefixed names plus their "node:" forms plus the
+// exclusively-prefixed set.
+inline const std::unordered_set<std::string>& nodeCoreModules() {
+	static const std::unordered_set<std::string> modules = [] {
+		std::unordered_set<std::string> m;
+		m.reserve(UnprefixedNodeCoreModules.size() * 2 +
+		          ExclusivelyPrefixedNodeCoreModules.size());
+		for (const auto& unprefixed : UnprefixedNodeCoreModules) {
+			m.insert(unprefixed);
+			m.insert("node:" + unprefixed);
+		}
+		for (const auto& p : ExclusivelyPrefixedNodeCoreModules) {
+			m.insert(p);
+		}
+		return m;
+	}();
+	return modules;
+}
+
+inline bool nodeCoreModulesContains(std::string_view name) {
+	return nodeCoreModules().count(std::string(name)) != 0;
+}
+
+inline std::string_view nonRelativeModuleNameForTypingCache(
+    std::string_view moduleName) {
+	if (nodeCoreModulesContains(moduleName)) {
+		return "node";
+	}
+	return moduleName;
+}
+
 }  // namespace tsc

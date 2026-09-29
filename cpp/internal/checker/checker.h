@@ -746,6 +746,37 @@ struct EmitResolver;
 
 struct Relater;
 
+// module/resolver — port of module.ResolvedModule/PackageId as seen by the
+// checker. The program returns these from GetResolvedModule; with no file
+// system the fields after `resolved` are unset.
+struct PackageId {
+	std::string name{};
+};
+
+struct ResolvedModule {
+	bool resolved{};
+	std::string resolvedFileName{};
+	bool resolvedUsingTsExtension{};
+	bool isExternalLibraryImport{};
+	std::string extension{};
+	std::string alternateResult{};
+	PackageId packageId{};
+	bool resolvedUsingExtraExtensions{};
+};
+
+// Project-reference plumbing (program/projection redirects). Defaults return
+// "no redirect" so a resolver-less program needs no override.
+class RedirectInfo {
+public:
+	virtual ~RedirectInfo() = default;
+	virtual std::string CommonSourceDirectory() = 0;
+	virtual const CompilerOptions* CompilerOptions() = 0;
+};
+
+struct ProjectReferenceRedirect {
+	std::string outputDts{};
+};
+
 // Program interface — port of checker's Program/Host. Only the members the
 // checker actually calls are declared; a SimpleProgram implements them.
 class Program {
@@ -763,6 +794,24 @@ public:
 	virtual ModuleKind GetImpliedNodeFormatForEmit(SourceFile* sourceFile) = 0;
 	virtual bool SourceFileMayBeEmitted(SourceFile* sourceFile, bool forceDtsEmit) = 0;
 	virtual std::string CommonSourceDirectory() = 0;
+	// Module resolution (checker.go resolveExternalModule). A program without
+	// a module resolver returns nullopt / ResolutionModeNone.
+	virtual std::optional<ResolvedModule> GetResolvedModule(
+	    SourceFile* file, const std::string& moduleReference,
+	    ResolutionMode mode) = 0;
+	virtual ResolutionMode GetModeForUsageLocation(SourceFile* file,
+	                                               Node* location) = 0;
+	virtual ResolutionMode GetDefaultResolutionModeForFile(
+	    SourceFile* file) = 0;
+	virtual std::string GetCurrentDirectory() = 0;
+	virtual bool UseCaseSensitiveFileNames() = 0;
+	virtual RedirectInfo* GetRedirectForResolution(SourceFile* sourceFile) {
+		return nullptr;
+	}
+	virtual const ProjectReferenceRedirect* GetProjectReferenceFromSource(
+	    const std::string& /*path*/) {
+		return nullptr;
+	}
 };
 
 // nodeLinkStore / symbolArenaLinkStore (links.go)
@@ -1579,6 +1628,45 @@ public:
 	Type* checkExpressionCached(Node* node);
 	Symbol* resolveExternalModuleName(Node* location, Node* moduleReference,
 									  bool ignoreErrors, Type* importAttributesType);
+	const DiagnosticMessage* getCannotResolveModuleNameErrorForSpecificModule(
+	    Node* moduleName);
+	Symbol* resolveExternalModule(Node* location,
+	                              const std::string& moduleReference,
+	                              const DiagnosticMessage* moduleNotFoundError,
+	                              Node* errorNode, bool isForAugmentation,
+	                              Type* importAttributesType);
+	SourceFile* getExternalModuleFileFromDeclaration(Node* declaration);
+	Symbol* tryResolvePatternAmbientModule(Symbol* resolvedSymbol,
+	                                       const std::string& moduleReference,
+	                                       Type* importAttributesType);
+	Symbol* tryFindAmbientModule(const std::string& moduleReference,
+	                             bool withAugmentations);
+	bool isCommonJSRequire(Node* node);
+	void errorOnImplicitAnyModule(bool isError, Node* errorNode,
+	                              ResolutionMode mode,
+	                              const ResolvedModule& resolvedModule,
+	                              const std::string& moduleReference);
+	Diagnostic* createModuleNotFoundChain(const ResolvedModule& resolvedModule,
+	                                      Node* errorNode,
+	                                      const std::string& moduleReference,
+	                                      ResolutionMode mode,
+	                                      const std::string& packageName);
+	Diagnostic* createModeMismatchDetails(SourceFile* sourceFile,
+	                                      Node* errorNode);
+	std::string getSuggestedImportSource(const std::string& moduleReference,
+	                                     std::string_view tsExtension,
+	                                     ResolutionMode mode);
+	std::string getSuggestedImportExtension(const std::string& fileName);
+	Symbol* resolveQualifiedName(Node* name, Node* left, Node* right,
+	                             SymbolFlags meaning, bool ignoreErrors,
+	                             Node* location);
+	Symbol* tryGetQualifiedNameAsValue(Node* name);
+	Symbol* getSuggestedSymbolForNonexistentModule(Node* name,
+	                                             Symbol* targetModule);
+	bool markSymbolOfAliasDeclarationIfTypeOnly(Node* aliasDeclaration,
+	                                            Node* exportStarDeclaration);
+	const DiagnosticMessage* getCannotFindNameDiagnosticForName(Node* node);
+	std::string getFullyQualifiedName(Symbol* symbol, Node* containingLocation);
 	Type* getTypeFromImportAttributes(Node* node);
 	Symbol* resolveExternalModuleSymbol(Symbol* moduleSymbol, bool dontResolveAlias);
 	Symbol* resolveAlias(Symbol* symbol);

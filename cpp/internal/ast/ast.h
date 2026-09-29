@@ -563,6 +563,15 @@ bool isLiteralImportTypeNode(Node* node);
 bool isRequireCall(Node* node, bool requireStringLiteralLikeArgument);
 bool isImportCall(Node* node);
 bool isImportMeta(Node* node);
+Node* getFirstIdentifier(Node* node);
+bool isExternalModuleAugmentation(Node* node);
+bool isEmittableImport(Node* node);
+Node* getModuleSpecifierOfBareOrAccessedRequire(Node* node);
+std::pair<ResolutionMode, bool> getResolutionModeOverride(
+    Node* attributes,
+    const std::function<bool(Node*, const DiagnosticMessage*)>& grammarErrorOnNode);
+bool hasResolutionModeOverride(Node* node);
+bool isResolutionModeOverrideHost(Node* node);
 bool isJsxOpeningLikeElement(Node* node);
 Node* getNodeAtPosition(SourceFile* file, int position, bool includeJSDoc);
 void setImportsOfSourceFile(SourceFile* file, std::vector<Node*> imports);
@@ -1073,8 +1082,11 @@ SymbolTable& getSymbolTable(SymbolTable& data);
 Diagnostic* newDiagnosticChain(Diagnostic* chain, const DiagnosticMessage* message,
 							   const std::vector<std::string>& args = {});
 Node* getImportAttributes(Node* node);
+bool hasImportAttributes(Node* node);
+bool isPartOfTypeOnlyImportOrExportDeclaration(Node* node);
 bool isVariableDeclarationInitializedWithRequireHelper(Node* node,
                                                        bool allowAccessedRequire);
+bool isVariableDeclarationInitializedToBareOrAccessedRequire(Node* node);
 bool isPotentiallyExecutableNode(Node* node);
 bool isCatchClauseVariableDeclarationOrBindingElement(Node* declaration);
 bool isBlockOrCatchScoped(Node* declaration);

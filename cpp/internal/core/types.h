@@ -352,6 +352,15 @@ struct CompilerOptions {
 		}
 		return CheckJs == Tristate::True;
 	}
+	// compileroptions.go: AllowImportingTsExtensionsFrom — the tspath check
+	// lives in the caller so this header doesn't depend on tspath.
+	bool AllowImportingTsExtensionsFrom(bool isDeclarationFile) const {
+		return GetAllowImportingTsExtensions() || isDeclarationFile;
+	}
+	bool DefaultIfUnknown(Tristate value, Tristate defaultValue) const {
+		return tristateIsTrue(value != Tristate::Unknown ? value
+		                                                : defaultValue);
+	}
 	bool GetJSXTransformEnabled() const {
 		return Jsx == JsxEmit::React || Jsx == JsxEmit::ReactJSX || Jsx == JsxEmit::ReactJSXDev;
 	}
