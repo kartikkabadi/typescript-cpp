@@ -166,4 +166,60 @@ inline std::string getSpellingSuggestionForStrings(
 	return std::string(bestCandidate);
 }
 
+// Generic getSpellingSuggestion — port of core.GetSpellingSuggestion
+// (core.go:606). Returns the default T when nothing is close enough.
+template <typename T, typename GetName, typename Compare>
+T getSpellingSuggestion(std::string_view name,
+                        const std::vector<T>& candidates, GetName getName,
+                        Compare compare, int maxCandidates = 0) {
+	std::vector<int32_t> runeName = utf8detail::decodeUtf8(name);
+	int maximumLengthDifference =
+		std::max(2, (int)((double)runeName.size() * 0.34));
+	double bestDistance =
+		std::floor((double)runeName.size() * 0.4) +
+		0.9;  // If the best result is worse than this, don't bother.
+	std::vector<double> previous, current;
+	T bestCandidate{};
+	bool hasBest = false;
+	int checkedCandidates = 0;
+	for (const T& candidate : candidates) {
+		checkedCandidates++;
+		if (maxCandidates > 0 && checkedCandidates > maxCandidates) {
+			return T{};
+		}
+		std::string candidateName = getName(candidate);
+		std::vector<int32_t> runeCandidate =
+			utf8detail::decodeUtf8(candidateName);
+		size_t maxLen = std::max(runeCandidate.size(), runeName.size());
+		size_t minLen = std::min(runeCandidate.size(), runeName.size());
+		if (!candidateName.empty() &&
+		    maxLen - minLen <= (size_t)maximumLengthDifference) {
+			if (candidateName == name) {
+				continue;
+			}
+			// Only consider candidates less than 3 characters long when they
+			// differ by case. Otherwise, don't bother, since a user would
+			// usually notice differences of a 2-character name.
+			if (candidateName.size() < 3 &&
+			    !utf8detail::equalFold(candidateName, name)) {
+				continue;
+			}
+			double distance = levenshteinWithMax(
+				previous, current, runeName, runeCandidate, bestDistance);
+			if (distance < 0) {
+				continue;
+			}
+			if (distance < bestDistance) {
+				bestDistance = distance;
+				bestCandidate = candidate;
+				hasBest = true;
+			} else if (!hasBest || compare(candidate, bestCandidate) < 0) {
+				bestCandidate = candidate;
+				hasBest = true;
+			}
+		}
+	}
+	return bestCandidate;
+}
+
 }  // namespace tsc

@@ -4,6 +4,7 @@
 // file once every type it needs is declared.
 #pragma once
 
+#include <cassert>
 #include <atomic>
 #include <cstdint>
 #include <functional>
@@ -31,6 +32,7 @@ namespace tsc {
 	std::abort();
 }
 #define TSC_UNREACHABLE(msg) ::tsc::tscUnreachable(msg)
+#define TSC_ASSERT(cond, msg) assert((cond) && (msg))
 
 struct Node;
 struct NodeList;
@@ -346,6 +348,7 @@ struct Diagnostic {
 	TextRange loc;
 	int32_t code = 0;
 	DiagnosticCategory category = DiagnosticCategory::Error;
+	std::string source; // external-source prefix (e.g. a content mapper's name); empty = "TS"
 	const DiagnosticMessage* message = nullptr;
 	std::string messageText;
 	const char* messageKey = "";
@@ -363,6 +366,7 @@ struct Diagnostic {
 	TextRange Loc() const { return loc; }
 	int32_t Code() const { return code; }
 	DiagnosticCategory Category() const { return category; }
+	std::string_view Source() const { return source; }
 	std::string_view MessageText() const { return messageText; }
 	std::string_view MessageKey() const { return messageKey; }
 	const std::vector<std::string>& MessageArgs() const { return messageArgs; }
@@ -382,6 +386,10 @@ struct Diagnostic {
 	}
 	Diagnostic* SetRelatedInfo(std::vector<Diagnostic*> info) {
 		relatedInformation = std::move(info);
+		return this;
+	}
+	Diagnostic* AddRelatedInfo(Diagnostic* info) {
+		relatedInformation.push_back(info);
 		return this;
 	}
 };
@@ -1004,6 +1012,43 @@ Node* getThisContainer(Node* node, bool includeArrowFunctions,
 bool isInTopLevelContext(Node* node);
 bool isIdentifierName(Node* node);
 Node* findAncestor(Node* node, const std::function<bool(Node*)>& callback);
+Node* findAncestorKind(Node* node, Kind kind);
+enum class FindAncestorResult : int32_t { False = 0, True, Quit };
+inline FindAncestorResult toFindAncestorResult(bool b) {
+	return b ? FindAncestorResult::True : FindAncestorResult::False;
+}
+Node* findAncestorOrQuit(
+	Node* node, const std::function<FindAncestorResult(Node*)>& callback);
+bool isNodeDescendantOf(Node* node, Node* ancestor);
+bool isFunctionLikeOrClassStaticBlockDeclaration(Node* node);
+FunctionFlags getFunctionFlags(Node* node);
+bool isComputedNonLiteralName(Node* name);
+std::string getTextOfPropertyName(Node* name);
+bool tryGetTextOfPropertyName(Node* name, std::string& out);
+inline bool isExclamationToken(Node* node) {
+	return node != nullptr && node->kind == Kind::ExclamationToken;
+}
+inline bool isThisKeyword(Node* node) {
+	return node != nullptr && node->kind == Kind::ThisKeyword;
+}
+inline bool isTypeQuery(Node* node) { return node->kind == Kind::TypeQuery; }
+inline bool isInfinityOrNaNString(std::string_view name) {
+	return name == "Infinity" || name == "-Infinity" || name == "NaN";
+}
+bool isBlockScope(Node* node, Node* parentNode);
+Node* getEnclosingBlockScopeContainer(Node* node);
+inline bool isAccessor(Node* node) {
+	return node->kind == Kind::GetAccessor || node->kind == Kind::SetAccessor;
+}
+inline bool isEntityName(Node* node) {
+	return node->kind == Kind::Identifier || node->kind == Kind::QualifiedName;
+}
+Node* getHeritageClause(Node* node, Kind kind);
+std::vector<Node*> getHeritageElements(Node* node, Kind kind);
+inline std::vector<Node*> getExtendsHeritageClauseElements(Node* node) {
+	return getHeritageElements(node, Kind::ExtendsKeyword);
+}
+Node* getHeritageClauseElementName(Node* node);
 bool isPrologueDirective(Node* node);
 bool isDottedName(Node* node);
 bool isPushOrUnshiftIdentifier(Node* node);
@@ -1023,6 +1068,11 @@ bool isBooleanLiteral(Node* node);
 Node* getImmediatelyInvokedFunctionExpression(Node* fn);
 bool isExpandoInitializer(Node* declaration, Node* initializer);
 bool isVariableDeclarationInitializedToRequire(Node* node);
+bool isAliasSymbolDeclaration(Node* node);
+SymbolTable& getSymbolTable(SymbolTable& data);
+Diagnostic* newDiagnosticChain(Diagnostic* chain, const DiagnosticMessage* message,
+							   const std::vector<std::string>& args = {});
+Node* getImportAttributes(Node* node);
 bool isVariableDeclarationInitializedWithRequireHelper(Node* node,
                                                        bool allowAccessedRequire);
 bool isPotentiallyExecutableNode(Node* node);
@@ -1041,6 +1091,12 @@ std::pair<std::string, bool> tryGetAmbientModuleNameFromSymbolName(
 	const std::string& s);
 bool isAmbientModuleSymbolName(const std::string& s);
 bool isExternalOrCommonJSModule(SourceFile* file);
+bool isNonLocalAlias(Symbol* symbol, SymbolFlags excludes);
+bool isPlainJSFile(SourceFile* file, Tristate checkJs);
+bool nodeKindIs(Node* node, Kind k1);
+bool nodeKindIs(Node* node, Kind k1, Kind k2);
+bool nodeKindIs(Node* node, Kind k1, Kind k2, Kind k3);
+bool nodeKindIs(Node* node, std::initializer_list<Kind> kinds);
 bool isJsonSourceFile(SourceFile* file);
 bool nodeHasName(Node* statement, Node* id);
 ModuleInstanceState getModuleInstanceState(Node* node);
@@ -1059,5 +1115,56 @@ bool isMethodOrAccessor(Node* node);
 bool isPrivateIdentifierClassElementDeclaration(Node* node);
 Node* getLeftmostAccessExpression(Node* expr);
 bool isLogicalBinaryOperator(Kind token);
+bool isModuleOrEnumDeclaration(Node* node);
+bool isGlobalSourceFile(Node* node);
+bool isConstTypeReference(Node* node);
+bool isConstAssertion(Node* node);
+Node* getDeclarationOfKind(Symbol* symbol, Kind kind);
+Node* findConstructorDeclaration(Node* node);
+
+// utilities.go — ported with the checker bootstrap slice.
+bool isTypeDeclaration(Node* node);
+bool isTypeDeclarationName(Node* name);
+bool isTypeOnlyImportDeclaration(Node* node);
+bool isTypeOnlyImportOrExportDeclaration(Node* node);
+bool isExclusivelyTypeOnlyImportOrExport(Node* node);
+bool isValidTypeOnlyAliasUseSite(Node* useSite);
+bool isShorthandPropertyNameUseSite(Node* useSite);
+bool isExpressionNode(Node* node);
+bool isInExpressionContext(Node* node);
+bool isPartOfTypeNode(Node* node);
+bool isJsxTagName(Node* node);
+bool isJSDocLinkLike(Node* node);
+bool isAssertionExpression(Node* node);
+bool isPropertyAccessOrQualifiedName(Node* node);
+bool hasDecorators(Node* node);
+bool nodeCanBeDecorated(bool useLegacyDecorators, Node* node, Node* parent,
+                        Node* grandparent);
+bool nodeIsDecorated(bool useLegacyDecorators, Node* node, Node* parent,
+                     Node* grandparent);
+bool nodeOrChildIsDecorated(bool useLegacyDecorators, Node* node, Node* parent,
+                            Node* grandparent);
+bool childIsDecorated(bool useLegacyDecorators, Node* node, Node* parent);
+Node* getFirstConstructorWithBody(Node* node);
+Node* getThisParameter(Node* signature);
+bool isThisParameter(Node* node);
+bool classOrConstructorParameterIsDecorated(bool useLegacyDecorators,
+                                            Node* node);
+bool classElementOrClassElementParameterIsDecorated(bool useLegacyDecorators,
+                                                    Node* node, Node* parent);
+struct AllAccessorDeclarations {
+	Node* firstAccessor{};
+	Node* secondAccessor{};
+	Node* setAccessor{};
+	Node* getAccessor{};
+};
+AllAccessorDeclarations getAllAccessorDeclarationsForDeclaration(
+	Node* accessor, const std::vector<Node*>& declarationsOfSymbol);
+AllAccessorDeclarations getAllAccessorDeclarations(
+	const std::vector<Node*>& parentDeclarations, Node* accessor);
+std::string getPropertyNameForPropertyNameNode(Node* name);
+bool hasAbstractModifier(Node* node);
+bool hasAmbientModifier(Node* node);
+bool isModuleWithStringLiteralName(Node* node);
 
 }  // namespace tsc

@@ -19,6 +19,16 @@ namespace tsc {
 static std::atomic<NodeId> nextNodeId{0};
 static std::atomic<SymbolId> nextSymbolId{0};
 
+template <class T, class F>
+static bool someList(const std::vector<T>& ts, F&& f) {
+	for (const T& t : ts) {
+		if (f(t)) {
+			return true;
+		}
+	}
+	return false;
+}
+
 NodeId getNodeId(Node* node) {
 	NodeId id = node->id.load();
 	if (id == 0) {
@@ -964,6 +974,982 @@ bool moduleExportNameIsDefault(Node* node) {
 
 bool expressionIsAlias(Node* node) {
 	return isEntityNameExpression(node) || isClassExpression(node);
+}
+
+
+bool isModuleOrEnumDeclaration(Node* node) {
+	return node->kind == Kind::ModuleDeclaration || node->kind == Kind::EnumDeclaration;
+}
+
+bool isGlobalSourceFile(Node* node) {
+	return node->kind == Kind::SourceFile && !isExternalOrCommonJSModule(node->as<SourceFile>());
+}
+
+bool isConstTypeReference(Node* node) {
+	return isTypeReferenceNode(node) && node->typeArguments().empty() &&
+		isIdentifier(node->as<TypeReferenceNode>()->TypeName) &&
+		node->as<TypeReferenceNode>()->TypeName->text() == "const";
+}
+
+bool isConstAssertion(Node* node) {
+	switch (node->kind) {
+	case Kind::AsExpression:
+	case Kind::TypeAssertionExpression:
+		return isConstTypeReference(node->type());
+	}
+	return false;
+}
+
+Node* getDeclarationOfKind(Symbol* symbol, Kind kind) {
+	for (Node* declaration : symbol->declarations) {
+		if (declaration->kind == kind) {
+			return declaration;
+		}
+	}
+	return nullptr;
+}
+
+Node* findConstructorDeclaration(Node* node) {
+	for (Node* member : node->members()) {
+		if (isConstructorDeclaration(member) && nodeIsPresent(member->body())) {
+			return member;
+		}
+	}
+	return nullptr;
+}
+
+bool isNonLocalAlias(Symbol* symbol, SymbolFlags excludes) {
+	if (symbol == nullptr) {
+		return false;
+	}
+	return (symbol->flags & (SymbolFlagsAlias | excludes)) == SymbolFlagsAlias ||
+		((symbol->flags & SymbolFlagsAlias) != 0 &&
+		 (symbol->flags & SymbolFlagsAssignment) != 0);
+}
+
+bool isPlainJSFile(SourceFile* file, Tristate checkJs) {
+	return file != nullptr &&
+		(file->ScriptKind == ScriptKind::JS || file->ScriptKind == ScriptKind::JSX) &&
+		file->CheckJsDirective == nullptr && checkJs == Tristate::Unknown;
+}
+
+bool nodeKindIs(Node* node, Kind k1) {
+	return node->kind == k1;
+}
+
+bool nodeKindIs(Node* node, Kind k1, Kind k2) {
+	return node->kind == k1 || node->kind == k2;
+}
+
+bool nodeKindIs(Node* node, Kind k1, Kind k2, Kind k3) {
+	return node->kind == k1 || node->kind == k2 || node->kind == k3;
+}
+
+bool nodeKindIs(Node* node, std::initializer_list<Kind> kinds) {
+	for (Kind k : kinds) {
+		if (node->kind == k) {
+			return true;
+		}
+	}
+	return false;
+}
+
+bool isAliasSymbolDeclaration(Node* node) {
+	switch (node->kind) {
+	case Kind::ImportEqualsDeclaration:
+	case Kind::NamespaceExportDeclaration:
+	case Kind::NamespaceImport:
+	case Kind::NamespaceExport:
+	case Kind::ImportSpecifier:
+	case Kind::ExportSpecifier:
+		return true;
+	case Kind::ImportClause:
+		return node->as<ImportClause>()->name != nullptr;
+	case Kind::ExportAssignment:
+		return expressionIsAlias(node->as<ExportAssignment>()->Expression);
+	case Kind::VariableDeclaration:
+	case Kind::BindingElement:
+		return isVariableDeclarationInitializedToRequire(node);
+	case Kind::BinaryExpression:
+		switch (getAssignmentDeclarationKind(node)) {
+		case JSDeclarationKind::ModuleExports:
+		case JSDeclarationKind::ExportsProperty:
+			return expressionIsAlias(node->as<BinaryExpression>()->Right);
+		default:
+			break;
+		}
+	}
+	return false;
+}
+
+Node* getImportAttributes(Node* node) {
+	switch (node->kind) {
+	case Kind::ImportDeclaration:
+	case Kind::JSImportDeclaration:
+		return node->as<ImportDeclaration>()->Attributes;
+	case Kind::ExportDeclaration:
+		return node->as<ExportDeclaration>()->Attributes;
+	case Kind::ImportType:
+		return node->as<ImportTypeNode>()->Attributes;
+	default:
+		break;
+	}
+	TSC_UNREACHABLE("Unhandled case in getImportAttributes");
+}
+
+Diagnostic* newDiagnosticChain(Diagnostic* chain, const DiagnosticMessage* message,
+							   const std::vector<std::string>& args) {
+	if (chain != nullptr) {
+		return newDiagnostic(chain->file, chain->loc, message, args)
+			->AddMessageChain(chain)
+			->SetRelatedInfo(chain->relatedInformation);
+	}
+	return newDiagnostic(nullptr, TextRange{}, message, args);
+}
+
+
+// Walks up the parents of a node to find the ancestor that matches the kind.
+Node* findAncestorKind(Node* node, Kind kind) {
+	for (; node != nullptr; node = node->parent) {
+		if (node->kind == kind) {
+			return node;
+		}
+	}
+	return nullptr;
+}
+
+// Walks up the parents of a node to find the ancestor that matches the callback.
+Node* findAncestorOrQuit(
+	Node* node, const std::function<FindAncestorResult(Node*)>& callback) {
+	for (; node != nullptr; node = node->parent) {
+		switch (callback(node)) {
+		case FindAncestorResult::Quit:
+			return nullptr;
+		case FindAncestorResult::True:
+			return node;
+		default:
+			break;
+		}
+	}
+	return nullptr;
+}
+
+bool isNodeDescendantOf(Node* node, Node* ancestor) {
+	for (; node != nullptr; node = node->parent) {
+		if (node == ancestor) {
+			return true;
+		}
+	}
+	return false;
+}
+
+bool isFunctionLikeOrClassStaticBlockDeclaration(Node* node) {
+	return node != nullptr && (isFunctionLike(node) || isClassStaticBlockDeclaration(node));
+}
+
+FunctionFlags getFunctionFlags(Node* node) {
+	if (node == nullptr) {
+		return FunctionFlagsInvalid;
+	}
+	BodyDataRef data = node->bodyData();
+	if (data.body == nullptr) {
+		return FunctionFlagsInvalid;
+	}
+	FunctionFlags flags = FunctionFlagsNormal;
+	switch (node->kind) {
+	case Kind::FunctionDeclaration:
+	case Kind::FunctionExpression:
+	case Kind::MethodDeclaration:
+		if (*data.asteriskToken != nullptr) {
+			flags |= FunctionFlagsGenerator;
+		}
+		[[fallthrough]];
+	case Kind::ArrowFunction:
+		if (hasSyntacticModifier(node, ModifierFlagsAsync)) {
+			flags |= FunctionFlagsAsync;
+		}
+		break;
+	default:
+		break;
+	}
+	if (*data.body == nullptr) {
+		flags |= FunctionFlagsInvalid;
+	}
+	return flags;
+}
+
+
+bool isComputedNonLiteralName(Node* name) {
+	return isComputedPropertyName(name) &&
+		   !isStringOrNumericLiteralLike(name->expression());
+}
+
+bool tryGetTextOfPropertyName(Node* name, std::string& out) {
+	switch (name->kind) {
+	case Kind::Identifier:
+	case Kind::PrivateIdentifier:
+	case Kind::StringLiteral:
+	case Kind::NumericLiteral:
+	case Kind::BigIntLiteral:
+	case Kind::NoSubstitutionTemplateLiteral:
+		out = name->text();
+		return true;
+	case Kind::ComputedPropertyName:
+		if (isStringOrNumericLiteralLike(name->expression())) {
+			out = name->expression()->text();
+			return true;
+		}
+		break;
+	case Kind::JsxNamespacedName:
+		out = name->as<JsxNamespacedName>()->Namespace->text() + ":" +
+			  name->as<JsxNamespacedName>()->name->text();
+		return true;
+	default:
+		break;
+	}
+	return false;
+}
+
+std::string getTextOfPropertyName(Node* name) {
+	std::string text;
+	tryGetTextOfPropertyName(name, text);
+	return text;
+}
+
+bool isBlockScope(Node* node, Node* parentNode) {
+	switch (node->kind) {
+	case Kind::SourceFile:
+	case Kind::CaseBlock:
+	case Kind::CatchClause:
+	case Kind::ModuleDeclaration:
+	case Kind::ForStatement:
+	case Kind::ForInStatement:
+	case Kind::ForOfStatement:
+	case Kind::Constructor:
+	case Kind::MethodDeclaration:
+	case Kind::GetAccessor:
+	case Kind::SetAccessor:
+	case Kind::FunctionDeclaration:
+	case Kind::FunctionExpression:
+	case Kind::ArrowFunction:
+	case Kind::PropertyDeclaration:
+	case Kind::ClassStaticBlockDeclaration:
+		return true;
+	case Kind::Block:
+		// function block is not considered block-scope container
+		// see comment in binder.ts: bind(...), case for SyntaxKind.Block
+		return !isFunctionLikeOrClassStaticBlockDeclaration(parentNode);
+	default:
+		break;
+	}
+	return false;
+}
+
+Node* getEnclosingBlockScopeContainer(Node* node) {
+	return findAncestor(node->parent, [](Node* current) {
+		return isBlockScope(current, current->parent);
+	});
+}
+
+
+static NodeList* getHeritageClauses(Node* node) {
+	switch (node->kind) {
+	case Kind::ClassDeclaration:
+		return node->as<ClassDeclaration>()->HeritageClauses;
+	case Kind::ClassExpression:
+		return node->as<ClassExpression>()->HeritageClauses;
+	case Kind::InterfaceDeclaration:
+		return node->as<InterfaceDeclaration>()->HeritageClauses;
+	default:
+		break;
+	}
+	return nullptr;
+}
+
+Node* getHeritageClause(Node* node, Kind kind) {
+	if (NodeList* clauses = getHeritageClauses(node)) {
+		for (Node* clause : clauses->nodes) {
+			if (clause->as<HeritageClause>()->Token == kind) {
+				return clause;
+			}
+		}
+	}
+	return nullptr;
+}
+
+std::vector<Node*> getHeritageElements(Node* node, Kind kind) {
+	if (Node* clause = getHeritageClause(node, kind)) {
+		return clause->as<HeritageClause>()->Types->nodes;
+	}
+	return {};
+}
+
+// Returns the expression or type name of a heritage clause element.
+Node* getHeritageClauseElementName(Node* node) {
+	if (isTypeReferenceNode(node)) {
+		return node->as<TypeReferenceNode>()->TypeName;
+	}
+	return node->as<ExpressionWithTypeArguments>()->Expression;
+}
+
+// Ported with the checker bootstrap slice.
+
+bool isTypeDeclaration(Node* node) {
+	switch (node->kind) {
+	case Kind::TypeParameter:
+	case Kind::ClassDeclaration:
+	case Kind::InterfaceDeclaration:
+	case Kind::TypeAliasDeclaration:
+	case Kind::JSTypeAliasDeclaration:
+	case Kind::EnumDeclaration:
+		return true;
+	case Kind::ImportClause:
+		return node->isTypeOnly();
+	case Kind::ImportSpecifier:
+	case Kind::ExportSpecifier:
+		return node->parent->parent->isTypeOnly();
+	default:
+		return false;
+	}
+}
+
+bool isTypeDeclarationName(Node* name) {
+	return name->kind == Kind::Identifier && isTypeDeclaration(name->parent) &&
+	       getNameOfDeclaration(name->parent) == name;
+}
+
+bool isTypeOnlyImportDeclaration(Node* node) {
+	switch (node->kind) {
+	case Kind::ImportSpecifier:
+		return node->isTypeOnly() || node->parent->parent->isTypeOnly();
+	case Kind::NamespaceImport:
+		return node->parent->isTypeOnly();
+	case Kind::ImportClause:
+	case Kind::ImportEqualsDeclaration:
+		return node->isTypeOnly();
+	}
+	return false;
+}
+
+static bool isTypeOnlyExportDeclaration(Node* node) {
+	switch (node->kind) {
+	case Kind::ExportSpecifier:
+		return node->isTypeOnly() || node->parent->parent->isTypeOnly();
+	case Kind::ExportDeclaration: {
+		ExportDeclaration* d = node->as<ExportDeclaration>();
+		return d->IsTypeOnly && d->ModuleSpecifier != nullptr &&
+		       d->ExportClause == nullptr;
+	}
+	case Kind::NamespaceExport:
+		return node->parent->isTypeOnly();
+	}
+	return false;
+}
+
+bool isTypeOnlyImportOrExportDeclaration(Node* node) {
+	return isTypeOnlyImportDeclaration(node) || isTypeOnlyExportDeclaration(node);
+}
+
+bool isExclusivelyTypeOnlyImportOrExport(Node* node) {
+	switch (node->kind) {
+	case Kind::ExportDeclaration:
+		return node->isTypeOnly();
+	case Kind::ImportDeclaration:
+	case Kind::JSImportDeclaration: {
+		if (Node* importClause = node->importClause()) {
+			return importClause->as<ImportClause>()->isTypeOnly();
+		}
+		break;
+	}
+	case Kind::JSDocImportTag: {
+		if (Node* importClause = node->importClause()) {
+			return importClause->as<ImportClause>()->isTypeOnly();
+		}
+		break;
+	}
+	default:
+		break;
+	}
+	return false;
+}
+
+bool isJsxTagName(Node* node) {
+	Node* parent = node->parent;
+	switch (parent->kind) {
+	case Kind::JsxOpeningElement:
+	case Kind::JsxClosingElement:
+	case Kind::JsxSelfClosingElement:
+		return parent->tagName() == node;
+	}
+	return false;
+}
+
+bool isJSDocLinkLike(Node* node) {
+	return nodeKindIs(node, Kind::JSDocLink, Kind::JSDocLinkCode,
+	                  Kind::JSDocLinkPlain);
+}
+
+bool isAssertionExpression(Node* node) {
+	Kind kind = node->kind;
+	return kind == Kind::TypeAssertionExpression || kind == Kind::AsExpression;
+}
+
+bool isPropertyAccessOrQualifiedName(Node* node) {
+	return node->kind == Kind::PropertyAccessExpression ||
+	       node->kind == Kind::QualifiedName;
+}
+
+static bool isPartOfTypeExpressionWithTypeArguments(Node* node) {
+	Node* parent = node->parent;
+	return isHeritageClause(parent) &&
+	           (!isClassLike(parent->parent) ||
+	            parent->as<HeritageClause>()->Token == Kind::ImplementsKeyword) ||
+	       isJSDocImplementsTag(parent) || isJSDocAugmentsTag(parent);
+}
+
+static bool isPartOfTypeNodeInParent(Node* node) {
+	Node* parent = node->parent;
+	if (parent->kind == Kind::TypeQuery) {
+		return false;
+	}
+	if (parent->kind == Kind::ImportType) {
+		return !parent->as<ImportTypeNode>()->IsTypeOf;
+	}
+	// Do not recursively call isPartOfTypeNode on the parent. In the example:
+	//
+	//     let a: A.B.C;
+	//
+	// Calling isPartOfTypeNode would consider the qualified name A.B a type node.
+	// Only C and A.B.C are type nodes.
+	if (parent->kind >= KindFirstTypeNode && parent->kind <= KindLastTypeNode) {
+		return true;
+	}
+	switch (parent->kind) {
+	case Kind::ExpressionWithTypeArguments:
+		return isPartOfTypeExpressionWithTypeArguments(parent);
+	case Kind::TypeParameter:
+		return node == parent->as<TypeParameterDeclaration>()->Constraint;
+	case Kind::VariableDeclaration:
+	case Kind::Parameter:
+	case Kind::PropertyDeclaration:
+	case Kind::PropertySignature:
+	case Kind::FunctionDeclaration:
+	case Kind::FunctionExpression:
+	case Kind::ArrowFunction:
+	case Kind::Constructor:
+	case Kind::MethodDeclaration:
+	case Kind::MethodSignature:
+	case Kind::GetAccessor:
+	case Kind::SetAccessor:
+	case Kind::CallSignature:
+	case Kind::ConstructSignature:
+	case Kind::IndexSignature:
+	case Kind::TypeAssertionExpression:
+		return node == parent->type();
+	case Kind::CallExpression:
+	case Kind::NewExpression:
+	case Kind::TaggedTemplateExpression: {
+		std::vector<Node*> typeArgs = parent->typeArguments();
+		return std::find(typeArgs.begin(), typeArgs.end(), node) !=
+		       typeArgs.end();
+	}
+	}
+	return false;
+}
+
+bool isPartOfTypeNode(Node* node) {
+	Kind kind = node->kind;
+	if (kind >= KindFirstTypeNode && kind <= KindLastTypeNode) {
+		return true;
+	}
+	switch (node->kind) {
+	case Kind::AnyKeyword:
+	case Kind::UnknownKeyword:
+	case Kind::NumberKeyword:
+	case Kind::BigIntKeyword:
+	case Kind::StringKeyword:
+	case Kind::BooleanKeyword:
+	case Kind::SymbolKeyword:
+	case Kind::ObjectKeyword:
+	case Kind::UndefinedKeyword:
+	case Kind::NullKeyword:
+	case Kind::NeverKeyword:
+		return true;
+	case Kind::VoidKeyword:
+		return node->parent->kind != Kind::VoidExpression;
+	case Kind::ExpressionWithTypeArguments:
+		return isPartOfTypeExpressionWithTypeArguments(node);
+	case Kind::TypeParameter:
+		return node->parent->kind == Kind::MappedType ||
+		       node->parent->kind == Kind::InferType;
+	case Kind::Identifier: {
+		Node* parent = node->parent;
+		if (isQualifiedName(parent) &&
+		    parent->as<QualifiedName>()->Right == node) {
+			return isPartOfTypeNodeInParent(parent);
+		}
+		if (isPropertyAccessExpression(parent) &&
+		    parent->as<PropertyAccessExpression>()->name == node) {
+			return isPartOfTypeNodeInParent(parent);
+		}
+		return isPartOfTypeNodeInParent(node);
+	}
+	case Kind::QualifiedName:
+	case Kind::PropertyAccessExpression:
+	case Kind::ThisKeyword:
+		return isPartOfTypeNodeInParent(node);
+	}
+	return false;
+}
+
+bool isExpressionNode(Node* node) {
+	switch (node->kind) {
+	case Kind::SuperKeyword:
+	case Kind::NullKeyword:
+	case Kind::TrueKeyword:
+	case Kind::FalseKeyword:
+	case Kind::RegularExpressionLiteral:
+	case Kind::ArrayLiteralExpression:
+	case Kind::ObjectLiteralExpression:
+	case Kind::PropertyAccessExpression:
+	case Kind::ElementAccessExpression:
+	case Kind::CallExpression:
+	case Kind::NewExpression:
+	case Kind::TaggedTemplateExpression:
+	case Kind::AsExpression:
+	case Kind::TypeAssertionExpression:
+	case Kind::SatisfiesExpression:
+	case Kind::NonNullExpression:
+	case Kind::ParenthesizedExpression:
+	case Kind::FunctionExpression:
+	case Kind::ClassExpression:
+	case Kind::ArrowFunction:
+	case Kind::VoidExpression:
+	case Kind::DeleteExpression:
+	case Kind::TypeOfExpression:
+	case Kind::PrefixUnaryExpression:
+	case Kind::PostfixUnaryExpression:
+	case Kind::BinaryExpression:
+	case Kind::ConditionalExpression:
+	case Kind::SpreadElement:
+	case Kind::TemplateExpression:
+	case Kind::OmittedExpression:
+	case Kind::JsxElement:
+	case Kind::JsxSelfClosingElement:
+	case Kind::JsxFragment:
+	case Kind::YieldExpression:
+	case Kind::AwaitExpression:
+		return true;
+	case Kind::MetaProperty:
+		// `import.defer` in `import.defer(...)` is not an expression
+		return !isImportCall(node->parent) ||
+		       node->parent->expression() != node;
+	case Kind::ExpressionWithTypeArguments:
+		return !isHeritageClause(node->parent);
+	case Kind::QualifiedName:
+		while (node->parent->kind == Kind::QualifiedName) {
+			node = node->parent;
+		}
+		return isTypeQueryNode(node->parent) ||
+		       isJSDocLinkLike(node->parent) ||
+		       isJSDocNameReference(node->parent) || isJsxTagName(node);
+	case Kind::PrivateIdentifier:
+		return isBinaryExpression(node->parent) &&
+		       node->parent->as<BinaryExpression>()->Left == node &&
+		       node->parent->as<BinaryExpression>()->OperatorToken->kind ==
+		           Kind::InKeyword;
+	case Kind::Identifier:
+		if (isTypeQueryNode(node->parent) || isJSDocLinkLike(node->parent) ||
+		    isJSDocNameReference(node->parent) || isJsxTagName(node)) {
+			return true;
+		}
+		[[fallthrough]];
+	case Kind::NumericLiteral:
+	case Kind::BigIntLiteral:
+	case Kind::StringLiteral:
+	case Kind::NoSubstitutionTemplateLiteral:
+	case Kind::ThisKeyword:
+		return isInExpressionContext(node);
+	default:
+		return false;
+	}
+}
+
+bool isInExpressionContext(Node* node) {
+	Node* parent = node->parent;
+	switch (parent->kind) {
+	case Kind::VariableDeclaration:
+	case Kind::Parameter:
+	case Kind::PropertyDeclaration:
+	case Kind::PropertySignature:
+	case Kind::EnumMember:
+	case Kind::PropertyAssignment:
+	case Kind::BindingElement:
+		return parent->initializer() == node;
+	case Kind::ExpressionStatement:
+	case Kind::IfStatement:
+	case Kind::DoStatement:
+	case Kind::WhileStatement:
+	case Kind::ReturnStatement:
+	case Kind::WithStatement:
+	case Kind::SwitchStatement:
+	case Kind::CaseClause:
+	case Kind::DefaultClause:
+	case Kind::ThrowStatement:
+	case Kind::TypeAssertionExpression:
+	case Kind::AsExpression:
+	case Kind::TemplateSpan:
+	case Kind::ComputedPropertyName:
+	case Kind::SatisfiesExpression:
+		return parent->expression() == node;
+	case Kind::ForStatement: {
+		ForStatement* s = parent->as<ForStatement>();
+		return s->Initializer == node &&
+		               s->Initializer->kind != Kind::VariableDeclarationList ||
+		       s->Condition == node || s->Incrementor == node;
+	}
+	case Kind::ForInStatement:
+	case Kind::ForOfStatement: {
+		ForInOrOfStatement* s = parent->as<ForInOrOfStatement>();
+		return s->Initializer == node &&
+		               s->Initializer->kind != Kind::VariableDeclarationList ||
+		       s->Expression == node;
+	}
+	case Kind::Decorator:
+	case Kind::JsxExpression:
+	case Kind::JsxSpreadAttribute:
+	case Kind::SpreadAssignment:
+		return true;
+	case Kind::ExpressionWithTypeArguments:
+		return parent->expression() == node && !isPartOfTypeNode(parent);
+	case Kind::ShorthandPropertyAssignment:
+		return parent->as<ShorthandPropertyAssignment>()
+		               ->ObjectAssignmentInitializer == node;
+	default:
+		return isExpressionNode(parent);
+	}
+}
+
+bool isShorthandPropertyNameUseSite(Node* useSite) {
+	return isIdentifier(useSite) &&
+	       isShorthandPropertyAssignment(useSite->parent) &&
+	       useSite->parent->as<ShorthandPropertyAssignment>()->name == useSite;
+}
+
+static bool isIdentifierInNonEmittingHeritageClause(Node* node) {
+	if (!isIdentifier(node)) {
+		return false;
+	}
+	Node* parent = node->parent;
+	while (isPropertyAccessExpression(parent) ||
+	       isExpressionWithTypeArguments(parent)) {
+		parent = parent->parent;
+	}
+	return isHeritageClause(parent) &&
+	       (parent->as<HeritageClause>()->Token == Kind::ImplementsKeyword ||
+	        isInterfaceDeclaration(parent->parent));
+}
+
+static bool isPartOfPossiblyValidTypeOrAbstractComputedPropertyName(
+	Node* node) {
+	while (nodeKindIs(node, Kind::Identifier, Kind::PropertyAccessExpression)) {
+		node = node->parent;
+	}
+	if (node->kind != Kind::ComputedPropertyName) {
+		return false;
+	}
+	if (hasSyntacticModifier(node->parent, ModifierFlagsAbstract)) {
+		return true;
+	}
+	return nodeKindIs(node->parent->parent, Kind::InterfaceDeclaration,
+	                  Kind::TypeLiteral);
+}
+
+bool isValidTypeOnlyAliasUseSite(Node* useSite) {
+	return useSite->flags & (NodeFlagsAmbient | NodeFlagsJSDoc) ||
+	       isPartOfTypeQuery(useSite) ||
+	       isIdentifierInNonEmittingHeritageClause(useSite) ||
+	       isPartOfPossiblyValidTypeOrAbstractComputedPropertyName(useSite) ||
+	       !(isExpressionNode(useSite) ||
+	         isShorthandPropertyNameUseSite(useSite));
+}
+
+bool hasAbstractModifier(Node* node) {
+	return hasSyntacticModifier(node, ModifierFlagsAbstract);
+}
+
+bool hasAmbientModifier(Node* node) {
+	return hasSyntacticModifier(node, ModifierFlagsAmbient);
+}
+
+bool hasDecorators(Node* node) {
+	return hasSyntacticModifier(node, ModifierFlagsDecorator);
+}
+
+
+Node* getFirstConstructorWithBody(Node* node) {
+	for (Node* member : node->members()) {
+		if (isConstructorDeclaration(member) && nodeIsPresent(member->body())) {
+			return member;
+		}
+	}
+	return nullptr;
+}
+
+bool nodeCanBeDecorated(bool useLegacyDecorators, Node* node, Node* parent,
+                        Node* grandparent) {
+	// private names cannot be used with decorators yet
+	if (useLegacyDecorators && node->name() != nullptr &&
+	    isPrivateIdentifier(node->name())) {
+		return false;
+	}
+	switch (node->kind) {
+	case Kind::ClassDeclaration:
+		// class declarations are valid targets
+		return true;
+	case Kind::ClassExpression:
+		// class expressions are valid targets for native decorators
+		return !useLegacyDecorators;
+	case Kind::PropertyDeclaration:
+		// property declarations are valid if their parent is a class declaration.
+		return parent != nullptr &&
+		       (useLegacyDecorators && isClassDeclaration(parent) ||
+		        !useLegacyDecorators && isClassLike(parent) &&
+		            !hasAbstractModifier(node) && !hasAmbientModifier(node));
+	case Kind::GetAccessor:
+	case Kind::SetAccessor:
+	case Kind::MethodDeclaration:
+		// if this method has a body and its parent is a class declaration, this
+		// is a valid target.
+		return parent != nullptr && node->body() != nullptr &&
+		       (useLegacyDecorators && isClassDeclaration(parent) ||
+		        !useLegacyDecorators && isClassLike(parent));
+	case Kind::Parameter:
+		// TODO(rbuckton): ParameterDeclaration decorator support for ES decorators
+		// must wait until it is standardized
+		if (!useLegacyDecorators) {
+			return false;
+		}
+		// if the parameter's parent has a body and its grandparent is a class
+		// declaration, this is a valid target.
+		return parent != nullptr && parent->body() != nullptr &&
+		       (parent->kind == Kind::Constructor ||
+		        parent->kind == Kind::MethodDeclaration ||
+		        parent->kind == Kind::SetAccessor) &&
+		       getThisParameter(parent) != node && grandparent != nullptr &&
+		       grandparent->kind == Kind::ClassDeclaration;
+	}
+	return false;
+}
+
+bool nodeIsDecorated(bool useLegacyDecorators, Node* node, Node* parent,
+                     Node* grandparent) {
+	return hasDecorators(node) &&
+	       nodeCanBeDecorated(useLegacyDecorators, node, parent, grandparent);
+}
+
+bool nodeOrChildIsDecorated(bool useLegacyDecorators, Node* node,
+                            Node* parent, Node* grandparent) {
+	return nodeIsDecorated(useLegacyDecorators, node, parent, grandparent) ||
+	       childIsDecorated(useLegacyDecorators, node, parent);
+}
+
+bool childIsDecorated(bool useLegacyDecorators, Node* node, Node* parent) {
+	switch (node->kind) {
+	case Kind::ClassDeclaration:
+	case Kind::ClassExpression: {
+		auto members = node->members();
+		return someList(members, [&](Node* m) {
+			return nodeOrChildIsDecorated(useLegacyDecorators, m, node, parent);
+		});
+	}
+	case Kind::MethodDeclaration:
+	case Kind::SetAccessor:
+	case Kind::Constructor: {
+		auto parameters = node->parameters();
+		return someList(parameters, [&](Node* p) {
+			return nodeIsDecorated(useLegacyDecorators, p, node, parent);
+		});
+	}
+	default:
+		return false;
+	}
+}
+
+AllAccessorDeclarations getAllAccessorDeclarationsForDeclaration(
+	Node* accessor, const std::vector<Node*>& declarationsOfSymbol) {
+	Kind otherKind{};
+	if (accessor->kind == Kind::SetAccessor) {
+		otherKind = Kind::GetAccessor;
+	} else if (accessor->kind == Kind::GetAccessor) {
+		otherKind = Kind::SetAccessor;
+	} else {
+		TSC_UNREACHABLE("Unexpected node kind");
+	}
+	// otherAccessor := GetDeclarationOfKind(c.getSymbolOfDeclaration(accessor),
+	// otherKind)
+	Node* otherAccessor = nullptr;
+	for (Node* d : declarationsOfSymbol) {
+		if (d->kind == otherKind) {
+			otherAccessor = d;
+			break;
+		}
+	}
+
+	Node* firstAccessor;
+	Node* secondAccessor;
+	if (otherAccessor != nullptr && otherAccessor->pos() < accessor->pos()) {
+		firstAccessor = otherAccessor;
+		secondAccessor = accessor;
+	} else {
+		firstAccessor = accessor;
+		secondAccessor = otherAccessor;
+	}
+
+	Node* setAccessor = nullptr;
+	Node* getAccessor = nullptr;
+	if (accessor->kind == Kind::SetAccessor) {
+		setAccessor = accessor;
+		if (otherAccessor != nullptr) {
+			getAccessor = otherAccessor;
+		}
+	} else {
+		getAccessor = accessor;
+		if (otherAccessor != nullptr) {
+			setAccessor = otherAccessor;
+		}
+	}
+
+	return AllAccessorDeclarations{firstAccessor, secondAccessor, setAccessor,
+	                               getAccessor};
+}
+
+AllAccessorDeclarations getAllAccessorDeclarations(
+	const std::vector<Node*>& parentDeclarations, Node* accessor) {
+	if (hasDynamicName(accessor)) {
+		// dynamic names can only be match up via checker symbol lookup, just
+		// return an object with just this accessor
+		return getAllAccessorDeclarationsForDeclaration(accessor,
+		                                                {accessor});
+	}
+
+	std::string accessorName = getPropertyNameForPropertyNameNode(accessor->name());
+	bool accessorStatic = isStatic(accessor);
+	std::vector<Node*> matches;
+	for (Node* member : parentDeclarations) {
+		if (!isAccessor(member) || isStatic(member) != accessorStatic) {
+			continue;
+		}
+		std::string memberName =
+			getPropertyNameForPropertyNameNode(member->name());
+		if (memberName == accessorName) {
+			matches.push_back(member);
+		}
+	}
+	return getAllAccessorDeclarationsForDeclaration(accessor, matches);
+}
+
+std::string getPropertyNameForPropertyNameNode(Node* name) {
+	switch (name->kind) {
+	case Kind::Identifier:
+	case Kind::PrivateIdentifier:
+	case Kind::StringLiteral:
+	case Kind::NoSubstitutionTemplateLiteral:
+	case Kind::NumericLiteral:
+	case Kind::BigIntLiteral:
+	case Kind::JsxNamespacedName:
+		return name->text();
+	case Kind::ComputedPropertyName: {
+		Node* nameExpression = name->expression();
+		if (isStringOrNumericLiteralLike(nameExpression)) {
+			return nameExpression->text();
+		}
+		if (isSignedNumericLiteral(nameExpression)) {
+			std::string text = nameExpression->as<PrefixUnaryExpression>()
+			                       ->Operand->text();
+			if (nameExpression->as<PrefixUnaryExpression>()->Operator ==
+			    Kind::MinusToken) {
+				text = "-" + text;
+			}
+			return text;
+		}
+		return InternalSymbolNameMissing;
+	}
+	default:
+		TSC_UNREACHABLE("Unhandled case in getPropertyNameForPropertyNameNode");
+	}
+}
+
+Node* getThisParameter(Node* signature) {
+	// callback tags do not currently support this parameters
+	std::vector<Node*> parameters = signature->parameters();
+	if (!parameters.empty()) {
+		Node* thisParameter = parameters[0];
+		if (isThisParameter(thisParameter)) {
+			return thisParameter;
+		}
+	}
+	return nullptr;
+}
+
+bool isThisParameter(Node* node) {
+	return isParameterDeclaration(node) && node->name() != nullptr &&
+	       isThisIdentifier(node->name());
+}
+
+bool classOrConstructorParameterIsDecorated(bool useLegacyDecorators,
+                                            Node* node) {
+	if (nodeIsDecorated(useLegacyDecorators, node, nullptr, nullptr)) {
+		return true;
+	}
+	Node* constructor = getFirstConstructorWithBody(node);
+	return constructor != nullptr &&
+	       childIsDecorated(useLegacyDecorators, constructor, node);
+}
+
+bool classElementOrClassElementParameterIsDecorated(bool useLegacyDecorators,
+                                                    Node* node,
+                                                    Node* parent) {
+	NodeList* parameters = nullptr;
+	if (isAccessor(node)) {
+		AllAccessorDeclarations decls =
+			getAllAccessorDeclarations(parent->members(), node);
+		Node* firstAccessorWithDecorators = nullptr;
+		if (hasDecorators(decls.firstAccessor)) {
+			firstAccessorWithDecorators = decls.firstAccessor;
+		} else if (decls.secondAccessor != nullptr &&
+		           hasDecorators(decls.secondAccessor)) {
+			firstAccessorWithDecorators = decls.secondAccessor;
+		}
+		if (firstAccessorWithDecorators == nullptr ||
+		    node != firstAccessorWithDecorators) {
+			return false;
+		}
+		if (decls.setAccessor != nullptr) {
+			parameters = decls.setAccessor->parameterList();
+		}
+	} else if (isMethodDeclaration(node)) {
+		parameters = node->parameterList();
+	}
+	if (nodeIsDecorated(useLegacyDecorators, node, parent, nullptr)) {
+		return true;
+	}
+	if (parameters != nullptr && !parameters->nodes.empty()) {
+		for (Node* parameter : parameters->nodes) {
+			if (isThisParameter(parameter)) {
+				continue;
+			}
+			if (nodeIsDecorated(useLegacyDecorators, parameter, node,
+			                    parent)) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+bool isModuleWithStringLiteralName(Node* node) {
+	return isModuleDeclaration(node) && node->name()->kind == Kind::StringLiteral;
 }
 
 } // namespace tsc
