@@ -36,6 +36,8 @@ jobs:
           go build -o lexdump ./cmd/lexdump
       - name: Conformance harness regressions
         run: python3 cpp/tools/test_conformance.py
+      - name: Lexer conformance
+        run: python3 cpp/tools/conformance_lex.py
       - name: Parser conformance
         run: RESULTDIR="$RUNNER_TEMP/cpp-conformance" ./cpp/tools/conformance_corpus.sh 2
       - name: Binder conformance
