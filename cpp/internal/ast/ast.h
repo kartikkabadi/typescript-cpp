@@ -32,7 +32,7 @@ namespace tsc {
 	std::abort();
 }
 #define TSC_UNREACHABLE(msg) ::tsc::tscUnreachable(msg)
-#define TSC_ASSERT(cond, msg) assert((cond) && (msg))
+#define TSC_ASSERT(cond, msg) assert((cond) || (::tsc::tscUnreachable(std::string(msg).c_str()), false))
 
 struct Node;
 struct NodeList;

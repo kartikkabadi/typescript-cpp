@@ -3419,10 +3419,9 @@ Node* Parser::parseLiteralTypeNode(bool negative) {
 
 Node* Parser::parseTypeReference() {
 	int pos = nodePos();
-	return finishNode(
-		factory.newTypeReferenceNode(parseEntityNameOfTypeReference(),
-		                             parseTypeArgumentsOfTypeReference()),
-		pos);
+	Node* name = parseEntityNameOfTypeReference();
+	NodeList* typeArguments = parseTypeArgumentsOfTypeReference();
+	return finishNode(factory.newTypeReferenceNode(name, typeArguments), pos);
 }
 
 Node* Parser::parseEntityNameOfTypeReference() {
@@ -3900,10 +3899,12 @@ Node* Parser::parseParameterEx(bool inOuterAwaitContext,
 	ModifierList* modifiers = parseModifiersEx(true, false, false);
 	contextFlags = saveContextFlags;
 	if (token == Kind::ThisKeyword) {
+		Node* name = createIdentifier(true);
+		Node* type = parseTypeAnnotation();
 		Node* result = factory.newParameterDeclaration(
 			modifiers, nullptr /*dotDotDotToken*/,
-			createIdentifier(true), nullptr /*questionToken*/,
-			parseTypeAnnotation(), nullptr /*initializer*/);
+			name, nullptr /*questionToken*/,
+			type, nullptr /*initializer*/);
 		if (modifiers != nullptr) {
 			parseErrorAtRange(
 				modifiers->nodes[0]->loc,
@@ -3916,10 +3917,12 @@ Node* Parser::parseParameterEx(bool inOuterAwaitContext,
 	if (!allowAmbiguity && !isParameterNameStart()) {
 		return nullptr;
 	}
+	Node* name = parseNameOfParameter(modifiers);
+	Node* questionToken = parseOptionalToken(Kind::QuestionToken);
+	Node* type = parseTypeAnnotation();
+	Node* initializer = parseInitializer();
 	Node* result = factory.newParameterDeclaration(
-		modifiers, dotDotDotToken, parseNameOfParameter(modifiers),
-		parseOptionalToken(Kind::QuestionToken), parseTypeAnnotation(),
-		parseInitializer());
+		modifiers, dotDotDotToken, name, questionToken, type, initializer);
 	withJSDoc(finishNode(result, pos), jsdoc);
 	return result;
 }
@@ -4307,10 +4310,9 @@ Node* Parser::parseAssertsTypePredicate() {
 
 Node* Parser::parseTemplateType() {
 	int pos = nodePos();
-	return finishNode(
-		factory.newTemplateLiteralTypeNode(parseTemplateHead(false),
-		                                   parseTemplateTypeSpans()),
-		pos);
+	Node* head = parseTemplateHead(false);
+	NodeList* spans = parseTemplateTypeSpans();
+	return finishNode(factory.newTemplateLiteralTypeNode(head, spans), pos);
 }
 
 Node* Parser::parseTemplateHead(bool isTaggedTemplate) {
@@ -4351,9 +4353,9 @@ NodeList* Parser::parseTemplateTypeSpans() {
 
 Node* Parser::parseTemplateTypeSpan() {
 	int pos = nodePos();
-	return finishNode(factory.newTemplateLiteralTypeSpan(
-			                  parseType(), parseLiteralOfTemplateSpan(false)),
-	                  pos);
+	Node* type = parseType();
+	Node* literal = parseLiteralOfTemplateSpan(false);
+	return finishNode(factory.newTemplateLiteralTypeSpan(type, literal), pos);
 }
 
 Node* Parser::parseLiteralOfTemplateSpan(bool isTaggedTemplate) {
@@ -4843,10 +4845,10 @@ Node* Parser::parseAssignmentExpressionOrHigherWorker(
 	// token for cases like `> > =` becoming `>>=`
 	if (isLeftHandSideExpression(expr) &&
 	    isAssignmentOperator(reScanGreaterThanToken())) {
-		return makeBinaryExpression(expr, parseTokenNode(),
-		                            parseAssignmentExpressionOrHigherWorker(
-		                                allowReturnTypeInArrowFunction),
-		                            pos);
+		Node* operatorToken = parseTokenNode();
+		Node* right = parseAssignmentExpressionOrHigherWorker(
+			allowReturnTypeInArrowFunction);
+		return makeBinaryExpression(expr, operatorToken, right, pos);
 	}
 	// It wasn't an assignment or a lambda. This is a conditional expression:
 	return parseConditionalExpressionRest(expr, pos,
@@ -4894,9 +4896,9 @@ Node* Parser::parseYieldExpression() {
 	Node* result;
 	if (!hasPrecedingLineBreak() &&
 	    (token == Kind::AsteriskToken || isStartOfExpression())) {
-		result = factory.newYieldExpression(
-			parseOptionalToken(Kind::AsteriskToken),
-			parseAssignmentExpressionOrHigher());
+		Node* asteriskToken = parseOptionalToken(Kind::AsteriskToken);
+		Node* expression = parseAssignmentExpressionOrHigher();
+		result = factory.newYieldExpression(asteriskToken, expression);
 	} else {
 		// if the next token is not on the same line as yield. or we don't
 		// have an '*' or the start of an expression, then this is just a
@@ -5464,9 +5466,9 @@ Node* Parser::parseBinaryExpressionRest(OperatorPrecedence precedence,
 				}
 			}
 		} else {
-			leftOperand = makeBinaryExpression(
-				leftOperand, parseTokenNode(),
-				parseBinaryExpressionOrHigher(newPrecedence), pos);
+			Node* operatorToken = parseTokenNode();
+			Node* right = parseBinaryExpressionOrHigher(newPrecedence);
+			leftOperand = makeBinaryExpression(leftOperand, operatorToken, right, pos);
 			lastOperand = leftOperand;
 		}
 	}
@@ -5669,12 +5671,14 @@ Node* Parser::parseJsxElementOrSelfClosingElementOrFragment(
 		             // parse result
 		break;
 	}
-	case Kind::JsxOpeningFragment:
+	case Kind::JsxOpeningFragment: {
+		NodeList* children = parseJsxChildren(opening);
+		Node* closing = parseJsxClosingFragment(inExpressionContext);
 		result = finishNode(
-			factory.newJsxFragment(opening, parseJsxChildren(opening),
-		                           parseJsxClosingFragment(inExpressionContext)),
+			factory.newJsxFragment(opening, children, closing),
 			pos);
 		break;
+	}
 	case Kind::JsxSelfClosingElement:
 		// Nothing else to do for self-closing elements
 		result = opening;
@@ -5947,10 +5951,9 @@ Node* Parser::parseJsxAttribute() {
 		return parseJsxSpreadAttribute();
 	}
 	int pos = nodePos();
-	return finishNode(
-		factory.newJsxAttribute(parseJsxAttributeName(),
-		                        parseJsxAttributeValue()),
-		pos);
+	Node* name = parseJsxAttributeName();
+	Node* value = parseJsxAttributeValue();
+	return finishNode(factory.newJsxAttribute(name, value), pos);
 }
 
 Node* Parser::parseJsxSpreadAttribute() {
@@ -6560,10 +6563,9 @@ Node* Parser::parseTaggedTemplateRest(int pos, Node* tag,
 
 Node* Parser::parseTemplateExpression(bool isTaggedTemplate) {
 	int pos = nodePos();
-	return finishNode(factory.newTemplateExpression(
-			                  parseTemplateHead(isTaggedTemplate),
-			                  parseTemplateSpans(isTaggedTemplate)),
-	                  pos);
+	Node* head = parseTemplateHead(isTaggedTemplate);
+	NodeList* spans = parseTemplateSpans(isTaggedTemplate);
+	return finishNode(factory.newTemplateExpression(head, spans), pos);
 }
 
 NodeList* Parser::parseTemplateSpans(bool isTaggedTemplate) {
