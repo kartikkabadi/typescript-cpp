@@ -1,6 +1,8 @@
 // parser.go / jsdoc.go / reparser.go / types.go / utilities.go — port to C++
 #pragma once
 
+#include <optional>
+
 #include "internal/ast/ast.h"
 #include "internal/ast/precedence.h"
 #include "internal/core/text.h"

@@ -5,6 +5,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <algorithm>
@@ -770,7 +771,7 @@ class RedirectInfo {
 public:
 	virtual ~RedirectInfo() = default;
 	virtual std::string CommonSourceDirectory() = 0;
-	virtual const CompilerOptions* CompilerOptions() = 0;
+	virtual const tsc::CompilerOptions* CompilerOptions() = 0;
 };
 
 struct ProjectReferenceRedirect {
