@@ -10,6 +10,11 @@ oracle.
 
 ## Status
 
+This is a front-end port, **not a replacement for `tsc` yet**. The checker
+has bootstrapping/support slices, but core operations remain unimplemented.
+There is no project typecheck (`--noEmit`/`-p`), project loader or emit mode.
+Parser/binder conformance does not establish typechecking correctness.
+
 | Component | Source (Go) | Port | Status |
 |---|---|---|---|
 | Diagnostics catalog | `diagnostics/` | `cpp/internal/diagnostics` | complete (generated) |
@@ -22,7 +27,7 @@ oracle.
 | JSDoc parser | `parser/jsdoc.go` | `cpp/internal/parser/jsdoc.cpp` | complete |
 | Reparser (JSDoc→declarations) | `parser/reparser.go` | `cpp/internal/parser/reparser.cpp` | complete |
 | Binder | `binder/` | `cpp/internal/binder` | complete |
-| Checker | `checker/` | — | not started |
+| Checker | `checker/` | `cpp/internal/checker` | partial; core operations still stubbed |
 | Emitter | `printer/`, `transformers/` | — | not started |
 
 ## Conformance
@@ -49,11 +54,15 @@ matching Go oracle.
 
 ```sh
 # single file
-./cpp/tools/conformance_parse.sh tsc/testdata/tests/cases/compiler/abstractClasses.ts
+./cpp/tools/conformance_parse.sh tsc/testdata/tests/cases/compiler/unusedVariablesinNamespaces1.ts
 
-# whole corpus (writes /tmp/tscpp_results.txt)
+# whole corpus (prints the directory containing results)
 ./cpp/tools/conformance_corpus.sh 8
 ```
+
+The conformance tools return nonzero on mismatches or failed compiler/oracle
+processes. Batch runs reject empty corpora. `TSCPP`, `PARSEDUMP`, `BINDUMP`
+and `LEXDUMP` can select alternate binaries; `RESULTDIR` selects corpus output.
 
 ## Performance
 
@@ -96,6 +105,7 @@ ninja -C cpp/build
 # Go oracle (one-time):
 (cd tsc/cmd/parsedump && go build -o ../../parsedump .)
 (cd tsc/cmd/lexdump   && go build -o ../../lexdump .)
+(cd tsc/cmd/bindump   && go build -o ../../bindump .)
 ```
 
 ## Porting notes (for future sessions)

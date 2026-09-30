@@ -6,12 +6,16 @@
 #   ./conformance_corpus.sh [jobs]
 #
 # Produces:
-#   /tmp/tscpp_corpus.list     all candidate files
-#   /tmp/tscpp_results.txt     PASS/FAIL per file
-#   /tmp/tscpp_fails.txt       the failing subset
+#   $RESULTDIR/tscpp_corpus.list     all candidate files
+#   $RESULTDIR/tscpp_results.txt     PASS/FAIL per file
+#   $RESULTDIR/tscpp_fails.txt       the failing subset
 set -u
+set -o pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 JOBS="${1:-8}"
+RESULTDIR="${RESULTDIR:-$(mktemp -d /tmp/tscpp-conformance.XXXXXX)}"
+mkdir -p "$RESULTDIR" || exit 2
+RESULTDIR="$(cd "$RESULTDIR" && pwd)" || exit 2
 cd "$REPO_ROOT"
 
 find tsc/testdata -type f \( -name '*.ts' -o -name '*.tsx' -o -name '*.js' \
@@ -20,11 +24,19 @@ find tsc/testdata -type f \( -name '*.ts' -o -name '*.tsx' -o -name '*.js' \
   | grep -v '/node_modules/' \
   | grep -v '^tsc/testdata/baselines/reference/project/nodeModules' \
   | grep -v '^tsc/tools/' \
-  | sort > /tmp/tscpp_corpus.list
+  | sort > "$RESULTDIR/tscpp_corpus.list" || exit 2
 
-echo "corpus: $(wc -l < /tmp/tscpp_corpus.list | tr -d ' ') files"
+count=$(wc -l < "$RESULTDIR/tscpp_corpus.list" | tr -d ' ')
+if [ "$count" -eq 0 ]; then
+  echo "empty corpus" >&2
+  exit 2
+fi
+echo "corpus: $count files; results: $RESULTDIR"
 xargs -P "$JOBS" -I{} "$REPO_ROOT/cpp/tools/conformance_parse.sh" {} \
-  < /tmp/tscpp_corpus.list > /tmp/tscpp_results.txt
-grep FAIL /tmp/tscpp_results.txt > /tmp/tscpp_fails.txt || true
-echo "PASS: $(grep -c PASS /tmp/tscpp_results.txt)  FAIL: $(wc -l < /tmp/tscpp_fails.txt | tr -d ' ')"
-cat /tmp/tscpp_fails.txt
+  < "$RESULTDIR/tscpp_corpus.list" > "$RESULTDIR/tscpp_results.txt"
+rc=$?
+grep '^FAIL ' "$RESULTDIR/tscpp_results.txt" > "$RESULTDIR/tscpp_fails.txt" || true
+passed=$(grep -c '^PASS ' "$RESULTDIR/tscpp_results.txt")
+echo "PASS: $passed  FAIL: $(wc -l < "$RESULTDIR/tscpp_fails.txt" | tr -d ' ')"
+cat "$RESULTDIR/tscpp_fails.txt"
+[ "$rc" -eq 0 ] && [ "$passed" -eq "$count" ]

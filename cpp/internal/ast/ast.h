@@ -32,7 +32,7 @@ namespace tsc {
 	std::abort();
 }
 #define TSC_UNREACHABLE(msg) ::tsc::tscUnreachable(msg)
-#define TSC_ASSERT(cond, msg) assert((cond) && (msg))
+#define TSC_ASSERT(cond, msg) assert((cond) || (::tsc::tscUnreachable(std::string(msg).c_str()), false))
 
 struct Node;
 struct NodeList;
@@ -204,7 +204,7 @@ struct NodeList {
 };
 
 struct ModifierList : NodeList {
-	ModifierFlags ModifierFlags{};
+	tsc::ModifierFlags ModifierFlags{};
 };
 
 template <class F>
@@ -269,7 +269,7 @@ struct Pragma : CommentRange {
 
 struct FileReference : TextRange {
 	std::string FileName;
-	ResolutionMode ResolutionMode = ResolutionMode::None;
+	tsc::ResolutionMode ResolutionMode = tsc::ResolutionMode::None;
 	bool Preserve = false;
 };
 
@@ -297,7 +297,7 @@ struct ExternalModuleIndicatorOptions {
 struct SourceFileParseOptions {
 	std::string FileName;
 	std::string Path;
-	ExternalModuleIndicatorOptions ExternalModuleIndicatorOptions;
+	tsc::ExternalModuleIndicatorOptions ExternalModuleIndicatorOptions;
 };
 
 enum class MappedDiagnosticDirectivePolicy : uint8_t {

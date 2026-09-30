@@ -1,0 +1,44 @@
+name: C++ front end
+
+on:
+  pull_request:
+    paths:
+      - 'cpp/**'
+      - 'tsc/**'
+      - '.github/workflows/cpp.yml'
+      - '.github/actions/setup-go/**'
+      - 'go.work*'
+  push:
+    branches: [main, devin/cpp-port]
+    paths:
+      - 'cpp/**'
+      - 'tsc/**'
+      - '.github/workflows/cpp.yml'
+      - '.github/actions/setup-go/**'
+      - 'go.work*'
+
+jobs:
+  conformance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-go
+      - name: Build C++ port
+        run: |
+          cmake -B cpp/build -S cpp -DCMAKE_BUILD_TYPE=Release
+          cmake --build cpp/build -j 2
+      - name: Build Go conformance oracles
+        working-directory: tsc
+        run: |
+          go build -o parsedump ./cmd/parsedump
+          go build -o bindump ./cmd/bindump
+          go build -o lexdump ./cmd/lexdump
+      - name: Conformance harness regressions
+        run: python3 cpp/tools/test_conformance.py
+      - name: Lexer conformance
+        run: python3 cpp/tools/conformance_lex.py
+      - name: Parser conformance
+        run: RESULTDIR="$RUNNER_TEMP/cpp-conformance" ./cpp/tools/conformance_corpus.sh 2
+      - name: Binder conformance
+        run: ./cpp/tools/conformance_bind.sh "$RUNNER_TEMP/cpp-conformance/tscpp_corpus.list" 2
