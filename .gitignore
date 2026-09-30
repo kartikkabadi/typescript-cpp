@@ -144,5 +144,6 @@ tools/gotestsum.exe.hash
 /cpp/build/
 /tsc/parsedump
 /tsc/lexdump
+/tsc/bindump
 /tsc/parsebench
 /tsc/scanbench

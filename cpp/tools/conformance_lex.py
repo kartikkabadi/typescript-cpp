@@ -7,8 +7,8 @@ import os
 import concurrent.futures
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-TSCPP = os.path.join(ROOT, "cpp", "build", "tscpp")
-ORACLE = os.environ.get("LEXDUMP", "/tmp/lexdump")
+TSCPP = os.environ.get("TSCPP", os.path.join(ROOT, "cpp", "build", "tscpp"))
+ORACLE = os.environ.get("LEXDUMP", os.path.join(ROOT, "tsc", "lexdump"))
 
 
 def run_one(path):
@@ -17,6 +17,8 @@ def run_one(path):
         b = subprocess.run([ORACLE, path], capture_output=True, timeout=60)
     except subprocess.TimeoutExpired:
         return path, "TIMEOUT", ""
+    except OSError as e:
+        return path, "EXEC-FAIL", str(e)
     if a.returncode != 0 or b.returncode != 0:
         return path, f"rc={a.returncode}/{b.returncode}", ""
     ta, tb = a.stdout.strip(), b.stdout.strip()
@@ -44,6 +46,8 @@ def main():
                     files.append(os.path.join(base, n))
     files.sort()
     print(f"{len(files)} files", file=sys.stderr)
+    if not files:
+        raise SystemExit("empty corpus")
     bad = 0
     shown = 0
     with concurrent.futures.ThreadPoolExecutor(16) as ex:
@@ -57,7 +61,8 @@ def main():
                         print(detail)
                     shown += 1
     print(f"\n{bad}/{len(files)} mismatched", file=sys.stderr)
+    return int(bad != 0)
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
