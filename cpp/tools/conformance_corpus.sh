@@ -15,6 +15,7 @@ REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 JOBS="${1:-8}"
 RESULTDIR="${RESULTDIR:-$(mktemp -d /tmp/tscpp-conformance.XXXXXX)}"
 mkdir -p "$RESULTDIR" || exit 2
+RESULTDIR="$(cd "$RESULTDIR" && pwd)" || exit 2
 cd "$REPO_ROOT"
 
 find tsc/testdata -type f \( -name '*.ts' -o -name '*.tsx' -o -name '*.js' \

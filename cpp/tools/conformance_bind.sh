@@ -31,7 +31,7 @@ run_one() {
   fi
 }
 
-if [ $# -eq 1 ] && [ -f "$1" ]; then
+if [ $# -eq 1 ]; then
   cd "$REPO_ROOT"
   run_one "$1"
 elif [ $# -eq 2 ]; then
@@ -39,10 +39,17 @@ elif [ $# -eq 2 ]; then
     echo "a non-empty file list and a positive job count are required" >&2
     exit 2
   fi
+  list="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")" || exit 2
   cd "$REPO_ROOT"
   export -f run_one
   export REPO_ROOT BINDUMP TSCPP
-  while IFS= read -r F; do printf '%s\0' "$F"; done < "$1" \
+  while IFS= read -r F || [ -n "$F" ]; do
+    if [ -z "$F" ]; then
+      echo "empty file list entry" >&2
+      exit 2
+    fi
+    printf '%s\0' "$F"
+  done < "$list" \
     | xargs -0 -r -P "$2" -I{} bash -c 'run_one "$@"' _ {}
 else
   echo "usage: $0 <file> | <listfile> <jobs>" >&2
