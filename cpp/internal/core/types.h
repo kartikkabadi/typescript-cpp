@@ -139,8 +139,10 @@ enum class JsxEmit : int32_t {
 };
 
 enum class NewLineKind : int32_t {
-	CarriageReturnLineFeed = 0,
-	LineFeed = 1,
+	// === slice: tsoptions === — numbered to match Go NewLineKind (compileroptions.go:485).
+	None = 0,
+	CarriageReturnLineFeed = 1,
+	LineFeed = 2,
 };
 
 enum class EmitFlags : uint32_t;
@@ -475,5 +477,107 @@ struct CompilerOptions {
 	// GetPathsBasePath — "" when Paths is unset.
 	std::string GetPathsBasePath(std::string_view currentDirectory) const;
 };
+
+// === slice: tsoptions ===
+
+// watchoptions.go
+enum class WatchFileKind : int32_t {
+	None = 0,
+	FixedPollingInterval = 1,
+	PriorityPollingInterval = 2,
+	DynamicPriorityPolling = 3,
+	FixedChunkSizePolling = 4,
+	UseFsEvents = 5,
+	UseFsEventsOnParentDirectory = 6,
+};
+
+enum class WatchDirectoryKind : int32_t {
+	None = 0,
+	UseFsEvents = 1,
+	FixedPollingInterval = 2,
+	DynamicPriorityPolling = 3,
+	FixedChunkSizePolling = 4,
+};
+
+enum class PollingKind : int32_t {
+	None = 0,
+	FixedInterval = 1,
+	PriorityInterval = 2,
+	DynamicPriority = 3,
+	FixedChunkSize = 4,
+};
+
+struct WatchOptions {
+	int* Interval{};
+	WatchFileKind FileKind{};
+	WatchDirectoryKind DirectoryKind{};
+	PollingKind FallbackPolling{};
+	Tristate SyncWatchDir{};
+	std::vector<std::string> ExcludeDir;
+	std::vector<std::string> ExcludeFiles;
+
+	// WatchInterval — watchoptions.go. Default 2000ms.
+	int64_t WatchInterval() const {
+		int64_t watchInterval = 2000;
+		if (Interval != nullptr) {
+			watchInterval = *Interval;
+		}
+		return watchInterval;
+	}
+};
+
+// typeacquisition.go
+struct TypeAcquisition {
+	Tristate Enable{};
+	std::vector<std::string> Include;
+	std::vector<std::string> Exclude;
+	Tristate DisableFilenameBasedTypeAcquisition{};
+
+	bool Equals(const TypeAcquisition* other) const {
+		if (this == other) {
+			return true;
+		}
+		if (other == nullptr) {
+			return false;
+		}
+		return Enable == other->Enable && Include == other->Include &&
+			   Exclude == other->Exclude &&
+			   DisableFilenameBasedTypeAcquisition ==
+				   other->DisableFilenameBasedTypeAcquisition;
+	}
+};
+
+// buildoptions.go
+struct BuildOptions {
+	Tristate Dry{};
+	Tristate Force{};
+	Tristate Verbose{};
+	int* Builders{};
+	Tristate StopBuildOnErrors{};
+
+	// Internal fields
+	Tristate Clean{};
+};
+
+// projectreference.go
+struct ProjectReference {
+	// Path is a normalized path on disk.
+	tspath::Path Path;
+	// OriginalPath is the path as it was originally written.
+	std::string OriginalPath;
+	// Circular indicates that this reference is intended to form a circularity.
+	bool Circular = false;
+};
+
+inline std::string ResolveConfigFileNameOfProjectReference(std::string_view path) {
+	if (tspath::fileExtensionIs(path, tspath::extensionJson)) {
+		return std::string{path};
+	}
+	return tspath::combinePaths(path, {"tsconfig.json"});
+}
+
+inline std::string ResolveProjectReferencePath(const ProjectReference& ref) {
+	return ResolveConfigFileNameOfProjectReference(ref.Path);
+}
 
 }  // namespace tsc

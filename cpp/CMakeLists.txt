@@ -79,6 +79,24 @@ add_library(tsc STATIC
 	internal/module/staticresolver.cpp
 	internal/packagejson/packagejson.cpp
 	internal/pseudochecker/pseudochecker.cpp
+	# === slice: tsoptions ===
+	internal/tsoptions/commandlineoption.cpp
+	internal/tsoptions/commandlineparser.cpp
+	internal/tsoptions/contentmappers.cpp
+	internal/tsoptions/declsbuild.cpp
+	internal/tsoptions/declscompiler.cpp
+	internal/tsoptions/declstypeacquisition.cpp
+	internal/tsoptions/declswatch.cpp
+	internal/tsoptions/diagnostics.cpp
+	internal/tsoptions/enummaps.cpp
+	internal/tsoptions/errors.cpp
+	internal/tsoptions/namemap.cpp
+	internal/tsoptions/parsedbuildcommandline.cpp
+	internal/tsoptions/parsedcommandline.cpp
+	internal/tsoptions/parsinghelpers.cpp
+	internal/tsoptions/showconfig.cpp
+	internal/tsoptions/tsconfigparsing.cpp
+	internal/tsoptions/wildcarddirectories.cpp
 )
 
 add_executable(tscpp cmd/tscpp/main.cpp)
