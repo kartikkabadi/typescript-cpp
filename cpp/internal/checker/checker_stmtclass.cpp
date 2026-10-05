@@ -1804,18 +1804,9 @@ bool Checker::isPropertyWithoutInitializer(Node* node) {
 Type* Checker::checkTruthinessExpression(Node* node, CheckMode checkMode) {
 	TSC_UNREACHABLE("checkTruthinessExpression — expressions slice");
 }
-void Checker::checkReferenceExpression(Node* node,
-                                       const DiagnosticMessage* invalidReferenceType,
-                                       const DiagnosticMessage* constantName) {
-	TSC_UNREACHABLE("checkReferenceExpression — expressions slice");
-}
-void Checker::checkDestructuringAssignment(Node* node, Type* sourceType,
-                                           CheckMode checkMode, bool checkResolvedType) {
-	TSC_UNREACHABLE("checkDestructuringAssignment — expressions slice");
-}
-bool Checker::isTypeEqualityComparableTo(Type* source, Type* target) {
-	TSC_UNREACHABLE("isTypeEqualityComparableTo — expressions slice");
-}
+// (deduped: checkReferenceExpression defined in cpp/internal/checker/checker_expressions_c.cpp)
+// (deduped: checkDestructuringAssignment defined in cpp/internal/checker/checker_expressions_c.cpp)
+// (deduped: isTypeEqualityComparableTo defined in cpp/internal/checker/checker_expressions_c.cpp)
 Node* Checker::getEffectiveCheckNode(Node* node) {
 	TSC_UNREACHABLE("getEffectiveCheckNode — expressions slice");
 }

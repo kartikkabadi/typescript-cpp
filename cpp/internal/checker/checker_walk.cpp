@@ -1192,7 +1192,7 @@ Type* Checker::checkSuperExpression(Node* node) { TSC_UNREACHABLE("checkSuperExp
 Type* Checker::checkTemplateExpression(Node* node) { TSC_UNREACHABLE("checkTemplateExpression — expressions slice"); }
 Type* Checker::checkRegularExpressionLiteral(Node* node) { TSC_UNREACHABLE("checkRegularExpressionLiteral — expressions slice"); }
 Type* Checker::checkArrayLiteral(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkArrayLiteral — expressions slice"); }
-Type* Checker::checkObjectLiteral(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkObjectLiteral — expressions slice"); }
+// (deduped: checkObjectLiteral defined in cpp/internal/checker/checker_expressions_c.cpp)
 Type* Checker::checkPropertyAccessExpression(Node* node, CheckMode checkMode, bool writeOnly) { TSC_UNREACHABLE("checkPropertyAccessExpression — expressions slice"); }
 Type* Checker::checkQualifiedName(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkQualifiedName — expressions slice"); }
 Type* Checker::checkIndexedAccess(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkIndexedAccess — expressions slice"); }
@@ -1202,7 +1202,7 @@ Type* Checker::checkTaggedTemplateExpression(Node* node) { TSC_UNREACHABLE("chec
 Type* Checker::checkParenthesizedExpression(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkParenthesizedExpression — expressions slice"); }
 Type* Checker::checkClassExpression(Node* node) { TSC_UNREACHABLE("checkClassExpression — expressions slice"); }
 Type* Checker::checkFunctionExpressionOrObjectLiteralMethod(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkFunctionExpressionOrObjectLiteralMethod — expressions slice"); }
-Type* Checker::checkAssertion(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkAssertion — expressions slice"); }
+// (deduped: checkAssertion defined in cpp/internal/checker/checker_expressions_c.cpp)
 Type* Checker::checkTypeOfExpression(Node* node) { TSC_UNREACHABLE("checkTypeOfExpression — expressions slice"); }
 Type* Checker::checkNonNullAssertion(Node* node) { TSC_UNREACHABLE("checkNonNullAssertion — expressions slice"); }
 Type* Checker::checkSatisfiesExpression(Node* node) { TSC_UNREACHABLE("checkSatisfiesExpression — expressions slice"); }
@@ -1212,7 +1212,7 @@ Type* Checker::checkVoidExpression(Node* node) { TSC_UNREACHABLE("checkVoidExpre
 Type* Checker::checkAwaitExpression(Node* node) { TSC_UNREACHABLE("checkAwaitExpression — expressions slice"); }
 Type* Checker::checkPrefixUnaryExpression(Node* node) { TSC_UNREACHABLE("checkPrefixUnaryExpression — expressions slice"); }
 Type* Checker::checkPostfixUnaryExpression(Node* node) { TSC_UNREACHABLE("checkPostfixUnaryExpression — expressions slice"); }
-Type* Checker::checkBinaryExpression(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkBinaryExpression — expressions slice"); }
+// (deduped: checkBinaryExpression defined in cpp/internal/checker/checker_expressions_c.cpp)
 Type* Checker::checkConditionalExpression(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkConditionalExpression — expressions slice"); }
 Type* Checker::checkSpreadExpression(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkSpreadExpression — expressions slice"); }
 Type* Checker::checkYieldExpression(Node* node) { TSC_UNREACHABLE("checkYieldExpression — expressions slice"); }
@@ -1231,8 +1231,8 @@ void Checker::checkFunctionExpressionOrObjectLiteralMethodDeferred(Node* node) {
 void Checker::checkClassExpressionDeferred(Node* node) { TSC_UNREACHABLE("checkClassExpressionDeferred — expressions slice"); }
 void Checker::checkJsxSelfClosingElementDeferred(Node* node) { TSC_UNREACHABLE("checkJsxSelfClosingElementDeferred — jsx slice"); }
 void Checker::checkJsxElementDeferred(Node* node) { TSC_UNREACHABLE("checkJsxElementDeferred — jsx slice"); }
-void Checker::checkAssertionDeferred(Node* node) { TSC_UNREACHABLE("checkAssertionDeferred — expressions slice"); }
-void Checker::checkContextualDeprecations(Node* node) { TSC_UNREACHABLE("checkContextualDeprecations — expressions slice"); }
+// (deduped: checkAssertionDeferred defined in cpp/internal/checker/checker_expressions_c.cpp)
+// (deduped: checkContextualDeprecations defined in cpp/internal/checker/checker_expressions_c.cpp)
 
 // owner: walker per-node checks (wave-3)
 void Checker::checkVariableStatement(Node* node) { TSC_UNREACHABLE("checkVariableStatement — declchecks slice"); }

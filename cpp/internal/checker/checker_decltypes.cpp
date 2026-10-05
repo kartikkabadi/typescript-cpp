@@ -2997,17 +2997,17 @@ namespace {
 
 // (deduped: checkExpressionWithContextualType defined in cpp/internal/checker/checker_walk.cpp)
 
-Type* Checker::checkExpressionForMutableLocation(Node* node, CheckMode checkMode) { decltypesDepUnreachable("checkExpressionForMutableLocation — decltypes dep"); }
+// (deduped: checkExpressionForMutableLocation defined in cpp/internal/checker/checker_expressions_c.cpp)
 // (deduped: checkIteratedTypeOrElementType defined in cpp/internal/checker/checker_contextual.cpp)
 
 Type* Checker::checkJsxAttribute(Node* node, CheckMode checkMode) { decltypesDepUnreachable("checkJsxAttribute — decltypes dep"); }
 // (deduped: checkNonNullExpression defined in cpp/internal/checker/checker_walk.cpp)
 
-Type* Checker::checkObjectLiteralMethod(Node* node, CheckMode checkMode) { decltypesDepUnreachable("checkObjectLiteralMethod — decltypes dep"); }
+// (deduped: checkObjectLiteralMethod defined in cpp/internal/checker/checker_expressions_c.cpp)
 // (deduped: checkPropertyAccessExpression defined in cpp/internal/checker/checker_walk.cpp)
 
-Type* Checker::checkPropertyAssignment(Node* node, CheckMode checkMode) { decltypesDepUnreachable("checkPropertyAssignment — decltypes dep"); }
-Type* Checker::checkShorthandPropertyAssignment(Node* node, bool inDestructuringPattern, CheckMode checkMode) { decltypesDepUnreachable("checkShorthandPropertyAssignment — decltypes dep"); }
+// (deduped: checkPropertyAssignment defined in cpp/internal/checker/checker_expressions_c.cpp)
+// (deduped: checkShorthandPropertyAssignment defined in cpp/internal/checker/checker_expressions_c.cpp)
 // (deduped: getAdjustedTypeWithFacts defined in cpp/internal/checker/checker_contextual.cpp)
 
 // (deduped: getConditionalTypeInstantiation defined in cpp/internal/checker/checker_instantiate.cpp)
@@ -3039,7 +3039,7 @@ Type* Checker::getFlowTypeOfReference(Node* reference, Type* declaredType) { dec
 
 // (deduped: getQuickTypeOfExpression defined in cpp/internal/checker/checker_walk.cpp)
 
-// (deduped: getResolvedSymbolOrNil defined in cpp/internal/checker/checker_declchecks.cpp)
+// (deduped: getResolvedSymbolOrNil defined in cpp/internal/checker/checker_expressions_c.cpp)
 
 // (deduped: getReturnTypeFromBody defined in cpp/internal/checker/checker_signatures.cpp)
 
@@ -3047,7 +3047,7 @@ Type* Checker::getFlowTypeOfReference(Node* reference, Type* declaredType) { dec
 
 // (deduped: getSingleCallSignature defined in cpp/internal/checker/checker_members.cpp)
 
-Symbol* Checker::getSpreadSymbol(Symbol* prop, bool readonly) { decltypesDepUnreachable("getSpreadSymbol — decltypes dep"); }
+// (deduped: getSpreadSymbol defined in cpp/internal/checker/checker_expressions_c.cpp)
 // (deduped: getTypeArguments defined in cpp/internal/checker/checker_instantiate.cpp)
 
 // (deduped: getTypeOfExpression defined in cpp/internal/checker/checker_walk.cpp)
@@ -3065,7 +3065,7 @@ Type* Checker::getTypeOfReverseMappedSymbol(Symbol* symbol) { decltypesDepUnreac
 
 // (deduped: hasBindableName defined in cpp/internal/checker/checker_signatures.cpp)
 
-bool Checker::hasDefaultValue(Node* node) { decltypesDepUnreachable("hasDefaultValue — decltypes dep"); }
+// (deduped: hasDefaultValue defined in cpp/internal/checker/checker_expressions_c.cpp)
 // (deduped: isArrayLikeType defined in cpp/internal/checker/checker_typenodes.cpp)
 
 // (deduped: isArrayOrTupleType defined in cpp/internal/checker/checker_typenodes.cpp)
@@ -3081,9 +3081,9 @@ bool Checker::hasDefaultValue(Node* node) { decltypesDepUnreachable("hasDefaultV
 // (deduped: isMappedTypeGenericIndexedAccess defined in cpp/internal/checker/checker_members.cpp)
 
 bool Checker::isMatchingReference(Node* source, Node* target) { decltypesDepUnreachable("isMatchingReference — decltypes dep"); }
-bool Checker::isSpreadableProperty(Symbol* prop) { decltypesDepUnreachable("isSpreadableProperty — decltypes dep"); }
+// (deduped: isSpreadableProperty defined in cpp/internal/checker/checker_expressions_c.cpp)
 Type* Checker::sliceTupleType(Type* t, int index, int endSkipCount) { decltypesDepUnreachable("sliceTupleType — decltypes dep"); }
-bool Checker::isValidSpreadType(Type* t) { decltypesDepUnreachable("isValidSpreadType — decltypes dep"); }
+// (deduped: isValidSpreadType defined in cpp/internal/checker/checker_expressions_c.cpp)
 // (deduped: removeMissingType defined in cpp/internal/checker/checker_contextual.cpp)
 
 // (deduped: removeOptionalTypeMarker defined in cpp/internal/checker/checker_contextual.cpp)

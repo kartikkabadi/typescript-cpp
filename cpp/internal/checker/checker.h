@@ -940,6 +940,14 @@ struct RecursionId {
 	bool operator==(const RecursionId&) const = default;
 };
 
+// === slice: expr_c === — PredicateSemantics (checker.go:13084)
+using PredicateSemantics = uint32_t;
+inline constexpr PredicateSemantics PredicateSemanticsNone = 0;
+inline constexpr PredicateSemantics PredicateSemanticsAlways = 1 << 0;
+inline constexpr PredicateSemantics PredicateSemanticsNever = 1 << 1;
+inline constexpr PredicateSemantics PredicateSemanticsSometimes =
+	PredicateSemanticsAlways | PredicateSemanticsNever;
+
 // Checker
 
 class Checker {
@@ -2267,10 +2275,10 @@ public:
 
 	// stmtclass dep stubs — owned by other slices
 	Type* checkTruthinessExpression(Node* node, CheckMode checkMode);
-	void checkReferenceExpression(Node* node, const DiagnosticMessage* invalidReferenceType,
-	                              const DiagnosticMessage* constantName);
-	void checkDestructuringAssignment(Node* node, Type* sourceType, CheckMode checkMode,
-	                                  bool checkResolvedType);
+	bool checkReferenceExpression(Node* expr, const DiagnosticMessage* invalidReferenceMessage,
+	                              const DiagnosticMessage* invalidOptionalChainMessage);
+	Type* checkDestructuringAssignment(Node* node, Type* sourceType, CheckMode checkMode,
+	                                  bool rightIsThis);
 	bool isTypeEqualityComparableTo(Type* source, Type* target);
 	Node* getEffectiveCheckNode(Node* node);
 	std::string getTypeNameForErrorDisplay(Type* t);
@@ -3109,6 +3117,62 @@ public:
 	bool isUncalledFunctionReference(Node* node, Symbol* prop);             // expressions slice
 	bool isJSLiteralType(Type* t);                                          // decltypes slice
 	bool isDeprecatedSymbol(Symbol* symbol);                                // decltypes slice
+
+	// === slice: expr_c === (checker.go:12390-14184 — checker_expressions_c.cpp)
+	void checkThisInStaticClassFieldInitializerInDecoratedClass(Node* thisExpression, Node* container);
+	void checkThisBeforeSuper(Node* node, Node* container, const DiagnosticMessage* diagnosticMessage);
+	Type* checkBinaryLikeExpression(Node* left, Node* operatorToken, Node* right, CheckMode checkMode, Node* errorNode);
+	Type* checkObjectLiteralAssignment(Node* node, Type* sourceType, bool rightIsThis);
+	Type* checkObjectLiteralDestructuringPropertyAssignment(Node* node, Type* objectLiteralType, int propertyIndex, NodeList* allProperties, bool rightIsThis);
+	Type* checkArrayLiteralAssignment(Node* node, Type* sourceType, CheckMode checkMode);
+	Type* checkArrayLiteralDestructuringElementAssignment(Node* node, Type* sourceType, int elementIndex, Type* elementType, CheckMode checkMode);
+	Type* checkReferenceAssignment(Node* target, Type* sourceType, CheckMode checkMode);
+	void reportOperatorError(Type* leftType, Kind operatorKind, Type* rightType, Node* errorNode, const std::function<bool(Type*, Type*)>& isRelated);
+	void reportOperatorErrorUnless(Type* leftType, Kind operatorKind, Type* rightType, Node* errorNode, const std::function<bool(Type*, Type*)>& typesAreCompatible);
+	std::pair<Type*, Type*> getBaseTypesIfUnrelated(Type* leftType, Type* rightType, const std::function<bool(Type*, Type*)>& isRelated);
+	void checkAssignmentOperator(Node* left, Kind operatorKind, Node* right, Type* leftType, Type* rightType);
+	bool bothAreBigIntLike(Type* left, Type* right);
+	Kind getSuggestedBooleanOperator(Kind operatorKind);
+	bool checkArithmeticOperandType(Node* operand, Type* t, const DiagnosticMessage* diagnostic, bool isAwaitValid);
+	bool checkForDisallowedESSymbolOperand(Node* left, Node* right, Type* leftType, Type* rightType, Kind operatorKind);
+	void checkNaNEquality(Node* errorNode, Kind operatorKind, Node* left, Node* right);
+	bool isGlobalNaN(Node* expr);
+	Type* checkTruthinessOfType(Type* t, Node* node);
+	PredicateSemantics getSyntacticTruthySemantics(Node* node);
+	void checkNullishCoalesceOperands(Node* left, Node* right);
+	void checkNullishCoalesceOperandLeft(Node* left);
+	PredicateSemantics getSyntacticNullishnessSemantics(Node* node);
+	bool isSideEffectFree(Node* node);
+	bool isIndirectCall(Node* node);
+	Type* checkInstanceOfExpression(Node* left, Node* right, Type* leftType, Type* rightType, CheckMode checkMode);
+	Type* checkInExpression(Node* left, Node* right, Type* leftType, Type* rightType);
+	bool hasEmptyObjectIntersection(Type* t);
+	std::vector<Symbol*> getExactOptionalUnassignableProperties(Type* source, Type* target);
+	bool isExactOptionalPropertyMismatch(Type* source, Type* target);
+	void checkDeprecatedProperty(Node* name, Type* contextualType);
+	void checkSpreadPropOverrides(Type* t, const SymbolTable& props, Node* spread);
+	Type* getSpreadType(Type* left, Type* right, Symbol* symbol, ObjectFlags objectFlags, bool readonly);
+	IndexInfo* getIndexInfoWithReadonly(IndexInfo* info, bool readonly);
+	bool isNonGenericObjectType(Type* t);
+	Type* tryMergeUnionOfObjectTypeAndEmptyObject(Type* t, bool readonly);
+	bool isEmptyObjectTypeOrSpreadsIntoEmptyObject(Type* t);
+	bool isInlineImportAttributes(Node* node);
+	bool isValidConstAssertionArgument(Node* node);
+	bool isInPropertyInitializerOrClassStaticBlock(Node* node, bool ignoreArrowFunctions);
+	Type* getNarrowedTypeOfSymbol(Symbol* symbol, Node* location);
+	bool isReadonlyAssignmentDeclaration(Node* node);
+	Symbol* getReferencedValueOrAliasSymbol(Node* reference);
+
+	// expr_c dep stubs — owned by other slices; bodies stubbed in
+	// checker_expressions_c.cpp under "dep stubs".
+	Type* checkNonNullType(Type* t, Node* node);                            // expressions slice
+	void reportNonexistentProperty(Node* propNode, Type* containingType, bool isUncheckedJS); // expressions slice
+	bool checkPropertyAccessibility(Node* node, bool isSuper, bool writing, Type* t, Symbol* prop); // expressions slice
+	bool isPostSuperFlowNode(FlowNode* flow, bool noCacheCheck);            // flow slice
+	bool isTypeComparableTo(Type* source, Type* target);                    // relater slice
+	bool areTypesComparable(Type* type1, Type* type2);                      // relater slice
+	std::pair<std::string, std::string> getTypeNamesForErrorDisplay(Type* left, Type* right); // relater slice
+	void addIntraExpressionInferenceSite(InferenceContext* n, Node* node, Type* t); // inference slice
 };  // class Checker
 
 // Free helpers used across checker translation units.
