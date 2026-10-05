@@ -421,7 +421,7 @@ void Checker::checkForInStatement(Node* node) {
 
 // checker.go:4055
 Type* Checker::getIndexTypeOrString(Type* t) {
-	Type* indexType = getExtractStringType(getIndexType(t, IndexFlagsNone, nullptr));
+	Type* indexType = getExtractStringType(getIndexTypeEx(t, IndexFlagsNone));
 	return (indexType->flags & TypeFlagsNever) != 0 ? stringType : indexType;
 }
 
@@ -1000,7 +1000,7 @@ bool Checker::areTypeParametersIdentical(
     const std::vector<Node*>& declarations, const std::vector<Type*>& targetParameters,
     const std::function<std::vector<Node*>(Node*)>& getTypeParameterDeclarations) {
 	size_t maxTypeArgumentCount = targetParameters.size();
-	size_t minTypeArgumentCount = getMinTypeArgumentCount(targetParameters);
+	size_t minTypeArgumentCount = static_cast<size_t>(getMinTypeArgumentCount(targetParameters));
 	for (Node* declaration : declarations) {
 		// If this declaration has too few or too many type parameters, we report an error
 		std::vector<Node*> sourceParameters = getTypeParameterDeclarations(declaration);
@@ -1925,10 +1925,6 @@ ConstructorAccessibilityError* Checker::getConstructorAccessibilityError(
 	TSC_UNREACHABLE("getConstructorAccessibilityError — members slice");
 }
 
-// owner: instantiate slice (checker.go:22285-23219)
-size_t Checker::getMinTypeArgumentCount(const std::vector<Type*>& typeParameters) {
-	TSC_UNREACHABLE("getMinTypeArgumentCount — instantiate slice");
-}
 
 // owner: decltypes slice (checker.go:16720-19097)
 Type* Checker::getNonMissingTypeOfSymbol(Symbol* symbol) {

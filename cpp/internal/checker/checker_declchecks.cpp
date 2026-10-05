@@ -1742,9 +1742,6 @@ Type* Checker::getResolvedTypeParameterDefault(Type* t) {
 Type* Checker::getNameTypeFromMappedType(Type* t) {
 	TSC_UNREACHABLE("getNameTypeFromMappedType — instantiate slice");
 }
-Type* Checker::getConstraintTypeFromMappedType(Type* t) {
-	TSC_UNREACHABLE("getConstraintTypeFromMappedType — instantiate slice");
-}
 // owner: typenodes slice (checker.go:23220-25738)
 Type* Checker::getTypeFromThisTypeNode(Node* node) {
 	TSC_UNREACHABLE("getTypeFromThisTypeNode — typenodes slice");
