@@ -26,6 +26,7 @@ add_library(tsc STATIC
 	internal/checker/checker_walk.cpp
 	internal/checker/checker_jsdoc.cpp
 	internal/checker/checker_tracer.cpp
+	internal/checker/checker_grammar.cpp
 	internal/checker/mapper.cpp
 	internal/evaluator/evaluator.cpp
 	internal/jsnum/jsnum.cpp

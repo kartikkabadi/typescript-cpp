@@ -2107,4 +2107,120 @@ bool isVariableDeclarationInitializedToBareOrAccessedRequire(Node* node) {
 	    node, true /*allowAccessedRequire*/);
 }
 
+// --- slice: grammarchecks — utilities.go helpers ---
+
+// utilities.go: IsCommaExpression
+bool isCommaExpression(Node* node) {
+	return node->kind == Kind::BinaryExpression &&
+	       node->as<BinaryExpression>()->OperatorToken->kind == Kind::CommaToken;
+}
+
+// utilities.go: IsCommaSequence
+bool isCommaSequence(Node* node) {
+	return isCommaExpression(node);
+}
+
+// utilities.go: IsIterationStatement
+bool isIterationStatement(Node* node, bool lookInLabeledStatements) {
+	switch (node->kind) {
+	case Kind::ForStatement:
+	case Kind::ForInStatement:
+	case Kind::ForOfStatement:
+	case Kind::DoStatement:
+	case Kind::WhileStatement:
+		return true;
+	case Kind::LabeledStatement:
+		return lookInLabeledStatements &&
+		       isIterationStatement(node->statement(), lookInLabeledStatements);
+	default:
+		return false;
+	}
+}
+
+// utilities.go: IsStringLiteralLikeType
+bool isStringLiteralLikeType(Node* node) {
+	return node->kind == Kind::LiteralType &&
+	       isStringLiteralLike(node->as<LiteralTypeNode>()->Literal);
+}
+
+// utilities.go: WalkUpParenthesizedTypes
+Node* walkUpParenthesizedTypes(Node* node) {
+	while (node != nullptr && node->kind == Kind::ParenthesizedType) {
+		node = node->parent;
+	}
+	return node;
+}
+
+// utilities.go: CanHaveModifiers
+bool canHaveModifiers(Node* node) {
+	switch (node->kind) {
+	case Kind::TypeParameter:
+	case Kind::Parameter:
+	case Kind::PropertySignature:
+	case Kind::PropertyDeclaration:
+	case Kind::MethodSignature:
+	case Kind::MethodDeclaration:
+	case Kind::Constructor:
+	case Kind::GetAccessor:
+	case Kind::SetAccessor:
+	case Kind::IndexSignature:
+	case Kind::ConstructorType:
+	case Kind::FunctionExpression:
+	case Kind::ArrowFunction:
+	case Kind::ClassExpression:
+	case Kind::VariableStatement:
+	case Kind::FunctionDeclaration:
+	case Kind::ClassDeclaration:
+	case Kind::InterfaceDeclaration:
+	case Kind::TypeAliasDeclaration:
+	case Kind::EnumDeclaration:
+	case Kind::ModuleDeclaration:
+	case Kind::ImportEqualsDeclaration:
+	case Kind::ImportDeclaration:
+	case Kind::JSImportDeclaration:
+	case Kind::ExportAssignment:
+	case Kind::ExportDeclaration:
+		return true;
+	default:
+		return false;
+	}
+}
+
+// utilities.go: CanHaveIllegalModifiers
+bool canHaveIllegalModifiers(Node* node) {
+	switch (node->kind) {
+	case Kind::ClassStaticBlockDeclaration:
+	case Kind::PropertyAssignment:
+	case Kind::ShorthandPropertyAssignment:
+	case Kind::MissingDeclaration:
+	case Kind::NamespaceExportDeclaration:
+		return true;
+	default:
+		return false;
+	}
+}
+
+// utilities.go: HasModifier
+bool hasModifier(Node* node, ModifierFlags flags) {
+	return (node->modifierFlags() & flags) != 0;
+}
+
+// utilities.go: GetContainingFunction
+Node* getContainingFunction(Node* node) {
+	return findAncestor(node->parent, isFunctionLike);
+}
+
+// utilities.go: isCommonJSContainingModuleKind
+static bool isCommonJSContainingModuleKind(ModuleKind kind) {
+	return kind == ModuleKind::CommonJS ||
+	       (ModuleKind::Node16 <= kind && kind <= ModuleKind::NodeNext);
+}
+
+// utilities.go: IsEffectiveExternalModule
+bool isEffectiveExternalModule(SourceFile* node, const CompilerOptions* compilerOptions) {
+	return isExternalModule(node) ||
+	       (isCommonJSContainingModuleKind(compilerOptions->GetEmitModuleKind()) &&
+	        node->CommonJSModuleIndicator != nullptr);
+}
+
 } // namespace tsc

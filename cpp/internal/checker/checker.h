@@ -23,6 +23,7 @@
 #include "internal/core/linkstore.h"
 #include "internal/core/types.h"
 #include "internal/jsnum/jsnum.h"
+#include "internal/scanner/scanner.h"
 
 namespace tsc::checker {
 
@@ -1058,7 +1059,7 @@ public:
 	LinkStore<Symbol*, MarkedAssignmentSymbolLinks> markedAssignmentSymbolLinks{&linksArena};
 	LinkStore<Symbol*, ContainingSymbolLinks> symbolContainerLinks{&linksArena};
 	LinkStore<SourceFile*, SourceFileLinks> sourceFileLinks{&linksArena};
-	// regExpScanner
+	std::optional<Scanner> regExpScanner;
 	std::unordered_map<Type*, Node*> patternForType;
 	std::unordered_map<Node*, Type*> contextFreeTypes;
 	Type* anyType{};
@@ -1832,14 +1833,9 @@ public:
 											 const std::vector<Type*>& typeParameters);
 	Type* checkExpressionWorker(Node* node, CheckMode checkMode);
 	Type* checkPrivateIdentifierExpression(Node* node);
-	Symbol* getSymbolForPrivateIdentifierExpression(Node* node);
 	void skippedGenericFunction(Node* node, CheckMode checkMode);
 
 	// Dep-stub decls (callees owned by other slices — see checker_walk.cpp bottom)
-	bool checkGrammarStatementInAmbientContext(Node* node);
-	void checkGrammarNumericLiteral(Node* node);
-	bool checkGrammarBigIntLiteral(Node* node);
-	void checkGrammarPrivateIdentifierExpression(Node* node);
 	bool isReachableFlowNode(FlowNode* flow);
 	Type* getAwaitedType(Type* t);
 	Type* getOptionalExpressionType(Type* exprType, Node* expression);
@@ -1910,7 +1906,6 @@ public:
 	Type* checkJsxAttributes(Node* node, CheckMode checkMode);
 	Type* checkNonNullExpression(Node* node);
 	bool isSymbolOrSymbolForCall(Node* node);
-	Symbol* lookupSymbolForPrivateIdentifierDeclaration(const std::string& name, Node* location);
 	Signature* resolveUntypedCall(Node* node);
 	void checkFunctionExpressionOrObjectLiteralMethodDeferred(Node* node);
 	void checkClassExpressionDeferred(Node* node);
@@ -1976,9 +1971,104 @@ public:
 	void checkMissingDeclaration(Node* node);
 	void checkJSDocType(Node* node);
 	std::string getIsolatedModulesLikeFlagName();
+
+	// === slice: grammarchecks (checker_grammar.cpp) ===
+	bool grammarErrorOnFirstToken(Node* node, const DiagnosticMessage* message,
+								  std::vector<std::string> args = {});
+	bool grammarErrorAtPos(Node* nodeForSourceFile, int start, int length,
+						   const DiagnosticMessage* message,
+						   std::vector<std::string> args = {});
+	bool grammarErrorOnNode(Node* node, const DiagnosticMessage* message,
+							std::vector<std::string> args = {});
+	bool grammarErrorOnNodeSkippedOnNoEmit(Node* node, const DiagnosticMessage* message,
+										   std::vector<std::string> args = {});
+	bool hasParseDiagnostics(SourceFile* sourceFile);
+	bool checkGrammarRegularExpressionLiteral(RegularExpressionLiteral* node);
+	bool checkGrammarPrivateIdentifierExpression(PrivateIdentifier* privId);
+	bool checkGrammarMappedType(MappedTypeNode* node);
+	bool checkGrammarDecorator(Decorator* decorator);
+	bool checkGrammarExportDeclaration(ExportDeclaration* node);
+	bool checkGrammarModuleElementContext(Node* node, const DiagnosticMessage* errorMessage);
+	bool checkGrammarModifiers(Node* node);
+	bool reportObviousModifierErrors(Node* node);
+	Node* findFirstModifierExcept(Node* node, Kind allowedModifier);
+	Node* findFirstIllegalModifier(Node* node);
+	bool reportObviousDecoratorErrors(Node* node);
+	Node* findFirstIllegalDecorator(Node* node);
+	bool checkGrammarAsyncModifier(Node* node, Node* asyncModifier);
+	bool checkGrammarForDisallowedTrailingComma(NodeList* list, const DiagnosticMessage* diag);
+	bool checkGrammarTypeParameterList(NodeList* typeParameters, SourceFile* file);
+	bool checkGrammarParameterList(NodeList* parameters);
+	bool checkGrammarForUseStrictSimpleParameterList(Node* node);
+	bool checkGrammarFunctionLikeDeclaration(Node* node);
+	bool checkGrammarClassLikeDeclaration(Node* node);
+	bool checkGrammarArrowFunction(Node* node, SourceFile* file);
+	bool checkGrammarIndexSignatureParameters(IndexSignatureDeclaration* node);
+	bool checkGrammarIndexSignature(IndexSignatureDeclaration* node);
+	bool checkGrammarForAtLeastOneTypeArgument(Node* node, NodeList* typeArguments);
+	bool checkGrammarTypeArguments(Node* node, NodeList* typeArguments);
+	bool checkGrammarTaggedTemplateChain(TaggedTemplateExpression* node);
+	bool checkGrammarHeritageClause(HeritageClause* node);
+	bool checkGrammarExpressionWithTypeArguments(Node* node);
+	bool checkGrammarClassDeclarationHeritageClauses(Node* node, SourceFile* file);
+	bool checkGrammarInterfaceDeclaration(InterfaceDeclaration* node);
+	bool checkGrammarComputedPropertyName(Node* node);
+	bool checkGrammarForGenerator(Node* node);
+	bool checkGrammarForInvalidQuestionMark(Node* postfixToken, const DiagnosticMessage* message);
+	bool checkGrammarForInvalidExclamationToken(Node* postfixToken, const DiagnosticMessage* message);
+	bool checkGrammarObjectLiteralExpression(ObjectLiteralExpression* node, bool inDestructuring);
+	bool checkGrammarJsxElement(Node* node);
+	bool checkGrammarJsxName(Node* node);
+	bool checkGrammarJsxExpression(JsxExpression* node);
+	bool checkGrammarForInOrForOfStatement(ForInOrOfStatement* forInOrOfStatement);
+	bool checkGrammarAccessor(Node* accessor);
+	bool doesAccessorHaveCorrectParameterCount(Node* accessor);
+	bool checkGrammarTypeOperatorNode(TypeOperatorNode* node);
+	bool checkGrammarForInvalidDynamicName(Node* node, const DiagnosticMessage* message);
+	bool isNonBindableDynamicName(Node* node);
+	bool checkGrammarMethod(Node* node);
+	bool checkGrammarBreakOrContinueStatement(Node* node);
+	bool checkGrammarBindingElement(BindingElement* node);
+	bool checkGrammarVariableDeclaration(VariableDeclaration* node);
+	bool checkGrammarForEsModuleMarkerInBindingName(Node* name);
+	bool checkGrammarNameInLetOrConstDeclarations(Node* name);
+	bool checkGrammarVariableDeclarationList(VariableDeclarationList* declarationList);
+	bool checkGrammarAwaitOrAwaitUsing(Node* node);
+	bool checkGrammarYieldExpression(Node* node);
+	bool checkGrammarForDisallowedBlockScopedVariableStatement(VariableStatement* node);
+	bool containerAllowsBlockScopedVariable(Node* parent);
+	bool checkGrammarMetaProperty(MetaProperty* node);
+	bool checkGrammarConstructorTypeParameters(ConstructorDeclaration* node);
+	bool checkGrammarConstructorTypeAnnotation(ConstructorDeclaration* node);
+	bool checkGrammarProperty(Node* node);
+	bool checkAmbientInitializer(Node* node);
+	bool isInitializerSimpleLiteralEnumReference(Node* expr);
+	bool checkGrammarTopLevelElementForRequiredDeclareModifier(Node* node);
+	bool checkGrammarTopLevelElementsForRequiredDeclareModifier(SourceFile* file);
+	bool checkGrammarStatementInAmbientContext(Node* node);
+	void checkGrammarNumericLiteral(NumericLiteral* node);
+	bool checkGrammarBigIntLiteral(BigIntLiteral* node);
+	bool checkGrammarImportClause(ImportClause* node);
+	bool checkGrammarImportAttributeValues(ImportAttributes* node);
+	bool checkGrammarTypeOnlyNamedImportsOrExports(Node* namedBindings);
+	bool checkGrammarImportCallExpression(Node* node);
+	bool checkGrammarImportAttributesType(TypeLiteralNode* attributes);
+	// grammarchecks.go dependencies ported alongside the slice
+	Symbol* getSymbolForPrivateIdentifierExpression(Node* node);
+	Node* getAccessorThisParameter(Node* accessor);
+	bool isInParameterInitializerBeforeContainingFunction(Node* node);
+	std::pair<std::string, bool> getEffectivePropertyNameForPropertyNameNode(Node* node);
+	bool isValidIndexKeyType(Type* t);
+	bool isGenericType(Type* t);
+	// grammarchecks.go dependencies stubbed — owned by other slices
+	Symbol* lookupSymbolForPrivateIdentifierDeclaration(const std::string& propName, Node* location);
+	ObjectFlags getGenericObjectFlags(Type* t);
+	std::pair<std::string, bool> tryGetNameFromType(Type* t);
 };
 
 // Free helpers used across checker translation units.
+Diagnostic* NewDiagnosticForNode(Node* node, const DiagnosticMessage* message,
+								 const std::vector<std::string>& args);
 Type* getNonDistributedTypeParameter(Type* t);
 bool isThisTypeParameter(Type* t);
 void clearCachedInferences(std::vector<InferenceInfo*>& inferences);

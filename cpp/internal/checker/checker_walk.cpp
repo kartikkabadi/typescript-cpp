@@ -1016,10 +1016,10 @@ Type* Checker::checkExpressionWorker(Node* node, CheckMode checkMode) {
 		}
 		return getFreshTypeOfLiteralType(getStringLiteralType(node->text()));
 	case Kind::NumericLiteral:
-		checkGrammarNumericLiteral(node);
+		checkGrammarNumericLiteral(node->as<NumericLiteral>());
 		return getFreshTypeOfLiteralType(getNumberLiteralType(numberFromString(node->text())));
 	case Kind::BigIntLiteral:
-		checkGrammarBigIntLiteral(node);
+		checkGrammarBigIntLiteral(node->as<BigIntLiteral>());
 		return getFreshTypeOfLiteralType(
 			getBigIntLiteralType(PseudoBigInt::create(parsePseudoBigInt(node->text()), false /*negative*/)));
 	case Kind::TrueKeyword:
@@ -1108,7 +1108,7 @@ Type* Checker::checkExpressionWorker(Node* node, CheckMode checkMode) {
 }
 
 Type* Checker::checkPrivateIdentifierExpression(Node* node) {
-	checkGrammarPrivateIdentifierExpression(node);
+	checkGrammarPrivateIdentifierExpression(node->as<PrivateIdentifier>());
 	Symbol* symbol = getSymbolForPrivateIdentifierExpression(node);
 	if (symbol != nullptr) {
 		markPropertyAsReferenced(symbol, nullptr /*nodeForCheckWriteOnly*/, false /*isSelfTypeAccess*/);
@@ -1116,13 +1116,8 @@ Type* Checker::checkPrivateIdentifierExpression(Node* node) {
 	return anyType;
 }
 
-Symbol* Checker::getSymbolForPrivateIdentifierExpression(Node* node) {
-	auto* links = symbolNodeLinks.Get(node);
-	if (links->resolvedSymbol == nullptr) {
-		links->resolvedSymbol = lookupSymbolForPrivateIdentifierDeclaration(node->text(), node);
-	}
-	return links->resolvedSymbol;
-}
+// (getSymbolForPrivateIdentifierExpression moved to the grammarchecks slice's
+// file — identical ports; theirs is the surviving definition.)
 
 // checker.go:10217
 void Checker::skippedGenericFunction(Node* node, CheckMode checkMode) {
@@ -1139,12 +1134,7 @@ void Checker::skippedGenericFunction(Node* node, CheckMode checkMode) {
 // real definition lands. Never called successfully until then.
 // ---------------------------------------------------------------------------
 
-// owner: grammar slice (wave-1)
-void Checker::checkGrammarSourceFile(SourceFile* node) { TSC_UNREACHABLE("checkGrammarSourceFile — grammar slice"); }
-bool Checker::checkGrammarStatementInAmbientContext(Node* node) { TSC_UNREACHABLE("checkGrammarStatementInAmbientContext — grammar slice"); }
-void Checker::checkGrammarNumericLiteral(Node* node) { TSC_UNREACHABLE("checkGrammarNumericLiteral — grammar slice"); }
-bool Checker::checkGrammarBigIntLiteral(Node* node) { TSC_UNREACHABLE("checkGrammarBigIntLiteral — grammar slice"); }
-void Checker::checkGrammarPrivateIdentifierExpression(Node* node) { TSC_UNREACHABLE("checkGrammarPrivateIdentifierExpression — grammar slice"); }
+// (grammar dep-stubs removed — grammarchecks slice landed the real definitions.)
 
 // owner: flow slice (flow.go)
 bool Checker::isReachableFlowNode(FlowNode* flow) { TSC_UNREACHABLE("isReachableFlowNode — flow slice"); }
