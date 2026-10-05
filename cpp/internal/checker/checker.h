@@ -27,6 +27,7 @@
 #include "internal/scanner/scanner.h"
 #include "internal/nodebuilder/types.h"
 #include "internal/printer/emitcontext.h"
+#include "internal/binder/referenceresolver.h"
 
 namespace tsc::checker {
 
@@ -833,7 +834,118 @@ struct Tracer {
 
 // EmitResolver — ported with emitresolver.go.
 
-struct EmitResolver;
+// JSXLinks — emitresolver.go:16
+struct JSXLinks {
+	Node* importRef{}; // Import referenced by the JSX identifier
+};
+
+// DeclarationLinks — emitresolver.go:20
+struct DeclarationLinks {
+	Tristate isVisible{Tristate::Unknown}; // Node is visible
+};
+
+// DeclarationFileLinks — emitresolver.go:30
+struct DeclarationFileLinks {
+	bool aliasesMarked{}; // if file has had alias visibility marked
+};
+
+// NodeBuilder — nodebuilder.go:10. Dep-decl only the methods emitresolver.go
+// calls; bodies are TSC_UNREACHABLE dep-stubs until the nodebuilder slice lands.
+struct NodeBuilder {
+	Node* SerializeReturnTypeForSignature(Node* signatureDeclaration, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
+	std::vector<Node*> SerializeTypeParametersForSignature(Node* signatureDeclaration, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
+	Node* SerializeTypeForDeclaration(Node* declaration, Symbol* symbol, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
+	Node* SerializeTypeForExpression(Node* expr, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
+	Node* SymbolToExpression(Symbol* symbol, SymbolFlags meaning, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
+	Node* TypeToTypeNode(Type* typ, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
+	Node* IndexInfoToIndexSignatureDeclaration(IndexInfo* info, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
+	Node* TryJSTypeNodeToTypeNode(Node* node, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
+};
+
+// NewNodeBuilder — nodebuilder.go:279 (dep-stub until the nodebuilder slice lands)
+NodeBuilder* NewNodeBuilder(Checker* ch, printer::EmitContext* e);
+
+// EmitResolver — emitresolver.go:34. Go's checkerMu is elided: the C++ checker
+// is single-threaded, so every lock in emitresolver.go compiles away.
+struct EmitResolver {
+	Checker* checker{};
+	std::function<bool(Node*)> isValueAliasDeclaration;
+	std::function<bool(Node*)> aliasMarkingVisitor;
+	binder::ReferenceResolver* referenceResolver{};
+
+	Arena jsxLinksArena;
+	LinkStore<Node*, JSXLinks> jsxLinks{&jsxLinksArena};
+	Arena declarationLinksArena;
+	LinkStore<Node*, DeclarationLinks> declarationLinks{&declarationLinksArena};
+	Arena declarationFileLinksArena;
+	LinkStore<Node*, DeclarationFileLinks> declarationFileLinks{&declarationFileLinksArena};
+
+	// Locking API surface (locks elided — see note above).
+	Node* GetJsxFactoryEntity(Node* location);
+	Node* GetJsxFragmentFactoryEntity(Node* location);
+	bool IsOptionalParameter(Node* node);
+	bool IsLateBound(Node* node);
+	EvalResult GetEnumMemberValue(Node* node);
+	bool IsDeclarationVisible(Node* node);
+	void PrecalculateDeclarationEmitVisibility(SourceFile* file);
+	printer::SymbolAccessibilityResult IsEntityNameVisible(Node* entityName, Node* enclosingDeclaration);
+	bool IsImplementationOfOverload(Node* node);
+	bool IsImportRequiredByAugmentation(Node* decl);
+	bool IsDefinitelyReferenceToGlobalSymbolObject(Node* node);
+	bool RequiresAddingImplicitUndefined(Node* declaration, Symbol* symbol, Node* enclosingDeclaration);
+	bool RequiresAddingImplicitUndefinedUnsafe(Node* declaration, Symbol* symbol, Node* enclosingDeclaration);
+	bool IsLiteralConstDeclaration(Node* node);
+	bool IsExpandoFunctionDeclaration(Node* node);
+	bool IsExpandoFunctionDeclarationUnsafe(Node* node);
+	printer::SymbolAccessibilityResult IsSymbolAccessible(Symbol* symbol, Node* enclosingDeclaration, SymbolFlags meaning, bool shouldComputeAliasToMarkVisible);
+	bool IsReferencedAliasDeclaration(Node* node);
+	bool IsValueAliasDeclaration(Node* node);
+	bool IsTopLevelValueImportEqualsWithEntityName(Node* node);
+	void MarkLinkedReferencesRecursively(SourceFile* file);
+	SourceFile* GetExternalModuleFileFromDeclaration(Node* declaration);
+	Node* GetReferencedExportContainer(Node* node, bool prefixLocals);
+	void SetReferencedImportDeclaration(Node* node, Node* ref);
+	Node* GetReferencedImportDeclaration(Node* node);
+	Node* GetReferencedValueDeclaration(Node* node);
+	Node* GetReferencedValueDeclarationUnsafe(Node* node);
+	std::vector<Node*> GetReferencedValueDeclarations(Node* node);
+	bool IsNameResolvable(Node* location, const std::string& name);
+	std::string GetElementAccessExpressionName(ElementAccessExpression* expression);
+	Node* GetReferencedMemberValueDeclaration(Node* node);
+	Node* CreateReturnTypeOfSignatureDeclaration(printer::EmitContext* emitContext, Node* signatureDeclaration, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
+	std::vector<Node*> CreateTypeParametersOfSignatureDeclaration(printer::EmitContext* emitContext, Node* signatureDeclaration, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
+	Node* CreateTypeOfDeclaration(printer::EmitContext* emitContext, Node* declaration, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
+	Node* CreateLiteralConstValue(printer::EmitContext* emitContext, Node* node, nodebuilder::SymbolTracker* tracker);
+	Node* CreateTypeOfExpression(printer::EmitContext* emitContext, Node* expression, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
+	std::vector<Node*> CreateLateBoundIndexSignatures(printer::EmitContext* emitContext, Node* container, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
+	ModifierFlags GetEffectiveDeclarationFlags(Node* node, ModifierFlags flags);
+	LiteralValue GetConstantValue(Node* node);
+	printer::TypeReferenceSerializationKind GetTypeReferenceSerializationKind(Node* typeName, Node* location);
+	std::vector<Symbol*> GetPropertiesOfContainerFunction(Node* node);
+	Node* TryJSTypeNodeToTypeNode(printer::EmitContext* emitContext, Node* typeNode, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
+	bool IsThisPropertyAssignmentDeclarationRedundant(Node* node);
+
+	// Internal workers (unlocked in Go).
+	bool isDeclarationVisible(Node* node);
+	bool determineIfDeclarationIsVisible(Node* node);
+	bool aliasMarkingVisitorWorker(Node* node);
+	void markLinkedAliases(Node* node);
+	printer::SymbolAccessibilityResult isEntityNameVisible(Node* entityName, Node* enclosingDeclaration, bool shouldComputeAliasToMakeVisible);
+	printer::SymbolAccessibilityResult* hasVisibleDeclarations(Symbol* symbol, bool shouldComputeAliasToMakeVisible);
+	bool requiresAddingImplicitUndefined(Node* declaration, Symbol* symbol, Node* enclosingDeclaration);
+	bool requiresAddingImplicitUndefinedWorker(Node* parameter, Node* enclosingDeclaration);
+	bool declaredParameterTypeContainsUndefined(Node* parameter);
+	bool isOptionalUninitializedParameterProperty(Node* parameter);
+	bool isRequiredInitializedParameter(Node* parameter, Node* enclosingDeclaration);
+	bool isOptionalParameter(Node* node);
+	printer::SymbolAccessibilityResult isSymbolAccessible(Symbol* symbol, Node* enclosingDeclaration, SymbolFlags meaning, bool shouldComputeAliasToMarkVisible);
+	bool isValueAliasDeclarationWorker(Node* node);
+	bool isAliasResolvedToValue(Symbol* symbol, bool excludeTypeOnlyValues);
+	binder::ReferenceResolver* getReferenceResolver();
+};
+
+// newEmitResolver — emitresolver.go:45
+EmitResolver* newEmitResolver(Checker* checker);
 
 // Relater (relater.go)
 
@@ -3851,6 +3963,15 @@ public:
 	bool checkApplicableSignatureForJsxCallLikeElement(
 		Node* node, Signature* signature, Relation* relation, CheckMode checkMode,
 		bool reportErrors, std::vector<Diagnostic*>* diagnosticOutput);              // jsx.go:591 — jsx slice
+
+	// === slice: emitresolver === (checker_emitresolver.cpp — dep-stub decls for
+	// callees emitresolver.go needs that belong to other slices; bodies are
+	// TSC_UNREACHABLE defs at the bottom of checker_emitresolver.cpp)
+	Node* getJsxFragmentFactoryEntity(Node* location);                             // jsx.go:1414 — jsx slice
+	ModifierFlags GetEffectiveDeclarationFlags(Node* n, ModifierFlags flagsToCheck); // exports.go:207 — exports slice
+	bool isOptionalParameter(Node* node);                                          // utilities.go:302 — utilities slice
+	LiteralValue GetConstantValue(Node* node);                                     // services.go:870 — services slice
+	// === end slice: emitresolver ===
 };  // class Checker
 
 // moduletarget-slice file-local callees hoisted for the dep graph (defs in
