@@ -665,13 +665,15 @@ inline constexpr TypeFacts TypeFactsFunctionFacts =
 inline constexpr TypeFacts TypeFactsVoidFacts =
 	TypeFactsTypeofNEString | TypeFactsTypeofNENumber | TypeFactsTypeofNEBigInt |
 	TypeFactsTypeofNEBoolean | TypeFactsTypeofNESymbol | TypeFactsTypeofNEObject |
-	TypeFactsTypeofNEFunction | TypeFactsTypeofNEHostObject | TypeFactsNENull | TypeFactsFalsy;
+	TypeFactsTypeofNEFunction | TypeFactsTypeofNEHostObject | TypeFactsEQUndefined |
+	TypeFactsEQUndefinedOrNull | TypeFactsNENull | TypeFactsFalsy;
 inline constexpr TypeFacts TypeFactsUndefinedFacts = TypeFactsVoidFacts | TypeFactsIsUndefined;
 inline constexpr TypeFacts TypeFactsNullFacts =
 	TypeFactsTypeofEQObject | TypeFactsTypeofNEString | TypeFactsTypeofNENumber |
 	TypeFactsTypeofNEBigInt | TypeFactsTypeofNEBoolean | TypeFactsTypeofNESymbol |
-	TypeFactsTypeofNEFunction | TypeFactsEQNull | TypeFactsEQUndefinedOrNull |
-	TypeFactsNEUndefined | TypeFactsFalsy | TypeFactsIsNull;
+	TypeFactsTypeofNEFunction | TypeFactsTypeofNEHostObject | TypeFactsEQNull |
+	TypeFactsEQUndefinedOrNull | TypeFactsNEUndefined | TypeFactsFalsy |
+	TypeFactsIsNull;
 inline constexpr TypeFacts TypeFactsEmptyObjectStrictFacts =
 	TypeFactsAll & ~(TypeFactsEQUndefined | TypeFactsEQNull | TypeFactsEQUndefinedOrNull |
 					 TypeFactsIsUndefinedOrNull);
