@@ -343,6 +343,57 @@ struct EmitContext {
 	void addEmitFlags(Node* node, EmitFlags flags) {
 		emitNodes.Get(node)->emitFlags |= flags;
 	}
+
+	// === slice: nodebuilder ===
+	// Gets the range to use for a node when emitting comments
+	// (emitcontext.go:603).
+	TextRange commentRange(Node* node) {
+		if (emitNode* en = emitNodes.TryGet(node);
+		    en != nullptr && (en->flags & hasCommentRange) != 0) {
+			return en->commentRange;
+		}
+		return node->loc;
+	}
+
+	// Sets the range to use for a node when emitting comments
+	// (emitcontext.go:611).
+	void setCommentRange(Node* node, TextRange loc) {
+		emitNode* en = emitNodes.Get(node);
+		en->commentRange = loc;
+		en->flags |= hasCommentRange;
+	}
+
+	// Sets the range to use for a node when emitting comments
+	// (emitcontext.go:618).
+	void assignCommentRange(Node* to, Node* from) {
+		setCommentRange(to, commentRange(from));
+	}
+
+	// emitcontext.go:1018 — AddSyntheticLeadingComment
+	Node* addSyntheticLeadingComment(Node* node, Kind kind,
+	                                 const std::string& text,
+	                                 bool hasTrailingNewLine) {
+		auto& comments = emitNodes.Get(node)->leadingComments;
+		comments.push_back(SynthesizedComment{kind, TextRange{-1, -1},
+		                                      false /*HasLeadingNewLine*/,
+		                                      hasTrailingNewLine, text});
+		return node;
+	}
+
+	// emitcontext.go:1035 — AddSyntheticTrailingComment
+	Node* addSyntheticTrailingComment(Node* node, Kind kind,
+	                                  const std::string& text,
+	                                  bool hasTrailingNewLine) {
+		auto& comments = emitNodes.Get(node)->trailingComments;
+		comments.push_back(SynthesizedComment{kind, TextRange{-1, -1},
+		                                      false /*HasLeadingNewLine*/,
+		                                      hasTrailingNewLine, text});
+		return node;
+	}
+
+	// nodebuilder.go — e.Factory.ReleaseArenas()
+	void releaseArenas() { factory.releaseArenas(); }
+	// === end slice: nodebuilder ===
 };
 
 }  // namespace tsc::printer

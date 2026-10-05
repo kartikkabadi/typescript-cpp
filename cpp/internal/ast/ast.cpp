@@ -1824,6 +1824,11 @@ bool isGlobalScopeAugmentation(Node* node) {
 	       node->as<ModuleDeclaration>()->Keyword == Kind::GlobalKeyword;
 }
 
+// symbol.go:23 — IsExternalModule
+bool Symbol::isExternalModule() const {
+	return (flags & SymbolFlagsModule) != 0 && isAmbientModuleSymbolName(name);
+}
+
 bool isExternalModule(SourceFile* file) {
 	return file->ExternalModuleIndicator != nullptr;
 }

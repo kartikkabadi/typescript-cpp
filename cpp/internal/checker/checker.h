@@ -30,7 +30,19 @@
 #include "internal/printer/printer.h"
 #include "internal/binder/referenceresolver.h"
 
+// === slice: nodebuilder ===
+namespace tsc::pseudochecker {
+struct PseudoChecker;
+struct PseudoParameter;
+struct PseudoType;
+} // namespace tsc::pseudochecker
+// === end slice: nodebuilder ===
+
 namespace tsc::checker {
+// === slice: nodebuilder ===
+struct NodeBuilder;
+struct VerbosityContext;
+// === end slice: nodebuilder ===
 
 
 // TypeSystemEntity / TypeSystemPropertyName — Go uses `any`-shaped unions;
@@ -1189,13 +1201,6 @@ inline constexpr PredicateSemantics PredicateSemanticsSometimes =
 // callers). Level 0 = default hover (maxExpansionDepth = 0; detects
 // expandability without expanding). Level 1+ = expansion enabled
 // (maxExpansionDepth = Level).
-struct VerbosityContext {
-	int Level = 0;                    // 0 = default (no expansion), 1+ = expansion depth
-	int MaxTruncationLength = 0;      // 0 = use default
-	bool CanIncreaseVerbosity = false; // output: whether increasing Level would reveal more
-	bool Truncated = false;            // output: whether output was truncated
-};
-
 // accessibleSymbolChainContext (symbolaccessibility.go:391) — recursion state
 // threaded through getAccessibleSymbolChain*. Go shares visitedSymbolTablesMap
 // across ctx copies (maps are reference types); a shared_ptr preserves that.
@@ -1213,74 +1218,7 @@ struct accessibleSymbolChainContext {
 struct NodeBuilderContext;
 struct NodeBuilderImpl;
 
-// NodeBuilder (nodebuilder.go:10) — minimal facade used by printer.go.
-// Method bodies other than EmitContext are dep-stubbed in checker_printer.cpp
-// until the nodebuilder slice lands.
-struct NodeBuilder {
-	std::vector<NodeBuilderContext*> ctxStack;
-	Program* host = nullptr;
-	NodeBuilderImpl* impl = nullptr;
-	VerbosityContext* verbosity = nullptr; // nil for non-hover callers
-
-	printer::EmitContext* EmitContext(); // real body in checker_printer.cpp
-	Node* IndexInfoToIndexSignatureDeclaration(
-		IndexInfo* info, Node* enclosingDeclaration, nodebuilder::Flags flags,
-		nodebuilder::InternalFlags internalFlags,
-		nodebuilder::SymbolTracker* tracker);
-	Node* SerializeReturnTypeForSignature(
-		Node* signatureDeclaration, Node* enclosingDeclaration,
-		nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags,
-		nodebuilder::SymbolTracker* tracker);
-	std::vector<Node*> SerializeTypeParametersForSignature(
-		Node* signatureDeclaration, Node* enclosingDeclaration,
-		nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags,
-		nodebuilder::SymbolTracker* tracker);
-	Node* SerializeTypeForDeclaration(
-		Node* declaration, Symbol* symbol, Node* enclosingDeclaration,
-		nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags,
-		nodebuilder::SymbolTracker* tracker);
-	Node* SerializeTypeForExpression(
-		Node* expr, Node* enclosingDeclaration, nodebuilder::Flags flags,
-		nodebuilder::InternalFlags internalFlags,
-		nodebuilder::SymbolTracker* tracker);
-	Node* SignatureToSignatureDeclaration(
-		Signature* signature, Kind kind, Node* enclosingDeclaration,
-		nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags,
-		nodebuilder::SymbolTracker* tracker);
-	std::vector<Node*> ExpandSymbolForHover(Symbol* symbol, SymbolFlags meaning);
-	Node* SymbolToEntityName(Symbol* symbol, SymbolFlags meaning,
-	                         Node* enclosingDeclaration, nodebuilder::Flags flags,
-	                         nodebuilder::InternalFlags internalFlags,
-	                         nodebuilder::SymbolTracker* tracker);
-	Node* SymbolToExpression(Symbol* symbol, SymbolFlags meaning,
-	                        Node* enclosingDeclaration, nodebuilder::Flags flags,
-	                        nodebuilder::InternalFlags internalFlags,
-	                        nodebuilder::SymbolTracker* tracker);
-	Node* SymbolToNode(Symbol* symbol, SymbolFlags meaning,
-	                   Node* enclosingDeclaration, nodebuilder::Flags flags,
-	                   nodebuilder::InternalFlags internalFlags,
-	                   nodebuilder::SymbolTracker* tracker);
-	std::vector<Node*> SymbolToTypeParameterDeclarations(
-		Symbol* symbol, Node* enclosingDeclaration, nodebuilder::Flags flags,
-		nodebuilder::InternalFlags internalFlags,
-		nodebuilder::SymbolTracker* tracker);
-	Node* TypeParameterToDeclaration(
-		Type* parameter, Node* enclosingDeclaration, nodebuilder::Flags flags,
-		nodebuilder::InternalFlags internalFlags,
-		nodebuilder::SymbolTracker* tracker);
-	Node* TypePredicateToTypePredicateNode(
-		TypePredicate* predicate, Node* enclosingDeclaration,
-		nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags,
-		nodebuilder::SymbolTracker* tracker);
-	Node* TypeToTypeNode(Type* typ, Node* enclosingDeclaration,
-	                     nodebuilder::Flags flags,
-	                     nodebuilder::InternalFlags internalFlags,
-	                     nodebuilder::SymbolTracker* tracker);
-	Node* TryJSTypeNodeToTypeNode(Node* node, Node* enclosingDeclaration,
-	                              nodebuilder::Flags flags,
-	                              nodebuilder::InternalFlags internalFlags,
-	                              nodebuilder::SymbolTracker* tracker);
-};
+// (NodeBuilder real struct defined under "// === slice: nodebuilder ===")
 
 // === end slice: symbolaccess ===
 
@@ -4601,6 +4539,11 @@ public:
 	Type* GetWidenedType(Type* t);
 	int CompareSymbols(Symbol* s1, Symbol* s2);
 	// === end slice: exports ===
+	// === slice: nodebuilder ===
+	// (all nodebuilder member decls already present in HEAD — symbolaccess,
+	// services2, exports and earlier dep blocks; member fns live in
+	// checker_nodebuilder.cpp)
+	// === end slice: nodebuilder ===
 };  // class Checker
 
 // moduletarget-slice file-local callees hoisted for the dep graph (defs in
@@ -4665,6 +4608,8 @@ struct CopyOnWriteMap {
 		}
 		return {it->second, true};
 	}
+
+	bool Has(const K& k) const { return Get(k).second; } // slice: nodebuilder
 
 	void Set(const K& k, const V& v) {
 		ensureOwned();
@@ -4783,7 +4728,7 @@ struct NodeBuilderSymbolLinks {
 
 // NodeBuilderContext (nodebuilderimpl.go).
 struct NodeBuilderContext {
-	void* host = nullptr; // modulespecifiers Host — not ported yet
+	Program* host = nullptr; // modulespecifiers Host = ch.program (nodebuilder.go:285)
 	nodebuilder::SymbolTracker* tracker = nullptr;
 	int approximateLength = 0;
 	int maxTruncationLength = 0;
@@ -4818,6 +4763,118 @@ struct NodeBuilderContext {
 	CopyOnWriteSet<SymbolId> typeParameterSymbolList;
 };
 
+// === slice: nodebuilder ===
+
+struct NodeBuilderImpl;
+
+// VerbosityContext (nodebuilder.go) — controls hover-expansion behavior in the
+// node builder. A null verbosity pointer means no expansion (non-hover
+// callers). Level 0 = default hover (maxExpansionDepth = 0; detects
+// expandability without expanding). Level 1+ = expansion enabled
+// (maxExpansionDepth = Level).
+struct VerbosityContext {
+	int Level = 0;                     // 0 = default, 1+ = expansion depth
+	int MaxTruncationLength = 0;       // 0 = use default
+	bool CanIncreaseVerbosity = false; // output: whether increasing Level would reveal more
+	bool Truncated = false;            // output: whether output was truncated
+};
+
+// NodeBuilder (nodebuilder.go).
+struct NodeBuilder {
+	std::vector<NodeBuilderContext*> ctxStack;
+	Program* host = nullptr;
+	NodeBuilderImpl* impl = nullptr;
+	VerbosityContext* verbosity = nullptr; // nullptr for non-hover callers
+
+	printer::EmitContext* EmitContext();
+	void enterContext(Node* enclosingDeclaration, nodebuilder::Flags flags,
+	                  nodebuilder::InternalFlags internalFlags,
+	                  nodebuilder::SymbolTracker* tracker);
+	void propagateVerbosityOut();
+	void popContext();
+	Node* exitContext(Node* result);
+	std::vector<Node*> exitContextSlice(std::vector<Node*> result);
+	void exitContextCheck();
+
+	Node* IndexInfoToIndexSignatureDeclaration(
+		IndexInfo* info, Node* enclosingDeclaration, nodebuilder::Flags flags,
+		nodebuilder::InternalFlags internalFlags,
+		nodebuilder::SymbolTracker* tracker);
+	Node* SerializeReturnTypeForSignature(
+		Node* signatureDeclaration, Node* enclosingDeclaration,
+		nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags,
+		nodebuilder::SymbolTracker* tracker);
+	std::vector<Node*> SerializeTypeParametersForSignature(
+		Node* signatureDeclaration, Node* enclosingDeclaration,
+		nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags,
+		nodebuilder::SymbolTracker* tracker);
+	Node* SerializeTypeForDeclaration(
+		Node* declaration, Symbol* symbol, Node* enclosingDeclaration,
+		nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags,
+		nodebuilder::SymbolTracker* tracker);
+	Node* SerializeTypeForExpression(
+		Node* expr, Node* enclosingDeclaration, nodebuilder::Flags flags,
+		nodebuilder::InternalFlags internalFlags,
+		nodebuilder::SymbolTracker* tracker);
+	Node* SignatureToSignatureDeclaration(
+		Signature* signature, Kind kind, Node* enclosingDeclaration,
+		nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags,
+		nodebuilder::SymbolTracker* tracker);
+	std::vector<Node*> ExpandSymbolForHover(Symbol* symbol, SymbolFlags meaning);
+	Node* SymbolToEntityName(Symbol* symbol, SymbolFlags meaning,
+	                         Node* enclosingDeclaration, nodebuilder::Flags flags,
+	                         nodebuilder::InternalFlags internalFlags,
+	                         nodebuilder::SymbolTracker* tracker);
+	Node* SymbolToExpression(Symbol* symbol, SymbolFlags meaning,
+	                         Node* enclosingDeclaration, nodebuilder::Flags flags,
+	                         nodebuilder::InternalFlags internalFlags,
+	                         nodebuilder::SymbolTracker* tracker);
+	Node* SymbolToNode(Symbol* symbol, SymbolFlags meaning,
+	                   Node* enclosingDeclaration, nodebuilder::Flags flags,
+	                   nodebuilder::InternalFlags internalFlags,
+	                   nodebuilder::SymbolTracker* tracker);
+	Node* symbolToParameterDeclaration(Symbol* symbol,
+	                                   Node* enclosingDeclaration,
+	                                   nodebuilder::Flags flags,
+	                                   nodebuilder::InternalFlags internalFlags,
+	                                   nodebuilder::SymbolTracker* tracker);
+	std::vector<Node*> SymbolToTypeParameterDeclarations(
+		Symbol* symbol, Node* enclosingDeclaration, nodebuilder::Flags flags,
+		nodebuilder::InternalFlags internalFlags,
+		nodebuilder::SymbolTracker* tracker);
+	Node* TypeParameterToDeclaration(Type* parameter, Node* enclosingDeclaration,
+	                                 nodebuilder::Flags flags,
+	                                 nodebuilder::InternalFlags internalFlags,
+	                                 nodebuilder::SymbolTracker* tracker);
+	Node* TypePredicateToTypePredicateNode(
+		TypePredicate* predicate, Node* enclosingDeclaration,
+		nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags,
+		nodebuilder::SymbolTracker* tracker);
+	Node* TypeToTypeNode(Type* typ, Node* enclosingDeclaration,
+	                     nodebuilder::Flags flags,
+	                     nodebuilder::InternalFlags internalFlags,
+	                     nodebuilder::SymbolTracker* tracker);
+	Node* TryJSTypeNodeToTypeNode(Node* node, Node* enclosingDeclaration,
+	                              nodebuilder::Flags flags,
+	                              nodebuilder::InternalFlags internalFlags,
+	                              nodebuilder::SymbolTracker* tracker);
+};
+
+// sortedSymbolNamePair (nodebuilderimpl.go).
+struct sortedSymbolNamePair {
+	Symbol* sym = nullptr;
+	std::string name;
+};
+
+// SignatureToSignatureDeclarationOptions (nodebuilderimpl.go).
+struct SignatureToSignatureDeclarationOptions {
+	std::vector<Node*> modifiers;
+	Node* name = nullptr;
+	Node* questionToken = nullptr;
+};
+
+// === end slice: nodebuilder ===
+
 // propertyNameNodeKind (nodebuilderimpl.go).
 enum class propertyNameNodeKind : int32_t {
 	Identifier = 0,
@@ -4835,7 +4892,7 @@ struct NodeBuilderImpl {
 	NodeFactory* f = nullptr;
 	Checker* ch = nullptr;
 	printer::EmitContext* e = nullptr;
-	void* pc = nullptr; // *pseudochecker.PseudoChecker — not ported
+	::tsc::pseudochecker::PseudoChecker* pc = nullptr;
 
 	// cache
 	Arena linksArena;
@@ -4885,6 +4942,187 @@ struct NodeBuilderImpl {
 	moduleSpecifierResult getSpecifierForModuleSymbol(
 		Symbol* symbol, ResolutionMode overrideImportMode);
 	Node* typeParameterToName(Type* typeParameter);
+
+	// === slice: nodebuilder ===
+	// nodebuilderimpl.go
+	std::function<void()> saveRestoreFlags();
+	bool checkTruncationLength();
+	bool checkTruncationLengthIfExpanding();
+	bool isExpandableType(Type* t, bool isAlias);
+	bool isTypeOnStack(Type* t);
+	bool shouldExpandType(Type* t, bool isAlias);
+	bool isActivelyExpanding();
+	Node* appendReferenceToType(Node* root, Node* ref);
+	Node* createElidedInformationPlaceholder();
+	NodeList* mapToTypeNodes(std::vector<Type*> list, bool isBareList);
+	void setCommentRange(Node* node, Node* range_);
+	bool typeNodeIsEquivalentToType(Node* annotatedDeclaration, Type* t,
+	                                Type* typeFromTypeNode);
+	bool existingTypeNodeIsNotReferenceOrIsReferenceWithCompatibleTypeArgumentCount(
+		Node* existing, Type* t);
+	Node* tryReuseExistingNonParameterTypeNode(Node* existing, Type* t,
+	                                           Node* host, Type* annotationType);
+	Type* getResolvedTypeWithoutAbstractConstructSignatures(
+		StructuredType* t);
+	Node* symbolToNode(Symbol* symbol, SymbolFlags meaning);
+	Node* symbolToName(Symbol* symbol, SymbolFlags meaning,
+	                   bool expectsIdentifier);
+	Node* createEntityNameFromSymbolChain(std::vector<Symbol*> chain,
+	                                      int index);
+	Node* symbolToEntityNameNode(Symbol* symbol);
+	Node* symbolToTypeNode(Symbol* symbol, SymbolFlags mask,
+	                       NodeList* typeArguments);
+	Node* createAccessFromSymbolChain(std::vector<Symbol*> chain, int index,
+	                                  int stopper, NodeList* overrideTypeArguments);
+	Node* symbolToExpression(Symbol* symbol, SymbolFlags mask);
+	Node* symbolToExpressionWorker(Symbol* symbol, SymbolFlags mask);
+	Node* createExpressionFromSymbolChain(std::vector<Symbol*> chain,
+	                                      int index);
+	std::string getNameOfSymbolFromNameType(Symbol* symbol);
+	std::string getNameOfSymbolAsWritten(Symbol* symbol);
+	std::vector<Type*> getTypeParametersOfClassOrInterface(Symbol* symbol);
+	NodeList* lookupTypeParameterNodes(std::vector<Symbol*> chain, int index);
+	std::vector<Symbol*> lookupSymbolChainWorker(Symbol* symbol,
+	                                             SymbolFlags meaning,
+	                                             bool yieldModuleSymbol);
+	std::vector<Symbol*> getSymbolChain(Symbol* symbol, SymbolFlags meaning,
+	                                    bool endOfChain, bool yieldModuleSymbol);
+	int sortByBestName(const sortedSymbolNamePair& a,
+	                   const sortedSymbolNamePair& b);
+	moduleSpecifierResult moduleSpecifierResultForSymbol(
+		moduleSpecifierResult result, Type* importAttributesType,
+		Symbol* symbol);
+	bool moduleSpecifierResolvesToSymbol(const std::string& specifier,
+	                                     Type* importAttributesType,
+	                                     Symbol* symbol);
+	Node* createImportAttributesForModuleSpecifier(
+		moduleSpecifierResult result, ResolutionMode importModeOverride);
+	Node* typeParameterToDeclarationWithConstraint(Type* typeParameter,
+	                                               Node* constraintNode);
+	bool typeParameterShadowsOtherTypeParameterInScope(const std::string& name,
+	                                                   Type* typeParameter);
+	bool isMappedTypeHomomorphic(Type* mapped);
+	bool isHomomorphicMappedTypeWithNonHomomorphicInstantiation(
+		MappedType* mapped);
+	Node* createMappedTypeNodeFromType(Type* t);
+	Node* typePredicateToTypePredicateNode(TypePredicate* predicate);
+	Node* typeToTypeNodeHelperWithPossibleReusableTypeNode(Type* t,
+	                                                       Node* typeNode);
+	Node* typeParameterToDeclaration(Type* parameter);
+	std::vector<Node*> symbolToTypeParameterDeclarations(Symbol* symbol);
+	std::vector<Node*> typeParametersToTypeParameterDeclarations(
+		Symbol* symbol);
+	Node* symbolToParameterDeclaration(Symbol* parameterSymbol,
+	                                   bool preserveModifierFlags);
+	Node* parameterToParameterDeclarationName(Symbol* parameterSymbol,
+	                                          Node* parameterDeclaration);
+	Node* cloneBindingName(Node* node);
+	Node* serializeTypeForExpression(Node* expr);
+	Node* serializeInferredReturnTypeForSignature(Signature* signature,
+	                                              Type* returnType);
+	Node* typePredicateToTypePredicateNodeHelper(
+		TypePredicate* typePredicate);
+	Node* signatureToSignatureDeclarationHelper(
+		Signature* signature, Kind kind,
+		SignatureToSignatureDeclarationOptions* options);
+	Node* tryGetThisParameterDeclaration(Signature* signature);
+	Node* serializeReturnTypeForSignature(Signature* signature, bool tryReuse);
+	bool isTriviallySerializableComputedName(Node* e);
+	std::vector<Node*> indexInfoToObjectComputedNamesOrSignatureDeclaration(
+		IndexInfo* indexInfo, Node* typeNode);
+	Node* indexInfoToIndexSignatureDeclarationHelper(IndexInfo* indexInfo,
+	                                               Node* typeNode);
+	Node* serializeTypeForDeclaration(Node* declaration, Type* t,
+	                                  Symbol* symbol, bool tryReuse);
+	bool shouldUsePlaceholderForProperty(Symbol* propertySymbol);
+	void trackComputedName(Node* accessExpression, Node* enclosingDeclaration);
+	Node* createPropertyNameNodeForIdentifierOrLiteral(
+		const std::string& name, bool singleQuote, bool stringNamed,
+		bool isMethod, Symbol* symbol);
+	bool isStringNamed(Node* d);
+	bool isSingleQuotedStringNamed(Node* d);
+	Node* getPropertyNameNodeForSymbol(Symbol* symbol,
+	                                   Node* enclosingDeclaration);
+	Node* getPropertyNameNodeForSymbolFromNameType(
+		Symbol* symbol, Node* enclosingDeclaration, bool singleQuote,
+		bool stringNamed, bool isMethod);
+	std::vector<Node*> addPropertyToElementList(
+		Symbol* propertySymbol, std::vector<Node*> typeElements);
+	NodeList* createTypeNodesFromResolvedType(StructuredType* resolvedType);
+	Node* createTypeNodeFromObjectType(Type* t);
+	bool shouldWriteTypeOfFunctionSymbol(Symbol* symbol, TypeId typeId,
+	                                     Symbol** outSymbol);
+	bool shouldEmitTypeOfSymbol(bool forceExpansion, bool forceClassExpansion,
+	                            SymbolFlags isInstanceType, Symbol* symbol,
+	                            TypeId typeId, Symbol** outSymbol);
+	Node* createAnonymousTypeNode(Type* t);
+	Node* createAnonymousTypeNodeEx(Type* t, bool forceClassExpansion,
+	                                bool forceExpansion);
+	Node* typeToTypeNodeOrCircularityElision(Type* t);
+	Node* conditionalTypeToTypeNode(Type* _t);
+	Symbol* getParentSymbolOfTypeParameter(Type* typeParameter);
+	Node* typeReferenceToTypeNode(Type* t);
+	Node* visitAndTransformType(Type* t,
+	                            Node* (NodeBuilderImpl::*transform)(Type*));
+	Node* newStringLiteral(const std::string& text);
+	Node* newStringLiteralEx(const std::string& text, bool isSingleQuote);
+	Node* createAccessExpression(Node* node);
+	Node* createExpressionWithTypeArguments(Node* expr,
+	                                        NodeList* typeArguments);
+	NodeList* lookupInstantiatedTypeArgumentNodes(
+		std::vector<Symbol*> chain, int index);
+	NodeList* lookupExpressionChainTypeArgumentNodes(
+		std::vector<Symbol*> chain, int index);
+	bool shouldWriteTypeParametersInQualifiedName(
+		std::vector<Symbol*> chain, int index);
+
+	// nodebuilder_hover.go
+	std::vector<Node*> expandSymbolForHover(Symbol* symbol);
+	Node* expandEnumDecl(Symbol* symbol);
+	Node* enumMemberInitializer(Symbol* p);
+	Node* expandClassDecl(Symbol* symbol);
+	std::vector<Node*> addClassModifiers(std::vector<Node*> members,
+	                                     bool isStatic);
+	Node* expandInterfaceDecl(Symbol* symbol);
+	std::vector<Node*> hoverHeritageClauses(
+		std::vector<Node*> declarations);
+	std::vector<Node*> serializePropertiesWithTruncation(
+		std::vector<Symbol*> properties, std::vector<Node*> elements);
+	std::vector<Node*> serializeConstructors(Type* staticType,
+	                                         Type* staticBaseType, bool isClass,
+	                                         Symbol* symbol);
+	std::vector<Node*> serializeIndexSignaturesOfType(Type* input,
+	                                                  Type* baseType);
+	Node* serializeNamespaceMember(Symbol* resolved, const std::string& name);
+	Node* expandModuleDecl(Symbol* symbol);
+	Node* serializeTypeAliasForNamespace(Symbol* symbol,
+	                                     const std::string& name);
+	std::vector<Symbol*> filterInheritedProperties(
+		Type* t, std::vector<Type*> baseTypes, std::vector<Symbol*> properties);
+	bool isNamespaceMember(Symbol* p);
+
+	// pseudotypenodebuilder.go
+	Node* pseudoTypeToNodeWithCheckerFallback(
+		::tsc::pseudochecker::PseudoType* t, Type* checkerType);
+	Node* pseudoTypeToNode(::tsc::pseudochecker::PseudoType* t);
+	NodeList* pseudoParametersToNodeList(
+		std::vector<::tsc::pseudochecker::PseudoParameter*> params);
+	Node* pseudoParameterToNode(::tsc::pseudochecker::PseudoParameter* p);
+	bool pseudoTypeEquivalentToType(::tsc::pseudochecker::PseudoType* t,
+	                                Type* type_, bool isOptionalAnnotated,
+	                                bool reportErrors);
+	bool pseudoParametersEquivalentToParameters(
+		std::vector<::tsc::pseudochecker::PseudoParameter*> params,
+		Signature* targetSig, bool reportErrors, Node* nonParamErrorLocation);
+	bool pseudoReturnTypeMatchesPredicate(
+		::tsc::pseudochecker::PseudoType* rt, TypePredicate* predicate);
+	Type* pseudoTypeToType(::tsc::pseudochecker::PseudoType* t);
+
+	// nodebuilderscopes.go
+	std::function<void()> addSymbolTypeToContext(Symbol* symbol, Type* t);
+	std::pair<std::vector<Symbol*>, std::function<void()>> enterSignatureScope(
+		Signature* signature);
+	// === end slice: nodebuilder ===
 };
 
 // originalRecoveryScopeState (nodecopy.go).
@@ -4969,6 +5207,19 @@ SymbolTrackerImpl* newSymbolTrackerImpl(
 	NodeBuilderContext* context, nodebuilder::SymbolTracker* tracker);
 NodeVisitor* getExistingNodeTreeVisitor(NodeBuilderImpl* b,
                                       recoveryBoundary* bound);
+
+// === slice: nodebuilder ===
+// nodebuilder.go
+NodeBuilder* newNodeBuilder(Checker* ch, printer::EmitContext* e);
+NodeBuilder* newNodeBuilderEx(
+	Checker* ch, printer::EmitContext* e,
+	std::unordered_map<Node*, Symbol*>* idToSymbol);
+// nodebuilderimpl.go — TryGetModuleSpecifierFromDeclaration (exported in Go;
+// also used by ls/* and checker.go).
+Node* tryGetModuleSpecifierFromDeclaration(Node* node);
+// emitresolver.go dep-stubs (owned by the emitresolver slice; stubbed in
+// checker_nodebuilder.cpp under "dep stubs").
+// === end slice: nodebuilder ===
 
 // property name classification (nodebuilderimpl.go) + emitresolver helpers.
 propertyNameNodeKind classifyPropertyName(const std::string& name,

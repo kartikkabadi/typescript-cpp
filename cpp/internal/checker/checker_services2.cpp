@@ -1562,13 +1562,6 @@ bool Checker::IsLibTypeForHoverVerbosity(Type* t) {
 // Dep stubs — removed when the owner slice lands.
 // ---------------------------------------------------------------------------
 
-// nodebuilderimpl.go:1984 — nodebuilder slice
-std::vector<std::vector<Symbol*>>
-Checker::getExpandedParameters(Signature* /*sig*/,
-							   bool /*skipUnionExpanding*/) {
-	TSC_UNREACHABLE("getExpandedParameters — nodebuilder slice");
-}
-
 namespace {
 
 // astnav.GetTouchingPropertyName — astnav slice (token navigation, ~600 lines
