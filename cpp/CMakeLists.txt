@@ -65,6 +65,17 @@ add_library(tsc STATIC
 	internal/compiler/includeprocessor.cpp
 	internal/compiler/program.cpp
 	internal/evaluator/evaluator.cpp
+	# === slice: format ===
+	internal/format/api.cpp
+	internal/format/context.cpp
+	internal/format/indent.cpp
+	internal/format/rule.cpp
+	internal/format/rulecontext.cpp
+	internal/format/rules.cpp
+	internal/format/rulesmap.cpp
+	internal/format/scanner.cpp
+	internal/format/span.cpp
+	internal/format/util.cpp
 	internal/jsnum/jsnum.cpp
 	internal/module/resolver.cpp
 	internal/scanner/scanner.cpp
