@@ -6610,11 +6610,7 @@ Type* Checker::getRestrictiveTypeParameter(Type* t) {
 }
 
 // getApparentType is defined in checker_members.cpp (members slice).
-
-bool Checker::couldContainTypeVariablesWorker(Type* t) {
-	TSC_UNREACHABLE(
-		"couldContainTypeVariablesWorker — ported with checker.go:22605 slice");
-}
+// couldContainTypeVariablesWorker is defined in checker_instantiate.cpp (instantiate slice).
 
 bool Checker::isStringIndexSignatureOnlyTypeWorker(Type* t) {
 	TSC_UNREACHABLE(

@@ -3063,18 +3063,6 @@ bool Checker::isDiscriminantWithNeverType(Symbol* prop) {
 // === dep stubs — removed when owner slice lands ===
 // ---------------------------------------------------------------------------
 
-std::vector<Type*> Checker::getTypeArguments(Type* t) {
-	TSC_UNREACHABLE("getTypeArguments — owned by type-arguments slice (checker.go:22285)");
-}
-bool Checker::isNamedMember(Symbol* symbol, const std::string& id) {
-	TSC_UNREACHABLE("isNamedMember — owned by checker.go:22479 slice");
-}
-bool Checker::symbolIsValue(Symbol* symbol) {
-	TSC_UNREACHABLE("symbolIsValue — owned by checker.go:22483 slice");
-}
-bool Checker::symbolIsValueEx(Symbol* symbol, bool includeTypeOnlyMembers) {
-	TSC_UNREACHABLE("symbolIsValueEx — owned by checker.go:22487 slice");
-}
 Type* Checker::getBaseConstructorTypeOfClass(Type* t) {
 	TSC_UNREACHABLE("getBaseConstructorTypeOfClass — owned by checker.go:17277 slice");
 }
@@ -3091,28 +3079,12 @@ Signature* Checker::getSignatureFromDeclaration(Node* declaration) {
 Signature* Checker::getSignatureOfFullSignatureType(Node* node) {
 	TSC_UNREACHABLE("getSignatureOfFullSignatureType — owned by signatures slice");
 }
-int Checker::getMinTypeArgumentCount(const std::vector<Type*>& typeParameters) {
-	TSC_UNREACHABLE("getMinTypeArgumentCount — owned by checker.go:22330 slice");
-}
-std::vector<Type*> Checker::fillMissingTypeArguments(std::vector<Type*> typeArguments,
-	const std::vector<Type*>& typeParameters, int minTypeArgumentCount,
-	bool isJavaScriptImplicitAny) {
-	TSC_UNREACHABLE("fillMissingTypeArguments — owned by checker.go:22346 slice");
-}
 Signature* Checker::instantiateSignature(Signature* sig, TypeMapper* m) {
 	TSC_UNREACHABLE("instantiateSignature — owned by signatures slice");
 }
 Signature* Checker::instantiateSignatureEx(Signature* sig, TypeMapper* m,
 	bool eraseTypeParameters) {
 	TSC_UNREACHABLE("instantiateSignatureEx — owned by signatures slice");
-}
-std::vector<Signature*> Checker::instantiateSignatures(
-	const std::vector<Signature*>& signatures, TypeMapper* m) {
-	TSC_UNREACHABLE("instantiateSignatures — owned by checker.go:23196 slice");
-}
-std::vector<IndexInfo*> Checker::instantiateIndexInfos(
-	const std::vector<IndexInfo*>& indexInfos, TypeMapper* m) {
-	TSC_UNREACHABLE("instantiateIndexInfos — owned by checker.go:23200 slice");
 }
 InferenceContext* Checker::newInferenceContext(
 	const std::vector<Type*>& typeParameters, Signature* signature,
@@ -3153,11 +3125,6 @@ bool Checker::isGenericTupleType(Type* t) {
 Type* Checker::getKnownKeysOfTupleType(Type* t) {
 	TSC_UNREACHABLE("getKnownKeysOfTupleType — owned by relater.go slice");
 }
-Type* Checker::getConditionalTypeInstantiation(Type* t, TypeMapper* mapper,
-	bool forConstraint, TypeAlias* alias) {
-	TSC_UNREACHABLE(
-		"getConditionalTypeInstantiation — owned by checker.go:22906 slice");
-}
 Type* Checker::getRestTypeOfTupleType(Type* t) {
 	TSC_UNREACHABLE("getRestTypeOfTupleType — owned by checker.go:25317 slice");
 }
@@ -3167,36 +3134,11 @@ bool Checker::isArrayOrTupleType(Type* t) {
 bool Checker::isArrayOrTupleOrIntersection(Type* t) {
 	TSC_UNREACHABLE("isArrayOrTupleOrIntersection — owned by checker.go:24017 slice");
 }
-Type* Checker::getHomomorphicTypeVariable(Type* t) {
-	TSC_UNREACHABLE("getHomomorphicTypeVariable — owned by checker.go:22945 slice");
-}
-Type* Checker::getTypeParameterFromMappedType(Type* t) {
-	TSC_UNREACHABLE("getTypeParameterFromMappedType — owned by checker.go:23091 slice");
-}
-Type* Checker::getConstraintTypeFromMappedType(Type* t) {
-	TSC_UNREACHABLE("getConstraintTypeFromMappedType — owned by checker.go:23099 slice");
-}
-Type* Checker::getNameTypeFromMappedType(Type* t) {
-	TSC_UNREACHABLE("getNameTypeFromMappedType — owned by checker.go:23107 slice");
-}
 MappedTypeNameTypeKind Checker::getMappedTypeNameTypeKind(Type* t) {
 	TSC_UNREACHABLE("getMappedTypeNameTypeKind — owned by checker.go:27308 slice");
 }
-Type* Checker::getTemplateTypeFromMappedType(Type* t) {
-	TSC_UNREACHABLE("getTemplateTypeFromMappedType — owned by checker.go:23118 slice");
-}
 Type* Checker::getModifiersTypeFromMappedType(Type* t) {
 	TSC_UNREACHABLE("getModifiersTypeFromMappedType — owned by checker.go:28593 slice");
-}
-bool Checker::isMappedTypeWithKeyofConstraintDeclaration(Type* t) {
-	TSC_UNREACHABLE(
-		"isMappedTypeWithKeyofConstraintDeclaration — owned by checker.go:23130 slice");
-}
-void Checker::forEachMappedTypePropertyKeyTypeAndIndexSignatureKeyType(
-	Type* t, TypeFlags include, bool stringsOnly,
-	const std::function<void(Type*)>& cb) {
-	TSC_UNREACHABLE(
-		"forEachMappedTypePropertyKeyTypeAndIndexSignatureKeyType — owned by checker.go:23148 slice");
 }
 bool Checker::isReadonlySymbol(Symbol* symbol) {
 	TSC_UNREACHABLE("isReadonlySymbol — owned by checker.go:14083 slice");
@@ -3260,10 +3202,6 @@ int Checker::getMinArgumentCount(Signature* signature) {
 }
 std::string Checker::getParameterNameAtPosition(Signature* signature, int pos) {
 	TSC_UNREACHABLE("getParameterNameAtPosition — owned by relater.go slice");
-}
-std::vector<Type*> Checker::getEffectiveTypeArguments(
-	Node* node, const std::vector<Type*>& typeParameters) {
-	TSC_UNREACHABLE("getEffectiveTypeArguments — owned by checker.go:22325 slice");
 }
 std::vector<Type*> Checker::getTypeArgumentsFromNode(Node* node) {
 	TSC_UNREACHABLE("getTypeArgumentsFromNode — owned by checker.go:23673 slice");

@@ -1958,6 +1958,80 @@ public:
 	std::string typeToStringEx(Type* t, Node* enclosingDeclaration,
 		TypeFormatFlags flags, void* vc);
 	// === end slice: members ===
+
+	// === slice: instantiate ===
+	// checker.go:22285-23219 — instantiation machinery (checker_instantiate.cpp).
+	// (getTypeArguments, getEffectiveTypeArguments, getMinTypeArgumentCount,
+	// fillMissingTypeArguments, getNamedMembers, isNamedMember, symbolIsValue[Ex],
+	// couldContainTypeVariablesWorker, getConditionalTypeInstantiation,
+	// getHomomorphicTypeVariable, get{TypeParameter,ConstraintType,NameType,
+	// TemplateType}FromMappedType, isMappedTypeWithKeyofConstraintDeclaration,
+	// forEachMappedTypePropertyKeyTypeAndIndexSignatureKeyType, instantiateType,
+	// instantiateTypes, instantiateSignatures, instantiateIndexInfos are declared
+	// in the members block above.)
+
+	// Spare cache maps for pushActiveMapper/popActiveMapper, mirroring Go's
+	// cap-reuse of the activeTypeMappersCaches backing array.
+	std::vector<CacheMap<Type*>*> freeTypeMappersCaches;
+
+	bool hasTypeParameterDefault(Type* t);
+	Type* getDefaultTypeArgumentType(bool isInJavaScriptFile);
+	Type* getDefaultFromTypeParameter(Type* t);
+	Type* getResolvedTypeParameterDefault(Type* t);
+	Type* getDefaultOrUnknownFromTypeParameter(Type* t);
+	bool isDeclarationContainedBy(Symbol* symbol, Symbol* container);
+	Type* instantiateTypeWithAlias(Type* t, TypeMapper* m, TypeAlias* alias);
+	std::vector<std::string> getCircularTypeNames();
+	void pushActiveMapper(TypeMapper* mapper);
+	void popActiveMapper();
+	int findActiveMapper(TypeMapper* mapper);
+	void clearActiveMapperCaches();
+	bool isNonGenericTopLevelType(Type* t);
+	Type* instantiateTypeWorker(Type* t, TypeMapper* m, TypeAlias* alias);
+	Type* getObjectTypeInstantiation(Type* t, TypeMapper* m, TypeAlias* alias);
+	bool isTypeParameterPossiblyReferenced(Type* tp, Node* node);
+	Type* instantiateAnonymousType(Type* t, TypeMapper* m, TypeAlias* alias);
+	Type* cloneTypeParameter(Type* tp);
+	Type* instantiateMappedType(Type* t, TypeMapper* m, TypeAlias* alias);
+	bool hasArrayOrTypeTypeConstraint(Type* typeVariable);
+	Type* instantiateMappedArrayType(Type* arrayType, Type* mappedType, TypeMapper* m);
+	Type* instantiateMappedTupleType(Type* tupleType, Type* mappedType,
+									 Type* typeVariable, TypeMapper* m);
+	Type* instantiateMappedTypeTemplate(Type* t, Type* key, bool isOptional,
+										TypeMapper* m);
+	Node* getConstraintDeclarationForMappedType(Type* t);
+	Type* getApparentMappedTypeKeys(Type* nameType, Type* targetType);
+	Type* instantiateReverseMappedType(Type* t, TypeMapper* m);
+	TypeAlias* instantiateTypeAlias(TypeAlias* alias, TypeMapper* m);
+	std::vector<Symbol*> instantiateSymbols(const std::vector<Symbol*>& symbols,
+											TypeMapper* m);
+	template <typename T>
+	std::vector<T> instantiateList(const std::vector<T>& values, TypeMapper* m,
+								   T (Checker::*instantiator)(T, TypeMapper*));
+
+	// Dep stubs — declared here, defined at the bottom of checker_instantiate.cpp.
+	Type* getIndexedAccessTypeEx(Type* objectType, Type* indexType,
+								 AccessFlags accessFlags, Node* accessNode,
+								 TypeAlias* alias);
+	Type* getConditionalType(ConditionalRoot* root, TypeMapper* mapper,
+							 bool forConstraint, TypeAlias* alias);
+	Type* getSubstitutionType(Type* baseType, Type* constraint);
+	Type* getRestrictiveInstantiation(Type* t);
+	Type* createNormalizedTypeReference(Type* target,
+										std::vector<Type*> typeArguments);
+	IndexInfo* instantiateIndexInfo(IndexInfo* info, TypeMapper* m);
+	bool isArrayType(Type* t);
+	Type* getElementTypeOfArrayType(Type* t);
+	std::vector<Type*> getElementTypes(Type* t);
+	bool isReadonlyArrayType(Type* t);
+	Type* createTupleTypeEx(std::vector<Type*> elementTypes,
+							std::vector<TupleElementInfo> elementInfos, bool readonly);
+	Type* addOptionalityEx(Type* t, bool isProperty, bool isOptional);
+	Type* inferTypeForHomomorphicMappedType(Type* source, Type* target,
+											Type* constraint);
+	Type* getActualTypeVariable(Type* t);
+	Symbol* getSymbolFromTypeReference(Node* node);
+	// === end slice: instantiate ===
 };
 
 // Free helpers used across checker translation units.
