@@ -27,6 +27,7 @@
 #include "internal/scanner/scanner.h"
 #include "internal/nodebuilder/types.h"
 #include "internal/printer/emitcontext.h"
+#include "internal/printer/printer.h"
 
 namespace tsc::checker {
 
@@ -1019,6 +1020,114 @@ inline constexpr PredicateSemantics PredicateSemanticsAlways = 1 << 0;
 inline constexpr PredicateSemantics PredicateSemanticsNever = 1 << 1;
 inline constexpr PredicateSemantics PredicateSemanticsSometimes =
 	PredicateSemanticsAlways | PredicateSemanticsNever;
+
+// === slice: symbolaccess === (symbolaccessibility.go + printer.go —
+// checker_symbolaccess.cpp, checker_printer.cpp)
+
+// VerbosityContext (nodebuilder.go:19) — controls hover-expansion behavior in
+// the node builder. A nil VerbosityContext means no expansion (non-hover
+// callers). Level 0 = default hover (maxExpansionDepth = 0; detects
+// expandability without expanding). Level 1+ = expansion enabled
+// (maxExpansionDepth = Level).
+struct VerbosityContext {
+	int Level = 0;                    // 0 = default (no expansion), 1+ = expansion depth
+	int MaxTruncationLength = 0;      // 0 = use default
+	bool CanIncreaseVerbosity = false; // output: whether increasing Level would reveal more
+	bool Truncated = false;            // output: whether output was truncated
+};
+
+// accessibleSymbolChainContext (symbolaccessibility.go:391) — recursion state
+// threaded through getAccessibleSymbolChain*. Go shares visitedSymbolTablesMap
+// across ctx copies (maps are reference types); a shared_ptr preserves that.
+struct accessibleSymbolChainContext {
+	Symbol* symbol = nullptr;
+	Node* enclosingDeclaration = nullptr;
+	SymbolFlags meaning{};
+	bool useOnlyExternalAliasing = false;
+	std::shared_ptr<std::unordered_map<SymbolId, std::unordered_set<symbolTableID>>>
+		visitedSymbolTablesMap;
+};
+
+// EmitResolver — minimal shape for symbolaccessibility.go's
+// hasVisibleDeclarations call. The full emitresolver.go port replaces this.
+struct EmitResolver {
+	printer::SymbolAccessibilityResult* hasVisibleDeclarations(
+		Symbol* symbol, bool shouldComputeAliasesToMakeVisible);
+};
+
+struct NodeBuilderContext;
+struct NodeBuilderImpl;
+
+// NodeBuilder (nodebuilder.go:10) — minimal facade used by printer.go.
+// Method bodies other than EmitContext are dep-stubbed in checker_printer.cpp
+// until the nodebuilder slice lands.
+struct NodeBuilder {
+	std::vector<NodeBuilderContext*> ctxStack;
+	Program* host = nullptr;
+	NodeBuilderImpl* impl = nullptr;
+	VerbosityContext* verbosity = nullptr; // nil for non-hover callers
+
+	printer::EmitContext* EmitContext(); // real body in checker_printer.cpp
+	Node* IndexInfoToIndexSignatureDeclaration(
+		IndexInfo* info, Node* enclosingDeclaration, nodebuilder::Flags flags,
+		nodebuilder::InternalFlags internalFlags,
+		nodebuilder::SymbolTracker* tracker);
+	Node* SerializeReturnTypeForSignature(
+		Node* signatureDeclaration, Node* enclosingDeclaration,
+		nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags,
+		nodebuilder::SymbolTracker* tracker);
+	std::vector<Node*> SerializeTypeParametersForSignature(
+		Node* signatureDeclaration, Node* enclosingDeclaration,
+		nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags,
+		nodebuilder::SymbolTracker* tracker);
+	Node* SerializeTypeForDeclaration(
+		Node* declaration, Symbol* symbol, Node* enclosingDeclaration,
+		nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags,
+		nodebuilder::SymbolTracker* tracker);
+	Node* SerializeTypeForExpression(
+		Node* expr, Node* enclosingDeclaration, nodebuilder::Flags flags,
+		nodebuilder::InternalFlags internalFlags,
+		nodebuilder::SymbolTracker* tracker);
+	Node* SignatureToSignatureDeclaration(
+		Signature* signature, Kind kind, Node* enclosingDeclaration,
+		nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags,
+		nodebuilder::SymbolTracker* tracker);
+	std::vector<Node*> ExpandSymbolForHover(Symbol* symbol, SymbolFlags meaning);
+	Node* SymbolToEntityName(Symbol* symbol, SymbolFlags meaning,
+	                         Node* enclosingDeclaration, nodebuilder::Flags flags,
+	                         nodebuilder::InternalFlags internalFlags,
+	                         nodebuilder::SymbolTracker* tracker);
+	Node* SymbolToExpression(Symbol* symbol, SymbolFlags meaning,
+	                        Node* enclosingDeclaration, nodebuilder::Flags flags,
+	                        nodebuilder::InternalFlags internalFlags,
+	                        nodebuilder::SymbolTracker* tracker);
+	Node* SymbolToNode(Symbol* symbol, SymbolFlags meaning,
+	                   Node* enclosingDeclaration, nodebuilder::Flags flags,
+	                   nodebuilder::InternalFlags internalFlags,
+	                   nodebuilder::SymbolTracker* tracker);
+	std::vector<Node*> SymbolToTypeParameterDeclarations(
+		Symbol* symbol, Node* enclosingDeclaration, nodebuilder::Flags flags,
+		nodebuilder::InternalFlags internalFlags,
+		nodebuilder::SymbolTracker* tracker);
+	Node* TypeParameterToDeclaration(
+		Type* parameter, Node* enclosingDeclaration, nodebuilder::Flags flags,
+		nodebuilder::InternalFlags internalFlags,
+		nodebuilder::SymbolTracker* tracker);
+	Node* TypePredicateToTypePredicateNode(
+		TypePredicate* predicate, Node* enclosingDeclaration,
+		nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags,
+		nodebuilder::SymbolTracker* tracker);
+	Node* TypeToTypeNode(Type* typ, Node* enclosingDeclaration,
+	                     nodebuilder::Flags flags,
+	                     nodebuilder::InternalFlags internalFlags,
+	                     nodebuilder::SymbolTracker* tracker);
+	Node* TryJSTypeNodeToTypeNode(Node* node, Node* enclosingDeclaration,
+	                              nodebuilder::Flags flags,
+	                              nodebuilder::InternalFlags internalFlags,
+	                              nodebuilder::SymbolTracker* tracker);
+};
+
+// === end slice: symbolaccess ===
 
 // Checker
 
@@ -2391,7 +2500,7 @@ public:
 	Type* getBaseConstructorTypeOfClass(Type* t);
 	bool hasTypeFacts(Type* t, TypeFacts mask);
 	// === slice: nodecopy ===
-	printer::SymbolAccessibilityResult isSymbolAccessible(
+	printer::SymbolAccessibilityResult IsSymbolAccessible(
 		Symbol* symbol, Node* enclosingDeclaration, SymbolFlags meaning,
 		bool shouldComputeAliasesToMakeVisible);
 
@@ -2564,7 +2673,7 @@ public:
 		const std::vector<Type*>& typeParameters, int minTypeArgumentCount,
 		bool isJavaScriptImplicitAny);
 	std::string TypeToStringEx(Type* t, Node* enclosingDeclaration,
-							   TypeFormatFlags flags, void* verbosityContext);
+							   TypeFormatFlags flags, VerbosityContext* vc);
 	Symbol* getPropertyOfTypeEx(Type* type, const std::string& name,
 								bool skipObjectFunctionPropertyAugment,
 								bool includeTypeOnlyMembers);
@@ -3851,6 +3960,112 @@ public:
 	bool checkApplicableSignatureForJsxCallLikeElement(
 		Node* node, Signature* signature, Relation* relation, CheckMode checkMode,
 		bool reportErrors, std::vector<Diagnostic*>* diagnosticOutput);              // jsx.go:591 — jsx slice
+
+	// === slice: symbolaccess ===
+	// Ported from symbolaccessibility.go and printer.go (bodies in
+	// checker_symbolaccess.cpp and checker_printer.cpp).
+
+	// symbolaccessibility.go
+	bool IsTypeSymbolAccessible(Symbol* typeSymbol, Node* enclosingDeclaration);
+	bool IsValueSymbolAccessible(Symbol* symbol, Node* enclosingDeclaration);
+	bool IsSymbolAccessibleByFlags(Symbol* symbol, Node* enclosingDeclaration,
+	                               SymbolFlags flags);
+	printer::SymbolAccessibilityResult* IsAnySymbolAccessible(
+		const std::vector<Symbol*>& symbols, Node* enclosingDeclaration,
+		Symbol* initialSymbol, SymbolFlags meaning,
+		bool shouldComputeAliasesToMakeVisible, bool allowModules);
+	std::vector<Symbol*> getWithAlternativeContainers(
+		Symbol* container, Symbol* symbol, Node* enclosingDeclaration,
+		SymbolFlags meaning);
+	std::vector<Symbol*> getAlternativeContainingModules(Symbol* symbol,
+	                                                  Node* enclosingDeclaration);
+	Symbol* getVariableDeclarationOfObjectLiteral(Symbol* symbol, SymbolFlags meaning);
+	Symbol* getExternalModuleContainer(Node* declaration);
+	Symbol* getFileSymbolIfFileSymbolExportEqualsContainer(Node* d, Symbol* container);
+	std::vector<Symbol*> getContainersOfSymbol(Symbol* symbol,
+	                                          Node* enclosingDeclaration,
+	                                          SymbolFlags meaning);
+	Symbol* getAliasForSymbolInContainer(Symbol* container, Symbol* symbol);
+	std::vector<Symbol*> getAccessibleSymbolChain(
+		Symbol* symbol, Node* enclosingDeclaration, SymbolFlags meaning,
+		bool useOnlyExternalAliasing);
+	std::vector<Symbol*> GetAccessibleSymbolChain(
+		Symbol* symbol, Node* enclosingDeclaration, SymbolFlags meaning,
+		bool useOnlyExternalAliasing);
+	std::vector<Symbol*> getAccessibleSymbolChainEx(accessibleSymbolChainContext ctx);
+	std::vector<Symbol*> getAccessibleSymbolChainFromSymbolTable(
+		accessibleSymbolChainContext ctx, const SymbolTable& t, symbolTableID tableId,
+		bool ignoreQualification, bool isLocalNameLookup);
+	std::vector<Symbol*> getSymbolTableAliases(const SymbolTable& symbols,
+	                                          symbolTableID tableId);
+	std::vector<Symbol*> trySymbolTable(accessibleSymbolChainContext ctx,
+	                                   const SymbolTable& symbols,
+	                                   symbolTableID tableId,
+	                                   bool ignoreQualification,
+	                                   bool isLocalNameLookup);
+	std::vector<Symbol*> getCandidateListForSymbol(
+		accessibleSymbolChainContext ctx, Symbol* symbolFromSymbolTable,
+		Symbol* resolvedImportedSymbol, bool ignoreQualification);
+	bool isAccessible(accessibleSymbolChainContext ctx,
+	                 Symbol* symbolFromSymbolTable, Symbol* resolvedAliasSymbol,
+	                 bool ignoreQualification);
+	bool canQualifySymbol(accessibleSymbolChainContext ctx,
+	                     Symbol* symbolFromSymbolTable, SymbolFlags meaning);
+	bool needsQualification(Symbol* symbol, Node* enclosingDeclaration,
+	                       SymbolFlags meaning);
+	bool someSymbolTableInScope(
+		Node* enclosingDeclaration,
+		const std::function<bool(const SymbolTable&, symbolTableID, bool, bool, Node*)>&
+			callback);
+	SymbolTable* getClassExpressionNameTable(Node* location);
+	printer::SymbolAccessibilityResult isSymbolAccessibleWorker(
+		Symbol* symbol, Node* enclosingDeclaration, SymbolFlags meaning,
+		bool shouldComputeAliasesToMakeVisible, bool allowModules);
+
+	// printer.go
+	std::string typeToString(Type* t, Node* enclosingDeclaration);
+	std::string typeToStringEx(Type* t, Node* enclosingDeclaration,
+	                          TypeFormatFlags flags, VerbosityContext* vc);
+	std::string SignatureToStringEx(Signature* signature,
+	                               Node* enclosingDeclaration, TypeFormatFlags flags,
+	                               VerbosityContext* vc);
+	std::string signatureToStringEx(Signature* signature,
+	                               Node* enclosingDeclaration, TypeFormatFlags flags,
+	                               VerbosityContext* vc);
+	std::string typePredicateToString(TypePredicate* typePredicate);
+	std::string typePredicateToStringEx(TypePredicate* typePredicate,
+	                                   Node* enclosingDeclaration,
+	                                   TypeFormatFlags flags);
+	std::string SymbolToStringEx(Symbol* symbol, Node* enclosingDeclaration,
+	                            SymbolFlags meaning, SymbolFormatFlags flags);
+	std::string valueToString(
+		const std::variant<std::monostate, std::string, Number, bool, PseudoBigInt>&
+			value);
+	std::vector<Type*> formatUnionTypes(const std::vector<Type*>& types,
+	                                   bool expandingEnum);
+	Node* TypeToTypeNode(Type* t, Node* enclosingDeclaration, nodebuilder::Flags flags,
+	                    std::unordered_map<Node*, Symbol*>* idToSymbol);
+	Node* SignatureToSignatureDeclaration(Signature* signature, Kind kind,
+	                                     Node* enclosingDeclaration,
+	                                     nodebuilder::Flags flags);
+	std::string ExpandSymbolForHover(Symbol* symbol, SymbolFlags meaning,
+	                                VerbosityContext* vc);
+	std::string TypeParameterToStringEx(Type* t, Node* enclosingDeclaration,
+	                                   VerbosityContext* vc);
+	Node* TypeToTypeNodeEx(Type* t, Node* enclosingDeclaration,
+	                      nodebuilder::Flags flags,
+	                      nodebuilder::InternalFlags internalFlags,
+	                      std::unordered_map<Node*, Symbol*>* idToSymbol);
+	Node* TypePredicateToTypePredicateNode(
+		TypePredicate* t, Node* enclosingDeclaration, nodebuilder::Flags flags,
+		std::unordered_map<Node*, Symbol*>* idToSymbol);
+
+	// nodebuilder.go dep decls — real bodies in checker_printer.cpp; the
+	// nodebuilder slice owns what NodeBuilder delegates to.
+	std::pair<NodeBuilder*, std::function<void()>> getNodeBuilder();
+	NodeBuilder* getNodeBuilderEx(std::unordered_map<Node*, Symbol*>* idToSymbol);
+	NodeBuilder* typeToStringNodebuilder = nullptr; // checker.go:905
+	// === end slice: symbolaccess ===
 };  // class Checker
 
 // moduletarget-slice file-local callees hoisted for the dep graph (defs in

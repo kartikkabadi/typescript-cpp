@@ -27,13 +27,7 @@ void Checker::checkNotCanceled() {
 
 // --- getSignatureFromDeclaration — ported with the signatures slice ---------
 
-// --- IsSymbolAccessible — ported with the symbolaccessibility slice ---------
-
-printer::SymbolAccessibilityResult Checker::isSymbolAccessible(
-	Symbol* symbol, Node* enclosingDeclaration, SymbolFlags meaning,
-	bool shouldComputeAliasesToMakeVisible) {
-	TSC_UNREACHABLE("isSymbolAccessible — ported with the symbolaccessibility slice");
-}
+// (deduped: IsSymbolAccessible defined in cpp/internal/checker/checker_symbolaccess.cpp)
 
 // --- IsExternalModuleSymbol — utilities.go:1708 -----------------------------
 
@@ -594,7 +588,7 @@ std::string NodeBuilderImpl::getModuleSpecifierOverride(Node* parent,
 		}
 		Symbol* parentSymbol = nullptr;
 		if (nodeSymbol != nullptr &&
-			ch->isSymbolAccessible(nodeSymbol, ctx->enclosingDeclaration,
+			ch->IsSymbolAccessible(nodeSymbol, ctx->enclosingDeclaration,
 			                       meaning, false)
 					.Accessibility == printer::SymbolAccessibility::Accessible) {
 			parentSymbol = lookupSymbolChain(nodeSymbol, meaning, true)[0];
@@ -705,7 +699,7 @@ NodeVisitor* getExistingNodeTreeVisitor(NodeBuilderImpl* b,
 			// `this` isn't a bindable identifier - skip resolution, find a relevant `this` symbol directly and avoid exhaustive scope traversal
 			sym = b->ch->getSymbolOfDeclaration(
 				b->ch->getThisContainer(leftmost, false, false));
-			if (b->ch->isSymbolAccessible(sym, leftmost, meaning, false)
+			if (b->ch->IsSymbolAccessible(sym, leftmost, meaning, false)
 					.Accessibility != printer::SymbolAccessibility::Accessible) {
 				introducesError = true;
 				b->ctx->tracker->ReportInaccessibleThisError();
@@ -763,7 +757,7 @@ NodeVisitor* getExistingNodeTreeVisitor(NodeBuilderImpl* b,
 			if ((sym->flags & SymbolFlagsTypeParameter) ==
 					0 /* Type parameters are visible in the current context if they are are resolvable */ &&
 				!isDeclarationName(node) &&
-				b->ch->isSymbolAccessible(sym, enclosingDeclaration, meaning,
+				b->ch->IsSymbolAccessible(sym, enclosingDeclaration, meaning,
 				                          false)
 						.Accessibility !=
 					printer::SymbolAccessibility::Accessible) {

@@ -2588,11 +2588,7 @@ Type* Checker::getImpliedConstraint(Type* t, Node* checkNode,
 
 
 
-std::string Checker::TypeToStringEx(Type* t, Node* enclosingDeclaration,
-									TypeFormatFlags flags,
-									void* verbosityContext) {
-	TSC_UNREACHABLE("TypeToStringEx — typenodes dep");
-}
+// (deduped: TypeToStringEx defined in cpp/internal/checker/checker_printer.cpp)
 
 
 

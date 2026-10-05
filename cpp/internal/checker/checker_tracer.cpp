@@ -545,10 +545,7 @@ std::vector<tsc::tracing::TracedType*> wrapTypes(const std::vector<Type*>& types
 // Dependencies owned by other slices — stubbed until they land.
 // ---------------------------------------------------------------------------
 
-// printer.go:43
-std::string Checker::TypeToString(Type* t) {
-	TSC_UNREACHABLE("TypeToString — ported with the printer slice");
-}
+// (deduped: TypeToString defined in cpp/internal/checker/checker_printer.cpp)
 
 // checker.go:28593
 // checker.go:28593

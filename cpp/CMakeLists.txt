@@ -25,6 +25,7 @@ add_library(tsc STATIC
 	internal/checker/checker.cpp
 	internal/checker/checker_walk.cpp
 	internal/checker/checker_jsdoc.cpp
+	internal/checker/checker_symbolaccess.cpp
 	internal/checker/checker_tracer.cpp
 	internal/checker/checker_grammar.cpp
 	internal/checker/checker_declchecks.cpp
@@ -32,6 +33,7 @@ add_library(tsc STATIC
 	internal/checker/checker_stmtclass.cpp
 	internal/checker/checker_markrefs.cpp
 	internal/checker/checker_nodecopy.cpp
+	internal/checker/checker_printer.cpp
 	internal/checker/checker_signatures.cpp
 	internal/checker/checker_typenodes.cpp
 	internal/checker/checker_inference.cpp
