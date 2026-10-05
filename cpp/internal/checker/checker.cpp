@@ -6798,7 +6798,7 @@ static Node* getAliasDeclarationFromName(Node* node) {
 }
 
 // utilities.go: entityNameToString
-static std::string entityNameToString(Node* name) {
+std::string entityNameToString(Node* name) {
 	Node* current = name;
 	std::vector<std::string_view> parts;
 	for (; current; current = current->kind == Kind::QualifiedName
