@@ -137,6 +137,27 @@ inline char32_t decodeUtf8Rune(std::string_view s, int* width) {
 	return r;
 }
 
+// utf8.DecodeRuneInString — strict variant. decodeUtf8Rune above accepts
+// overlong encodings and surrogate halves that Go rejects; use this wherever
+// the Go source calls the real utf8 decoder. Rejects by re-validating the
+// decoded rune against its width.
+inline char32_t decodeUtf8RuneStrict(std::string_view s, int* width) {
+	char32_t r = decodeUtf8Rune(s, width);
+	int w = *width;
+	if (w == 0) {
+		return r;
+	}
+	bool ok = (w == 1)   ? r < 0x80
+	          : (w == 2) ? r >= 0x80
+	          : (w == 3) ? (r >= 0x800 && !isSurrogate(r))
+	                     : (r >= 0x10000 && r <= 0x10FFFF);
+	if (!ok) {
+		*width = 1;
+		return kRuneError;
+	}
+	return r;
+}
+
 inline char32_t decodeLastUtf8Rune(std::string_view s, int* width) {
 	if (s.empty()) {
 		*width = 0;

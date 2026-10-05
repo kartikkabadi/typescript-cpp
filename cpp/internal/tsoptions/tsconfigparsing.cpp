@@ -530,7 +530,7 @@ validateJsonOptionValue(const CommandLineOption* opt,
 			        sourceFile, valueExpression, diag));
 		}
 	} else if (opt->extraValidation_ == extraValidationLocale) {
-		if (!locale::Parse(val.asString()).second) {
+		if (!locale::parse(val.asString()).second) {
 			errors.push_back(
 			    CreateDiagnosticForNodeInSourceFileOrCompilerDiagnostic(
 			        sourceFile, valueExpression,

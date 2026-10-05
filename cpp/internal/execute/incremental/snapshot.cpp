@@ -689,21 +689,8 @@ std::string snapshot::computeSignatureWithDiagnostics(
 	return computeHash(builder);
 }
 
-namespace {
-const char* categoryName(DiagnosticCategory category) {
-	switch (category) {
-	case DiagnosticCategory::Warning:
-		return "warning";
-	case DiagnosticCategory::Error:
-		return "error";
-	case DiagnosticCategory::Suggestion:
-		return "suggestion";
-	case DiagnosticCategory::Message:
-		return "message";
-	}
-	TSC_UNREACHABLE("Unhandled diagnostic category");
-}
-}  // namespace
+// Category.Name — uses tsc::categoryName from diagnostics.h (the
+// file-local duplicate was removed when diagnostics.h grew the real one).
 
 // snapshot.go:405 diagnosticToStringBuilder — writes into a std::string.
 void diagnosticToStringBuilder(Diagnostic* diagnostic, SourceFile* file,

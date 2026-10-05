@@ -183,6 +183,16 @@ add_library(tsc STATIC
 	internal/tsoptions/showconfig.cpp
 	internal/tsoptions/tsconfigparsing.cpp
 	internal/tsoptions/wildcarddirectories.cpp
+	# === slice: infra ===
+	internal/diagnosticwriter/diagnosticwriter.cpp
+	internal/diagnostics/localize.cpp
+	internal/glob/glob.cpp
+	internal/json/json.cpp
+	internal/locale/locale.cpp
+	internal/nativepath/nativepath.cpp
+	internal/osutil/osutil.cpp
+	internal/pprof/pprof.cpp
+	internal/repo/paths.cpp
 	# === slice: incremental ===
 	internal/execute/incremental/affectedfileshandler.cpp
 	internal/execute/incremental/buildinfo.cpp
@@ -206,6 +216,8 @@ add_library(tsc STATIC
 	internal/vfs/vfsmatch/vfsmatch.cpp
 	internal/vfs/vfstest/vfstest.cpp
 )
+
+target_link_libraries(tsc PUBLIC z) # zlib — pprof profile writer
 
 add_executable(tscpp cmd/tscpp/main.cpp)
 target_link_libraries(tscpp PRIVATE tsc)

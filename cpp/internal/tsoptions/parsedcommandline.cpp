@@ -498,7 +498,7 @@ ParsedCommandLine* ParsedCommandLine::ReloadFileNamesOfParsedCommandLine(
 // Locale — parsedcommandline.go:489.
 locale::Locale ParsedCommandLine::Locale() {
 	std::call_once(localeOnce, [&] {
-		locale_ = locale::Parse(CompilerOptions()->Locale).first;
+		locale_ = locale::parse(CompilerOptions()->Locale).first;
 	});
 	return locale_;
 }

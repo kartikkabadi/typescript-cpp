@@ -5,9 +5,18 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 namespace tsc {
+
+// From ast/ast.h — re-declared here so this header does not need to include
+// ast.h (which itself includes this header).
+[[noreturn]] void tscUnreachable(const char* message);
+
+namespace locale {
+class Locale;
+}
 
 enum class DiagnosticCategory : int32_t {
 	Warning = 0,
@@ -29,6 +38,41 @@ struct DiagnosticMessage {
 	bool ElidedInCompatibilityPyramid() const { return elidedInCompatibilityPyramid; }
 	bool ReportsDeprecated() const { return reportsDeprecated; }
 };
+
+// Category.Name — diagnostics.go:27
+inline std::string_view categoryName(DiagnosticCategory category) {
+	switch (category) {
+	case DiagnosticCategory::Warning:
+		return "warning";
+	case DiagnosticCategory::Error:
+		return "error";
+	case DiagnosticCategory::Suggestion:
+		return "suggestion";
+	case DiagnosticCategory::Message:
+		return "message";
+	}
+	tscUnreachable("Unhandled diagnostic category");
+}
+
+using Key = std::string;
+
+// keyToMessage — diagnostics.go:75 (most diagnostics carry a message pointer,
+// so only build the lookup when a key is used).
+const DiagnosticMessage* keyToMessage(std::string_view key);
+
+// Format — diagnostics.go:129 (renamed: `tsc::format` is a namespace).
+// Replaces {N} placeholders; panics on an out-of-range index like Go.
+std::string formatText(std::string_view text, const std::vector<std::string>& args);
+
+// getLocalizedMessages — diagnostics.go:101. Localized message tables are
+// generated data from diagnostics/loc_generated.go; none are ported yet, so
+// every lookup currently finds nothing (English).
+const std::unordered_map<Key, std::string>* getLocalizedMessages(
+	const locale::Locale& loc);
+
+// Localize — diagnostics.go:82
+std::string localize(const locale::Locale& loc, const DiagnosticMessage* message,
+                     Key key, const std::vector<std::string>& args);
 
 // Substitute {0}, {1}, ... in the message text with the given args.
 inline std::string formatDiagnosticMessage(const DiagnosticMessage& msg,

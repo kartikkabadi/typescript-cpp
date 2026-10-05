@@ -22,7 +22,7 @@ std::vector<std::string> ParsedBuildCommandLine::ResolvedProjectPaths() {
 // Locale — parsedbuildcommandline.go:40.
 locale::Locale ParsedBuildCommandLine::Locale() {
 	std::call_once(localeOnce, [&] {
-		locale_ = locale::Parse(CompilerOptions->Locale).first;
+		locale_ = locale::parse(CompilerOptions->Locale).first;
 	});
 	return locale_;
 }
