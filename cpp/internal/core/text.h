@@ -11,6 +11,10 @@
 namespace tsc {
 
 using TextPos = int32_t;
+// === slice: sourcemap ===
+// core.UTF16Offset — Go `type UTF16Offset int`; kept 32-bit like TextPos.
+using UTF16Offset = int32_t;
+// === end slice: sourcemap ===
 
 struct TextRange {
 	TextPos pos_{-1};
