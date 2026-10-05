@@ -992,6 +992,8 @@ static Diagnostic* makeDiagnostic(SourceFile* file, TextRange loc,
 	d->message = message;
 	d->messageKey = message->key;
 	d->messageArgs = args;
+	d->reportsUnnecessary = message->ReportsUnnecessary();
+	d->reportsDeprecated = message->ReportsDeprecated();
 	return d;
 }
 

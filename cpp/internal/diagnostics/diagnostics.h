@@ -21,6 +21,13 @@ struct DiagnosticMessage {
 	DiagnosticCategory category;
 	const char* key;
 	const char* text;
+	bool reportsUnnecessary = false;
+	bool elidedInCompatibilityPyramid = false;
+	bool reportsDeprecated = false;
+
+	bool ReportsUnnecessary() const { return reportsUnnecessary; }
+	bool ElidedInCompatibilityPyramid() const { return elidedInCompatibilityPyramid; }
+	bool ReportsDeprecated() const { return reportsDeprecated; }
 };
 
 // Substitute {0}, {1}, ... in the message text with the given args.

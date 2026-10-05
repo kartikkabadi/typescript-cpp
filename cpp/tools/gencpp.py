@@ -105,13 +105,16 @@ def gen_diagnostics():
     src = open(os.path.join(TSC, "diagnostics", "diagnostics_generated.go")).read()
     # var Name = &Message{code: N, category: CategoryX, key: "...", text: "..."}
     pat = re.compile(
-        r'var (\w+) = &Message\{\s*code:\s*(-?\d+),\s*category:\s*(\w+),\s*key:\s*"([^"]*)",\s*text:\s*"((?:[^"\\]|\\.)*)"\s*\}',
+        r'var (\w+) = &Message\{\s*code:\s*(-?\d+),\s*category:\s*(\w+),\s*key:\s*"([^"]*)",\s*text:\s*"((?:[^"\\]|\\.)*)"([^}]*)\}',
         re.S)
     entries = []
     for m in pat.finditer(src):
-        name, code, cat, key, text = m.groups()
+        name, code, cat, key, text, extra = m.groups()
         text = bytes(text, "utf-8").decode("unicode_escape")
-        entries.append((name, int(code), cat, key, text))
+        un = "reportsUnnecessary: true" in extra
+        dep = "reportsDeprecated: true" in extra
+        elided = "elidedInCompatibilityPyramid: true" in extra
+        entries.append((name, int(code), cat, key, text, un, dep, elided))
     print(f"parsed {len(entries)} diagnostics")
 
     def cxxstr(s):
@@ -147,15 +150,16 @@ def gen_diagnostics():
     lines.append("namespace tsc {\n\n")
     lines.append("// const DiagnosticMessage& name or nullptr; emitted as a flat table.\n")
     lines.append("inline constexpr DiagnosticMessage kDiagnosticMessages[] = {\n")
-    for name, code, cat, key, text in entries:
+    for name, code, cat, key, text, un, dep, elided in entries:
         cxxcat = {"CategoryError": "DiagnosticCategory::Error",
                   "CategoryWarning": "DiagnosticCategory::Warning",
                   "CategorySuggestion": "DiagnosticCategory::Suggestion",
                   "CategoryMessage": "DiagnosticCategory::Message"}[cat]
-        lines.append(f'\t{{{code}, {cxxcat}, "{cxxstr(key)}", "{cxxstr(text)}"}},  // {name}\n')
+        flags = f", {str(un).lower()}, {str(elided).lower()}, {str(dep).lower()}" if (un or dep or elided) else ""
+        lines.append(f'\t{{{code}, {cxxcat}, "{cxxstr(key)}", "{cxxstr(text)}"{flags}}},  // {name}\n')
     lines.append("};\n\n")
     lines.append("// Named accessors matching the Go package-level vars.\n")
-    for i, (name, code, cat, key, text) in enumerate(entries):
+    for i, (name, code, cat, key, text, un, dep, elided) in enumerate(entries):
         lines.append(f"inline const DiagnosticMessage* {name} = &kDiagnosticMessages[{i}];\n")
     lines.append("\n}  // namespace tsc\n")
     out = os.path.join(OUT, "diagnostics", "messages_generated.h")
