@@ -6292,7 +6292,7 @@ void Checker::init(Program* p) {
 	getGlobalClassAccessorDecoratorResultType =
 		getGlobalTypeResolver("ClassAccessorDecoratorResult", 2, true);
 	getGlobalClassFieldDecoratorContextType =
-		getGlobalTypeResolver("ClassFieldDecoratorContext", 1, true);
+		getGlobalTypeResolver("ClassFieldDecoratorContext", 2, true);
 	initializeClosures();
 	initializeIterationResolvers();
 	initializeChecker();

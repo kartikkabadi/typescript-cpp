@@ -101,26 +101,20 @@ static double levenshteinWithMax(std::vector<double>& previous,
 		previous[i] = static_cast<double>(i);
 	for (size_t i = 1; i <= s1.size(); i++) {
 		char32_t c1 = s1[i - 1];
-		size_t minJ = std::max<size_t>(
-			static_cast<size_t>(std::ceil(static_cast<double>(i) - maxValue)),
+		int minJ = std::max<int>(
+			static_cast<int>(std::ceil(static_cast<double>(i) - maxValue)),
 			1);
-		size_t maxJ =
-			std::min<size_t>(static_cast<size_t>(std::floor(
-			                     maxValue + static_cast<double>(i))),
-			                 s2.size());
+		int maxJ =
+			std::min<int>(static_cast<int>(std::floor(
+			                  maxValue + static_cast<double>(i))),
+			              static_cast<int>(s2.size()));
 		double colMin = static_cast<double>(i);
 		current[0] = colMin;
-		for (size_t j = 1; j < minJ; j++)
+		for (int j = 1; j < minJ; j++)
 			current[j] = big;
-		for (size_t j = minJ; j <= maxJ; j++) {
+		for (int j = minJ; j <= maxJ; j++) {
 			double substitutionDistance, dist;
-			char32_t lower1 = s1[i - 1];
-			char32_t lower2 = s2[j - 1];
-			if (lower1 >= 'a' && lower1 <= 'z')
-				lower1 -= 'a' - 'A';
-			if (lower2 >= 'a' && lower2 <= 'z')
-				lower2 -= 'a' - 'A';
-			if (lower1 == lower2)
+			if (stringutil::toLowerRune(s1[i - 1]) == stringutil::toLowerRune(s2[j - 1]))
 				substitutionDistance = previous[j - 1] + 0.1;
 			else
 				substitutionDistance = previous[j - 1] + 2;
@@ -133,7 +127,7 @@ static double levenshteinWithMax(std::vector<double>& previous,
 			current[j] = dist;
 			colMin = std::min(colMin, dist);
 		}
-		for (size_t j = maxJ + 1; j <= s2.size(); j++)
+		for (int j = maxJ + 1; j <= static_cast<int>(s2.size()); j++)
 			current[j] = big;
 		if (colMin > maxValue)
 			return -1;

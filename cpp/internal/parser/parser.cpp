@@ -7733,7 +7733,7 @@ static int skipTo(std::string_view text, int pos, std::string_view s) {
 	if (i == std::string_view::npos) {
 		return -1;
 	}
-	return pos + (int)i;
+	return (int)i;
 }
 
 static int lineEndPos(std::string_view text, int pos) {

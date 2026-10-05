@@ -850,6 +850,16 @@ def gen_nodes():
         calls = re.findall(r"(visitModifiers|visitNodeList|visit)\(v, node\.(\w+)\)", body)
         foreach[sname] = calls
 
+    # forEachChild_<Struct> helpers a ForEachChild method may delegate to
+    # (e.g. JSDocParameterOrPropertyTag, whose visit order depends on
+    # IsNameFirst). The helper body is a boolean expression over visit calls
+    # and node fields; emit a translated verbatim return-expression.
+    foreach_helpers = {}
+    for m in re.finditer(
+            r"func forEachChild_(\w+)\(node \*(\w+), v Visitor\) bool \{\n(.*?)\n\}",
+            src_all, re.S):
+        foreach_helpers[m.group(2)] = m.group(3)
+
     # Update* factory methods (Go: func (f *NodeFactory) UpdateX(node *X, ...) *Node)
     upd_methods = {}   # sname -> (uname, [(argname, gtype)], body)
     for m in re.finditer(
@@ -1141,10 +1151,25 @@ def gen_nodes():
     out.append("\tswitch (kind) {\n")
     seen_kinds = set()
     for sname, calls in sorted(foreach.items()):
-        if not calls:
+        helper = foreach_helpers.get(sname)
+        if not calls and helper is None:
             continue
         out.append(kinds_case(sname, seen_kinds))
         out.append(f"\t\t{{\n\t\t\tauto* n = static_cast<const {sname}*>(this);\n")
+        if helper is not None:
+            # Delegated body: translate `return <bool-expr>` verbatim.
+            expr = helper.strip()
+            expr = re.sub(r"^return\s*", "", expr).rstrip().rstrip(";")
+            expr = re.sub(r"visitModifiers\(v, node\.(\w+)\)",
+                          lambda m: f"visitChildModifiers(v, n->{sanitize(m.group(1))})", expr)
+            expr = re.sub(r"visitNodeList\(v, node\.(\w+)\)",
+                          lambda m: f"visitChildList(v, n->{sanitize(m.group(1))})", expr)
+            expr = re.sub(r"visit\(v, node\.(\w+)\)",
+                          lambda m: f"visitChild(v, n->{sanitize(m.group(1))})", expr)
+            expr = re.sub(r"node\.(\w+)",
+                          lambda m: f"n->{sanitize(m.group(1))}", expr)
+            out.append("\t\t\treturn " + expr + ";\n\t\t}\n")
+            continue
         parts = []
         for fn, field in calls:
             cf = sanitize(field)

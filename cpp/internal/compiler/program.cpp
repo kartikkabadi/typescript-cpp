@@ -347,6 +347,9 @@ SimpleProgram::SimpleProgram(CompilerHost* host_,
 	    std::move(parser.jsxRuntimeImportSpecifiers);
 	importHelpersImportSpecifiers =
 	    std::move(parser.importHelpersImportSpecifiers);
+	// Keep the synthetic import specifier nodes (created in
+	// filesParser::factory) alive for the program's lifetime.
+	syntheticImportArena = std::move(parser.factory.arena());
 	sourceFilesFoundSearchingNodeModules =
 	    std::move(parser.sourceFilesFoundSearchingNodeModules);
 	libFiles = std::move(parser.libFiles);
