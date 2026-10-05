@@ -7769,20 +7769,36 @@ bool Checker::isGenericIndexType(Type* t) {
 
 // checker.go:23091 getTypeParameterFromMappedType
 Type* Checker::getTypeParameterFromMappedType(Type* t) {
-	TSC_UNREACHABLE(
-	    "getTypeParameterFromMappedType — ported with the mapped-type slice");
+	MappedType* m = t->AsMappedType();
+	if (!m->typeParameter) {
+		m->typeParameter = getDeclaredTypeOfTypeParameter(getSymbolOfDeclaration(
+		    m->declaration->as<MappedTypeNode>()->TypeParameter));
+	}
+	return m->typeParameter;
 }
 
 // checker.go:23099 getConstraintTypeFromMappedType
 Type* Checker::getConstraintTypeFromMappedType(Type* t) {
-	TSC_UNREACHABLE(
-	    "getConstraintTypeFromMappedType — ported with the mapped-type slice");
+	MappedType* m = t->AsMappedType();
+	if (!m->constraintType) {
+		Type* c = getConstraintOfTypeParameter(getTypeParameterFromMappedType(t));
+		m->constraintType = c ? c : errorType;
+	}
+	return m->constraintType;
 }
 
 // checker.go:23107 getNameTypeFromMappedType
 Type* Checker::getNameTypeFromMappedType(Type* t) {
-	TSC_UNREACHABLE(
-	    "getNameTypeFromMappedType — ported with the mapped-type slice");
+	MappedType* m = t->AsMappedType();
+	if (!m->declaration->as<MappedTypeNode>()->NameType) {
+		return nullptr;
+	}
+	if (!m->nameType) {
+		m->nameType = instantiateType(
+		    getTypeFromTypeNode(m->declaration->as<MappedTypeNode>()->NameType),
+		    m->mapper);
+	}
+	return m->nameType;
 }
 
 // checker.go:25374 isGenericMappedType
