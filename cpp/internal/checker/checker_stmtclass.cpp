@@ -1800,10 +1800,7 @@ std::string Checker::getTypeNameForErrorDisplay(Type* t) {
 	TSC_UNREACHABLE("getTypeNameForErrorDisplay — expressions slice");
 }
 
-// owner: varchecks slice (checker.go:5929-6264)
-void Checker::checkVariableDeclarationList(Node* node) {
-	TSC_UNREACHABLE("checkVariableDeclarationList — varchecks slice");
-}
+// (deduped: checkVariableDeclarationList defined in cpp/internal/checker/checker_declchecks2.cpp)
 
 // owner: iterations/decltypes slice (checker.go:18014)
 Type* Checker::checkRightHandSideOfForOf(Node* node) {
@@ -1842,11 +1839,7 @@ ConstructorAccessibilityError* Checker::getConstructorAccessibilityError(
 // (deduped: getSymbolAtLocation defined in the owning slice file)
 // (deduped: getApplicableIndexInfos defined in the owning slice file)
 
-// owner: modulechecks slice (checker.go:5082-5928 region; fn at 7082 is
-// in aliasunused range)
-void Checker::checkExportsOnMergedDeclarations(Node* node) {
-	TSC_UNREACHABLE("checkExportsOnMergedDeclarations — aliasunused slice");
-}
+// (deduped: checkExportsOnMergedDeclarations defined in cpp/internal/checker/checker_declchecks2.cpp)
 
 // owner: decltypes slice (checker.go:17277)
 

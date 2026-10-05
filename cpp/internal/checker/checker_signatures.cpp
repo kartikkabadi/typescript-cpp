@@ -1034,9 +1034,9 @@ bool Checker::isResolvingReturnTypeOfSignature(Signature* /*signature*/) { TSC_U
 
 // (deduped: isGenericType defined in cpp/internal/checker/checker_grammar.cpp)
 
-IterationTypes Checker::getIterationTypesOfIterable(Type* /*t*/, IterationUse /*use*/, Node* /*errorNode*/) { TSC_UNREACHABLE("getIterationTypesOfIterable — owned by iteration"); }
-Type* Checker::getIterationTypeOfGeneratorFunctionReturnType(IterationTypeKind /*typeKind*/, Type* /*returnType*/, bool /*isAsyncGenerator*/) { TSC_UNREACHABLE("getIterationTypeOfGeneratorFunctionReturnType — owned by iteration"); }
-// isConstantReference / isReachableFlowNode / isSymbolAssigned — defined in checker_flow.cpp
+// (deduped: getIterationTypesOfIterable/getIterationTypeOfGeneratorFunctionReturnType defined in checker_declchecks2.cpp)
+// (deduped: getIterationTypesOfIterable defined in cpp/internal/checker/checker_declchecks2.cpp)
+// (deduped: getIterationTypeOfGeneratorFunctionReturnType defined in cpp/internal/checker/checker_declchecks2.cpp)
+} // namespace tsc::checker
 
-} // namespace checker
 } // namespace tsc

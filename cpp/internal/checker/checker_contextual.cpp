@@ -3695,25 +3695,7 @@ Type* Checker::getThisTypeOfSignature(Signature* /*signature*/) {
 // (deduped: checkDeclarationInitializer defined in cpp/internal/checker/checker_decltypes.cpp)
 
 
-Type* Checker::getIteratedTypeOrElementType(IterationUse /*use*/,
-											Type* /*inputType*/,
-											Type* /*sentType*/,
-											Node* /*errorNode*/,
-											bool /*checkAssignability*/) {
-	TSC_UNREACHABLE("getIteratedTypeOrElementType — iteration slice (checker.go:6276)");
-}
-
-Type* Checker::checkIteratedTypeOrElementType(IterationUse /*use*/,
-											  Type* /*inputType*/,
-											  Type* /*sentType*/,
-											  Node* /*errorNode*/) {
-	TSC_UNREACHABLE("checkIteratedTypeOrElementType — iteration slice (checker.go:6265)");
-}
-
-IterationTypes Checker::getIterationTypesOfGeneratorFunctionReturnType(
-	Type* /*t*/, bool /*isAsyncGenerator*/) {
-	TSC_UNREACHABLE("getIterationTypesOfGeneratorFunctionReturnType — iteration slice (checker.go:6394)");
-}
+// (deduped: getIteratedTypeOrElementType, checkIteratedTypeOrElementType, getIterationTypesOfGeneratorFunctionReturnType defined in cpp/internal/checker/checker_declchecks2.cpp)
 
 std::string Checker::getKeyPropertyName(Type* /*t*/) {
 	TSC_UNREACHABLE("getKeyPropertyName — relater slice (relater.go:1111)");

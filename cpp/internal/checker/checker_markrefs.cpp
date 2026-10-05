@@ -983,10 +983,7 @@ Node* Checker::getJsxFactoryEntity(Node* location) { TSC_UNREACHABLE("getJsxFact
 // owner: relater slice (relater.go)
 int Checker::getParameterCount(Signature* signature) { TSC_UNREACHABLE("getParameterCount — relater slice"); }
 // owner: signatures slice (checker.go:20143-20986)
-// owner: declchecks slice (checker.go:5081-5929 module-declaration checks)
-bool Checker::checkExternalImportOrExportDeclaration(Node* node) {
-	TSC_UNREACHABLE("checkExternalImportOrExportDeclaration — declchecks slice");
-}
+// (deduped: checkExternalImportOrExportDeclaration defined in cpp/internal/checker/checker_declchecks2.cpp)
 // owner: instantiate slice (checker.go:22285-23219)
 
 }  // namespace tsc::checker

@@ -4160,9 +4160,7 @@ bool Checker::checkTypeAssignableTo(Type* source, Type* target, Node* errorNode,
 // getTypeWithThisArgument and getBaseTypes are defined in checker_members.cpp
 // (members slice).
 
-Type* Checker::getBuiltinIteratorReturnType() {
-	TSC_UNREACHABLE("getBuiltinIteratorReturnType — ported with checker.cpp:6570");
-}
+// (deduped: getBuiltinIteratorReturnType defined in cpp/internal/checker/checker_declchecks2.cpp)
 
 // ---------------------------------------------------------------------------
 // NewChecker bootstrap (checker.go:911-1500) — ported with the bootstrap slice
@@ -7604,10 +7602,7 @@ std::vector<Symbol*> Checker::getNamedMembers(const SymbolTable& members,
 	return result;
 }
 
-Type* Checker::getTypeFromImportAttributes(Node* node) {
-	TSC_UNREACHABLE(
-	    "getTypeFromImportAttributes — ported with the type-node slice");
-}
+// (deduped: getTypeFromImportAttributes defined in cpp/internal/checker/checker_declchecks2.cpp)
 
 // (deduped: getTypeOfSymbol defined in cpp/internal/checker/checker_decltypes.cpp)
 

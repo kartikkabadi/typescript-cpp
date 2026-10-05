@@ -1211,35 +1211,35 @@ void Checker::checkJsxElementDeferred(Node* node) { TSC_UNREACHABLE("checkJsxEle
 // (deduped: checkContextualDeprecations defined in cpp/internal/checker/checker_expressions_c.cpp)
 
 // owner: walker per-node checks (wave-3)
-void Checker::checkVariableStatement(Node* node) { TSC_UNREACHABLE("checkVariableStatement — declchecks slice"); }
+// (deduped: checkVariableStatement defined in cpp/internal/checker/checker_declchecks2.cpp)
 void Checker::checkExpressionStatement(Node* node) { TSC_UNREACHABLE("checkExpressionStatement — stmtchecks slice"); }
-void Checker::checkVariableDeclaration(Node* node) { TSC_UNREACHABLE("checkVariableDeclaration — declchecks slice"); }
-void Checker::checkInterfaceDeclaration(Node* node) { TSC_UNREACHABLE("checkInterfaceDeclaration — declchecks slice"); }
-void Checker::checkTypeAliasDeclaration(Node* node) { TSC_UNREACHABLE("checkTypeAliasDeclaration — declchecks slice"); }
-void Checker::checkEnumDeclaration(Node* node) { TSC_UNREACHABLE("checkEnumDeclaration — declchecks slice"); }
-void Checker::checkEnumMember(Node* node) { TSC_UNREACHABLE("checkEnumMember — declchecks slice"); }
-void Checker::checkModuleDeclaration(Node* node) { TSC_UNREACHABLE("checkModuleDeclaration — modulechecks slice"); }
-void Checker::checkImportDeclaration(Node* node) { TSC_UNREACHABLE("checkImportDeclaration — modulechecks slice"); }
-void Checker::checkImportEqualsDeclaration(Node* node) { TSC_UNREACHABLE("checkImportEqualsDeclaration — modulechecks slice"); }
-void Checker::checkExportDeclaration(Node* node) { TSC_UNREACHABLE("checkExportDeclaration — modulechecks slice"); }
-void Checker::checkExportAssignment(Node* node) { TSC_UNREACHABLE("checkExportAssignment — modulechecks slice"); }
-void Checker::checkMissingDeclaration(Node* node) { TSC_UNREACHABLE("checkMissingDeclaration — declchecks slice"); }
+// (deduped: checkVariableDeclaration defined in cpp/internal/checker/checker_declchecks2.cpp)
+// (deduped: checkInterfaceDeclaration defined in cpp/internal/checker/checker_declchecks2.cpp)
+// (deduped: checkTypeAliasDeclaration defined in cpp/internal/checker/checker_declchecks2.cpp)
+// (deduped: checkEnumDeclaration defined in cpp/internal/checker/checker_declchecks2.cpp)
+// (deduped: checkEnumMember defined in cpp/internal/checker/checker_declchecks2.cpp)
+// (deduped: checkModuleDeclaration defined in cpp/internal/checker/checker_declchecks2.cpp)
+// (deduped: checkImportDeclaration defined in cpp/internal/checker/checker_declchecks2.cpp)
+// (deduped: checkImportEqualsDeclaration defined in cpp/internal/checker/checker_declchecks2.cpp)
+// (deduped: checkExportDeclaration defined in cpp/internal/checker/checker_declchecks2.cpp)
+// (deduped: checkExportAssignment defined in cpp/internal/checker/checker_declchecks2.cpp)
+// (deduped: checkMissingDeclaration defined in cpp/internal/checker/checker_declchecks2.cpp)
 
 // owner: unused/export bookkeeping (wave-3)
-void Checker::checkUnusedIdentifiers(const std::vector<Node*>& potentiallyUnusedIdentifiers) { TSC_UNREACHABLE("checkUnusedIdentifiers — unusedcheck slice"); }
-void Checker::checkUnusedRenamedBindingElements() { TSC_UNREACHABLE("checkUnusedRenamedBindingElements — unusedcheck slice"); }
-void Checker::checkExternalModuleExports(Node* moduleNode) { TSC_UNREACHABLE("checkExternalModuleExports — modulechecks slice"); }
-void Checker::registerForUnusedIdentifiersCheck(Node* node) { TSC_UNREACHABLE("registerForUnusedIdentifiersCheck — unusedcheck slice"); }
+// (deduped: checkUnusedIdentifiers defined in cpp/internal/checker/checker_declchecks2.cpp)
+// (deduped: checkUnusedRenamedBindingElements defined in cpp/internal/checker/checker_declchecks2.cpp)
+// (deduped: checkExternalModuleExports defined in cpp/internal/checker/checker_declchecks2.cpp)
+// (deduped: registerForUnusedIdentifiersCheck defined in cpp/internal/checker/checker_declchecks2.cpp)
 
 // (TypeToString dep-stub removed — tracer slice landed the real definition.)
 
 // owner: module/resolved-symbol helpers
-std::string Checker::getIsolatedModulesLikeFlagName() { TSC_UNREACHABLE("getIsolatedModulesLikeFlagName — modulechecks slice"); }
+// (deduped: getIsolatedModulesLikeFlagName defined in cpp/internal/checker/checker_declchecks2.cpp)
 
 
 // dep stubs — owned by slices not yet merged
 Node* Checker::getEffectiveCheckNode(Node* argument) { TSC_UNREACHABLE("getEffectiveCheckNode — expr-a slice"); }
-Type* Checker::getImportAttributesTypeForModuleSpecifier(Node* moduleSpecifier) { TSC_UNREACHABLE("getImportAttributesTypeForModuleSpecifier — declchecks2 slice"); }
+// (deduped: getImportAttributesTypeForModuleSpecifier defined in owning slice file)
 Symbol* Checker::getSymbolOfPartOfRightHandSideOfImportEquals(Node* entityName) { TSC_UNREACHABLE("getSymbolOfPartOfRightHandSideOfImportEquals — symboltype slice"); }
 Symbol* Checker::getIntrinsicTagSymbol(Node* node) { TSC_UNREACHABLE("getIntrinsicTagSymbol — jsx slice"); }
 

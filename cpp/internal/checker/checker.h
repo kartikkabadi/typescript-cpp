@@ -3624,6 +3624,89 @@ public:
 	                                 const std::vector<Node*>& typeArguments); // checker.go:9406 slice
 	std::string SymbolToString(Symbol* s);                                    // printer slice
 	// === end slice: expr_b ===
+	// === slice: declchecks2 ===
+	// Declarations for cpp/internal/checker/checker_declchecks2.cpp
+	// (checker.go:5082-7500).
+	// checker.go:7249 — UnusedKind
+	enum class UnusedKind : int32_t { Local, Parameter };
+	bool checkInheritedPropertiesAreIdentical(Type* t, Node* typeNode);
+	bool isPropertyIdenticalTo(Symbol* sourceProp, Symbol* targetProp);
+	void checkImportAttributesType(Node* attributes);
+	void checkModuleAugmentationElement(Node* node);
+	void checkImportBinding(Node* node);
+	void checkModuleExportName(Node* name, bool allowStringLiteral);
+	void checkExternalModuleNameInGlobalScope(Node* node);
+	void checkExportSpecifier(Node* node);
+	bool hasExportedMembersOfKind(Symbol* moduleSymbol, SymbolFlags kind);
+	bool hasShadowedNamespace(Symbol* symbol);
+	void errorNextVariableOrPropertyDeclarationMustHaveSameType(
+		Node* firstDeclaration, Type* firstType, Node* nextDeclaration, Type* nextType);
+	void checkVarDeclaredNamesNotShadowed(Node* node);
+	void checkDecorator(Node* node);
+	IterationTypes getIterationTypesOfIterable(Type* t, IterationUse use,
+	                                         Type* inputType, Node* errorNode);
+	IterationTypes getIterationTypesOfIterableWorker(Type* t, IterationUse use,
+	                                               Node* errorNode, bool noCache);
+	IterationTypes getIterationTypesOfIterableFast(Type* t, IterationTypesResolver* r);
+	bool isReferenceToSomeType(Type* t, const std::vector<Type*>& targets);
+	IterationTypes combineIterationTypes(std::vector<IterationTypes> iterationTypes);
+	Type* getIterationTypeUnion(
+		const std::vector<IterationTypes>& iterationTypes,
+		const std::function<Type*(const IterationTypes&)>& f);
+	IterationTypes getAsyncFromSyncIterationTypes(IterationTypes iterationTypes,
+	                                            Node* errorNode);
+	IterationTypes getIterationTypesOfIterableSlow(
+		Type* t, IterationTypesResolver* r, Node* errorNode,
+		std::vector<Diagnostic*>* diagnosticOutput);
+	IterationTypes getIterationTypesOfIterator(
+		Type* t, IterationTypesResolver* r, Node* errorNode,
+		std::vector<Diagnostic*>* diagnosticOutput);
+	IterationTypes getIterationTypesOfIteratorWorker(
+		Type* t, IterationTypesResolver* r, Node* errorNode,
+		std::vector<Diagnostic*>* diagnosticOutput);
+	IterationTypes getIterationTypesOfIteratorFast(Type* t, IterationTypesResolver* r);
+	IterationTypes getIterationTypesOfIteratorSlow(
+		Type* t, IterationTypesResolver* r, Node* errorNode,
+		std::vector<Diagnostic*>* diagnosticOutput);
+	IterationTypes getIterationTypesOfMethod(
+		Type* t, IterationTypesResolver* resolver, const std::string& methodName,
+		Node* errorNode, std::vector<Diagnostic*>* diagnosticOutput);
+	IterationTypes getIterationTypesOfIteratorResult(Type* t);
+	bool isYieldIteratorResult(Type* t);
+	bool isReturnIteratorResult(Type* t);
+	bool isIteratorResult(Type* t, IterationTypeKind kind);
+	Diagnostic* reportTypeNotIterableError(Node* errorNode, Type* t, bool allowAsyncIterables);
+	std::pair<const DiagnosticMessage*, bool> getIterationDiagnosticDetails(
+		IterationUse use, Type* inputType, bool allowsStrings);
+	void checkAliasSymbol(Node* node);
+	bool areDeclarationFlagsIdentical(Node* left, Node* right);
+	DeclarationSpaces getDeclarationSpaces(Node* node);
+	void checkTypeParametersNotReferenced(Node* root,
+	                                      const std::vector<Node*>& typeParameters,
+	                                      size_t index);
+	bool isReferenced(Symbol* symbol);
+	void reportUnusedVariable(Node* location, Diagnostic* diagnostic);
+	void reportUnused(Node* location, UnusedKind kind, Diagnostic* diagnostic);
+	bool unusedIsError(UnusedKind kind);
+	void checkUnusedClassMembers(Node* node);
+	void checkUnusedLocalsAndParameters(Node* node);
+	void reportUnusedLocal(Node* node, const std::string& name);
+	void reportUnusedVariables(Node* node);
+	void reportUnusedParameters(Node* node);
+	void reportUnusedBindingElements(Node* node);
+	void reportUnusedVariableDeclarations(std::vector<Node*> declarations);
+	bool isUnreferencedVariableDeclaration(Node* node);
+	void reportUnusedImports(Node* node, std::vector<Node*> unuseds);
+	void checkUnusedInferTypeParameter(Node* node);
+	void checkUnusedTypeParameters(Node* node);
+	bool isUnreferencedTypeParameter(Node* typeParameter);
+	// declchecks2 dep decls — owned by other slices; bodies stubbed in
+	// checker_declchecks2.cpp under "dep stubs".
+	void checkDeprecatedSignature(Signature* signature, Node* node);       // expressions slice
+	Node* getFirstTransformableStaticClassElement(Node* node);             // expressions slice
+	void reportDiagnostic(Diagnostic* diagnostic,
+	                      std::vector<Diagnostic*>* diagnosticOutput);     // relater slice
+	// === end slice: declchecks2 ===
 };  // class Checker
 
 // moduletarget-slice file-local callees hoisted for the dep graph (defs in

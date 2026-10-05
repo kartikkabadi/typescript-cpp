@@ -2869,11 +2869,7 @@ std::vector<Type*> Checker::checkTypeArguments(
 	TSC_UNREACHABLE("checkTypeArguments — checker.go:9414 slice");
 }
 
-Type* Checker::getIterationTypeOfIterable(IterationUse use,
-                                        IterationTypeKind typeKind,
-                                        Type* inputType, Node* errorNode) {
-	TSC_UNREACHABLE("getIterationTypeOfIterable — checker.go:6408 slice");
-}
+// (deduped: getIterationTypeOfIterable defined in owning slice file)
 
 // (deduped: getMapperFromContext defined in the owning slice file)
 
@@ -2898,10 +2894,7 @@ bool Checker::hasCorrectTypeArgumentArity(
 
 // (deduped: isSymbolAssignedDefinitely defined in the owning slice file)
 
-Symbol* Checker::resolveAliasWithDeprecationCheck(Symbol* symbol,
-                                                  Node* location) {
-	TSC_UNREACHABLE("resolveAliasWithDeprecationCheck — checker.go:16630 slice");
-}
+// (deduped: resolveAliasWithDeprecationCheck defined in owning slice file)
 
 std::string Checker::SymbolToString(Symbol* s) {
 	TSC_UNREACHABLE("SymbolToString — printer slice");
