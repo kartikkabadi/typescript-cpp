@@ -183,12 +183,12 @@ bool maybeTypeOfKind(Type* t, TypeFlags flags) {
 
 bool containsType(const std::vector<Type*>& types, Type* t) {
 	return std::binary_search(types.begin(), types.end(), t,
-		[](Type* a, Type* b) { return compareTypeIds(a, b) < 0; });
+		[](Type* a, Type* b) { return CompareTypes(a, b) < 0; });
 }
 
 static bool insertType(std::vector<Type*>& types, Type* t) {
 	auto it = std::lower_bound(types.begin(), types.end(), t,
-		[](Type* a, Type* b) { return compareTypeIds(a, b) < 0; });
+		[](Type* a, Type* b) { return CompareTypes(a, b) < 0; });
 	if (it == types.end() || *it != t) {
 		types.insert(it, t);
 		return true;
@@ -1049,7 +1049,7 @@ std::pair<std::vector<Type*>, TypeFlags> Checker::addTypesToUnion(
 	if (types.size() >= 2) {
 		// Sort and deduplicate types
 		std::stable_sort(types.begin(), types.end(),
-			[](Type* a, Type* b) { return compareTypeIds(a, b) < 0; });
+			[](Type* a, Type* b) { return CompareTypes(a, b) < 0; });
 		size_t unique = 1;
 		for (size_t i = 1; i < types.size(); i++) {
 			if (types[i] != types[unique - 1]) {
@@ -2960,7 +2960,7 @@ Type* Checker::reportCircularityError(Symbol* symbol) {
 									symbolToString(symbol));
 		error(node, Circular_definition_of_import_alias_0, {symbolToString(symbol)});
 	}
-	return errorType;
+	return anyType;
 }
 
 // ---------------------------------------------------------------------------
@@ -3901,15 +3901,26 @@ static bool isPropertyImmediatelyReferencedWithinDeclaration(
 			// even when stopping at any property declaration, they need to come
 			// from the same class
 			return stopAtAnyPropertyDeclaration &&
-				   isClassLike(node->parent) &&
-				   node->parent == declaration->parent;
-		case Kind::ClassStaticBlockDeclaration:
-			return true;
+				   ((isPropertyDeclaration(declaration) &&
+					 node->parent == declaration->parent) ||
+					(isParameterPropertyDeclaration(declaration,
+													declaration->parent) &&
+					 node->parent == declaration->parent->parent));
+		case Kind::Block:
+			switch (node->parent->kind) {
+			case Kind::MethodDeclaration:
+			case Kind::GetAccessor:
+			case Kind::SetAccessor:
+				return false;
+			default:
+				break;
+			}
+			break;
 		default:
 			break;
 		}
 	}
-	return false;
+	return true;
 }
 
 bool Checker::isUsedInFunctionOrInstanceProperty(Node* usage, Node* declaration,

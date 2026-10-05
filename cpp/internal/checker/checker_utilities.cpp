@@ -595,7 +595,11 @@ int compareTypeNames(Type* t1, Type* t2) {
 	Symbol* s1 = getTypeNameSymbol(t1);
 	Symbol* s2 = getTypeNameSymbol(t2);
 	if (s1 == s2) {
-		return compareTypeLists(t1->alias->TypeArguments(), t2->alias->TypeArguments());
+		// TypeArguments() tolerates a null alias, matching the Go nil-receiver semantics.
+		static const std::vector<Type*> noArgs;
+		return compareTypeLists(
+			t1->alias != nullptr ? t1->alias->TypeArguments() : noArgs,
+			t2->alias != nullptr ? t2->alias->TypeArguments() : noArgs);
 	}
 	if (s1 == nullptr) {
 		return 1;

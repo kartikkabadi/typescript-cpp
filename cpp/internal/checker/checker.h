@@ -594,7 +594,8 @@ inline constexpr TypeFacts TypeFactsBaseNumberStrictFacts =
 	TypeFactsTypeofNEFunction | TypeFactsTypeofNEHostObject | TypeFactsNEUndefined |
 	TypeFactsNENull | TypeFactsNEUndefinedOrNull;
 inline constexpr TypeFacts TypeFactsBaseNumberFacts =
-	TypeFactsBaseNumberStrictFacts | TypeFactsEQNull | TypeFactsEQUndefinedOrNull | TypeFactsFalsy;
+	TypeFactsBaseNumberStrictFacts | TypeFactsEQUndefined | TypeFactsEQNull |
+	TypeFactsEQUndefinedOrNull | TypeFactsFalsy;
 inline constexpr TypeFacts TypeFactsNumberStrictFacts =
 	TypeFactsBaseNumberStrictFacts | TypeFactsTruthy | TypeFactsFalsy;
 inline constexpr TypeFacts TypeFactsNumberFacts = TypeFactsBaseNumberFacts | TypeFactsTruthy;
@@ -611,7 +612,8 @@ inline constexpr TypeFacts TypeFactsBaseBigIntStrictFacts =
 	TypeFactsTypeofNEFunction | TypeFactsTypeofNEHostObject | TypeFactsNEUndefined |
 	TypeFactsNENull | TypeFactsNEUndefinedOrNull;
 inline constexpr TypeFacts TypeFactsBaseBigIntFacts =
-	TypeFactsBaseBigIntStrictFacts | TypeFactsEQNull | TypeFactsEQUndefinedOrNull | TypeFactsFalsy;
+	TypeFactsBaseBigIntStrictFacts | TypeFactsEQUndefined | TypeFactsEQNull |
+	TypeFactsEQUndefinedOrNull | TypeFactsFalsy;
 inline constexpr TypeFacts TypeFactsBigIntStrictFacts =
 	TypeFactsBaseBigIntStrictFacts | TypeFactsTruthy | TypeFactsFalsy;
 inline constexpr TypeFacts TypeFactsBigIntFacts = TypeFactsBaseBigIntFacts | TypeFactsTruthy;
@@ -628,7 +630,8 @@ inline constexpr TypeFacts TypeFactsBaseBooleanStrictFacts =
 	TypeFactsTypeofNEFunction | TypeFactsTypeofNEHostObject | TypeFactsNEUndefined |
 	TypeFactsNENull | TypeFactsNEUndefinedOrNull;
 inline constexpr TypeFacts TypeFactsBaseBooleanFacts =
-	TypeFactsBaseBooleanStrictFacts | TypeFactsEQNull | TypeFactsEQUndefinedOrNull | TypeFactsFalsy;
+	TypeFactsBaseBooleanStrictFacts | TypeFactsEQUndefined | TypeFactsEQNull |
+	TypeFactsEQUndefinedOrNull | TypeFactsFalsy;
 inline constexpr TypeFacts TypeFactsBooleanStrictFacts =
 	TypeFactsBaseBooleanStrictFacts | TypeFactsTruthy | TypeFactsFalsy;
 inline constexpr TypeFacts TypeFactsBooleanFacts = TypeFactsBaseBooleanFacts | TypeFactsTruthy;
@@ -657,7 +660,7 @@ inline constexpr TypeFacts TypeFactsObjectFacts =
 inline constexpr TypeFacts TypeFactsFunctionStrictFacts =
 	TypeFactsTypeofEQFunction | TypeFactsTypeofEQHostObject | TypeFactsTypeofNEString |
 	TypeFactsTypeofNENumber | TypeFactsTypeofNEBigInt | TypeFactsTypeofNEBoolean |
-	TypeFactsTypeofNESymbol | TypeFactsTypeofNEFunction | TypeFactsNEUndefined |
+	TypeFactsTypeofNESymbol | TypeFactsTypeofNEObject | TypeFactsNEUndefined |
 	TypeFactsNENull | TypeFactsNEUndefinedOrNull | TypeFactsTruthy;
 inline constexpr TypeFacts TypeFactsFunctionFacts =
 	TypeFactsFunctionStrictFacts | TypeFactsEQUndefined | TypeFactsEQNull |
@@ -665,12 +668,14 @@ inline constexpr TypeFacts TypeFactsFunctionFacts =
 inline constexpr TypeFacts TypeFactsVoidFacts =
 	TypeFactsTypeofNEString | TypeFactsTypeofNENumber | TypeFactsTypeofNEBigInt |
 	TypeFactsTypeofNEBoolean | TypeFactsTypeofNESymbol | TypeFactsTypeofNEObject |
-	TypeFactsTypeofNEFunction | TypeFactsTypeofNEHostObject | TypeFactsNENull | TypeFactsFalsy;
+	TypeFactsTypeofNEFunction | TypeFactsTypeofNEHostObject | TypeFactsEQUndefined |
+	TypeFactsEQUndefinedOrNull | TypeFactsNENull | TypeFactsFalsy;
 inline constexpr TypeFacts TypeFactsUndefinedFacts = TypeFactsVoidFacts | TypeFactsIsUndefined;
 inline constexpr TypeFacts TypeFactsNullFacts =
 	TypeFactsTypeofEQObject | TypeFactsTypeofNEString | TypeFactsTypeofNENumber |
 	TypeFactsTypeofNEBigInt | TypeFactsTypeofNEBoolean | TypeFactsTypeofNESymbol |
-	TypeFactsTypeofNEFunction | TypeFactsEQNull | TypeFactsEQUndefinedOrNull |
+	TypeFactsTypeofNEFunction | TypeFactsTypeofNEHostObject | TypeFactsEQNull |
+	TypeFactsEQUndefinedOrNull |
 	TypeFactsNEUndefined | TypeFactsFalsy | TypeFactsIsNull;
 inline constexpr TypeFacts TypeFactsEmptyObjectStrictFacts =
 	TypeFactsAll & ~(TypeFactsEQUndefined | TypeFactsEQNull | TypeFactsEQUndefinedOrNull |
