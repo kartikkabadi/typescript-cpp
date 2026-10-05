@@ -2970,7 +2970,10 @@ Type* Checker::reportCircularityError(Symbol* symbol) {
 									symbolToString(symbol));
 		error(node, Circular_definition_of_import_alias_0, {symbolToString(symbol)});
 	}
-	return errorType;
+	// Circularities could also result from parameters in function expressions that end up
+	// having themselves as contextual types following type argument inference. In those cases
+	// we have already reported an implicit any error so we don't report anything here.
+	return anyType;
 }
 
 // ---------------------------------------------------------------------------
@@ -3911,15 +3914,26 @@ static bool isPropertyImmediatelyReferencedWithinDeclaration(
 			// even when stopping at any property declaration, they need to come
 			// from the same class
 			return stopAtAnyPropertyDeclaration &&
-				   isClassLike(node->parent) &&
-				   node->parent == declaration->parent;
-		case Kind::ClassStaticBlockDeclaration:
-			return true;
+				   ((isPropertyDeclaration(declaration) &&
+					 node->parent == declaration->parent) ||
+					(isParameterPropertyDeclaration(declaration,
+													declaration->parent) &&
+					 node->parent == declaration->parent->parent));
+		case Kind::Block:
+			switch (node->parent->kind) {
+			case Kind::MethodDeclaration:
+			case Kind::GetAccessor:
+			case Kind::SetAccessor:
+				return false;
+			default:
+				break;
+			}
+			break;
 		default:
 			break;
 		}
 	}
-	return false;
+	return true;
 }
 
 bool Checker::isUsedInFunctionOrInstanceProperty(Node* usage, Node* declaration,
