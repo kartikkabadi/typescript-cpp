@@ -1808,7 +1808,11 @@ void Checker::resolveReverseMappedTypeMembers(Type* t) {
 // getTypeOfReverseMappedSymbol — inference.go:1145
 Type* Checker::getTypeOfReverseMappedSymbol(Symbol* symbol) {
 	ValueSymbolLinks* links = valueSymbolLinks.Get(symbol);
-	if (links->resolvedType == nullptr) {
+	if (links->resolvedType == nullptr ||
+		staleForCheckFile(links->resolvedTypeCheckFile)) {
+		// Go: fresh per-checker cache — recompute under this file.
+		links->resolvedType = nullptr;
+		links->resolvedTypeCheckFile = activeCheckFile;
 		ReverseMappedSymbolLinks* reverseLinks = reverseMappedSymbolLinks.Get(symbol);
 		links->resolvedType = orElse(
 			inferReverseMappedType(reverseLinks->propertyType, reverseLinks->mappedType,

@@ -953,8 +953,9 @@ void Checker::checkTypeParameterListsIdentical(Symbol* symbol) {
 		return;
 	}
 	auto* links = declaredTypeLinks.Get(symbol);
-	if (!links->typeParametersChecked) {
-		links->typeParametersChecked = true;
+	if (links->typeParametersCheckedFile == nullptr ||
+		staleForCheckFile(links->typeParametersCheckedFile)) {
+		links->typeParametersCheckedFile = activeCheckFile;
 		std::vector<Node*> declarations = getClassOrInterfaceDeclarationsOfSymbol(symbol);
 		if (declarations.size() <= 1) {
 			return;
@@ -1705,8 +1706,9 @@ void Checker::checkIndexConstraintForIndexSignature(Type* t, IndexInfo* checkInf
 void Checker::checkClassOrInterfaceForDuplicateIndexSignatures(Node* node) {
 	// Only check the type once
 	auto* links = declaredTypeLinks.Get(getSymbolOfDeclaration(node));
-	if (!links->indexSignaturesChecked) {
-		links->indexSignaturesChecked = true;
+	if (links->indexSignaturesCheckedFile == nullptr ||
+		staleForCheckFile(links->indexSignaturesCheckedFile)) {
+		links->indexSignaturesCheckedFile = activeCheckFile;
 		checkTypeForDuplicateIndexSignatures(node);
 	}
 }

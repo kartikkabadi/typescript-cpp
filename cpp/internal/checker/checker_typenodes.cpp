@@ -564,7 +564,11 @@ Type* Checker::getTypeFromTypeNodeWorker(Node* node) {
 
 Type* Checker::getTypeFromThisTypeNode(Node* node) {
 	auto* links = typeNodeLinks.Get(node);
-	if (links->resolvedType == nullptr) {
+	if (links->resolvedType == nullptr ||
+		staleForCheckFile(links->resolvedTypeCheckFile)) {
+		// Go: fresh per-checker cache — recompute under this file.
+		links->resolvedType = nullptr;
+		links->resolvedTypeCheckFile = activeCheckFile;
 		links->resolvedType = getThisType(node);
 	}
 	return links->resolvedType;
@@ -598,7 +602,11 @@ Type* Checker::getTypeFromLiteralTypeNode(Node* node) {
 		return nullType;
 	}
 	auto* links = typeNodeLinks.Get(node);
-	if (links->resolvedType == nullptr) {
+	if (links->resolvedType == nullptr ||
+		staleForCheckFile(links->resolvedTypeCheckFile)) {
+		// Go: fresh per-checker cache — recompute under this file.
+		links->resolvedType = nullptr;
+		links->resolvedTypeCheckFile = activeCheckFile;
 		links->resolvedType = getRegularTypeOfLiteralType(
 			checkExpression(node->as<LiteralTypeNode>()->Literal));
 	}
@@ -607,7 +615,11 @@ Type* Checker::getTypeFromLiteralTypeNode(Node* node) {
 
 Type* Checker::getTypeFromTypeLiteralOrFunctionOrConstructorTypeNode(Node* node) {
 	auto* links = typeNodeLinks.Get(node);
-	if (links->resolvedType == nullptr) {
+	if (links->resolvedType == nullptr ||
+		staleForCheckFile(links->resolvedTypeCheckFile)) {
+		// Go: fresh per-checker cache — recompute under this file.
+		links->resolvedType = nullptr;
+		links->resolvedTypeCheckFile = activeCheckFile;
 		// Deferred resolution of members is handled by resolveObjectTypeMembers
 		TypeAlias* alias = getAliasForTypeNode(node);
 		Symbol* sym = node->symbol();
@@ -625,7 +637,11 @@ Type* Checker::getTypeFromTypeLiteralOrFunctionOrConstructorTypeNode(Node* node)
 
 Type* Checker::getTypeFromIndexedAccessTypeNode(Node* node) {
 	auto* links = typeNodeLinks.Get(node);
-	if (links->resolvedType == nullptr) {
+	if (links->resolvedType == nullptr ||
+		staleForCheckFile(links->resolvedTypeCheckFile)) {
+		// Go: fresh per-checker cache — recompute under this file.
+		links->resolvedType = nullptr;
+		links->resolvedTypeCheckFile = activeCheckFile;
 		Type* objectType = getTypeFromTypeNode(
 			node->as<IndexedAccessTypeNode>()->ObjectType);
 		Type* indexType =
@@ -639,7 +655,11 @@ Type* Checker::getTypeFromIndexedAccessTypeNode(Node* node) {
 
 Type* Checker::getTypeFromTypeOperatorNode(Node* node) {
 	auto* links = typeNodeLinks.Get(node);
-	if (links->resolvedType == nullptr) {
+	if (links->resolvedType == nullptr ||
+		staleForCheckFile(links->resolvedTypeCheckFile)) {
+		// Go: fresh per-checker cache — recompute under this file.
+		links->resolvedType = nullptr;
+		links->resolvedTypeCheckFile = activeCheckFile;
 		Node* argType = node->type();
 		switch (node->as<TypeOperatorNode>()->Operator) {
 		case Kind::KeyOfKeyword:
@@ -691,7 +711,11 @@ Type* Checker::getESSymbolLikeTypeForNode(Node* node) {
 
 Type* Checker::getTypeFromTypeReference(Node* node) {
 	auto* links = typeNodeLinks.Get(node);
-	if (links->resolvedType == nullptr) {
+	if (links->resolvedType == nullptr ||
+		staleForCheckFile(links->resolvedTypeCheckFile)) {
+		// Go: fresh per-checker cache — recompute under this file.
+		links->resolvedType = nullptr;
+		links->resolvedTypeCheckFile = activeCheckFile;
 		// Cache both the resolved symbol and the resolved type. The resolved
 		// symbol is needed when we check the type reference in
 		// checkTypeReferenceNode.
@@ -815,7 +839,10 @@ Type* Checker::getIntendedTypeFromJSDocTypeReference(Node* node) {
 
 Symbol* Checker::getSymbolFromTypeReference(Node* node) {
 	auto* links = symbolNodeLinks.Get(node);
-	if (links->resolvedSymbol == nullptr) {
+	if (links->resolvedSymbol == nullptr ||
+		staleForCheckFile(links->resolvedSymbolCheckFile)) {
+		// Go: fresh per-checker cache — re-resolve under this file.
+		links->resolvedSymbolCheckFile = activeCheckFile;
 		// The `const` in a `const` assertion resolves to nothing; resolveName
 		// knows not to report an error for it, so no special-casing is needed
 		// here.
@@ -1515,7 +1542,11 @@ Type* Checker::getTypeAliasInstantiation(
 
 Type* Checker::getTypeFromTypeQueryNode(Node* node) {
 	auto* links = typeNodeLinks.Get(node);
-	if (links->resolvedType == nullptr) {
+	if (links->resolvedType == nullptr ||
+		staleForCheckFile(links->resolvedTypeCheckFile)) {
+		// Go: fresh per-checker cache — recompute under this file.
+		links->resolvedType = nullptr;
+		links->resolvedTypeCheckFile = activeCheckFile;
 		// TypeScript 1.0 spec (April 2014): 3.6.3
 		// The expression is processed as an identifier expression (section 4.3)
 		// or property access expression(section 4.10),
@@ -1529,7 +1560,11 @@ Type* Checker::getTypeFromTypeQueryNode(Node* node) {
 
 Type* Checker::getTypeFromArrayOrTupleTypeNode(Node* node) {
 	auto* links = typeNodeLinks.Get(node);
-	if (links->resolvedType == nullptr) {
+	if (links->resolvedType == nullptr ||
+		staleForCheckFile(links->resolvedTypeCheckFile)) {
+		// Go: fresh per-checker cache — recompute under this file.
+		links->resolvedType = nullptr;
+		links->resolvedTypeCheckFile = activeCheckFile;
 		Type* target = getArrayOrTupleTargetType(node);
 		if (target == emptyGenericType) {
 			links->resolvedType = emptyObjectType;
@@ -1592,7 +1627,11 @@ bool Checker::isReadonlyTypeOperator(Node* node) {
 
 Type* Checker::getTypeFromNamedTupleTypeNode(Node* node) {
 	auto* links = typeNodeLinks.Get(node);
-	if (links->resolvedType == nullptr) {
+	if (links->resolvedType == nullptr ||
+		staleForCheckFile(links->resolvedTypeCheckFile)) {
+		// Go: fresh per-checker cache — recompute under this file.
+		links->resolvedType = nullptr;
+		links->resolvedTypeCheckFile = activeCheckFile;
 		if (node->as<NamedTupleMember>()->DotDotDotToken != nullptr) {
 			links->resolvedType = getTypeFromRestTypeNode(node);
 		} else {
@@ -1644,7 +1683,11 @@ Type* Checker::getTypeFromOptionalTypeNode(Node* node) {
 
 Type* Checker::getTypeFromUnionTypeNode(Node* node) {
 	auto* links = typeNodeLinks.Get(node);
-	if (links->resolvedType == nullptr) {
+	if (links->resolvedType == nullptr ||
+		staleForCheckFile(links->resolvedTypeCheckFile)) {
+		// Go: fresh per-checker cache — recompute under this file.
+		links->resolvedType = nullptr;
+		links->resolvedTypeCheckFile = activeCheckFile;
 		TypeAlias* alias = getAliasForTypeNode(node);
 		links->resolvedType = getUnionTypeEx(
 			mapList(node->as<UnionTypeNode>()->Types->nodes,
@@ -1656,7 +1699,11 @@ Type* Checker::getTypeFromUnionTypeNode(Node* node) {
 
 Type* Checker::getTypeFromIntersectionTypeNode(Node* node) {
 	auto* links = typeNodeLinks.Get(node);
-	if (links->resolvedType == nullptr) {
+	if (links->resolvedType == nullptr ||
+		staleForCheckFile(links->resolvedTypeCheckFile)) {
+		// Go: fresh per-checker cache — recompute under this file.
+		links->resolvedType = nullptr;
+		links->resolvedTypeCheckFile = activeCheckFile;
 		TypeAlias* alias = getAliasForTypeNode(node);
 		std::vector<Type*> types = mapList(
 			node->as<IntersectionTypeNode>()->Types->nodes,
@@ -1690,7 +1737,11 @@ Type* Checker::getTypeFromIntersectionTypeNode(Node* node) {
 
 Type* Checker::getTypeFromTemplateTypeNode(Node* node) {
 	auto* links = typeNodeLinks.Get(node);
-	if (links->resolvedType == nullptr) {
+	if (links->resolvedType == nullptr ||
+		staleForCheckFile(links->resolvedTypeCheckFile)) {
+		// Go: fresh per-checker cache — recompute under this file.
+		links->resolvedType = nullptr;
+		links->resolvedTypeCheckFile = activeCheckFile;
 		NodeList* spans = node->as<TemplateLiteralTypeNode>()->TemplateSpans;
 		std::vector<std::string> texts(spans->nodes.size() + 1);
 		std::vector<Type*> types(spans->nodes.size());
@@ -1707,7 +1758,11 @@ Type* Checker::getTypeFromTemplateTypeNode(Node* node) {
 
 Type* Checker::getTypeFromMappedTypeNode(Node* node) {
 	auto* links = typeNodeLinks.Get(node);
-	if (links->resolvedType == nullptr) {
+	if (links->resolvedType == nullptr ||
+		staleForCheckFile(links->resolvedTypeCheckFile)) {
+		// Go: fresh per-checker cache — recompute under this file.
+		links->resolvedType = nullptr;
+		links->resolvedTypeCheckFile = activeCheckFile;
 		Type* t = newObjectType(ObjectFlagsMapped, node->symbol());
 		t->AsMappedType()->declaration = node->as<MappedTypeNode>();
 		t->alias = getAliasForTypeNode(node);
@@ -1722,7 +1777,11 @@ Type* Checker::getTypeFromMappedTypeNode(Node* node) {
 
 Type* Checker::getTypeFromConditionalTypeNode(Node* node) {
 	auto* links = typeNodeLinks.Get(node);
-	if (links->resolvedType == nullptr) {
+	if (links->resolvedType == nullptr ||
+		staleForCheckFile(links->resolvedTypeCheckFile)) {
+		// Go: fresh per-checker cache — recompute under this file.
+		links->resolvedType = nullptr;
+		links->resolvedTypeCheckFile = activeCheckFile;
 		Type* checkType = getTypeFromTypeNode(
 			node->as<ConditionalTypeNode>()->CheckType);
 		TypeAlias* alias = getAliasForTypeNode(node);
@@ -2103,7 +2162,11 @@ Type* Checker::getInferredTrueTypeFromConditionalType(Type* t) {
 
 Type* Checker::getTypeFromInferTypeNode(Node* node) {
 	auto* links = typeNodeLinks.Get(node);
-	if (links->resolvedType == nullptr) {
+	if (links->resolvedType == nullptr ||
+		staleForCheckFile(links->resolvedTypeCheckFile)) {
+		// Go: fresh per-checker cache — recompute under this file.
+		links->resolvedType = nullptr;
+		links->resolvedTypeCheckFile = activeCheckFile;
 		links->resolvedType = getDeclaredTypeOfTypeParameter(
 			getSymbolOfDeclaration(
 				node->as<InferTypeNode>()->TypeParameter));
@@ -2113,11 +2176,17 @@ Type* Checker::getTypeFromInferTypeNode(Node* node) {
 
 Type* Checker::getTypeFromImportTypeNode(Node* node) {
 	auto* links = typeNodeLinks.Get(node);
-	if (links->resolvedType == nullptr) {
+	if (links->resolvedType == nullptr ||
+		staleForCheckFile(links->resolvedTypeCheckFile)) {
+		// Go: fresh per-checker cache — recompute under this file.
+		links->resolvedType = nullptr;
+		links->resolvedTypeCheckFile = activeCheckFile;
 		ImportTypeNode* n = node->as<ImportTypeNode>();
 		if (!isLiteralImportTypeNode(node)) {
 			error(n->Argument, String_literal_expected);
-			symbolNodeLinks.Get(node)->resolvedSymbol = unknownSymbol;
+			auto* argLinks = symbolNodeLinks.Get(node);
+			argLinks->resolvedSymbol = unknownSymbol;
+			argLinks->resolvedSymbolCheckFile = activeCheckFile;
 			links->resolvedType = errorType;
 			return links->resolvedType;
 		}
@@ -2130,7 +2199,9 @@ Type* Checker::getTypeFromImportTypeNode(Node* node) {
 			/*ignoreErrors*/ false,
 			getTypeFromImportAttributes(getImportAttributes(node)));
 		if (innerModuleSymbol == nullptr) {
-			symbolNodeLinks.Get(node)->resolvedSymbol = unknownSymbol;
+			auto* modLinks = symbolNodeLinks.Get(node);
+			modLinks->resolvedSymbol = unknownSymbol;
+			modLinks->resolvedSymbolCheckFile = activeCheckFile;
 			links->resolvedType = errorType;
 			return links->resolvedType;
 		}
@@ -2196,8 +2267,12 @@ Type* Checker::getTypeFromImportTypeNode(Node* node) {
 					links->resolvedType = errorType;
 					return links->resolvedType;
 				}
-				symbolNodeLinks.Get(current)->resolvedSymbol = next;
-				symbolNodeLinks.Get(current->parent)->resolvedSymbol = next;
+				auto* curLinks = symbolNodeLinks.Get(current);
+				curLinks->resolvedSymbol = next;
+				curLinks->resolvedSymbolCheckFile = activeCheckFile;
+				auto* parLinks = symbolNodeLinks.Get(current->parent);
+				parLinks->resolvedSymbol = next;
+				parLinks->resolvedSymbolCheckFile = activeCheckFile;
 				currentNamespace = next;
 			}
 			links->resolvedType =
@@ -2213,7 +2288,9 @@ Type* Checker::getTypeFromImportTypeNode(Node* node) {
 						: Module_0_does_not_refer_to_a_type_but_is_used_as_a_type_here_Did_you_mean_typeof_import_0;
 				error(node, message,
 					  {n->Argument->as<LiteralTypeNode>()->Literal->text()});
-				symbolNodeLinks.Get(node)->resolvedSymbol = unknownSymbol;
+				auto* errLinks = symbolNodeLinks.Get(node);
+				errLinks->resolvedSymbol = unknownSymbol;
+				errLinks->resolvedSymbolCheckFile = activeCheckFile;
 				links->resolvedType = errorType;
 			}
 		}
@@ -2234,7 +2311,9 @@ std::vector<Node*> Checker::getIdentifierChain(Node* node) {
 Type* Checker::resolveImportSymbolType(Node* node, Symbol* symbol,
 									   SymbolFlags meaning) {
 	Symbol* resolvedSymbol = resolveSymbol(symbol);
-	symbolNodeLinks.Get(node)->resolvedSymbol = resolvedSymbol;
+	auto* symLinks = symbolNodeLinks.Get(node);
+	symLinks->resolvedSymbol = resolvedSymbol;
+	symLinks->resolvedSymbolCheckFile = activeCheckFile;
 	if (meaning == SymbolFlagsValue) {
 		// intentionally doesn't use resolved symbol so type is cached as
 		// expected on the alias

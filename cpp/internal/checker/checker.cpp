@@ -2542,6 +2542,7 @@ Symbol* Checker::lateBindMember(Symbol* parent, SymbolTable& earlySymbols, Symbo
 		// In the event we attempt to resolve the late-bound name of this member recursively,
 		// fall back to the early-bound name of this member.
 		links->resolvedSymbol = decl->symbol();
+		links->resolvedSymbolCheckFile = activeCheckFile;
 		Node* declName;
 		if (isBinaryExpression(decl)) {
 			declName = decl->as<BinaryExpression>()->Left;
@@ -2603,6 +2604,7 @@ Symbol* Checker::lateBindMember(Symbol* parent, SymbolTable& earlySymbols, Symbo
 				lateSymbol->parent = parent;
 			}
 			links->resolvedSymbol = lateSymbol;
+			links->resolvedSymbolCheckFile = activeCheckFile;
 		}
 	}
 	return links->resolvedSymbol;
@@ -2935,8 +2937,11 @@ int Checker::findResolutionCycleStartIndex(TypeSystemEntity target, TypeSystemPr
 
 bool Checker::typeResolutionHasProperty(TypeResolution* r) {
 	switch (r->propertyName) {
-	case TypeSystemPropertyName::Type:
-		return valueSymbolLinks.Get(static_cast<Symbol*>(r->target))->resolvedType != nullptr;
+	case TypeSystemPropertyName::Type: {
+		auto* sl = valueSymbolLinks.Get(static_cast<Symbol*>(r->target));
+		return sl->resolvedType != nullptr &&
+			   !staleForCheckFile(sl->resolvedTypeCheckFile);
+	}
 	case TypeSystemPropertyName::DeclaredType:
 		return typeAliasLinks.Get(static_cast<Symbol*>(r->target))->declaredType != nullptr;
 	case TypeSystemPropertyName::ResolvedTypeArguments:
@@ -2952,8 +2957,11 @@ bool Checker::typeResolutionHasProperty(TypeResolution* r) {
 	case TypeSystemPropertyName::InitializerIsUndefined:
 		return (nodeLinks.Get(static_cast<Node*>(r->target))->flags &
 				NodeCheckFlagsInitializerIsUndefinedComputed) != 0;
-	case TypeSystemPropertyName::WriteType:
-		return valueSymbolLinks.Get(static_cast<Symbol*>(r->target))->writeType != nullptr;
+	case TypeSystemPropertyName::WriteType: {
+		auto* sl = valueSymbolLinks.Get(static_cast<Symbol*>(r->target));
+		return sl->writeType != nullptr &&
+			   !staleForCheckFile(sl->writeTypeCheckFile);
+	}
 	case TypeSystemPropertyName::AliasTarget:
 		return aliasSymbolLinks.Get(static_cast<Symbol*>(r->target))->aliasTarget != nullptr;
 	default:
@@ -2996,7 +3004,11 @@ Type* Checker::reportCircularityError(Symbol* symbol) {
 
 Type* Checker::getTypeOfSymbolWithDeferredType(Symbol* symbol) {
 	auto* links = valueSymbolLinks.Get(symbol);
-	if (links->resolvedType == nullptr) {
+	if (links->resolvedType == nullptr ||
+		staleForCheckFile(links->resolvedTypeCheckFile)) {
+		// Go: fresh per-checker cache — recompute under this file.
+		links->resolvedType = nullptr;
+		links->resolvedTypeCheckFile = activeCheckFile;
 		auto* deferred = deferredSymbolLinks.Get(symbol);
 		if (deferred->parent->flags & TypeFlagsUnion) {
 			links->resolvedType = getUnionType(deferred->constituents);
@@ -3009,7 +3021,11 @@ Type* Checker::getTypeOfSymbolWithDeferredType(Symbol* symbol) {
 
 Type* Checker::getWriteTypeOfSymbolWithDeferredType(Symbol* symbol) {
 	auto* links = valueSymbolLinks.Get(symbol);
-	if (links->writeType == nullptr) {
+	if (links->writeType == nullptr ||
+		staleForCheckFile(links->writeTypeCheckFile)) {
+		// Go: fresh per-checker cache — recompute under this file.
+		links->writeType = nullptr;
+		links->writeTypeCheckFile = activeCheckFile;
 		auto* deferred = deferredSymbolLinks.Get(symbol);
 		if (!deferred->writeConstituents.empty()) {
 			if (deferred->parent->flags & TypeFlagsUnion) {
@@ -3033,7 +3049,12 @@ Type* Checker::getWriteTypeOfSymbol(Symbol* symbol) {
 			return getWriteTypeOfSymbolWithDeferredType(symbol);
 		}
 		auto* links = valueSymbolLinks.Get(symbol);
-		return links->writeType != nullptr ? links->writeType : links->resolvedType;
+		if (links->writeType != nullptr &&
+			!staleForCheckFile(links->writeTypeCheckFile)) {
+			return links->writeType;
+		}
+		return staleForCheckFile(links->resolvedTypeCheckFile)
+				   ? nullptr : links->resolvedType;
 	}
 	if (symbol->flags & SymbolFlagsProperty) {
 		return removeMissingType(getTypeOfSymbol(symbol), (symbol->flags & SymbolFlagsOptional) != 0);

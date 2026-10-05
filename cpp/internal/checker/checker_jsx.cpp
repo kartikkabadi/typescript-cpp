@@ -1542,9 +1542,12 @@ Type* Checker::getIntrinsicAttributesTypeFromJsxOpeningLikeElement(Node* node) {
 // jsx.go:1214
 Symbol* Checker::getIntrinsicTagSymbol(Node* node) {
 	SymbolNodeLinks* links = symbolNodeLinks.Get(node);
-	if (links->resolvedSymbol != nullptr) {
+	if (links->resolvedSymbol != nullptr &&
+		!staleForCheckFile(links->resolvedSymbolCheckFile)) {
 		return links->resolvedSymbol;
 	}
+	links->resolvedSymbol = nullptr;
+	links->resolvedSymbolCheckFile = activeCheckFile;
 	Type* intrinsicElementsType = getJsxType(JsxNames.IntrinsicElements, node);
 	if (!isErrorType(intrinsicElementsType)) {
 		// Property case

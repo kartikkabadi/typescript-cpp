@@ -892,7 +892,10 @@ void Checker::checkAssignmentOperator(Node* left, Kind operatorKind, Node* right
 	if (isAssignmentOperator(operatorKind)) {
 		// We ignore assignments of undefined to CommonJS exports when there are multiple assignment declarations
 		if (isDeclarationNode(left->parent) && getAssignmentDeclarationKind(left->parent) == JSDeclarationKind::ExportsProperty) {
-			if (Symbol* symbol = symbolNodeLinks.Get(left)->resolvedSymbol; symbol != nullptr && symbol->declarations.size() > 1 && (rightType->flags & TypeFlagsUndefined) != 0) {
+			SymbolNodeLinks* leftLinks = symbolNodeLinks.Get(left);
+			if (Symbol* symbol = staleForCheckFile(leftLinks->resolvedSymbolCheckFile)
+									 ? nullptr : leftLinks->resolvedSymbol;
+				symbol != nullptr && symbol->declarations.size() > 1 && (rightType->flags & TypeFlagsUndefined) != 0) {
 				return;
 			}
 		}
@@ -1314,7 +1317,9 @@ Type* Checker::checkInExpression(Node* left, Node* right, Type* leftType, Type* 
 		}
 		// Unlike in 'checkPrivateIdentifierExpression' we now have access to the RHS type
 		// which provides us with the opportunity to emit more detailed errors
-		if (symbolNodeLinks.Get(left)->resolvedSymbol == nullptr && getContainingClass(left) != nullptr) {
+		if ((symbolNodeLinks.Get(left)->resolvedSymbol == nullptr ||
+		 staleForCheckFile(symbolNodeLinks.Get(left)->resolvedSymbolCheckFile)) &&
+		getContainingClass(left) != nullptr) {
 			bool isUncheckedJS = isUncheckedJSSuggestion(left, rightType->symbol, true /*excludeClasses*/);
 			reportNonexistentProperty(left, rightType, isUncheckedJS);
 		}
@@ -2260,7 +2265,11 @@ Type* Checker::checkExpressionForMutableLocation(Node* node, CheckMode checkMode
 
 Symbol* Checker::getResolvedSymbol(Node* node) {
 	SymbolNodeLinks* links = symbolNodeLinks.Get(node);
-	if (links->resolvedSymbol == nullptr) {
+	if (links->resolvedSymbol == nullptr ||
+		staleForCheckFile(links->resolvedSymbolCheckFile)) {
+		// Go: fresh per-checker cache — re-resolve under this file.
+		links->resolvedSymbol = nullptr;
+		links->resolvedSymbolCheckFile = activeCheckFile;
 		Symbol* symbol = nullptr;
 		if (!nodeIsMissing(node)) {
 			symbol = resolveName(node, node->text(), SymbolFlagsValue | SymbolFlagsExportValue,
@@ -2276,7 +2285,9 @@ Symbol* Checker::getResolvedSymbol(Node* node) {
 // ---------------------------------------------------------------------------
 
 Symbol* Checker::getResolvedSymbolOrNil(Node* node) {
-	return symbolNodeLinks.Get(node)->resolvedSymbol;
+	SymbolNodeLinks* links = symbolNodeLinks.Get(node);
+	return staleForCheckFile(links->resolvedSymbolCheckFile)
+			   ? nullptr : links->resolvedSymbol;
 }
 
 // ---------------------------------------------------------------------------
@@ -2284,7 +2295,9 @@ Symbol* Checker::getResolvedSymbolOrNil(Node* node) {
 // ---------------------------------------------------------------------------
 
 Symbol* Checker::getReferencedValueOrAliasSymbol(Node* reference) {
-	Symbol* resolvedSymbol = symbolNodeLinks.Get(reference)->resolvedSymbol;
+	SymbolNodeLinks* links = symbolNodeLinks.Get(reference);
+	Symbol* resolvedSymbol = staleForCheckFile(links->resolvedSymbolCheckFile)
+								? nullptr : links->resolvedSymbol;
 	if (resolvedSymbol != nullptr && resolvedSymbol != unknownSymbol) {
 		return resolvedSymbol;
 	}

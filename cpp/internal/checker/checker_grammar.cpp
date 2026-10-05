@@ -269,7 +269,10 @@ bool Checker::checkGrammarPrivateIdentifierExpression(PrivateIdentifier* privId)
 // checker.go: getSymbolForPrivateIdentifierExpression
 Symbol* Checker::getSymbolForPrivateIdentifierExpression(Node* node) {
 	SymbolNodeLinks* links = symbolNodeLinks.Get(node);
-	if (links->resolvedSymbol == nullptr) {
+	if (links->resolvedSymbol == nullptr ||
+		staleForCheckFile(links->resolvedSymbolCheckFile)) {
+		// Go: fresh per-checker cache — re-resolve under this file.
+		links->resolvedSymbolCheckFile = activeCheckFile;
 		links->resolvedSymbol = lookupSymbolForPrivateIdentifierDeclaration(node->text(), node);
 	}
 	return links->resolvedSymbol;
