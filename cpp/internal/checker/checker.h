@@ -394,6 +394,19 @@ inline constexpr InferencePriority InferencePriorityContravariantConditional = 1
 inline constexpr InferencePriority InferencePriorityReturnType = 1 << 7;
 inline constexpr InferencePriority InferencePriorityLiteralKeyof = 1 << 8;
 inline constexpr InferencePriority InferencePriorityNoConstraints = 1 << 9;
+
+// CheckMode (checker.go:34)
+
+using CheckMode = uint32_t;
+inline constexpr CheckMode CheckModeNormal = 0;               // Normal type checking
+inline constexpr CheckMode CheckModeContextual = 1 << 0;      // Explicitly assigned contextual type, therefore not cacheable
+inline constexpr CheckMode CheckModeInferential = 1 << 1;     // Inferential typing
+inline constexpr CheckMode CheckModeSkipContextSensitive = 1 << 2; // Skip context sensitive function expressions
+inline constexpr CheckMode CheckModeSkipGenericFunctions = 1 << 3; // Skip single signature generic functions
+inline constexpr CheckMode CheckModeIsForSignatureHelp = 1 << 4;   // Call resolution for purposes of signature help
+inline constexpr CheckMode CheckModeRestBindingElement = 1 << 5;   // Checking a type that is going to be used to determine the type of a rest binding element
+inline constexpr CheckMode CheckModeTypeOnly = 1 << 6;        // Called from getTypeOfExpression, diagnostics may be omitted
+inline constexpr CheckMode CheckModeForceTuple = 1 << 7;
 inline constexpr InferencePriority InferencePriorityAlwaysStrict = 1 << 10;
 inline constexpr InferencePriority InferencePriorityMaxValue = 1 << 11;
 inline constexpr InferencePriority InferencePriorityCircularity = -1;
@@ -778,6 +791,20 @@ struct ProjectReferenceRedirect {
 	std::string outputDts{};
 };
 
+// tsoptions.ProjectReference — only what the checker needs.
+class ProjectReference {
+public:
+	virtual ~ProjectReference() = default;
+	virtual const CompilerOptions* CompilerOptions() = 0;
+};
+
+// tsoptions.SourceOutputAndProjectReference
+struct SourceOutputAndProjectReference {
+	SourceFile* source{};
+	std::string outputDts{};
+	ProjectReference* resolved{};
+};
+
 // Program interface — port of checker's Program/Host. Only the members the
 // checker actually calls are declared; a SimpleProgram implements them.
 class Program {
@@ -810,6 +837,10 @@ public:
 		return nullptr;
 	}
 	virtual const ProjectReferenceRedirect* GetProjectReferenceFromSource(
+	    const std::string& /*path*/) {
+		return nullptr;
+	}
+	virtual const SourceOutputAndProjectReference* GetProjectReferenceFromOutputDts(
 	    const std::string& /*path*/) {
 		return nullptr;
 	}
@@ -1745,6 +1776,183 @@ public:
 	Type* instantiateType(Type* t, TypeMapper* mapper);
 	void inferFromIntraExpressionSites(InferenceContext* context);
 	Type* getInferredType(InferenceContext* context, size_t index);
+
+	// === slice: walk === (checker_walk.cpp: diagnostics tail, check walker,
+	// deferred checks, JSDoc comment pass, expression entry + dispatch)
+	std::vector<std::function<void()>> deferredDiagnosticCallbacks;
+	std::vector<Diagnostic*> GetDiagnostics(SourceFile* sourceFile);
+	std::vector<Diagnostic*> GetSuggestionDiagnostics(SourceFile* sourceFile);
+	std::vector<Diagnostic*> getDiagnostics(SourceFile* sourceFile, DiagnosticsCollection* collection);
+	std::vector<Diagnostic*> GetGlobalDiagnostics();
+	void addDeferredDiagnostic(std::function<void()> callback);
+	void checkNotCanceled();
+	bool isSourceElementUnreachable(Node* node);
+	void checkNodeDeferred(Node* node);
+	void checkJSDocComments(Node* node);
+	void checkJSDocComment(Node* node);
+	Symbol* resolveJSDocMemberName(Node* name);
+	Type* getTypeOfExpression(Node* node);
+	Type* getQuickTypeOfExpression(Node* node);
+	Type* getReturnTypeOfSingleNonGenericSignature(Type* funcType, SignatureKind kind);
+	Type* getReturnTypeOfSingleNonGenericSignatureOfCallChain(Node* expr);
+	Type* checkExpressionWithContextualType(Node* node, Type* contextualType,
+											InferenceContext* inferenceContext, CheckMode checkMode);
+	Node* getContextNode(Node* node);
+	Type* checkExpressionCachedEx(Node* node, CheckMode checkMode);
+	Type* getContextFreeTypeOfExpression(Node* node);
+	Type* checkExpressionEx(Node* node, CheckMode checkMode);
+	void checkConstEnumAccess(Node* node, Type* t);
+	Type* instantiateTypeWithSingleGenericCallSignature(Node* node, Type* t, CheckMode checkMode);
+	std::vector<Type*> getOuterInferenceTypeParameters();
+	std::vector<Type*> getUniqueTypeParameters(InferenceContext* context,
+											 const std::vector<Type*>& typeParameters);
+	Type* checkExpressionWorker(Node* node, CheckMode checkMode);
+	Type* checkPrivateIdentifierExpression(Node* node);
+	Symbol* getSymbolForPrivateIdentifierExpression(Node* node);
+	void skippedGenericFunction(Node* node, CheckMode checkMode);
+
+	// Dep-stub decls (callees owned by other slices — see checker_walk.cpp bottom)
+	bool checkGrammarStatementInAmbientContext(Node* node);
+	void checkGrammarNumericLiteral(Node* node);
+	bool checkGrammarBigIntLiteral(Node* node);
+	void checkGrammarPrivateIdentifierExpression(Node* node);
+	bool isReachableFlowNode(FlowNode* flow);
+	Type* getAwaitedType(Type* t);
+	Type* getOptionalExpressionType(Type* exprType, Node* expression);
+	Type* propagateOptionalTypeMarker(Type* t, Node* node, bool wasOptional);
+	Type* getApparentTypeOfContextualType(Node* node, ContextFlags contextFlags);
+	void pushContextualType(Node* node, Type* t, bool isCache);
+	void popContextualType();
+	void pushInferenceContext(Node* node, InferenceContext* inferenceContext);
+	void popInferenceContext();
+	InferenceContext* getInferenceContext(Node* node);
+	Type* instantiateContextualType(Type* contextualType, Node* node, ContextFlags contextFlags);
+	Type* GetNonNullableType(Type* t);
+	Signature* getSingleSignature(Type* t, SignatureKind kind, bool allowMembers);
+	Signature* getSingleCallOrConstructSignature(Type* t);
+	Signature* getSignatureInstantiationWithoutFillingInTypeArguments(Signature* sig,
+																const std::vector<Type*>& typeArguments);
+	Type* getOrCreateTypeFromSignature(Signature* sig);
+	Signature* instantiateSignatureInContextOf(Signature* signature, Signature* contextualSignature,
+											 InferenceContext* inferenceContext, TypeMapper* compareTypes);
+	Type* getReturnTypeOfSignature(Signature* sig);
+	bool maybeTypeOfKind(Type* type, TypeFlags flags);
+	void markPropertyAsReferenced(Symbol* symbol, Node* nodeForCheckWriteOnly, bool isSelfTypeAccess);
+	bool isSkipDirectInferenceNode(Node* node);
+	void inferTypes(std::vector<InferenceInfo*>& inferences, Type* originalSource, Type* originalTarget,
+					InferencePriority priority, bool contravariant);
+	void applyToParameterTypes(Signature* source, Signature* target,
+							   const std::function<void(Type*, Type*)>& callback);
+	void applyToReturnTypes(Signature* source, Signature* target,
+							const std::function<void(Type*, Type*)>& callback);
+	bool hasOverlappingInferences(std::vector<InferenceInfo*>& a, std::vector<InferenceInfo*>& b);
+	void mergeInferences(std::vector<InferenceInfo*>& target, const std::vector<InferenceInfo*>& source);
+	// `newInferenceInfo` / `hasInferenceCandidates` are free fns (inference.go:1626,1651).
+	Type* checkIdentifier(Node* node, CheckMode checkMode);
+	Type* checkThisExpression(Node* node);
+	Type* checkSuperExpression(Node* node);
+	Type* checkTemplateExpression(Node* node);
+	Type* checkRegularExpressionLiteral(Node* node);
+	Type* checkArrayLiteral(Node* node, CheckMode checkMode);
+	Type* checkObjectLiteral(Node* node, CheckMode checkMode);
+	Type* checkPropertyAccessExpression(Node* node, CheckMode checkMode, bool writeOnly);
+	Type* checkQualifiedName(Node* node, CheckMode checkMode);
+	Type* checkIndexedAccess(Node* node, CheckMode checkMode);
+	Type* checkCallExpression(Node* node, CheckMode checkMode);
+	Type* checkImportCallExpression(Node* node);
+	Type* checkTaggedTemplateExpression(Node* node);
+	Type* checkParenthesizedExpression(Node* node, CheckMode checkMode);
+	Type* checkClassExpression(Node* node);
+	Type* checkFunctionExpressionOrObjectLiteralMethod(Node* node, CheckMode checkMode);
+	Type* checkAssertion(Node* node, CheckMode checkMode);
+	Type* checkTypeOfExpression(Node* node);
+	Type* checkNonNullAssertion(Node* node);
+	Type* checkSatisfiesExpression(Node* node);
+	Type* checkMetaProperty(Node* node);
+	Type* checkDeleteExpression(Node* node);
+	Type* checkVoidExpression(Node* node);
+	Type* checkAwaitExpression(Node* node);
+	Type* checkPrefixUnaryExpression(Node* node);
+	Type* checkPostfixUnaryExpression(Node* node);
+	Type* checkBinaryExpression(Node* node, CheckMode checkMode);
+	Type* checkConditionalExpression(Node* node, CheckMode checkMode);
+	Type* checkSpreadExpression(Node* node, CheckMode checkMode);
+	Type* checkYieldExpression(Node* node);
+	Type* checkSyntheticExpression(Node* node);
+	Type* checkJsxExpression(Node* node, CheckMode checkMode);
+	Type* checkJsxElement(Node* node, CheckMode checkMode);
+	Type* checkJsxSelfClosingElement(Node* node, CheckMode checkMode);
+	Type* checkJsxFragment(Node* node);
+	Type* checkJsxAttributes(Node* node, CheckMode checkMode);
+	Type* checkNonNullExpression(Node* node);
+	bool isSymbolOrSymbolForCall(Node* node);
+	Symbol* lookupSymbolForPrivateIdentifierDeclaration(const std::string& name, Node* location);
+	Signature* resolveUntypedCall(Node* node);
+	void checkFunctionExpressionOrObjectLiteralMethodDeferred(Node* node);
+	void checkClassExpressionDeferred(Node* node);
+	void checkTypeParameterDeferred(Node* node);
+	void checkJsxSelfClosingElementDeferred(Node* node);
+	void checkJsxElementDeferred(Node* node);
+	void checkAssertionDeferred(Node* node);
+	void checkContextualDeprecations(Node* node);
+	void checkTypeParameter(Node* node);
+	void checkParameter(Node* node);
+	void checkPropertyDeclaration(Node* node);
+	void checkPropertySignature(Node* node);
+	void checkSignatureDeclaration(Node* node);
+	void checkMethodDeclaration(Node* node);
+	void checkClassStaticBlockDeclaration(Node* node);
+	void checkConstructorDeclaration(Node* node);
+	void checkAccessorDeclaration(Node* node);
+	void checkTypeReferenceNode(Node* node);
+	void checkTypePredicate(Node* node);
+	void checkTypeQuery(Node* node);
+	void checkTypeLiteral(Node* node);
+	void checkArrayType(Node* node);
+	void checkTupleType(Node* node);
+	void checkUnionOrIntersectionType(Node* node);
+	void checkThisType(Node* node);
+	void checkTypeOperator(Node* node);
+	void checkConditionalType(Node* node);
+	void checkInferType(Node* node);
+	void checkTemplateLiteralType(Node* node);
+	void checkImportType(Node* node);
+	void checkNamedTupleMember(Node* node);
+	void checkIndexedAccessType(Node* node);
+	void checkMappedType(Node* node);
+	void checkFunctionDeclaration(Node* node);
+	void checkBlock(Node* node);
+	void checkVariableStatement(Node* node);
+	void checkExpressionStatement(Node* node);
+	void checkIfStatement(Node* node);
+	void checkDoStatement(Node* node);
+	void checkWhileStatement(Node* node);
+	void checkForStatement(Node* node);
+	void checkForInStatement(Node* node);
+	void checkForOfStatement(Node* node);
+	void checkBreakOrContinueStatement(Node* node);
+	void checkReturnStatement(Node* node);
+	void checkWithStatement(Node* node);
+	void checkSwitchStatement(Node* node);
+	void checkLabeledStatement(Node* node);
+	void checkThrowStatement(Node* node);
+	void checkTryStatement(Node* node);
+	void checkVariableDeclaration(Node* node);
+	void checkBindingElement(Node* node);
+	void checkClassDeclaration(Node* node);
+	void checkInterfaceDeclaration(Node* node);
+	void checkTypeAliasDeclaration(Node* node);
+	void checkEnumDeclaration(Node* node);
+	void checkEnumMember(Node* node);
+	void checkModuleDeclaration(Node* node);
+	void checkImportDeclaration(Node* node);
+	void checkImportEqualsDeclaration(Node* node);
+	void checkExportDeclaration(Node* node);
+	void checkExportAssignment(Node* node);
+	void checkMissingDeclaration(Node* node);
+	void checkJSDocType(Node* node);
+	std::string TypeToString(Type* t);
+	std::string getIsolatedModulesLikeFlagName();
 };
 
 // Free helpers used across checker translation units.
