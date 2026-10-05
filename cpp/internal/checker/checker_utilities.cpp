@@ -43,6 +43,13 @@ static PseudoBigInt getBigIntLiteralValue(Type* t) {
 	return std::get<PseudoBigInt>(t->AsLiteralType()->value);
 }
 
+// core.FindIndex — index of first element satisfying pred, or -1.
+template <class T, class F>
+static int findIndexReplica(const std::vector<T>& v, F f) {
+	auto it = std::find_if(v.begin(), v.end(), f);
+	return it != v.end() ? static_cast<int>(it - v.begin()) : -1;
+}
+
 // checker_declchecks.cpp — signatureHasRestParameter.
 static bool signatureHasRestParameter(Signature* sig) {
 	return (sig->flags & SignatureFlagsHasRestParameter) != 0;
@@ -1468,6 +1475,44 @@ Node* getClassLikeDeclarationOfSymbol(Symbol* symbol) {
 	auto it = std::find_if(symbol->declarations.begin(), symbol->declarations.end(),
 						   isClassLike);
 	return it == symbol->declarations.end() ? nullptr : *it;
+}
+
+// utilities.go:302 — isOptionalParameter (this file's owner; was a dep-stub
+// in checker_emitresolver.cpp).
+bool Checker::isOptionalParameter(Node* node) {
+	// !!! TODO: JSDoc support
+	if (isParameterDeclaration(node) && node->questionToken() != nullptr) {
+		return true;
+	}
+	if (!isParameterDeclaration(node)) {
+		return false;
+	}
+	if (node->initializer() != nullptr) {
+		Signature* signature = getSignatureFromDeclaration(node->parent);
+		int parameterIndex = findIndexReplica(
+			node->parent->parameters(),
+			[node](Node* p) { return p == node; });
+		// debug.Assert(parameterIndex >= 0) — FindIndex on own-parent params
+		// cannot miss for a real ParameterDeclaration node.
+		// Only consider syntactic or instantiated parameters as optional, not `void` parameters as this function is used
+		// in grammar checks and checking for `void` too early results in parameter types widening too early
+		// and causes some noImplicitAny errors to be lost.
+		return parameterIndex >= getMinArgumentCountEx(
+			signature,
+			MinArgumentCountFlagsStrongArityForUntypedJS |
+				MinArgumentCountFlagsVoidIsNonOptional);
+	}
+	Node* iife = getImmediatelyInvokedFunctionExpression(node->parent);
+	if (iife != nullptr) {
+		int parameterIndex = findIndexReplica(
+			node->parent->parameters(),
+			[node](Node* p) { return p == node; });
+		return node->type() == nullptr &&
+			node->as<ParameterDeclaration>()->DotDotDotToken == nullptr &&
+			parameterIndex >=
+				static_cast<int>(getEffectiveCallArguments(iife).size());
+	}
+	return false;
 }
 
 }  // namespace checker

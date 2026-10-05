@@ -15,7 +15,6 @@ namespace tsc::checker {
 // Bodies live at the bottom of this file under the dep-stub banner.
 // ---------------------------------------------------------------------------
 
-bool isLateVisibilityPaintedStatement(Node* node);        // utilities.go:3590 — dep-stub
 
 namespace {
 
@@ -1511,14 +1510,6 @@ bool EmitResolver::IsThisPropertyAssignmentDeclarationRedundant(Node* node) {
 // (deduped: getJsxFragmentFactoryEntity defined in checker_jsx.cpp)
 
 
-bool Checker::isOptionalParameter(Node* /*node*/) {
-	TSC_UNREACHABLE("isOptionalParameter — utilities slice");
-}
-
-
-bool isLateVisibilityPaintedStatement(Node* /*node*/) {
-	TSC_UNREACHABLE("isLateVisibilityPaintedStatement — utilities.go slice");
-}
 
 // (deduped: NewNodeBuilder + all NodeBuilder::* dep-stub bodies — real
 // defs live in checker_printer.cpp)

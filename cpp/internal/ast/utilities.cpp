@@ -1987,6 +1987,26 @@ Node* getFirstIdentifier(Node* node) {
 	}
 }
 
+// utilities.go: IsLateVisibilityPaintedStatement
+bool isLateVisibilityPaintedStatement(Node* node) {
+	switch (node->kind) {
+	case Kind::ImportDeclaration:
+	case Kind::JSImportDeclaration:
+	case Kind::ImportEqualsDeclaration:
+	case Kind::VariableStatement:
+	case Kind::ClassDeclaration:
+	case Kind::FunctionDeclaration:
+	case Kind::ModuleDeclaration:
+	case Kind::TypeAliasDeclaration:
+	case Kind::JSTypeAliasDeclaration:
+	case Kind::InterfaceDeclaration:
+	case Kind::EnumDeclaration:
+		return true;
+	default:
+		return false;
+	}
+}
+
 // utilities.go: IsExternalModuleAugmentation
 bool isExternalModuleAugmentation(Node* node) {
 	return isAmbientModule(node) && isModuleAugmentationExternal(node);

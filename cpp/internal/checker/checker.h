@@ -4411,9 +4411,7 @@ public:
 	NodeBuilder* typeToStringNodebuilder = nullptr; // checker.go:905
 	// === end slice: symbolaccess ===
 
-	// emitresolver dep-stub: utilities.go:302 — utilities slice (stub body in
-	// checker_emitresolver.cpp until the utilities slice's missing defs land)
-	bool isOptionalParameter(Node* node);
+	bool isOptionalParameter(Node* node);                          // utilities.go:302
 
 	// === slice: services2 === (services.go)
 	std::vector<Symbol*> GetSymbolsInScope(Node* location, SymbolFlags meaning);

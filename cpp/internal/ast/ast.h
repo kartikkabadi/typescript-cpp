@@ -669,6 +669,8 @@ bool isImportCall(Node* node);
 bool isImportMeta(Node* node);
 Node* getFirstIdentifier(Node* node);
 bool isExternalModuleAugmentation(Node* node);
+// utilities.go:3590
+bool isLateVisibilityPaintedStatement(Node* node);
 bool isEmittableImport(Node* node);
 Node* getModuleSpecifierOfBareOrAccessedRequire(Node* node);
 std::pair<ResolutionMode, bool> getResolutionModeOverride(
