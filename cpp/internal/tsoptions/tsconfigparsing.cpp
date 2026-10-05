@@ -1693,9 +1693,11 @@ ParsedCommandLine* parseJsonConfigFileContentWorker(
 		basePathForFileNames = tspath::normalizePath(basePath);
 	}
 
-	auto [parsedConfig, errors] = parseConfig(
+	auto parsedConfigResult = parseConfig(
 	    json, sourceFile, host, basePath, configFileName, resolutionStack,
 	    extendedConfigCache);
+	parsedTsconfig* parsedConfig = parsedConfigResult.first;
+	std::vector<Diagnostic*>& errors = parsedConfigResult.second;
 	mergeCompilerOptions(parsedConfig->options, existingOptions,
 	                     CompilerOptionsValue(existingOptionsRaw));
 	handleOptionConfigDirTemplateSubstitution(parsedConfig->options,
@@ -2380,7 +2382,7 @@ std::pair<SourceFile*, TextRange> GetContentMapperOptionDiagnosticLocation(
     ParsedCommandLine* config, contentmapper::Mapper* mapper,
     const std::vector<contentmapper::OptionPathSegment>& path) {
 	if (config == nullptr || config->ConfigFile == nullptr) {
-		return {nullptr, TextRange(-1, -1)};
+		return {nullptr, TextRange{-1, -1}};
 	}
 	int index = -1;
 	{
@@ -2419,12 +2421,12 @@ std::pair<SourceFile*, TextRange> GetContentMapperOptionDiagnosticLocation(
 		node = next;
 	}
 	if (node == nullptr) {
-		return {nullptr, TextRange(-1, -1)};
+		return {nullptr, TextRange{-1, -1}};
 	}
 	SourceFile* file = config->ConfigFile->SourceFile;
 	return {file,
-	        TextRange(tsc::skipTrivia(file->text, node->pos()),
-	                  node->end())};
+	        TextRange{tsc::skipTrivia(file->text, node->pos()),
+	                  node->end()}};
 }
 
 namespace {
@@ -2461,9 +2463,9 @@ Diagnostic* setContentMapperDiagnosticLocation(Diagnostic* diagnostic,
                                                Node* node) {
 	if (sourceFile != nullptr && node != nullptr) {
 		diagnostic->SetFile(sourceFile);
-		diagnostic->SetLocation(TextRange(
+		diagnostic->SetLocation(TextRange{
 		    tsc::skipTrivia(sourceFile->text, node->pos()),
-		    node->end()));
+		    node->end()});
 	}
 	return diagnostic;
 }
