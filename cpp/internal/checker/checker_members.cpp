@@ -3036,17 +3036,6 @@ bool isTupleType(Type* t) {
 bool hasReadonlyModifier(Node* node) {
 	TSC_UNREACHABLE("hasReadonlyModifier — owned by utilities.go slice");
 }
-bool isStaticPrivateIdentifierProperty(Symbol* s) {
-	TSC_UNREACHABLE("isStaticPrivateIdentifierProperty — owned by utilities.go slice");
-}
-ModifierFlags getDeclarationModifierFlagsFromSymbol(Symbol* s) {
-	TSC_UNREACHABLE(
-		"getDeclarationModifierFlagsFromSymbol — owned by utilities.go slice");
-}
-ModifierFlags getDeclarationModifierFlagsFromSymbolEx(Symbol* s, bool isWrite) {
-	TSC_UNREACHABLE(
-		"getDeclarationModifierFlagsFromSymbolEx — owned by utilities.go slice");
-}
 Ternary compareTypesEqual(Type* s, Type* t) {
 	TSC_UNREACHABLE("compareTypesEqual — owned by checker.go:28165 slice");
 }

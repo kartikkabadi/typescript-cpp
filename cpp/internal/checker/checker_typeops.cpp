@@ -2406,8 +2406,22 @@ std::string Checker::getTupleElementLabel(const TupleElementInfo& elementInfo,
 bool Checker::isJSLiteralType(Type* t) {
 	TSC_UNREACHABLE("isJSLiteralType — decltypes slice");
 }
+// checker.go:14288 — isDeprecatedSymbol (symboltype slice owner)
 bool Checker::isDeprecatedSymbol(Symbol* symbol) {
-	TSC_UNREACHABLE("isDeprecatedSymbol — decltypes slice");
+	auto isDeprecated = [](Node* d, Checker* c) { return c->IsDeprecatedDeclaration(d); };
+	Symbol* parentSymbol = getParentOfSymbol(symbol);
+	if (parentSymbol != nullptr && symbol->declarations.size() > 1) {
+		if ((parentSymbol->flags & SymbolFlagsInterface) != 0) {
+			return std::any_of(symbol->declarations.begin(), symbol->declarations.end(),
+							   [&](Node* d) { return IsDeprecatedDeclaration(d); });
+		}
+		return std::all_of(symbol->declarations.begin(), symbol->declarations.end(),
+						   [&](Node* d) { return IsDeprecatedDeclaration(d); });
+	}
+	return (symbol->valueDeclaration != nullptr && IsDeprecatedDeclaration(symbol->valueDeclaration)) ||
+		(!symbol->declarations.empty() &&
+		 std::all_of(symbol->declarations.begin(), symbol->declarations.end(),
+					 [&](Node* d) { return IsDeprecatedDeclaration(d); }));
 }
 
 // owner: flow slice

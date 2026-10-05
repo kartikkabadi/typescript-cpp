@@ -322,7 +322,7 @@ ModifierFlags getDeclarationModifierFlagsFromSymbolEx(Symbol* s, bool isWrite) {
 		if (s->parent != nullptr && (s->parent->flags & SymbolFlagsClass) != 0) {
 			return flags;
 		}
-		return flags & ~(ModifierFlagsStatic | ModifierFlagsAbstract);
+		return flags & ~ModifierFlagsAccessibilityModifier;
 	}
 	return ModifierFlagsNone;
 }

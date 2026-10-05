@@ -1716,8 +1716,40 @@ TypePredicate* Checker::getTypePredicateOfSignature(Signature* sig) {
 // (deduped: getResolvedSymbolOrNil defined in cpp/internal/checker/checker_expressions_c.cpp)
 
 // owner: diagnostics tail (checker.go:14185-14304)
+
+// utilities.go:1223 — GetJSDocDeprecatedTag
+static Node* getJSDocDeprecatedTag(Node* node) {
+	for (Node* jsdoc : node->jsDoc()) {
+		NodeList* tags = jsdoc->as<JSDoc>()->Tags;
+		if (tags != nullptr) {
+			for (Node* tag : tags->nodes) {
+				if (tag->kind == Kind::JSDocDeprecatedTag) {
+					return tag;
+				}
+			}
+		}
+	}
+	return nullptr;
+}
+
+// utilities.go:1246 — IsDeprecatedDeclarationWithCachedFlags
+static bool isDeprecatedDeclarationWithCachedFlags(Node* declaration,
+												   NodeFlags combinedFlags) {
+	if ((combinedFlags & NodeFlagsPossiblyContainsDeprecatedTag) == 0) {
+		return false;
+	}
+	for (Node* n = declaration; n != nullptr; n = n->parent) {
+		if ((n->flags & NodeFlagsPossiblyContainsDeprecatedTag) != 0) {
+			return getJSDocDeprecatedTag(n) != nullptr;
+		}
+	}
+	return false;
+}
+
+// checker.go:14268 — IsDeprecatedDeclaration
 bool Checker::IsDeprecatedDeclaration(Node* declaration) {
-	TSC_UNREACHABLE("IsDeprecatedDeclaration — diagtail slice");
+	return isDeprecatedDeclarationWithCachedFlags(declaration,
+												getCombinedNodeFlagsCached(declaration));
 }
 Diagnostic* Checker::addDeprecatedSuggestion(Node* location,
                                              std::vector<Node*> declarations,

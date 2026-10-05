@@ -4142,8 +4142,9 @@ bool Checker::isBlockScopedNameDeclaredBeforeUse(Node* declaration, Node* usage)
 
 // getSignaturesOfType is defined in checker_members.cpp (members slice).
 
+// checker.go:7725 — checkExpression (walk slice)
 Type* Checker::checkExpression(Node* node) {
-	TSC_UNREACHABLE("checkExpression — ported with the expression-checking slice");
+	return checkExpressionEx(node, CheckModeNormal);
 }
 
 bool Checker::checkTypeAssignableTo(Type* source, Type* target, Node* errorNode,
@@ -6330,12 +6331,67 @@ Symbol* Checker::resolveExternalModuleNameWorker(
 // allTypesAssignableToKindEx — ported in checker_typeops.cpp (typeops slice,
 // checker.go:28098).
 
+// checker.go:22087 — getApparentType (members slice owner)
 Type* Checker::getApparentType(Type* t) {
-	TSC_UNREACHABLE("getApparentType — ported with checker.go:22087 slice");
+	Type* originalType = t;
+	if ((t->flags & TypeFlagsInstantiable) != 0) {
+		t = getBaseConstraintOfType(t);
+		if (t == nullptr) {
+			t = unknownType;
+		}
+	}
+	if ((t->objectFlags & ObjectFlagsMapped) != 0) {
+		return getApparentTypeOfMappedType(t);
+	}
+	if ((t->objectFlags & ObjectFlagsReference) != 0 && t != originalType) {
+		return getTypeWithThisArgument(t, originalType, /*needsApparentType*/ false);
+	}
+	if ((t->flags & TypeFlagsIntersection) != 0) {
+		return getApparentTypeOfIntersectionType(t, originalType);
+	}
+	if ((t->flags & TypeFlagsStringLike) != 0) {
+		return globalStringType;
+	}
+	if ((t->flags & TypeFlagsNumberLike) != 0) {
+		return globalNumberType;
+	}
+	if ((t->flags & TypeFlagsBigIntLike) != 0) {
+		return getGlobalBigIntType();
+	}
+	if ((t->flags & TypeFlagsBooleanLike) != 0) {
+		return globalBooleanType;
+	}
+	if ((t->flags & TypeFlagsESSymbolLike) != 0) {
+		return getGlobalESSymbolType();
+	}
+	if ((t->flags & TypeFlagsNonPrimitive) != 0) {
+		return emptyObjectType;
+	}
+	if ((t->flags & TypeFlagsIndex) != 0) {
+		return stringNumberSymbolType;
+	}
+	if ((t->flags & TypeFlagsUnknown) != 0 && !strictNullChecks) {
+		return emptyObjectType;
+	}
+	return t;
 }
+
+// checker.go:24977 — getRestrictiveTypeParameter (decltypes slice owner)
 Type* Checker::getRestrictiveTypeParameter(Type* t) {
-	TSC_UNREACHABLE(
-		"getRestrictiveTypeParameter — ported with checker.go:24977 slice");
+	if ((t->AsTypeParameter()->constraint == nullptr &&
+	     getConstraintDeclaration(t) == nullptr) ||
+	    t->AsTypeParameter()->constraint == noConstraintType) {
+		return t;
+	}
+	CachedTypeKey key{CachedTypeKind::RestrictiveTypeParameter, t->id};
+	auto it = cachedTypes.find(key);
+	if (it != cachedTypes.end()) {
+		return it->second;
+	}
+	Type* result = newTypeParameter(t->symbol);
+	result->AsTypeParameter()->constraint = noConstraintType;
+	cachedTypes[key] = result;
+	return result;
 }
 
 // getApparentType is defined in checker_members.cpp (members slice).
@@ -7743,9 +7799,32 @@ Symbol* Checker::resolveExternalModuleSymbol(Symbol* moduleSymbol,
 	    "resolveExternalModuleSymbol — ported with the import-resolution slice");
 }
 
+// checker.go:19402 — resolveStructuredTypeMembers (members slice owner)
 StructuredType* Checker::resolveStructuredTypeMembers(Type* t) {
-	TSC_UNREACHABLE(
-	    "resolveStructuredTypeMembers — ported with the member-resolution slice");
+	if ((t->objectFlags & ObjectFlagsMembersResolved) == 0) {
+		if ((t->flags & TypeFlagsObject) != 0) {
+			if ((t->objectFlags & ObjectFlagsReference) != 0) {
+				resolveTypeReferenceMembers(t);
+			} else if ((t->objectFlags & ObjectFlagsClassOrInterface) != 0) {
+				resolveClassOrInterfaceMembers(t);
+			} else if ((t->objectFlags & ObjectFlagsReverseMapped) != 0) {
+				resolveReverseMappedTypeMembers(t);
+			} else if ((t->objectFlags & ObjectFlagsAnonymous) != 0) {
+				resolveAnonymousTypeMembers(t);
+			} else if ((t->objectFlags & ObjectFlagsMapped) != 0) {
+				resolveMappedTypeMembers(t);
+			} else {
+				TSC_UNREACHABLE("Unhandled case in resolveStructuredTypeMembers");
+			}
+		} else if ((t->flags & TypeFlagsUnion) != 0) {
+			resolveUnionTypeMembers(t);
+		} else if ((t->flags & TypeFlagsIntersection) != 0) {
+			resolveIntersectionTypeMembers(t);
+		} else {
+			TSC_UNREACHABLE("Unhandled case in resolveStructuredTypeMembers");
+		}
+	}
+	return t->AsStructuredType();
 }
 }  // namespace checker
 }  // namespace tsc

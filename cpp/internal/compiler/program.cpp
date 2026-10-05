@@ -650,11 +650,12 @@ SimpleProgram::getBindAndCheckDiagnosticsWithChecker(
 	if (SkipTypeChecking(sourceFile, false)) {
 		return {};
 	}
-	getChecker(); // checker creation forces binding
+	checker::Checker* fileChecker =
+	    getChecker(); // checker creation forces binding
 
 	std::vector<Diagnostic*> diags = sourceFile->bindDiagnostics;
-	// + fileChecker.GetDiagnostics(ctx, sourceFile) — check walker not
-	// ported; zero diagnostics (never fake).
+	auto checkerDiags = fileChecker->GetDiagnostics(sourceFile);
+	diags.insert(diags.end(), checkerDiags.begin(), checkerDiags.end());
 
 	bool isPlainJS = isPlainJSFile(sourceFile, options.CheckJs);
 	if (isPlainJS) {

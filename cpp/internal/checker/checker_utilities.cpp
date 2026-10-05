@@ -1405,5 +1405,70 @@ void Checker::reportObjectPossiblyNullOrUndefinedError(Node* node,
 	}
 }
 
+// utilities.go:71 — isStaticPrivateIdentifierProperty
+bool isStaticPrivateIdentifierProperty(Symbol* s) {
+	return s->valueDeclaration != nullptr &&
+		isPrivateIdentifierClassElementDeclaration(s->valueDeclaration) &&
+		isStatic(s->valueDeclaration);
+}
+
+// utilities.go:761 — getDeclarationModifierFlagsFromSymbolEx
+ModifierFlags getDeclarationModifierFlagsFromSymbolEx(Symbol* s, bool isWrite) {
+	if ((s->checkFlags & CheckFlagsSynthetic) != 0) {
+		ModifierFlags accessModifier{};
+		if ((!isWrite && (s->checkFlags & CheckFlagsContainsPublic) != 0) ||
+			(isWrite && (s->checkFlags & CheckFlagsContainsWritePublic) != 0)) {
+			accessModifier = ModifierFlagsPublic;
+		} else if ((!isWrite && (s->checkFlags & CheckFlagsContainsProtected) != 0) ||
+				   (isWrite && (s->checkFlags & CheckFlagsContainsWriteProtected) != 0)) {
+			accessModifier = ModifierFlagsProtected;
+		} else if ((!isWrite && (s->checkFlags & CheckFlagsContainsPrivate) != 0) ||
+				   (isWrite && (s->checkFlags & CheckFlagsContainsWritePrivate) != 0)) {
+			accessModifier = ModifierFlagsPrivate;
+		}
+		if ((s->checkFlags & CheckFlagsContainsStatic) != 0) {
+			return accessModifier | ModifierFlagsStatic;
+		}
+		return accessModifier;
+	}
+	if (s->valueDeclaration != nullptr) {
+		Node* declaration = nullptr;
+		if (isWrite) {
+			auto it = std::find_if(s->declarations.begin(), s->declarations.end(),
+								   isSetAccessorDeclaration);
+			if (it != s->declarations.end()) declaration = *it;
+		}
+		if (declaration == nullptr && (s->flags & SymbolFlagsGetAccessor) != 0) {
+			auto it = std::find_if(s->declarations.begin(), s->declarations.end(),
+								   isGetAccessorDeclaration);
+			if (it != s->declarations.end()) declaration = *it;
+		}
+		if (declaration == nullptr) {
+			declaration = s->valueDeclaration;
+		}
+		ModifierFlags flags = getCombinedModifierFlags(declaration);
+		if (s->parent != nullptr && (s->parent->flags & SymbolFlagsClass) != 0) {
+			return flags;
+		}
+		return flags & ~ModifierFlagsAccessibilityModifier;
+	}
+	if ((s->flags & SymbolFlagsPrototype) != 0) {
+		return ModifierFlagsPublic | ModifierFlagsStatic;
+	}
+	return ModifierFlagsNone;
+}
+
+// utilities.go:757 — getDeclarationModifierFlagsFromSymbol
+ModifierFlags getDeclarationModifierFlagsFromSymbol(Symbol* s) {
+	return getDeclarationModifierFlagsFromSymbolEx(s, false /*isWrite*/);
+}
+
+// ast/utilities.go:2994 — GetClassLikeDeclarationOfSymbol
+Node* getClassLikeDeclarationOfSymbol(Symbol* symbol) {
+	auto it = std::find_if(symbol->declarations.begin(), symbol->declarations.end(),
+						   isClassLike);
+	return it == symbol->declarations.end() ? nullptr : *it;
+}
+
 }  // namespace checker
 }  // namespace tsc
