@@ -27,7 +27,8 @@ from concurrent.futures import ThreadPoolExecutor
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 TSCPP = os.environ.get("TSCPP", os.path.join(REPO, "cpp", "build", "tscpp"))
 ORACLE_DIR = os.environ.get("EMIT_ORACLE_DIR", "/tmp/emit_oracle")
-TSCPP_DIR = "/tmp/tscpp_emit_out"
+TSCPP_DIR = os.environ.get("TSCPP_EMIT_DIR", "/tmp/tscpp_emit_out")
+EXTRA_FLAGS = os.environ.get("EMIT_FLAGS", "").split()
 os.makedirs(TSCPP_DIR, exist_ok=True)
 
 
@@ -41,11 +42,12 @@ def run_tscpp(f):
     if not os.path.exists(out):
         try:
             r = subprocess.run(
-                [TSCPP, "emitdump", f],
-                cwd=REPO, capture_output=True, text=True, timeout=120)
-            data = r.stdout
+                [TSCPP, "emitdump", f] + EXTRA_FLAGS,
+                cwd=REPO, capture_output=True, timeout=120)
+            data = r.stdout.decode("utf-8", errors="replace")
             if r.returncode != 0 and not data:
-                data = "EXIT " + str(r.returncode) + " " + r.stderr[:200]
+                data = "EXIT " + str(r.returncode) + " " + r.stderr.decode(
+                    "utf-8", errors="replace")[:200]
         except subprocess.TimeoutExpired:
             data = "TIMEOUT"
         with open(out, "w") as fh:
@@ -96,7 +98,7 @@ def one(f):
         return None
     k = key(f)
     opath = os.path.join(ORACLE_DIR, k + ".txt")
-    go = open(opath).read() if os.path.exists(opath) else "NO-ORACLE"
+    go = open(opath, errors="replace").read() if os.path.exists(opath) else "NO-ORACLE"
     cpp = run_tscpp(f)
     sig, detail = classify(go, cpp)
     if sig is None:

@@ -156,6 +156,8 @@ add_library(tsc STATIC
 	internal/pseudochecker/pseudochecker.cpp
 	# === slice: spanmap ===
 	internal/spanmap/spanmap.cpp
+	# === slice: infra ===
+	internal/locale/locale.cpp
 	# === slice: tsoptions ===
 	internal/tsoptions/commandlineoption.cpp
 	internal/tsoptions/commandlineparser.cpp

@@ -37,7 +37,7 @@ class SimpleProgram;
 // Real-FS host; `bundled:///libs/<name>` reads from <bundledLibsRoot>/<name>
 // (tsc/internal/bundled/libs on disk) while keeping the bundled:/// name on
 // the SourceFile — matching the Go oracle's bundled.WrapFS naming.
-class CompilerHost : public module::ResolutionHost {
+class CompilerHost : public tsoptions::ParseConfigHost {
 public:
 	std::string currentDirectory;
 	std::string bundledLibsRoot;

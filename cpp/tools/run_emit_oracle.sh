@@ -14,13 +14,13 @@ EMITDUMP="${EMITDUMP:-$HOME/tools/emitdump}"
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 mkdir -p "$ORACLE"
 
-export ORACLE EMITDUMP REPO
+export ORACLE EMITDUMP REPO EMIT_FLAGS
 work() {
     f="$1"
     k=$(printf '%s' "$f" | md5sum | cut -c1-12)
     out="$ORACLE/$k.txt"
     [ -f "$out" ] && return 0
-    (cd "$REPO" && "$EMITDUMP" "$f" > "$out" 2>/dev/null) || \
+    (cd "$REPO" && "$EMITDUMP" "$f" ${EMIT_FLAGS:-} > "$out" 2>/dev/null) || \
         printf 'EXIT %s\n' "$?" > "$out"
 }
 export -f work

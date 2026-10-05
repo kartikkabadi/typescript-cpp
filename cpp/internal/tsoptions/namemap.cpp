@@ -2,6 +2,8 @@
 // name maps. Tables are function-static so cross-TU init order is irrelevant.
 #include "internal/tsoptions/tsoptions.h"
 
+#include "internal/core/spelling.h"
+
 #include <cctype>
 
 namespace tsc::tsoptions {
@@ -73,6 +75,54 @@ const NameMap& WatchNameMap() {
 	static const std::shared_ptr<NameMap> m =
 	    GetNameMapFromList(OptionsForWatch());
 	return *m;
+}
+
+// CommandLineOptionNameMap — tsconfigparsing.go:596.
+const CommandLineOption* CommandLineOptionNameMap::Get(
+    std::string_view name) const {
+	auto it = m.find(std::string(name));
+	const CommandLineOption* opt =
+	    it != m.end() ? it->second : nullptr;
+	if (opt == nullptr) {
+		auto it2 = m.find(toLowerGo(name));
+		opt = it2 != m.end() ? it2->second : nullptr;
+	}
+	return opt;
+}
+
+const CommandLineOption* CommandLineOptionNameMap::GetSpellingSuggestion(
+    std::string_view name) const {
+	// Go: core.GetSpellingSuggestion(name, maps.Values(m), name, compare) —
+	// iterates the map's values; Go map iteration order is randomized but
+	// the suggestion algorithm is order-stable for distinct distances, so
+	// sort by name first for determinism.
+	std::vector<const CommandLineOption*> candidates;
+	candidates.reserve(m.size());
+	for (auto& [k, v] : m) {
+		candidates.push_back(v);
+	}
+	std::sort(candidates.begin(), candidates.end(),
+	          [](const CommandLineOption* a, const CommandLineOption* b) {
+		          return a->Name < b->Name;
+	          });
+	return getSpellingSuggestion(
+	    name, candidates,
+	    [](const CommandLineOption* o) { return o->Name; },
+	    [](const CommandLineOption* a, const CommandLineOption* b) {
+		    return a->Name.compare(b->Name);
+	    });
+}
+
+// commandLineOptionsToMap — tsconfigparsing.go:613.
+CommandLineOptionNameMap commandLineOptionsToMap(
+    const std::vector<const CommandLineOption*>& compilerOptions) {
+	CommandLineOptionNameMap result;
+	result.m.reserve(compilerOptions.size() * 2);
+	for (const auto* opt : compilerOptions) {
+		result.m[opt->Name] = opt;
+		result.m[toLowerGo(opt->Name)] = opt;
+	}
+	return result;
 }
 
 }  // namespace tsc::tsoptions

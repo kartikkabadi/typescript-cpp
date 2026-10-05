@@ -30,6 +30,7 @@
 #include "internal/diagnostics/diagnostics.h"
 #include "internal/parser/parser.h"
 #include "internal/scanner/scanner.h"
+#include "internal/tsoptions/tsoptions.h"
 
 using namespace tsc;
 
@@ -378,6 +379,30 @@ static void dumpDiagnostics(const std::vector<Diagnostic*>& diags) {
 	std::fwrite(out.data(), 1, out.size(), stdout);
 }
 
+// parseCLI — shared `tsc <args>` command-line parse for check/emit/emitdump.
+// Mirrors `tsoptions.ParseCommandLine(os.Args[1:], host)` in the Go oracle
+// drivers. On parse errors prints `C <code>` lines and returns nullptr.
+static tsoptions::ParsedCommandLine* parseCLI(int argc, char** argv,
+                                              compiler::CompilerHost* host,
+                                              const char* prepend = nullptr) {
+	std::vector<std::string> args;
+	if (prepend != nullptr) {
+		args.emplace_back(prepend);
+	}
+	for (int i = 2; i < argc; i++) {
+		args.emplace_back(argv[i]);
+	}
+	tsoptions::ParsedCommandLine* parsed =
+	    tsoptions::ParseCommandLine(args, host);
+	if (!parsed->Errors.empty()) {
+		for (auto* e : parsed->Errors) {
+			std::printf("C %d\n", e->Code());
+		}
+		return nullptr;
+	}
+	return parsed;
+}
+
 static void checkFile(int argc, char** argv) {
 	compiler::CompilerHost host;
 	host.currentDirectory =
@@ -385,19 +410,14 @@ static void checkFile(int argc, char** argv) {
 	host.bundledLibsRoot = findBundledLibsRoot();
 
 	// `tsc --noEmit <argv[2:]>` — "check" is our own subcommand, not a root
-	// filename (checkdump is invoked as `checkdump <file>`); every
-	// remaining arg becomes a root file via ParseCommandLine.
-	std::vector<std::string> rootFileNames;
-	for (int i = 2; i < argc; i++) {
-		rootFileNames.push_back(argv[i]);
+	// filename (checkdump is invoked as `checkdump <file>`).
+	tsoptions::ParsedCommandLine* parsed = parseCLI(argc, argv, &host, "--noEmit");
+	if (parsed == nullptr) {
+		return;
 	}
 
-	// ParseCommandLine defaults for bare file args: NoEmit set, everything
-	// else at defaults (no config file).
-	CompilerOptions options;
-	options.NoEmit = Tristate::True;
-
-	compiler::SimpleProgram program(&host, options, rootFileNames);
+	compiler::SimpleProgram program(&host, *parsed->ParsedConfig->CompilerOptions,
+	                              parsed->ParsedConfig->FileNames);
 	program.BindSourceFiles();
 	auto diags = compiler::getDiagnosticsOfAnyProgram(&program, {}, false);
 
@@ -440,16 +460,15 @@ static void emitFile(int argc, char** argv) {
 	    tspath::normalizePath(std::filesystem::current_path().string());
 	host.bundledLibsRoot = findBundledLibsRoot();
 
-	std::vector<std::string> rootFileNames;
-	for (int i = 2; i < argc; i++) {
-		rootFileNames.push_back(argv[i]);
-	}
-
 	// `tsc <argv[2:]>` — no NoEmit; defaults like a bare file-args
 	// command line (execute/tsc.go).
-	CompilerOptions options;
+	tsoptions::ParsedCommandLine* parsed = parseCLI(argc, argv, &host);
+	if (parsed == nullptr) {
+		return;
+	}
 
-	compiler::SimpleProgram program(&host, options, rootFileNames);
+	compiler::SimpleProgram program(&host, *parsed->ParsedConfig->CompilerOptions,
+	                              parsed->ParsedConfig->FileNames);
 	program.BindSourceFiles();
 	auto diags = compiler::getDiagnosticsOfAnyProgram(&program, {}, false);
 
@@ -470,16 +489,15 @@ static void emitdumpFile(int argc, char** argv) {
 	    tspath::normalizePath(std::filesystem::current_path().string());
 	host.bundledLibsRoot = findBundledLibsRoot();
 
-	std::vector<std::string> rootFileNames;
-	for (int i = 2; i < argc; i++) {
-		rootFileNames.push_back(argv[i]);
-	}
-
 	// `tsc <argv[2:]>` — no NoEmit; defaults like a bare file-args
 	// command line (execute/tsc.go).
-	CompilerOptions options;
+	tsoptions::ParsedCommandLine* parsed = parseCLI(argc, argv, &host);
+	if (parsed == nullptr) {
+		return;
+	}
 
-	compiler::SimpleProgram program(&host, options, rootFileNames);
+	compiler::SimpleProgram program(&host, *parsed->ParsedConfig->CompilerOptions,
+	                              parsed->ParsedConfig->FileNames);
 	program.BindSourceFiles();
 	auto diags = compiler::getDiagnosticsOfAnyProgram(&program, {}, false);
 

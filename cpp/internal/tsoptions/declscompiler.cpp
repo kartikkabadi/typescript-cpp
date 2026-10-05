@@ -7,7 +7,7 @@
 
 namespace tsc::tsoptions {
 
-static const std::vector<const CommandLineOption*> commonOptionsWithBuildData()
+static const std::vector<const CommandLineOption*>& commonOptionsWithBuildData()
 {
 	static const std::vector<const CommandLineOption*> v = [] {
 		//******* commonOptionsWithBuild *******
@@ -295,7 +295,7 @@ const std::vector<const CommandLineOption*>& commonOptionsWithBuild()
 	return commonOptionsWithBuildData();
 }
 
-static const std::vector<const CommandLineOption*> optionsForCompilerData()
+static const std::vector<const CommandLineOption*>& optionsForCompilerData()
 {
 	static const std::vector<const CommandLineOption*> v = [] {
 		//******* compilerOptions not common with --build *******

@@ -17,6 +17,7 @@
 #include "internal/ast/ast.h"
 #include "internal/collections/collections.h"
 #include "internal/core/types.h"
+#include "internal/locale/locale.h"
 #include "internal/module/types.h"
 #include "internal/outputpaths/outputpaths.h"
 #include "internal/parser/parser.h" // getErrorSpanForNode
@@ -612,17 +613,9 @@ std::pair<Glob*, bool> Parse(std::string_view pattern);
 // outputpaths dep-stub block removed — the real outputpaths.h port is in
 // tsc::outputpaths; unqualified `outputpaths::` lookups below resolve to it.
 
-namespace locale {  // dep-stub decls — owned by the locale slice
-// locale.go — a BCP-47 language tag; zero value is Default.
-struct Locale {
-	std::string tag;
-	std::string String() const { return tag; }
-	bool operator==(const Locale&) const = default;
-};
-inline Locale Default{};
-// locale.Parse — locale.go:36. dep-stubbed in tsconfigparsing' TU.
-std::pair<Locale, bool> Parse(std::string_view localeStr);
-}  // namespace locale
+// locale.go ported for real — cpp/internal/locale/. Alias keeps Go-shaped
+// `locale::Parse` call sites inside tsoptions working.
+namespace locale = tsc::locale;
 
 namespace contentmapper {  // minimal decls — contentmapper package types.
 // contentmapper.go — types only (the package's Host machinery isn't ported
@@ -840,9 +833,9 @@ struct ParsedCommandLine : module::ResolvedProjectReference,
 // NewParsedCommandLine — parsedcommandline.go:77.
 ParsedCommandLine* NewParsedCommandLine(
     tsc::CompilerOptions* compilerOptions,
-    std::vector<std::string> rootFileNames,
-    std::vector<ProjectReference*> projectReferences,
-    tspath::ComparePathsOptions comparePathsOptions);
+    const std::vector<std::string>& rootFileNames,
+    const std::vector<ProjectReference*>& projectReferences,
+    const tspath::ComparePathsOptions& comparePathsOptions);
 
 struct ParsedBuildCommandLine {
 	BuildOptions* BuildOptions = nullptr;
