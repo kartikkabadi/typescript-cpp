@@ -1730,7 +1730,7 @@ ModifierFlags Checker::getCombinedModifierFlagsCached(Node* node) {
 }
 // owner: instantiate slice (checker.go:22285-23219)
 std::vector<Type*> Checker::getEffectiveTypeArguments(Node* node,
-                                                    std::vector<Type*> typeParameters) {
+                                                    const std::vector<Type*>& typeParameters) {
 	TSC_UNREACHABLE("getEffectiveTypeArguments — instantiate slice");
 }
 Type* Checker::getDefaultFromTypeParameter(Type* t) {

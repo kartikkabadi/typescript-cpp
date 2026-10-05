@@ -1055,7 +1055,6 @@ Type* Checker::getIterationTypeOfGeneratorFunctionReturnType(IterationTypeKind /
 bool Checker::isConstantReference(Node* /*node*/) { TSC_UNREACHABLE("isConstantReference — owned by flow"); }
 bool Checker::isReachableFlowNode(FlowNode* /*flow*/) { TSC_UNREACHABLE("isReachableFlowNode — owned by flow"); }
 bool Checker::isSymbolAssigned(Symbol* /*symbol*/) { TSC_UNREACHABLE("isSymbolAssigned — owned by flow"); }
-std::string Checker::TypeToString(Type* /*t*/) { TSC_UNREACHABLE("TypeToString — owned by printer"); }
 
 } // namespace checker
 } // namespace tsc

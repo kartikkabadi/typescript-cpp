@@ -4373,9 +4373,7 @@ Type* Checker::getWidenedType(Type* t) {
 	TSC_UNREACHABLE("getWidenedType — ported with the widening slice");
 }
 
-std::vector<Signature*> Checker::getSignaturesOfType(Type* t, SignatureKind kind) {
-	TSC_UNREACHABLE("getSignaturesOfType — ported with the signature slice");
-}
+// getSignaturesOfType is defined in checker_members.cpp (members slice).
 
 bool Checker::isContextSensitive(Node* node) {
 	TSC_UNREACHABLE("isContextSensitive — ported with checker.cpp:31382 slice");
@@ -4404,14 +4402,8 @@ bool Checker::containsUndefinedType(Type* t) {
 	TSC_UNREACHABLE("containsUndefinedType — ported with checker.cpp:28320 slice");
 }
 
-Type* Checker::getTypeWithThisArgument(Type* t, Type* thisArgument,
-									   bool needApparentType) {
-	TSC_UNREACHABLE("getTypeWithThisArgument — ported with checker.cpp:19910");
-}
-
-std::vector<Type*> Checker::getBaseTypes(Type* t) {
-	TSC_UNREACHABLE("getBaseTypes — ported with checker.cpp:19504 slice");
-}
+// getTypeWithThisArgument and getBaseTypes are defined in checker_members.cpp
+// (members slice).
 
 Type* Checker::getBuiltinIteratorReturnType() {
 	TSC_UNREACHABLE("getBuiltinIteratorReturnType — ported with checker.cpp:6570");
@@ -6590,9 +6582,7 @@ Symbol* Checker::resolveExternalModuleNameWorker(
 	return nullptr;
 }
 
-Symbol* Checker::getPropertyOfType(Type* type, const std::string& name) {
-	TSC_UNREACHABLE("getPropertyOfType — ported with the member-resolution slice");
-}
+// getPropertyOfType is defined in checker_members.cpp (members slice).
 
 bool Checker::allTypesAssignableToKindEx(Type* source, TypeFlags kind,
                                          bool strict) {
@@ -6603,6 +6593,12 @@ bool Checker::allTypesAssignableToKindEx(Type* source, TypeFlags kind,
 Type* Checker::getApparentType(Type* t) {
 	TSC_UNREACHABLE("getApparentType — ported with checker.go:22087 slice");
 }
+Type* Checker::getRestrictiveTypeParameter(Type* t) {
+	TSC_UNREACHABLE(
+		"getRestrictiveTypeParameter — ported with checker.go:24977 slice");
+}
+
+// getApparentType is defined in checker_members.cpp (members slice).
 
 bool Checker::couldContainTypeVariablesWorker(Type* t) {
 	TSC_UNREACHABLE(
