@@ -71,4 +71,34 @@ Node* createAccessorPropertyBackingField(printer::NodeFactory* f, Node* node,
                                          ModifierList* modifiers,
                                          Node* initializer);
 
+// === slice: classfields ===
+
+// newClassFieldsTransformer — classfields.go:140. Wired into GetESTransformer
+// by definitions.go (esDecoratorAndClassFields chain).
+Transformer* newClassFieldsTransformer(TransformOptions* opts);
+
+// Dep-stub declarations — owned by the esdecorator-cluster slice
+// (namedevaluation.go + classthis.go). classfields.cpp provides
+// TSC_UNREACHABLE bodies until that slice lands; on merge the real
+// implementations replace them.
+
+// transformNamedEvaluation — namedevaluation.go:513
+Node* transformNamedEvaluation(printer::EmitContext* context, Node* node,
+                               bool ignoreEmptyStringLiteral,
+                               std::string assignedName);
+// isNamedEvaluationAnd — namedevaluation.go:89. `cb` is the anonymous-function
+// predicate (classfields passes its anonymous-class check).
+bool isNamedEvaluationAnd(printer::EmitContext* emitContext, Node* node,
+                          const std::function<bool(Node*)>& cb);
+// isClassThisAssignmentBlock — classthis.go:10
+bool isClassThisAssignmentBlock(printer::EmitContext* emitContext, Node* node);
+// isClassNamedEvaluationHelperBlock — namedevaluation.go:16
+bool isClassNamedEvaluationHelperBlock(printer::EmitContext* emitContext,
+                                       Node* node);
+// classHasExplicitlyAssignedName — namedevaluation.go:38
+bool classHasExplicitlyAssignedName(printer::EmitContext* emitContext,
+                                    Node* node);
+
+// === end slice: classfields ===
+
 }  // namespace tsc::transformers::estransforms
