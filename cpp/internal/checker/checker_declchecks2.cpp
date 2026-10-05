@@ -3218,9 +3218,7 @@ void Checker::checkUnusedRenamedBindingElements() {
 // (deduped: checkNonNullNonVoidType defined in owning slice file)
 
 // checker.go:8538 — expressions slice
-void Checker::checkDeprecatedSignature(Signature* signature, Node* node) {
-	TSC_UNREACHABLE("checkDeprecatedSignature — expressions slice");
-}
+// (deduped: checkDeprecatedSignature defined in owning slice file)
 
 // (deduped: getFirstTransformableStaticClassElement defined in owning slice file)
 

@@ -1088,6 +1088,150 @@ Type* Checker::checkPrivateIdentifierExpression(Node* node) {
 // checker.go:10217
 // (deduped: skippedGenericFunction defined in checker_expressions_a.cpp)
 
+Node* getSuperContainer(Node* node, bool stopOnFunctions);  // checker_utilities.cpp
+
+// checker.go:8026 checkSuperExpression
+Type* Checker::checkSuperExpression(Node* node) {
+	bool isSuperCall =
+	    isCallExpression(node->parent) &&
+	    node->parent->expression() == node;
+	Node* immediateContainer = getSuperContainer(node, /*stopOnFunctions*/ true);
+	Node* container = immediateContainer;
+
+	// adjust the container reference in case if super is used inside arrow
+	// functions with arbitrarily deep nesting
+	if (!isSuperCall) {
+		while (container != nullptr && isArrowFunction(container)) {
+			container = getSuperContainer(container, /*stopOnFunctions*/ true);
+		}
+	}
+
+	auto isLegalUsageOfSuperExpression = [&]() -> bool {
+		if (isSuperCall) {
+			// TS 1.0 SPEC (April 2014): 4.8.1
+			// Super calls are only permitted in constructors of derived classes
+			return isConstructorDeclaration(container);
+		}
+		// TS 1.0 SPEC (April 2014)
+		// 'super' property access is allowed
+		// - In a constructor, instance member function, instance member
+		//   accessor, or instance member variable initializer where this
+		//   references a derived class instance
+		// - In a static member function or static member accessor
+
+		// topmost container must be something that is directly nested in the
+		// class declaration\object literal expression
+		if (isClassLike(container->parent) ||
+		    isObjectLiteralExpression(container->parent)) {
+			if (isStatic(container)) {
+				return nodeKindIs(
+				    container, {Kind::MethodDeclaration, Kind::MethodSignature,
+				                Kind::GetAccessor, Kind::SetAccessor,
+				                Kind::PropertyDeclaration,
+				                Kind::ClassStaticBlockDeclaration});
+			}
+			return nodeKindIs(
+			    container, {Kind::MethodDeclaration, Kind::MethodSignature,
+			                Kind::GetAccessor, Kind::SetAccessor,
+			                Kind::PropertyDeclaration, Kind::PropertySignature,
+			                Kind::Constructor});
+		}
+		return false;
+	};
+
+	if (container == nullptr || !isLegalUsageOfSuperExpression()) {
+		// issue more specific error if super is used in computed property name
+		// class A { foo() { return "1" }}
+		// class B {
+		//     [super.foo()]() {}
+		// }
+		Node* current = findAncestorOrQuit(node, [&](Node* n) -> FindAncestorResult {
+			if (n == container) {
+				return FindAncestorResult::Quit;
+			}
+			if (isComputedPropertyName(n)) {
+				return FindAncestorResult::True;
+			}
+			return FindAncestorResult::False;
+		});
+		if (current != nullptr && isComputedPropertyName(current)) {
+			error(node, X_super_cannot_be_referenced_in_a_computed_property_name);
+		} else if (isSuperCall) {
+			error(node,
+			      Super_calls_are_not_permitted_outside_constructors_or_in_nested_functions_inside_constructors);
+		} else if (container == nullptr || container->parent == nullptr ||
+		           !(isClassLike(container->parent) ||
+		             isObjectLiteralExpression(container->parent))) {
+			error(node,
+			      X_super_can_only_be_referenced_in_members_of_derived_classes_or_object_literal_expressions);
+		} else {
+			error(node,
+			      X_super_property_access_is_permitted_only_in_a_constructor_member_function_or_member_accessor_of_a_derived_class);
+		}
+		return errorType;
+	}
+	if (!isSuperCall && isConstructorDeclaration(immediateContainer)) {
+		checkThisBeforeSuper(
+		    node, container,
+		    X_super_must_be_called_before_accessing_a_property_of_super_in_the_constructor_of_a_derived_class);
+	}
+	if (container->parent->kind == Kind::ObjectLiteralExpression) {
+		// for object literal assume that type of 'super' is 'any'
+		return anyType;
+	}
+	// at this point the only legal case for parent is ClassLikeDeclaration
+	Node* classLikeDeclaration = container->parent;
+	if (getClassExtendsHeritageElement(classLikeDeclaration) == nullptr) {
+		error(node, X_super_can_only_be_referenced_in_a_derived_class);
+		return errorType;
+	}
+	if (classDeclarationExtendsNull(classLikeDeclaration)) {
+		if (isSuperCall) {
+			return errorType;
+		}
+		return nullWideningType;
+	}
+	Type* classType =
+	    getDeclaredTypeOfSymbol(getSymbolOfDeclaration(classLikeDeclaration));
+	Type* baseClassType = nullptr;
+	if (classType != nullptr) {
+		auto baseTypes = getBaseTypes(classType);
+		baseClassType = baseTypes.empty() ? nullptr : baseTypes[0];
+	}
+	if (baseClassType == nullptr) {
+		return errorType;
+	}
+	if (isConstructorDeclaration(container) &&
+	    isInConstructorArgumentInitializer(node, container)) {
+		// issue custom error message for super property access in constructor
+		// arguments (to be aligned with old compiler)
+		error(node, X_super_cannot_be_referenced_in_constructor_arguments);
+		return errorType;
+	}
+	if (isStatic(container) || isSuperCall) {
+		if (!isSuperCall && languageVersion <= ScriptTarget::ES2021 &&
+		    (isPropertyDeclaration(container) ||
+		     isClassStaticBlockDeclaration(container))) {
+			// for `super.x` or `super[x]` in a static initializer, mark all
+			// enclosing block scope containers so that we can report potential
+			// collisions with `Reflect`.
+			for (Node* cur = getEnclosingBlockScopeContainer(node->parent);
+			     cur != nullptr;
+			     cur = getEnclosingBlockScopeContainer(cur)) {
+				if (!isSourceFile(cur) ||
+				    isExternalOrCommonJSModule(cur->as<SourceFile>())) {
+					nodeLinks.Get(cur)->flags |=
+					    NodeCheckFlagsContainsSuperPropertyInStaticInitializer;
+				}
+			}
+		}
+		return getBaseConstructorTypeOfClass(classType);
+	}
+	return getTypeWithThisArgument(baseClassType,
+	                               classType->AsInterfaceType()->thisType,
+	                               /*needsApparentType*/ false);
+}
+
 // ---------------------------------------------------------------------------
 // === dep stubs — owned by other slices; deleted from here when the owner's
 // real definition lands. Never called successfully until then.
@@ -1152,7 +1296,7 @@ Type* Checker::checkPrivateIdentifierExpression(Node* node) {
 // checker_contextual.cpp; `newInferenceInfo` lives in checker_inference.cpp.
 
 // owner: expression-check slices (wave-3)
-Type* Checker::checkSuperExpression(Node* node) { TSC_UNREACHABLE("checkSuperExpression — expressions slice"); }
+// (deduped: checkSuperExpression defined in owning slice file)
 // (deduped: checkArrayLiteral defined in owning slice file)
 // (deduped: checkObjectLiteral defined in cpp/internal/checker/checker_expressions_c.cpp)
 // (deduped: checkPropertyAccessExpression defined in the owning slice file)
@@ -1203,7 +1347,12 @@ Type* Checker::checkSuperExpression(Node* node) { TSC_UNREACHABLE("checkSuperExp
 
 // owner: walker per-node checks (wave-3)
 // (deduped: checkVariableStatement defined in cpp/internal/checker/checker_declchecks2.cpp)
-void Checker::checkExpressionStatement(Node* node) { TSC_UNREACHABLE("checkExpressionStatement — stmtchecks slice"); }
+// checker.go:7501 checkExpressionStatement
+void Checker::checkExpressionStatement(Node* node) {
+	// Grammar checking
+	checkGrammarStatementInAmbientContext(node);
+	checkExpression(node->expression());
+}
 // (deduped: checkVariableDeclaration defined in cpp/internal/checker/checker_declchecks2.cpp)
 // (deduped: checkInterfaceDeclaration defined in cpp/internal/checker/checker_declchecks2.cpp)
 // (deduped: checkTypeAliasDeclaration defined in cpp/internal/checker/checker_declchecks2.cpp)
@@ -1230,7 +1379,34 @@ void Checker::checkExpressionStatement(Node* node) { TSC_UNREACHABLE("checkExpre
 
 // (deduped: getEffectiveCheckNode defined in owning slice file)
 // (deduped: getImportAttributesTypeForModuleSpecifier defined in owning slice file)
-Symbol* Checker::getSymbolOfPartOfRightHandSideOfImportEquals(Node* entityName) { TSC_UNREACHABLE("getSymbolOfPartOfRightHandSideOfImportEquals — symboltype slice"); }
+// checker.go:14702 getSymbolOfPartOfRightHandSideOfImportEquals
+Symbol* Checker::getSymbolOfPartOfRightHandSideOfImportEquals(Node* entityName) {
+	// There are three things we might try to look for. In the following examples,
+	// the search term is enclosed in |...|:
+	//
+	//     import a = |b|; // Namespace
+	//     import a = |b.c|; // Value, type, namespace
+	//     import a = |b.c|.d; // Namespace
+	if (entityName->kind == Kind::Identifier &&
+	    isRightSideOfQualifiedNameOrPropertyAccess(entityName)) {
+		entityName = entityName->parent; // QualifiedName
+	}
+	// Check for case 1 and 3 in the above example
+	if (entityName->kind == Kind::Identifier ||
+	    entityName->parent->kind == Kind::QualifiedName) {
+		return resolveEntityName(entityName, SymbolFlagsNamespace,
+		                         /*ignoreErrors*/ false, /*dontResolveAlias*/ true,
+		                         /*location*/ nullptr);
+	}
+	// Case 2 in above example
+	// entityName.kind could be a QualifiedName or a Missing identifier
+	TSC_ASSERT(entityName->parent->kind == Kind::ImportEqualsDeclaration, "");
+	return resolveEntityName(entityName,
+	                         SymbolFlagsValue | SymbolFlagsType |
+	                             SymbolFlagsNamespace,
+	                         /*ignoreErrors*/ false, /*dontResolveAlias*/ true,
+	                         /*location*/ nullptr);
+}
 // (deduped: getIntrinsicTagSymbol defined in checker_jsx.cpp)
 
 } // namespace tsc::checker

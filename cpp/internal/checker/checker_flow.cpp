@@ -3736,9 +3736,7 @@ bool Checker::areTypesComparable(Type* left, Type* right) {
 
 // (deduped: getConstituentTypeForKeyType defined in the owning slice file)
 
-Type* Checker::getFlowTypeOfProperty(Node* reference, Symbol* prop) {
-	TSC_UNREACHABLE("getFlowTypeOfProperty — checker.go slice");
-}
+// (deduped: getFlowTypeOfProperty defined in owning slice file)
 
 // (deduped: getKeyPropertyName defined in the owning slice file)
 

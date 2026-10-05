@@ -3048,8 +3048,47 @@ std::string Checker::symbolToStringEx(Symbol* symbol, Node* /*enclosingDeclarati
 }
 
 
+// checker.go:16055 getTargetOfAliasDeclaration
 Symbol* Checker::getTargetOfAliasDeclaration(Node* node) {
-	TSC_UNREACHABLE("getTargetOfAliasDeclaration — ported with the import-resolution slice");
+	if (node == nullptr) {
+		return nullptr;
+	}
+	switch (node->kind) {
+	case Kind::ImportEqualsDeclaration:
+	case Kind::VariableDeclaration:
+		return getTargetOfImportEqualsDeclaration(node);
+	case Kind::ImportClause:
+		return getTargetOfImportClause(node);
+	case Kind::NamespaceImport:
+		return getTargetOfNamespaceImport(node);
+	case Kind::NamespaceExport:
+		return getTargetOfNamespaceExport(node);
+	case Kind::ImportSpecifier:
+	case Kind::BindingElement:
+		return getTargetOfImportSpecifier(node);
+	case Kind::ExportSpecifier:
+		return getTargetOfExportSpecifier(
+		    node, SymbolFlagsValue | SymbolFlagsType | SymbolFlagsNamespace,
+		    /*dontRecursivelyResolve*/ true);
+	case Kind::ExportAssignment:
+		return getTargetOfExportAssignment(node);
+	case Kind::BinaryExpression:
+		return getTargetOfBinaryExpression(node);
+	case Kind::NamespaceExportDeclaration:
+		return getTargetOfNamespaceExportDeclaration(node);
+	case Kind::ShorthandPropertyAssignment:
+		return resolveEntityName(
+		    node->as<ShorthandPropertyAssignment>()->name,
+		    SymbolFlagsValue | SymbolFlagsType | SymbolFlagsNamespace,
+		    /*ignoreErrors*/ true, /*dontResolveAlias*/ true,
+		    /*location*/ nullptr);
+	case Kind::PropertyAssignment:
+		return getTargetOfAliasLikeExpression(node->initializer());
+	case Kind::ElementAccessExpression:
+	case Kind::PropertyAccessExpression:
+		return getTargetOfAccessExpression(node);
+	}
+	TSC_UNREACHABLE("getTargetOfAliasDeclaration: unhandled node kind");
 }
 
 
@@ -7169,20 +7208,36 @@ void Checker::errorOnImplicitAnyModule(bool isError, Node* errorNode,
 	        {moduleReference, resolvedModule.resolvedFileName}));
 }
 
+// checker.go:15816 createModuleNotFoundChain
 Diagnostic* Checker::createModuleNotFoundChain(
     const ResolvedModule& resolvedModule, Node* errorNode,
     const std::string& moduleReference, ResolutionMode mode,
     const std::string& packageName) {
-	TSC_UNREACHABLE(
-	    "createModuleNotFoundChain — ported with the module-resolution "
-	    "chains (stage 4)");
+	// Store the original packageName for repopulateInfo before any modifications
+	std::string storedPackageName = packageName;
+	if (storedPackageName == moduleReference) {
+		storedPackageName = "";
+	}
+	DiagnosticDetails details =
+	    CreateModuleNotFoundChain(program, getSourceFileOfNode(errorNode),
+	                              moduleReference, mode, packageName);
+	Diagnostic* result =
+	    NewDiagnosticForNode(errorNode, details.message, details.args);
+	result->SetRepopulateInfo(new RepopulateDiagnosticInfo{
+	    RepopulateDiagnosticKind::ModuleNotFound, moduleReference, mode,
+	    storedPackageName});
+	return result;
 }
 
+// checker.go:15834 createModeMismatchDetails
 Diagnostic* Checker::createModeMismatchDetails(SourceFile* sourceFile,
                                                Node* errorNode) {
-	TSC_UNREACHABLE(
-	    "createModeMismatchDetails — ported with the module-resolution "
-	    "chains (stage 4)");
+	DiagnosticDetails details = CreateModeMismatchDetails(program, sourceFile);
+	Diagnostic* result =
+	    NewDiagnosticForNode(errorNode, details.message, details.args);
+	result->SetRepopulateInfo(new RepopulateDiagnosticInfo{
+	    RepopulateDiagnosticKind::ModeMismatch, "", ResolutionModeNone, ""});
+	return result;
 }
 
 std::string Checker::getSuggestedImportSource(
@@ -7569,16 +7624,17 @@ std::string Checker::getFullyQualifiedName(Symbol* symbol,
 // ---------------------------------------------------------------------------
 
 
+// checker.go:7685 checkExpressionCached
 Type* Checker::checkExpressionCached(Node* node) {
-	TSC_UNREACHABLE(
-	    "checkExpressionCached — ported with the expression-checking slice");
+	return checkExpressionCachedEx(node, CheckModeNormal);
 }
 
+// checker.go:14492 createDiagnosticForNode — file-local free function in Go;
+// kept as a Checker member to reuse the class declaration.
 Diagnostic* Checker::createDiagnosticForNode(
     Node* node, const DiagnosticMessage* message,
     const std::vector<std::string>& args) {
-	TSC_UNREACHABLE(
-	    "createDiagnosticForNode — ported with the diagnostic slice");
+	return NewDiagnosticForNode(node, message, args);
 }
 
 
@@ -7793,10 +7849,18 @@ Symbol* Checker::newSymbolEx(SymbolFlags flags, const std::string& name,
 	return result;
 }
 
+// checker.go:15875 resolveExternalModuleSymbol
 Symbol* Checker::resolveExternalModuleSymbol(Symbol* moduleSymbol,
                                              bool dontResolveAlias) {
-	TSC_UNREACHABLE(
-	    "resolveExternalModuleSymbol — ported with the import-resolution slice");
+	if (moduleSymbol != nullptr) {
+		Symbol* exportEquals =
+		    resolveSymbolEx(moduleSymbol->exports[InternalSymbolNameExportEquals],
+		                    dontResolveAlias);
+		if (exportEquals != nullptr) {
+			return getMergedSymbol(exportEquals);
+		}
+	}
+	return moduleSymbol;
 }
 
 // checker.go:19402 — resolveStructuredTypeMembers (members slice owner)
@@ -7943,19 +8007,13 @@ Symbol* Checker::newProperty(const std::string& name, Type* t) {
 	return symbol;
 }
 
-std::vector<Symbol*> Checker::getPropertiesOfType(Type* t) {
-	TSC_UNREACHABLE("getPropertiesOfType — ported with the <slice> slice");
-}
+// (deduped: getPropertiesOfType defined in checker_members.cpp)
 // (deduped: getStringMappingTypeForGenericType defined in cpp/internal/checker/checker_contextual.cpp)
 
 // (deduped: getTargetType defined in cpp/internal/checker/checker_contextual.cpp)
 
-Type* Checker::instantiateType(Type* t, TypeMapper* mapper) {
-	TSC_UNREACHABLE("instantiateType — ported with the <slice> slice");
-}
-std::vector<Type*> Checker::instantiateTypes(const std::vector<Type*>& types, TypeMapper* mapper) {
-	TSC_UNREACHABLE("instantiateTypes — ported with the <slice> slice");
-}
+// (deduped: instantiateType defined in checker_instantiate.cpp)
+// (deduped: instantiateTypes defined in checker_instantiate.cpp)
 bool Checker::isTypeDerivedFrom(Type* source, Type* target) {
 	TSC_UNREACHABLE("isTypeDerivedFrom — ported with the <slice> slice");
 }

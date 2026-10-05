@@ -1001,6 +1001,20 @@ Type* Checker::checkCallExpression(Node* node, CheckMode checkMode) {
 	return returnType;
 }
 
+// checker.go:8538 checkDeprecatedSignature
+void Checker::checkDeprecatedSignature(Signature* sig, Node* node) {
+	if (sig->flags & SignatureFlagsIsSignatureCandidateForOverloadFailure) {
+		return;
+	}
+	if (sig->declaration != nullptr && IsDeprecatedDeclaration(sig->declaration)) {
+		Node* suggestionNode = getDeprecatedSuggestionNode(node);
+		std::string name = tryGetPropertyAccessOrIdentifierToString(
+		    getInvokedExpression(node));
+		addDeprecatedSuggestionWithSignature(
+		    suggestionNode, sig->declaration, name, signatureToString(sig));
+	}
+}
+
 // (deduped: checkDeprecatedSignature defined in owning slice file)
 
 // checker.go:8549 — addDeprecatedSuggestionWithSignature
@@ -3466,8 +3480,9 @@ Signature* Checker::getContextualSignature(Node* node) {
 // (deduped: checkNonNullTypeWithReporter defined in checker_utilities.cpp)
 
 // (deduped: getFlowTypeOfAccessExpression defined in owning slice file)
+// checker.go:12162 — isNodeWithinClass (expr_b range)
 bool Checker::isNodeWithinClass(Node* node, Node* classDeclaration) {
-	TSC_UNREACHABLE("isNodeWithinClass — expressions-b slice dep");
+	return forEachEnclosingClass(node, [&](Node* n) { return n == classDeclaration; });
 }
 
 // owner: relater slice (relater.go:358,428,1891)

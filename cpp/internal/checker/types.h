@@ -45,6 +45,11 @@ enum class SignatureKind : int32_t {
 	Construct,
 };
 
+// stringer_generated.go — SignatureKind.String()
+inline const char* signatureKindString(SignatureKind k) {
+	return k == SignatureKind::Call ? "SignatureKindCall" : "SignatureKindConstruct";
+}
+
 enum class IndexKind : int32_t {
 	String,
 	Number,

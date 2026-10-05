@@ -1802,9 +1802,14 @@ std::string Checker::getTypeNameForErrorDisplay(Type* t) {
 
 // (deduped: checkVariableDeclarationList defined in cpp/internal/checker/checker_declchecks2.cpp)
 
-// owner: iterations/decltypes slice (checker.go:18014)
+// checker.go:18014 checkRightHandSideOfForOf
 Type* Checker::checkRightHandSideOfForOf(Node* node) {
-	TSC_UNREACHABLE("checkRightHandSideOfForOf — decltypes slice");
+	IterationUse use = node->as<ForInOrOfStatement>()->AwaitModifier != nullptr
+	                     ? IterationUseForAwaitOf
+	                     : IterationUseForOf;
+	return checkIteratedTypeOrElementType(
+	    use, checkNonNullExpression(node->expression()), undefinedType,
+	    node->expression());
 }
 
 // owner: relater.go

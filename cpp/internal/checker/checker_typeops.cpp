@@ -2401,10 +2401,30 @@ std::string Checker::getTupleElementLabel(const TupleElementInfo& elementInfo,
 // owner: contextual slice
 
 
-// owner: decltypes slice
-
+// utilities.go:1807 isJSLiteralType
 bool Checker::isJSLiteralType(Type* t) {
-	TSC_UNREACHABLE("isJSLiteralType — decltypes slice");
+	if (noImplicitAny) {
+		// Flag is meaningless under `noImplicitAny` mode
+		return false;
+	}
+	if (t->objectFlags & ObjectFlagsJSLiteral) {
+		return true;
+	}
+	if (t->flags & TypeFlagsUnion) {
+		return std::all_of(t->AsUnionType()->types.begin(),
+						   t->AsUnionType()->types.end(),
+						   [this](Type* u) { return isJSLiteralType(u); });
+	}
+	if (t->flags & TypeFlagsIntersection) {
+		return std::any_of(t->AsIntersectionType()->types.begin(),
+						   t->AsIntersectionType()->types.end(),
+						   [this](Type* u) { return isJSLiteralType(u); });
+	}
+	if (t->flags & TypeFlagsInstantiable) {
+		Type* constraint = getResolvedBaseConstraint(t, {});
+		return constraint != t && isJSLiteralType(constraint);
+	}
+	return false;
 }
 // checker.go:14288 — isDeprecatedSymbol (symboltype slice owner)
 bool Checker::isDeprecatedSymbol(Symbol* symbol) {

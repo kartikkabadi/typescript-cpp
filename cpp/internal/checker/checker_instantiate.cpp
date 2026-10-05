@@ -416,6 +416,17 @@ Type* Checker::getDefaultOrUnknownFromTypeParameter(Type* t) {
 
 // instantiateTypeWithAlias — checker.go:22496-22548
 
+// checker.go:22492 instantiateType
+Type* Checker::instantiateType(Type* t, TypeMapper* m) {
+	return instantiateTypeWithAlias(t, m, nullptr /*alias*/);
+}
+
+// checker.go:23188 instantiateTypes
+std::vector<Type*> Checker::instantiateTypes(const std::vector<Type*>& types,
+                                             TypeMapper* m) {
+	return instantiateList(types, m, &Checker::instantiateType);
+}
+
 Type* Checker::instantiateTypeWithAlias(Type* t, TypeMapper* m, TypeAlias* alias) {
 	// Check for type variables in the alias, so things like `type Brand<T> = number & {}` can potentially be copied with new alias type args, despite them being unreferenced.
 	// This is the behavior most people using aliases expect, and prevents the cache from leaking type parameters outside their scope of validity.
@@ -1292,13 +1303,26 @@ std::vector<T> Checker::instantiateList(const std::vector<T>& values, TypeMapper
 // === dep stubs — removed when owner slice lands ===
 // ---------------------------------------------------------------------------
 
+// checker.go:23753 createNormalizedTypeReference
 Type* Checker::createNormalizedTypeReference(Type* target,
 											 std::vector<Type*> typeArguments) {
-	TSC_UNREACHABLE("createNormalizedTypeReference — instantiate dep");
+	if (target->objectFlags & ObjectFlagsTuple) {
+		return createNormalizedTupleType(target, typeArguments);
+	}
+	return createTypeReference(target, typeArguments);
 }
+
+// checker.go:25206 createTupleTypeEx
 Type* Checker::createTupleTypeEx(std::vector<Type*> elementTypes,
 								 std::vector<TupleElementInfo> elementInfos, bool readonly) {
-	TSC_UNREACHABLE("createTupleTypeEx — instantiate dep");
+	Type* tupleTarget = getTupleTargetType(elementInfos, readonly);
+	if (tupleTarget == emptyGenericType) {
+		return emptyObjectType;
+	}
+	if (!elementTypes.empty()) {
+		return createNormalizedTypeReference(tupleTarget, elementTypes);
+	}
+	return tupleTarget;
 }
 // (deduped: addOptionalityEx defined in cpp/internal/checker/checker_decltypes.cpp)
 
@@ -1309,13 +1333,28 @@ Type* Checker::createTupleTypeEx(std::vector<Type*> elementTypes,
 
 // Free-function dep stubs (checker package / utilities.go).
 
+// checker.go:17906 getTypeInstantiationKey
 CacheKey getTypeInstantiationKey(const std::vector<Type*>& typeArguments, TypeAlias* alias,
 								 bool singleSignature) {
-	TSC_UNREACHABLE("getTypeInstantiationKey — instantiate dep");
+	keyBuilder b;
+	b.writeTypes(typeArguments);
+	b.writeAlias(alias);
+	if (singleSignature) {
+		b.writeByte('!');
+	}
+	return b.hash();
 }
+
+// checker.go:17939 getConditionalTypeKey
 CacheKey getConditionalTypeKey(const std::vector<Type*>& typeArguments, TypeAlias* alias,
 							   bool forConstraint) {
-	TSC_UNREACHABLE("getConditionalTypeKey — instantiate dep");
+	keyBuilder b;
+	b.writeTypes(typeArguments);
+	b.writeAlias(alias);
+	if (forConstraint) {
+		b.writeByte('!');
+	}
+	return b.hash();
 }
 // checker.go:27288 isNoInferType + 27860 getNoInferType (real ports; their only
 // callers landed with this slice).

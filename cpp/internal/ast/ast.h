@@ -353,6 +353,21 @@ struct TokenCacheKeyHash {
 	}
 };
 
+// RepopulateDiagnosticKind (ast/diagnostic.go) — kind of repopulation for a
+// diagnostic chain entry recomputed during incremental builds.
+enum class RepopulateDiagnosticKind : int32_t {
+	None = 0,
+	ModeMismatch = 1,
+	ModuleNotFound = 2,
+};
+
+struct RepopulateDiagnosticInfo {
+	RepopulateDiagnosticKind kind = RepopulateDiagnosticKind::None;
+	std::string moduleReference;
+	ResolutionMode mode = ResolutionModeNone;
+	std::string packageName;
+};
+
 struct Diagnostic {
 	SourceFile* file = nullptr;
 	TextRange loc;
@@ -368,6 +383,7 @@ struct Diagnostic {
 	bool reportsUnnecessary = false;
 	bool reportsDeprecated = false;
 	bool skippedOnNoEmit = false;
+	RepopulateDiagnosticInfo* repopulateInfo = nullptr;
 
 	SourceFile* File() const { return file; }
 	int Pos() const { return loc.pos(); }
@@ -402,6 +418,8 @@ struct Diagnostic {
 		relatedInformation.push_back(info);
 		return this;
 	}
+	RepopulateDiagnosticInfo* RepopulateInfo() const { return repopulateInfo; }
+	void SetRepopulateInfo(RepopulateDiagnosticInfo* info) { repopulateInfo = info; }
 };
 
 Diagnostic* newDiagnostic(SourceFile* file, TextRange loc,

@@ -2890,4 +2890,19 @@ std::string Checker::SymbolToString(Symbol* s) {
 	TSC_UNREACHABLE("SymbolToString — printer slice");
 }
 
+// checker.go:11644 getFlowTypeOfProperty
+Type* Checker::getFlowTypeOfProperty(Node* reference, Symbol* prop) {
+	Type* initialType = undefinedType;
+	if (prop != nullptr && prop->valueDeclaration != nullptr &&
+	    (!isAutoTypedProperty(prop) ||
+	     prop->valueDeclaration->modifierFlags() & ModifierFlagsAmbient)) {
+		if (Type* baseType = getTypeOfPropertyInBaseClass(prop);
+		    baseType != nullptr) {
+			initialType = baseType;
+		}
+	}
+	return getFlowTypeOfReferenceEx(reference, autoType, initialType, nullptr,
+	                                nullptr);
+}
+
 }  // namespace tsc::checker

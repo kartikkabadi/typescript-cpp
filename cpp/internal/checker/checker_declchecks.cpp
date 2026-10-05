@@ -1751,10 +1751,13 @@ bool Checker::IsDeprecatedDeclaration(Node* declaration) {
 	return isDeprecatedDeclarationWithCachedFlags(declaration,
 												getCombinedNodeFlagsCached(declaration));
 }
+// checker.go:14272 addDeprecatedSuggestion
 Diagnostic* Checker::addDeprecatedSuggestion(Node* location,
                                              std::vector<Node*> declarations,
                                              const std::string& deprecatedEntity) {
-	TSC_UNREACHABLE("addDeprecatedSuggestion — diagtail slice");
+	Diagnostic* diagnostic = NewDiagnosticForNode(
+	    location, X_0_is_deprecated, {deprecatedEntity});
+	return addDeprecatedSuggestionWorker(declarations, diagnostic);
 }
 // owner: checker.go ~7509-8090 (statement/expression checks outside this slice)
 // (deduped: checkImportAttributes defined in cpp/internal/checker/checker_declchecks2.cpp)

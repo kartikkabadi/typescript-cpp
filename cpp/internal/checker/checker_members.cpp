@@ -2960,6 +2960,15 @@ bool Checker::isDiscriminantWithNeverType(Symbol* prop) {
 }
 
 // ---------------------------------------------------------------------------
+// checker.go:19186 getPropertiesOfType
+std::vector<Symbol*> Checker::getPropertiesOfType(Type* t) {
+	t = getReducedApparentType(t);
+	if (t->flags & TypeFlagsUnionOrIntersection) {
+		return getPropertiesOfUnionOrIntersectionType(t);
+	}
+	return getPropertiesOfObjectType(t);
+}
+
 // === dep stubs — removed when owner slice lands ===
 // ---------------------------------------------------------------------------
 
@@ -3021,23 +3030,38 @@ std::string Checker::getParameterNameAtPosition(Signature* signature, int pos) {
 
 // Free-function dep stubs (checker package / utilities.go).
 
+// utilities.go:1029 isLateBoundName
 bool isLateBoundName(const std::string& name) {
-	TSC_UNREACHABLE("isLateBoundName — owned by utilities.go slice");
+	return name.size() >= 2 && name[0] == '\xfe' && name[1] == '@';
 }
+
+// utilities.go:1018 IsKnownSymbol
 bool IsKnownSymbol(Symbol* symbol) {
-	TSC_UNREACHABLE("IsKnownSymbol — owned by utilities.go slice");
+	return isLateBoundName(symbol->name);
 }
+
+// utilities.go:867 isObjectLiteralType
 bool isObjectLiteralType(Type* t) {
-	TSC_UNREACHABLE("isObjectLiteralType — owned by utilities.go slice");
+	return (t->objectFlags & ObjectFlagsObjectLiteral) != 0;
 }
+
+// checker.go:23946 isTupleType
 bool isTupleType(Type* t) {
-	TSC_UNREACHABLE("isTupleType — owned by checker.go:23946 slice");
+	return (t->objectFlags & ObjectFlagsReference) != 0 &&
+		   (t->Target()->objectFlags & ObjectFlagsTuple) != 0;
 }
+
+// utilities.go:67 hasReadonlyModifier
 bool hasReadonlyModifier(Node* node) {
-	TSC_UNREACHABLE("hasReadonlyModifier — owned by utilities.go slice");
+	return hasModifier(node, ModifierFlagsReadonly);
 }
+
+// checker.go:28165 compareTypesEqual
 Ternary compareTypesEqual(Type* s, Type* t) {
-	TSC_UNREACHABLE("compareTypesEqual — owned by checker.go:28165 slice");
+	if (s == t) {
+		return Ternary::True;
+	}
+	return Ternary::False;
 }
 
 } // namespace checker
