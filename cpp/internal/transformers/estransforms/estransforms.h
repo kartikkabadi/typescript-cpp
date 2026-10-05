@@ -71,4 +71,51 @@ Node* createAccessorPropertyBackingField(printer::NodeFactory* f, Node* node,
                                          ModifierList* modifiers,
                                          Node* initializer);
 
+// --- transformer factories (NewXTransformer in each Go file) -----------------
+
+// newLogicalAssignmentTransformer — logicalassignment.go:110
+Transformer* newLogicalAssignmentTransformer(TransformOptions* opt);
+
+// newTaggedTemplateLiftRestrictionTransformer — taggedtemplate.go:22
+Transformer* newTaggedTemplateLiftRestrictionTransformer(
+	TransformOptions* opt);
+
+// newOptionalChainTransformer — optionalchain.go:237
+Transformer* newOptionalChainTransformer(TransformOptions* opt);
+
+// newOptionalCatchTransformer — optionalcatch.go:34
+Transformer* newOptionalCatchTransformer(TransformOptions* opt);
+
+// newNullishCoalescingTransformer — nullishcoalescing.go:46
+Transformer* newNullishCoalescingTransformer(TransformOptions* opt);
+
+// newExponentiationTransformer — exponentiation.go:87
+Transformer* newExponentiationTransformer(TransformOptions* opt);
+
+// newObjectRestSpreadTransformer — objectrestspread.go:590
+Transformer* newObjectRestSpreadTransformer(TransformOptions* opt);
+
+// NewUseStrictTransformer — usestrict.go:9 (exported in Go)
+Transformer* NewUseStrictTransformer(TransformOptions* opt);
+
+// GetESTransformer — definitions.go:24 (exported in Go)
+Transformer* GetESTransformer(TransformOptions* opts);
+
+// --- factories owned by other slices (dep-stubbed in definitions.cpp) --------
+
+// newESDecoratorTransformer — esdecorator.go:124 — owned by esdecorator slice
+Transformer* newESDecoratorTransformer(TransformOptions* opt);
+
+// newClassFieldsTransformer — classfields.go:140 — owned by classfields slice
+Transformer* newClassFieldsTransformer(TransformOptions* opt);
+
+// newUsingDeclarationTransformer — using.go:21 — owned by using slice
+Transformer* newUsingDeclarationTransformer(TransformOptions* opt);
+
+// newforawaitTransformer — forawait.go:56 — owned by forawait slice
+Transformer* newforawaitTransformer(TransformOptions* opt);
+
+// newAsyncTransformer — async.go:37 — owned by async slice
+Transformer* newAsyncTransformer(TransformOptions* opt);
+
 }  // namespace tsc::transformers::estransforms

@@ -86,6 +86,15 @@ add_library(tsc STATIC
 	internal/transformers/utilities.cpp
 	internal/transformers/destructuring.cpp
 	internal/transformers/estransforms/utilities.cpp
+	internal/transformers/estransforms/logicalassignment.cpp
+	internal/transformers/estransforms/taggedtemplate.cpp
+	internal/transformers/estransforms/optionalchain.cpp
+	internal/transformers/estransforms/optionalcatch.cpp
+	internal/transformers/estransforms/nullishcoalescing.cpp
+	internal/transformers/estransforms/exponentiation.cpp
+	internal/transformers/estransforms/objectrestspread.cpp
+	internal/transformers/estransforms/usestrict.cpp
+	internal/transformers/estransforms/definitions.cpp
 	internal/transformers/tstransforms/utilities.cpp
 	internal/transformers/moduletransforms/utilities.cpp
 	internal/transformers/inliners/constenum.cpp
