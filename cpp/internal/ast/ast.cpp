@@ -897,6 +897,55 @@ static Node* getTargetOfBindingOrAssignmentElement(Node* element) {
 			return nullptr;
 		}
 	}
+	if (isAssignmentExpression(element, /*excludeCompoundAssignment*/ true)) {
+		return getTargetOfBindingOrAssignmentElement(
+			element->as<BinaryExpression>()->Left);
+	}
+	if (element->kind == Kind::SpreadElement) {
+		return getTargetOfBindingOrAssignmentElement(
+			element->expression());
+	}
+	return element;
+}
+
+// tryGetPropertyNameOfBindingOrAssignmentElement —
+// utilities.go:3961
+Node* tryGetPropertyNameOfBindingOrAssignmentElement(
+	Node* bindingElement) {
+	switch (bindingElement->kind) {
+	case Kind::BindingElement:
+		if (bindingElement->propertyName()) {
+			Node* propertyName = bindingElement->propertyName();
+			if (propertyName->kind == Kind::ComputedPropertyName &&
+				isStringOrNumericLiteralLike(
+					propertyName->expression())) {
+				return propertyName->expression();
+			}
+			return propertyName;
+		}
+		break;
+	case Kind::PropertyAssignment:
+		if (bindingElement->name()) {
+			Node* propertyName = bindingElement->name();
+			if (propertyName->kind == Kind::ComputedPropertyName &&
+				isStringOrNumericLiteralLike(
+					propertyName->expression())) {
+				return propertyName->expression();
+			}
+			return propertyName;
+		}
+		break;
+	case Kind::SpreadAssignment:
+		return bindingElement->name();
+	default:
+		break;
+	}
+	if (Node* target =
+			getTargetOfBindingOrAssignmentElement(bindingElement)) {
+		if (isPropertyName(target)) {
+			return target;
+		}
+	}
 	return nullptr;
 }
 
@@ -1196,7 +1245,7 @@ JSDeclarationKind getAssignmentDeclarationKind(Node* node) {
 	return JSDeclarationKind::None;
 }
 
-static Node* getNonAssignedNameOfDeclaration(Node* declaration) {
+Node* getNonAssignedNameOfDeclaration(Node* declaration) {
 	switch (declaration->kind) {
 	case Kind::BinaryExpression:
 	case Kind::CallExpression:

@@ -100,11 +100,6 @@ bool isTupleType(Type* t) {
 		(t->Target()->objectFlags & ObjectFlagsTuple) != 0;
 }
 
-// ast/utilities.go:1261 — isVarConst
-bool isVarConst(Node* node) {
-	return (getCombinedNodeFlags(node) & NodeFlagsBlockScoped) == NodeFlagsConst;
-}
-
 // checker.cpp:169 — isFreshLiteralType
 bool isFreshLiteralType(Type* t) {
 	return (t->flags & TypeFlagsFreshable) != 0 && t->AsLiteralType()->freshType == t;

@@ -2,8 +2,10 @@
 // ast.go, symbol.go, flow.go, symbolcompare.go.
 #include <algorithm>
 #include <atomic>
+#include <functional>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "internal/ast/ast.h"
@@ -2504,5 +2506,33 @@ std::string getJSXRuntimeImport(std::string_view base,
 	                                             : "jsx-runtime");
 }
 
+// ast.go: collectIdentifiersForSourceFile — every Identifier /
+// PrivateIdentifier / literal Text() in the file.
+static std::unordered_set<std::string> collectIdentifiersForSourceFile(
+	SourceFile* sourceFile) {
+	std::unordered_set<std::string> identifiers;
+	std::function<bool(Node*)> collect = [&](Node* node) -> bool {
+		switch (node->kind) {
+			case Kind::Identifier:
+			case Kind::PrivateIdentifier:
+			case Kind::StringLiteral:
+			case Kind::NumericLiteral:
+			case Kind::BigIntLiteral:
+			case Kind::NoSubstitutionTemplateLiteral:
+				identifiers.insert(node->text());
+		}
+		node->forEachChild(collect);
+		return false;
+	};
+	collect(sourceFile->asNode());
+	return identifiers;
+}
+
+// ast.go: SourceFile::HasIdentifier
+bool sourceFileHasIdentifier(SourceFile* file, const std::string& name) {
+	file->identifiersOnce.run(
+		[&] { file->identifiers = collectIdentifiersForSourceFile(file); });
+	return file->identifiers.count(name) != 0;
+}
 
 } // namespace tsc

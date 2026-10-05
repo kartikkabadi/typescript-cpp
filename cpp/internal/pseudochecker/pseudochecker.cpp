@@ -99,12 +99,6 @@ bool forEachReturnStatement(Node* body,
 	return traverse(body);
 }
 
-// ast/utilities.go — IsVarConst
-bool isVarConst(Node* node) {
-	return (getCombinedNodeFlags(node) & NodeFlagsBlockScoped) ==
-	       NodeFlagsConst;
-}
-
 // lookup.go:470 — isConstContextPropagatingKind
 bool isConstContextPropagatingKind(Kind kind) {
 	switch (kind) {

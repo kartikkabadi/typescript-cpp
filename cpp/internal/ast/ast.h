@@ -643,6 +643,9 @@ bool isModuleIdentifier(Node* node);
 Node* getElementOrPropertyAccessName(Node* node);
 bool isModuleExportsAccessExpression(Node* node);
 Node* getNameOfDeclaration(Node* declaration);
+Node* getNonAssignedNameOfDeclaration(Node* declaration);
+Node* tryGetPropertyNameOfBindingOrAssignmentElement(
+	Node* bindingElement);
 Node* getAssignedName(Node* node);
 
 template <class T>
@@ -1411,5 +1414,104 @@ std::string getJSXImplicitImportBase(const CompilerOptions* compilerOptions,
                                      SourceFile* file);
 std::string getJSXRuntimeImport(std::string_view base,
                                 const CompilerOptions* options);
+
+// === slice: printer === — kind/var/literal helpers needed by the emitter
+// (ast_generated.go IsKeywordKind/IsPunctuationKind/IsLiteralKind +
+// utilities.go).
+inline bool isKeywordKind(Kind kind) {
+	return kind >= KindFirstKeyword && kind <= KindLastKeyword;
+}
+
+inline bool isPunctuationKind(Kind kind) {
+	return kind >= KindFirstPunctuation && kind <= KindLastPunctuation;
+}
+
+inline bool isLiteralKind(Kind kind) {
+	return kind >= KindFirstLiteralToken && kind <= KindLastLiteralToken;
+}
+
+inline bool isJSDocKind(Kind kind) {
+	return kind >= KindFirstJSDocNode && kind <= KindLastJSDocNode;
+}
+
+inline bool isTemplateLiteralKind(Kind kind) {
+	return kind >= KindFirstTemplateToken && kind <= KindLastTemplateToken;
+}
+
+inline bool isMemberName(Node* node) {
+	return node->kind == Kind::Identifier || node->kind == Kind::PrivateIdentifier;
+}
+
+inline bool isTypeElement(Node* node) {
+	switch (node->kind) {
+		case Kind::ConstructSignature:
+		case Kind::CallSignature:
+		case Kind::PropertySignature:
+		case Kind::MethodSignature:
+		case Kind::IndexSignature:
+		case Kind::GetAccessor:
+		case Kind::SetAccessor:
+		case Kind::NotEmittedTypeElement:
+			return true;
+	}
+	return false;
+}
+
+inline bool isVarAwaitUsing(Node* node) {
+	return (getCombinedNodeFlags(node) & NodeFlagsBlockScoped) ==
+	       NodeFlagsAwaitUsing;
+}
+
+inline bool isVarUsing(Node* node) {
+	return (getCombinedNodeFlags(node) & NodeFlagsBlockScoped) ==
+	       NodeFlagsUsing;
+}
+
+inline bool isVarConst(Node* node) {
+	return (getCombinedNodeFlags(node) & NodeFlagsBlockScoped) ==
+	       NodeFlagsConst;
+}
+
+inline bool isVarConstLike(Node* node) {
+	switch (getCombinedNodeFlags(node) & NodeFlagsBlockScoped) {
+		case NodeFlagsConst:
+		case NodeFlagsUsing:
+		case NodeFlagsAwaitUsing:
+			return true;
+	}
+	return false;
+}
+
+inline bool isVarLet(Node* node) {
+	return (getCombinedNodeFlags(node) & NodeFlagsBlockScoped) == NodeFlagsLet;
+}
+
+inline bool isInJsonFile(Node* node) {
+	return (node->flags & NodeFlagsJsonFile) != 0;
+}
+
+inline bool isJsxChild(Node* node) {
+	switch (node->kind) {
+		case Kind::JsxElement:
+		case Kind::JsxExpression:
+		case Kind::JsxSelfClosingElement:
+		case Kind::JsxText:
+		case Kind::JsxFragment:
+			return true;
+	}
+	return false;
+}
+
+inline bool isUnterminatedLiteral(Node* node) {
+	return (isLiteralKind(node->kind) &&
+	        (*node->literalLikeData().tokenFlags & TokenFlagsUnterminated) != 0) ||
+	       (isTemplateLiteralKind(node->kind) &&
+	        (*node->templateLiteralLikeData().templateFlags &
+	         TokenFlagsUnterminated) != 0);
+}
+
+// SourceFile::HasIdentifier (ast.go:2674) — whether `name` appears as an
+// identifier/literal text anywhere in the file. Collects on first call.
+bool sourceFileHasIdentifier(SourceFile* file, const std::string& name);
 
 }  // namespace tsc

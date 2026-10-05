@@ -1295,7 +1295,7 @@ std::pair<Signature*, std::vector<Signature*>>
 Checker::getResolvedSignatureWorker(Node* node, CheckMode checkMode,
 									int argumentCount) {
 	printer::EmitContext emitContext;
-	Node* parsedNode = emitContext.ParseNode(node);
+	Node* parsedNode = emitContext.parseNode(node);
 	apparentArgumentCount = &argumentCount;
 	std::vector<Signature*> candidatesOutArray;
 	Signature* res = nullptr;
@@ -1557,17 +1557,4 @@ bool Checker::IsLibTypeForHoverVerbosity(Type* t) {
 }
 
 // ---------------------------------------------------------------------------
-// Dep stubs — removed when the owner slice lands.
-// ---------------------------------------------------------------------------
-
-
 }  // namespace tsc::checker
-
-namespace tsc::printer {
-
-// emitcontext.go:501 — printer slice.
-Node* EmitContext::ParseNode(Node* /*node*/) {
-	TSC_UNREACHABLE("EmitContext::ParseNode — printer slice");
-}
-
-}  // namespace tsc::printer

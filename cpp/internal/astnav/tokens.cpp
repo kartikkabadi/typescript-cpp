@@ -31,24 +31,6 @@ bool isTokenKind(Kind kind) {
 	return kind >= KindFirstToken && kind <= KindLastToken;
 }
 
-// utilities.go:755 — ast.IsJSDocKind
-bool isJSDocKind(Kind kind) {
-	return kind >= KindFirstJSDocNode && kind <= KindLastJSDocNode;
-}
-
-// utilities.go:612 — ast.IsJsxChild
-bool isJsxChild(Node* node) {
-	switch (node->kind) {
-	case Kind::JsxElement:
-	case Kind::JsxExpression:
-	case Kind::JsxSelfClosingElement:
-	case Kind::JsxText:
-	case Kind::JsxFragment:
-		return true;
-	}
-	return false;
-}
-
 // utilities.go:2134 — ast.IsJSDocTag
 bool isJSDocTag(Node* node) {
 	return node->kind >= KindFirstJSDocTagNode &&

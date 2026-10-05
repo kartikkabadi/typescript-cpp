@@ -324,10 +324,6 @@ bool isNumericLiteralName(const std::string& name) {
 	return numberFromString(name).string() == name;
 }
 
-// isVarConst — ast.IsVarConst
-bool isVarConst(Node* node) {
-	return (getCombinedNodeFlags(node) & NodeFlagsBlockScoped) == NodeFlagsConst;
-}
 
 // isVariableDeclarationInVariableStatement — checker/utilities.go:1011
 bool isVariableDeclarationInVariableStatement(Node* node) {

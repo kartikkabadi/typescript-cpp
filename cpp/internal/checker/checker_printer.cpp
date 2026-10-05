@@ -450,26 +450,3 @@ Node* Checker::TypePredicateToTypePredicateNode(
 
 } // namespace tsc::checker
 
-// printer package (emittextwriter.go / textwriter.go /
-// singlelinestringwriter.go / printer.go) — the real printer lands with the
-// emitter slice (Stage 4).
-namespace tsc::printer {
-
-EmitTextWriter* NewTextWriter(const std::string& newLine, int indentSize) {
-	TSC_UNREACHABLE("printer::NewTextWriter — printer (emitter) slice");
-}
-
-std::pair<EmitTextWriter*, std::function<void()>> GetSingleLineStringWriter() {
-	TSC_UNREACHABLE("printer::GetSingleLineStringWriter — printer (emitter) slice");
-}
-
-std::string Printer::Emit(Node* node, SourceFile* sourceFile) {
-	TSC_UNREACHABLE("Printer::Emit — printer (emitter) slice");
-}
-
-void Printer::Write(Node* node, SourceFile* sourceFile, EmitTextWriter* writer,
-                    void* sourceMapGenerator) {
-	TSC_UNREACHABLE("Printer::Write — printer (emitter) slice");
-}
-
-} // namespace tsc::printer

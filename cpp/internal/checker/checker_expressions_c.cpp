@@ -249,11 +249,6 @@ bool isCompoundAssignment(Kind kind) {
 	return kind >= KindFirstCompoundAssignment && kind <= KindLastCompoundAssignment;
 }
 
-// ast.IsInJsonFile — ast/utilities.go:1938
-bool isInJsonFile(Node* node) {
-	return (node->flags & NodeFlagsJsonFile) != 0;
-}
-
 } // namespace
 
 // ---------------------------------------------------------------------------
