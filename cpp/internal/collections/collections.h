@@ -155,6 +155,13 @@ public:
 		std::lock_guard<std::mutex> lock(mu);
 		return mp.size();
 	}
+
+	// === slice: vfs ===
+	// Clear — Go's SyncMap.Clear: deletes all keys.
+	void Clear() {
+		std::lock_guard<std::mutex> lock(mu);
+		mp.clear();
+	}
 };
 
 // === slice: modulespecifiers ===
