@@ -21,9 +21,9 @@
 #include <vector>
 
 // === dep-stubs for transformer factories owned by in-flight slices =====
-// DELETE each as the owning slice lands: tstransforms (5), estransforms
-// GetESTransformer+NewUseStrictTransformer (2). Declared here in the owning
-// namespace so callers already use the final names.
+// DELETE when the tstransforms slice lands (it provides all 5 factories).
+// Declared here in the owning namespace so callers already use the final
+// names.
 
 namespace tsc::transformers::tstransforms {
 // owned by the tstransforms slice
@@ -44,16 +44,6 @@ Transformer* NewLegacyDecoratorsTransformer(TransformOptions* /*opts*/) {
 	    "NewLegacyDecoratorsTransformer — owned by tstransforms slice");
 }
 } // namespace tsc::transformers::tstransforms
-
-namespace tsc::transformers::estransforms {
-// owned by the estransforms slice
-Transformer* GetESTransformer(TransformOptions* /*opts*/) {
-	TSC_UNREACHABLE("GetESTransformer — owned by estransforms slice");
-}
-Transformer* NewUseStrictTransformer(TransformOptions* /*opts*/) {
-	TSC_UNREACHABLE("NewUseStrictTransformer — owned by estransforms slice");
-}
-} // namespace tsc::transformers::estransforms
 
 // === end dep-stubs ==========================================================
 
