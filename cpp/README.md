@@ -22,8 +22,8 @@ oracle.
 | JSDoc parser | `parser/jsdoc.go` | `cpp/internal/parser/jsdoc.cpp` | complete |
 | Reparser (JSDoc→declarations) | `parser/reparser.go` | `cpp/internal/parser/reparser.cpp` | complete |
 | Binder | `binder/` | `cpp/internal/binder` | complete |
-| Checker | `checker/` | `cpp/internal/checker` | in progress — bootstrap, mapper/link store, JSDoc, tracer, grammar checks, node copy, module resolution, statements/class machinery, signatures, members, typenodes, declared types, widening, type ops, contextual typing, control-flow narrowing, inference, expression checks, JSX, module/alias resolution, services tail (~1,800 `Checker::` defs across 27 files; ~177 `TSC_UNREACHABLE` dep stubs pending the in-flight `relater.go`, `nodebuilder*`, `emitresolver.go`, `services.go`/`exports.go`, `symbolaccessibility.go`/`printer.go` slices) |
-| Emitter | `printer/`, `transformers/` | — | not started |
+| Checker | `checker/` | `cpp/internal/checker` | near-complete — every Go checker file ported function-by-function: bootstrap, mapper/link store, JSDoc, tracer, grammar checks, node copy, module resolution, statements/class machinery, signatures, members, typenodes, declared types, widening, type ops, contextual typing, control-flow narrowing, inference, expression checks, JSX, module/alias resolution, relater (assignability), nodebuilder (type→TypeNode), emit resolver, services, exports, symbol accessibility (~2,220 `Checker::`/`EmitResolver::`/etc. defs across ~30 files, ~81k lines; remaining `TSC_UNREACHABLE` sites are dep-stubs owned by the in-flight `printer` package, `astnav`, and `modulespecifiers` slices). `tscpp check` runs end-to-end and matches the Go `checkdump` oracle byte-for-byte on all files that complete |
+| Emitter | `printer/`, `transformers/` | `cpp/internal/printer` | in progress — printer package port underway (diagnostic type-name formatting is the last checker blocker) |
 
 ## Conformance
 
