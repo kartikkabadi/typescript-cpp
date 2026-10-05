@@ -131,6 +131,12 @@ add_library(tsc STATIC
 	internal/module/staticresolver.cpp
 	# === slice: outputpaths ===
 	internal/outputpaths/outputpaths.cpp
+	# === slice: sourcemap ===
+	internal/sourcemap/generator.cpp
+	internal/sourcemap/decoder.cpp
+	internal/sourcemap/lineinfo.cpp
+	internal/sourcemap/source_mapper.cpp
+	internal/sourcemap/util.cpp
 	# === slice: modulespecifiers ===
 	internal/modulespecifiers/specifiers.cpp
 	internal/modulespecifiers/util.cpp
