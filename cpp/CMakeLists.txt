@@ -215,6 +215,15 @@ add_library(tsc STATIC
 	internal/vfs/osvfs/osvfs.cpp
 	internal/vfs/vfsmatch/vfsmatch.cpp
 	internal/vfs/vfstest/vfstest.cpp
+	# === slice: fswatch ===
+	internal/fswatch/debounce.cpp
+	internal/fswatch/event.cpp
+	internal/fswatch/fanotify.cpp
+	internal/fswatch/inotify.cpp
+	internal/fswatch/pathcompare.cpp
+	internal/fswatch/util.cpp
+	internal/fswatch/walkdir.cpp
+	internal/fswatch/watcher.cpp
 )
 
 target_link_libraries(tsc PUBLIC z) # zlib — pprof profile writer
