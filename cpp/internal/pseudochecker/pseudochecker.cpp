@@ -950,8 +950,12 @@ std::optional<std::vector<Node*>> PseudoChecker::canGetTypeFromObjectLiteral(
 			}
 		}
 	}
-	return errorNodes; // may be empty (non-nil slice) when errors were listed
-	                   // then cleared — Go returns the accumulated slice
+	// Go returns a nil slice when no error nodes were found — an engaged
+	// empty vector would be misread as "cannot type" by callers.
+	if (errorNodes.empty()) {
+		return std::nullopt;
+	}
+	return errorNodes;
 }
 
 // lookup.go:438 — typeFromArrayLiteral
