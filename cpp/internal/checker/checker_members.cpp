@@ -2989,17 +2989,8 @@ void Checker::applyToReturnTypes(Signature* source, Signature* target,
 Type* Checker::getEffectiveRestType(Signature* signature) {
 	TSC_UNREACHABLE("getEffectiveRestType — owned by relater.go slice");
 }
-bool Checker::isTypeAssignableToKind(Type* source, TypeFlags kind) {
-	TSC_UNREACHABLE("isTypeAssignableToKind — owned by checker.go:28107 slice");
-}
 Type* Checker::getKnownKeysOfTupleType(Type* t) {
 	TSC_UNREACHABLE("getKnownKeysOfTupleType — owned by relater.go slice");
-}
-MappedTypeNameTypeKind Checker::getMappedTypeNameTypeKind(Type* t) {
-	TSC_UNREACHABLE("getMappedTypeNameTypeKind — owned by checker.go:27308 slice");
-}
-Type* Checker::getModifiersTypeFromMappedType(Type* t) {
-	TSC_UNREACHABLE("getModifiersTypeFromMappedType — owned by checker.go:28593 slice");
 }
 bool Checker::isReadonlySymbol(Symbol* symbol) {
 	TSC_UNREACHABLE("isReadonlySymbol — owned by checker.go:14083 slice");
@@ -3036,10 +3027,6 @@ Ternary Checker::compareSignaturesIdentical(Signature* source, Signature* target
 Ternary Checker::compareTypesIdentical(Type* source, Type* target) {
 	TSC_UNREACHABLE("compareTypesIdentical — owned by relater.go slice");
 }
-Ternary Checker::compareProperties(Symbol* sourceProp, Symbol* targetProp,
-	const std::function<Ternary(Type*, Type*)>& compareTypes) {
-	TSC_UNREACHABLE("compareProperties — owned by checker.go:28138 slice");
-}
 // (deduped: isMixinConstructorType defined in cpp/internal/checker/checker_decltypes.cpp)
 
 bool Checker::hasEffectiveRestParameter(Signature* signature) {
@@ -3056,12 +3043,6 @@ int Checker::getMinArgumentCount(Signature* signature) {
 }
 std::string Checker::getParameterNameAtPosition(Signature* signature, int pos) {
 	TSC_UNREACHABLE("getParameterNameAtPosition — owned by relater.go slice");
-}
-Type* Checker::getIndexedAccessType(Type* objectType, Type* indexType) {
-	TSC_UNREACHABLE("getIndexedAccessType — owned by checker.go:27389 slice");
-}
-Type* Checker::getIndexType(Type* t) {
-	TSC_UNREACHABLE("getIndexType — owned by checker.go:27146 slice");
 }
 
 // Free-function dep stubs (checker package / utilities.go).

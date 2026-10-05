@@ -551,5 +551,8 @@ std::string Checker::TypeToString(Type* t) {
 }
 
 // checker.go:28593
+// checker.go:28593
+// getModifiersTypeFromMappedType — checker.go:28593 — ported in
+// checker_typeops.cpp (typeops slice).
 
 } // namespace tsc::checker

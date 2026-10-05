@@ -54,12 +54,7 @@ static bool IsTypeAny(Type* t) {
 	return t != nullptr && (t->flags & TypeFlagsAny) != 0;
 }
 
-// utilities.go:79-105 — owner: utilities slice (file-local; internal linkage, no conflict)
-enum class AssignmentKind : int32_t {
-	None,
-	Definite,
-	Compound,
-};
+// AssignmentKind is declared in checker.h.
 
 static AssignmentKind getAssignmentTargetKind(Node* node) {
 	Node* target = getAssignmentTarget(node);

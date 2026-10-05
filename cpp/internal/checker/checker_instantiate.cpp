@@ -1294,11 +1294,6 @@ std::vector<T> Checker::instantiateList(const std::vector<T>& values, TypeMapper
 // === dep stubs — removed when owner slice lands ===
 // ---------------------------------------------------------------------------
 
-Type* Checker::getIndexedAccessTypeEx(Type* objectType, Type* indexType,
-									  AccessFlags accessFlags, Node* accessNode,
-									  TypeAlias* alias) {
-	TSC_UNREACHABLE("getIndexedAccessTypeEx — instantiate dep");
-}
 Type* Checker::createNormalizedTypeReference(Type* target,
 											 std::vector<Type*> typeArguments) {
 	TSC_UNREACHABLE("createNormalizedTypeReference — instantiate dep");
@@ -1330,46 +1325,6 @@ CacheKey getConditionalTypeKey(const std::vector<Type*>& typeArguments, TypeAlia
 // callers landed with this slice).
 // checker.go:27877-27894 getSubstitutionType / getOrCreateSubstitutionType +
 // 27866 isNoInferTargetType.
-Type* Checker::getSubstitutionType(Type* baseType, Type* constraint) {
-	if ((constraint->flags & TypeFlagsAnyOrUnknown) != 0 ||
-	    constraint == baseType || (baseType->flags & TypeFlagsAny) != 0) {
-		return baseType;
-	}
-	return getOrCreateSubstitutionType(baseType, constraint);
-}
-Type* Checker::getOrCreateSubstitutionType(Type* baseType, Type* constraint) {
-	SubstitutionTypeKey key{baseType->id, constraint->id};
-	if (auto cached = substitutionTypes.find(key); cached != substitutionTypes.end()) {
-		return cached->second;
-	}
-	Type* result = newSubstitutionType(baseType, constraint);
-	substitutionTypes[key] = result;
-	return result;
-}
-bool Checker::isNoInferTargetType(Type* t) {
-	// This is effectively a more conservative and predictable form of
-	// couldContainTypeVariables. We want to preserve NoInfer<T> only for types
-	// that could contain type variables, but we don't want to exhaustively
-	// examine all object type members.
-	return (t->flags & TypeFlagsUnionOrIntersection) != 0 &&
-	           anyOf(t->AsUnionOrIntersectionType()->types,
-	                 [this](Type* u) { return isNoInferTargetType(u); }) ||
-	       (t->flags & TypeFlagsSubstitution) != 0 && !isNoInferType(t) &&
-	           isNoInferTargetType(t->AsSubstitutionType()->baseType) ||
-	       (t->flags & TypeFlagsObject) != 0 && !IsEmptyAnonymousObjectType(t) ||
-	       (t->flags & (TypeFlagsInstantiable & ~TypeFlagsSubstitution)) != 0 &&
-	           !isPatternLiteralType(t);
-}
-bool Checker::isNoInferType(Type* t) {
-	return (t->flags & TypeFlagsSubstitution) != 0 &&
-	       (t->AsSubstitutionType()->constraint->flags & TypeFlagsUnknown) != 0;
-}
-Type* Checker::getNoInferType(Type* t) {
-	if (isNoInferTargetType(t)) {
-		return getOrCreateSubstitutionType(t, unknownType);
-	}
-	return t;
-}
 bool isReservedMemberName(const std::string& name) {
 	TSC_UNREACHABLE("isReservedMemberName — instantiate dep");
 }

@@ -1858,15 +1858,8 @@ ConstructorAccessibilityError* Checker::getConstructorAccessibilityError(
 
 // (deduped: getNonNullableTypeIfNeeded defined in cpp/internal/checker/checker_decltypes.cpp)
 
-Type* Checker::getLiteralTypeFromProperty(Symbol* prop, TypeFlags include,
-                                          bool includeNonPublic) {
-	TSC_UNREACHABLE("getLiteralTypeFromProperty — decltypes slice");
-}
 
 // owner: typeops slice (checker.go:26020-28654)
-Type* Checker::getExtractStringType(Type* t) {
-	TSC_UNREACHABLE("getExtractStringType — typeops slice");
-}
 
 // owner: services tail (checker.go:32070-32660)
 Symbol* Checker::getSymbolAtLocation(Node* node, bool ignoreErrors) {

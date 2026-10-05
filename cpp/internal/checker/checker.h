@@ -669,6 +669,17 @@ enum thisAssignmentDeclarationKind : int32_t {
 	thisAssignmentDeclarationMethod,
 };
 
+// AssignmentKind — checker.go:utilities.go:79
+enum class AssignmentKind : int32_t {
+	None = 0,
+	Definite = 1,
+	Compound = 2,
+};
+inline constexpr AssignmentKind AssignmentKindNone = AssignmentKind::None;
+inline constexpr AssignmentKind AssignmentKindDefinite = AssignmentKind::Definite;
+inline constexpr AssignmentKind AssignmentKindCompound = AssignmentKind::Compound;
+
+
 // symbolTableID
 
 using symbolTableID = uint64_t;
@@ -926,6 +937,7 @@ struct WideningContext {
 // uintptr is the faithful equivalent for identity-only use.
 struct RecursionId {
 	uintptr_t value{};
+	bool operator==(const RecursionId&) const = default;
 };
 
 // Checker
@@ -1380,11 +1392,6 @@ public:
 	Type* getTemplateLiteralType(const std::vector<std::string>& texts,
 		const std::vector<Type*>& types);
 	Type* getStringMappingType(Symbol* symbol, Type* type);
-	Type* getIndexedAccessType(Type* objectType, Type* indexType, AccessFlags accessFlags,
-		Node* accessNode, Symbol* aliasSymbol, const std::vector<Type*>& aliasTypeArguments);
-	Type* getIndexedAccessTypeOrUndefined(Type* objectType, Type* indexType,
-		AccessFlags accessFlags, Node* accessNode, Symbol* aliasSymbol,
-		const std::vector<Type*>& aliasTypeArguments);
 	Type* getIndexTypeEx(Type* t, IndexFlags indexFlags);
 	Type* newConditionalType(ConditionalRoot* root, TypeMapper* mapper, TypeMapper* combinedMapper);
 	Type* newSubstitutionType(Type* baseType, Type* constraint);
@@ -1855,7 +1862,7 @@ public:
 	// === slice: tracer ===
 	Tracer* tracer{};
 	std::string TypeToString(Type* t);                 // printer.go — defined in checker_tracer.cpp
-	Type* getModifiersTypeFromMappedType(Type* t);     // checker.go:28593 — defined in checker_tracer.cpp
+	Type* getModifiersTypeFromMappedType(Type* t);     // checker.go:28593 — defined in checker_typeops.cpp
 
 	// === slice: jsdoc ===
 	void checkUnmatchedJSDocParameters(Node* node);
@@ -1914,8 +1921,6 @@ public:
 	Signature* getSignatureInstantiationWithoutFillingInTypeArguments(Signature* sig,
 																const std::vector<Type*>& typeArguments);
 	Type* getOrCreateTypeFromSignature(Signature* sig);
-	Signature* instantiateSignatureInContextOf(Signature* signature, Signature* contextualSignature,
-											 InferenceContext* inferenceContext, TypeMapper* compareTypes);
 	Type* getReturnTypeOfSignature(Signature* sig);
 	bool maybeTypeOfKind(Type* type, TypeFlags flags);
 	void markPropertyAsReferenced(Symbol* symbol, Node* nodeForCheckWriteOnly, bool isSelfTypeAccess);
@@ -2463,7 +2468,7 @@ public:
 	// typenodes dep stubs — removed when owner slice lands
 	Type* addOptionality(Type* t);
 	Type* addOptionalityEx(Type* t, bool isProperty, bool isOptional);
-	Type* getIndexedAccessType(Type* objectType, Type* indexType);
+	Type* getIndexedAccessType(Type* objectType, Type* indexType);   // checker.go:27389
 	Type* getIndexedAccessTypeEx(Type* objectType, Type* indexType,
 								 AccessFlags accessFlags, Node* accessNode,
 								 TypeAlias* alias);
@@ -2836,7 +2841,6 @@ public:
 		const std::vector<Node*>& staticBlocks);
 	Type* getFlowTypeOfReference(Node* reference, Type* declaredType);
 	Type* getNonUndefinedType(Type* t);
-	Type* getResolvedBaseConstraint(Type* t, const std::vector<RecursionId>& stack);
 	Type* getSimplifiedType(Type* t, bool writing);
 	Type* getSimplifiedTypeOrConstraint(Type* t);
 	Symbol* getSpreadSymbol(Symbol* prop, bool readonly);
@@ -3025,6 +3029,86 @@ public:
 	Type* getEffectiveFirstArgumentForJsxSignature(Signature* signature,
 												   Node* node);
 	// === end slice: contextual ===
+	// === slice: typeops === (checker_typeops.cpp — checker.go:26223-28654:
+	// index/indexed-access machinery, base constraints, literal/enum helpers,
+	// simplification, normalization, member transforms)
+	std::vector<Type*> UnionTypes();
+	Type* intersectTypes(Type* type1, Type* type2);
+	// getLiteralTypeFromProperties / getLiteralTypeFromProperty /
+	// getLiteralTypeFromPropertyName / isKeyTypeIncluded — declared above (1728-1731)
+	// checkComputedPropertyName — declared above (1675)
+	// isNoInferType — declared above (1722)
+	Type* getSubstitutionIntersection(Type* t);
+	// shouldDeferIndexType — declared above (1724)
+	// getIndexTypeForGenericType / getIndexTypeForMappedType — declared above (1725-1726)
+	Type* getIndexedAccessTypeOrUndefined(Type* objectType, Type* indexType,
+	                                      AccessFlags accessFlags, Node* accessNode,
+	                                      TypeAlias* alias);
+	Type* getPropertyTypeForIndexType(Type* originalObjectType, Type* objectType,
+	                                  Type* indexType, Type* fullIndexType,
+	                                  Node* accessNode, AccessFlags accessFlags);
+	bool typeHasStaticProperty(const std::string& propName, Type* containingType);
+	std::string getSuggestionForNonexistentProperty(const std::string& name,
+	                                                Type* containingType);
+	std::string getSuggestionForNonexistentIndexSignature(Type* objectType, Node* expr,
+	                                                      Type* keyedType);
+	Type* getSuggestedTypeForNonexistentStringLiteralType(Type* source, Type* target);
+	void errorIfWritingToReadonlyIndex(IndexInfo* indexInfo, Type* objectType,
+	                                   Node* accessExpression);
+	bool isSelfTypeAccess(Node* name, Symbol* parent);
+	bool isAssignmentToReadonlyEntity(Node* expr, Symbol* symbol,
+	                                  AssignmentKind assignmentKind);
+	bool isThisPropertyAccessInConstructor(Node* node, Symbol* prop);
+	bool isAutoTypedProperty(Symbol* symbol);
+	std::string getPropertyNameFromIndex(Type* indexType, Node* accessNode);
+	// isStringIndexSignatureOnlyTypeWorker — declared above (1596)
+	bool shouldDeferIndexedAccessType(Type* objectType, Type* indexType,
+	                                  Node* accessNode);
+	// getNoInferType — declared above (1723)
+	// getBaseConstraintOrType — declared above (1428)
+	// getBaseConstraintOfType — declared above (1737)
+	Type* getResolvedBaseConstraint(Type* t, std::vector<RecursionId> stack);
+	Type* computeBaseConstraint(Type* t, std::vector<RecursionId> stack);
+	Type* getNextBaseConstraint(Type* t, const std::vector<RecursionId>& stack);
+	// maybeTypeOfKind — declared above (1861)
+	bool maybeTypeOfKindConsideringBaseConstraint(Type* t, TypeFlags kind);
+	bool allTypesAssignableToKind(Type* source, TypeFlags kind);
+	// allTypesAssignableToKindEx — declared above (1524)
+	bool isTypeAssignableToKindEx(Type* source, TypeFlags kind, bool strict);
+	// markPropertyAsReferenced — declared above (1862)
+	std::vector<Symbol*> expandSignatureParametersWithTupleMembers(
+		Signature* signature, TypeReference* restType, int restIndex, Symbol* restSymbol);
+	std::vector<std::string> getUniqAssociatedNamesFromTupleType(TypeReference* t,
+	                                                           Symbol* restSymbol);
+	bool isUnknownLikeUnionType(Type* t);
+	bool isUniformUnionType(Type* t);
+	bool computeIsUniformUnionType(const std::vector<Type*>& types);
+	// containsUndefinedType — declared above (1608)
+	bool typeHasCallOrConstructSignatures(Type* t);
+	Type* getNormalizedType(Type* t, bool writing);
+	Type* getSimplifiedIndexedAccessType(Type* t, bool writing);
+	Type* getSimplifiedIndexedAccessTypeWorker(Type* t, bool writing);
+	Type* distributeObjectOverIndexType(Type* objectType, Type* indexType, bool writing);
+	Type* distributeIndexOverObjectType(Type* objectType, Type* indexType, bool writing);
+	Type* getSimplifiedConditionalType(Type* t, bool writing);
+	bool isIntersectionEmpty(Type* type1, Type* type2);
+	Type* getNormalizedUnionOrIntersectionType(Type* t, bool writing);
+	bool shouldNormalizeIntersection(Type* t);
+	Type* getNormalizedTupleType(Type* t, bool writing);
+	Type* getSingleBaseForNonAugmentingSubtype(Type* t);
+	// getModifiersTypeFromMappedType — declared above (1799)
+	Type* extractTypesOfKind(Type* t, TypeFlags kind);
+	Type* getRegularTypeOfObjectLiteral(Type* t);
+	SymbolTable transformTypeOfMembers(Type* t, const std::function<Type*(Type*)>& f);
+
+	// typeops dep decls — owned by other slices; bodies stubbed in
+	// checker_typeops.cpp under "dep stubs".
+	std::string getTupleElementLabel(const TupleElementInfo& elementInfo,
+	                               Symbol* restSymbol, int index);          // relater slice
+	Node* getControlFlowContainer(Node* node);                              // expressions slice
+	bool isUncalledFunctionReference(Node* node, Symbol* prop);             // expressions slice
+	bool isJSLiteralType(Type* t);                                          // decltypes slice
+	bool isDeprecatedSymbol(Symbol* symbol);                                // decltypes slice
 };  // class Checker
 
 // Free helpers used across checker translation units.

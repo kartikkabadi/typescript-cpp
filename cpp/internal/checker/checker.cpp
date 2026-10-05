@@ -4157,9 +4157,9 @@ Type* Checker::getFlowTypeOfReferenceEx(Node* reference, Type* declaredType,
 	TSC_UNREACHABLE("getFlowTypeOfReferenceEx — ported with flow.go");
 }
 
-bool Checker::containsUndefinedType(Type* t) {
-	TSC_UNREACHABLE("containsUndefinedType — ported with checker.cpp:28320 slice");
-}
+
+// containsUndefinedType is defined in checker_typeops.cpp.
+// getOptionalType stub above (kept).
 
 // getTypeWithThisArgument and getBaseTypes are defined in checker_members.cpp
 // (members slice).
@@ -6338,11 +6338,8 @@ Symbol* Checker::resolveExternalModuleNameWorker(
 
 // getPropertyOfType is defined in checker_members.cpp (members slice).
 
-bool Checker::allTypesAssignableToKindEx(Type* source, TypeFlags kind,
-                                         bool strict) {
-	TSC_UNREACHABLE(
-		"allTypesAssignableToKindEx — ported with checker.go:28098 slice");
-}
+// allTypesAssignableToKindEx — ported in checker_typeops.cpp (typeops slice,
+// checker.go:28098).
 
 Type* Checker::getApparentType(Type* t) {
 	TSC_UNREACHABLE("getApparentType — ported with checker.go:22087 slice");
@@ -6355,10 +6352,8 @@ Type* Checker::getRestrictiveTypeParameter(Type* t) {
 // getApparentType is defined in checker_members.cpp (members slice).
 // couldContainTypeVariablesWorker is defined in checker_instantiate.cpp (instantiate slice).
 
-bool Checker::isStringIndexSignatureOnlyTypeWorker(Type* t) {
-	TSC_UNREACHABLE(
-		"isStringIndexSignatureOnlyTypeWorker — ported with checker.go:27831 slice");
-}
+// isStringIndexSignatureOnlyTypeWorker — ported in checker_typeops.cpp
+// (typeops slice, checker.go:27831).
 
 bool Checker::markNodeAssignmentsWorker(Node* node) {
 	TSC_UNREACHABLE(
@@ -7533,10 +7528,6 @@ std::string Checker::getFullyQualifiedName(Symbol* symbol,
 // never fake results.
 // ---------------------------------------------------------------------------
 
-Type* Checker::checkComputedPropertyName(Node* node) {
-	TSC_UNREACHABLE(
-	    "checkComputedPropertyName — ported with the expression-checking slice");
-}
 
 Type* Checker::checkExpressionCached(Node* node) {
 	TSC_UNREACHABLE(
@@ -7550,10 +7541,6 @@ Diagnostic* Checker::createDiagnosticForNode(
 	    "createDiagnosticForNode — ported with the diagnostic slice");
 }
 
-Type* Checker::getBaseConstraintOfType(Type* t) {
-	TSC_UNREACHABLE(
-	    "getBaseConstraintOfType — ported with the constraint slice");
-}
 
 // utilities.go:1677 isReservedMemberName
 static bool isReservedMemberName(const std::string& name) {
@@ -7864,6 +7851,14 @@ size_t Checker::StringMappingKeyHash::operator()(const StringMappingKey& k) cons
 	return static_cast<size_t>(h);
 }
 
+size_t Checker::PropertiesTypesKeyHash::operator()(const PropertiesTypesKey& k) const noexcept {
+	uint64_t h = 1469598103934665603ull;
+	h = checkerHashStep(h, static_cast<uint64_t>(k.typeId));
+	h = checkerHashStep(h, static_cast<uint64_t>(k.include));
+	h = checkerHashStep(h, static_cast<uint64_t>(k.includeOrigin));
+	return static_cast<size_t>(h);
+}
+
 // checker.go:14318
 Symbol* Checker::newParameter(const std::string& name, Type* t) {
 	Symbol* symbol = newSymbol(SymbolFlagsFunctionScopedVariable, name);
@@ -7878,9 +7873,6 @@ Symbol* Checker::newProperty(const std::string& name, Type* t) {
 	return symbol;
 }
 
-Type* Checker::getBaseConstraintOrType(Type* t) {
-	TSC_UNREACHABLE("getBaseConstraintOrType — ported with the <slice> slice");
-}
 std::vector<Symbol*> Checker::getPropertiesOfType(Type* t) {
 	TSC_UNREACHABLE("getPropertiesOfType — ported with the <slice> slice");
 }

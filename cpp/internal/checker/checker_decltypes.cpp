@@ -1606,7 +1606,7 @@ Type* Checker::getConstraintFromIndexedAccess(Type* t) {
 	Type* indexConstraint = getSimplifiedTypeOrConstraint(d->indexType);
 	if (indexConstraint != nullptr && indexConstraint != d->indexType) {
 		Type* indexedAccess = getIndexedAccessTypeOrUndefined(d->objectType, indexConstraint,
-															  d->accessFlags, nullptr, nullptr, {});
+															  d->accessFlags, nullptr, nullptr);
 		if (indexedAccess != nullptr) {
 			return indexedAccess;
 		}
@@ -1614,7 +1614,7 @@ Type* Checker::getConstraintFromIndexedAccess(Type* t) {
 	Type* objectConstraint = getSimplifiedTypeOrConstraint(d->objectType);
 	if (objectConstraint != nullptr && objectConstraint != d->objectType) {
 		return getIndexedAccessTypeOrUndefined(objectConstraint, d->indexType, d->accessFlags,
-											   nullptr, nullptr, {});
+											   nullptr, nullptr);
 	}
 	return nullptr;
 }
@@ -1830,7 +1830,7 @@ Type* Checker::getBindingElementTypeFromParentType(Node* declaration, Type* pare
 			Type* indexType = getNumberLiteralType(Number(index));
 			Type* declaredType = orElse(
 				getIndexedAccessTypeOrUndefined(parentType, indexType, accessFlags,
-												declaration->name(), nullptr, {}),
+												declaration->name(), nullptr),
 				errorType);
 			t = getFlowTypeOfDestructuring(declaration, declaredType);
 		} else {
@@ -2965,25 +2965,6 @@ std::pair<std::string, bool> Checker::tryGetNameFromType(Type* t) {
 }
 
 // getLiteralTypeFromPropertyName — checker.go:27235
-Type* Checker::getLiteralTypeFromPropertyName(Node* name) {
-	if (isPrivateIdentifier(name)) {
-		return neverType;
-	}
-	if (isNumericLiteral(name)) {
-		return getRegularTypeOfLiteralType(checkExpression(name));
-	}
-	if (isComputedPropertyName(name)) {
-		return getRegularTypeOfLiteralType(checkComputedPropertyName(name));
-	}
-	std::string propertyName = getPropertyNameForPropertyNameNode(name);
-	if (propertyName != InternalSymbolNameMissing) {
-		return getStringLiteralType(propertyName);
-	}
-	if (isExpression(name)) {
-		return getRegularTypeOfLiteralType(checkExpression(name));
-	}
-	return neverType;
-}
 
 // getCombinedModifierFlagsCached — checker.go:19077
 ModifierFlags Checker::getCombinedModifierFlagsCached(Node* node) {
@@ -3034,7 +3015,6 @@ Type* Checker::checkShorthandPropertyAssignment(Node* node, bool inDestructuring
 Type* Checker::getContextualThisParameterType(Node* fn) { decltypesDepUnreachable("getContextualThisParameterType — decltypes dep"); }
 // (deduped: getContextuallyTypedParameterType defined in cpp/internal/checker/checker_contextual.cpp)
 
-Node* Checker::getDeclaringConstructor(Symbol* symbol) { decltypesDepUnreachable("getDeclaringConstructor — decltypes dep"); }
 std::pair<std::string, bool> Checker::getDestructuringPropertyName(Node* node) { decltypesDepUnreachable("getDestructuringPropertyName — decltypes dep"); }
 // (deduped: getElementTypeOfArrayType defined in cpp/internal/checker/checker_typenodes.cpp)
 
@@ -3059,15 +3039,12 @@ Type* Checker::getFlowTypeOfReference(Node* reference, Type* declaredType) { dec
 
 // (deduped: getQuickTypeOfExpression defined in cpp/internal/checker/checker_walk.cpp)
 
-Type* Checker::getResolvedBaseConstraint(Type* t, const std::vector<RecursionId>& stack) { decltypesDepUnreachable("getResolvedBaseConstraint — decltypes dep"); }
 // (deduped: getResolvedSymbolOrNil defined in cpp/internal/checker/checker_declchecks.cpp)
 
 // (deduped: getReturnTypeFromBody defined in cpp/internal/checker/checker_signatures.cpp)
 
 // (deduped: getReturnTypeOfSignature defined in cpp/internal/checker/checker_signatures.cpp)
 
-Type* Checker::getSimplifiedType(Type* t, bool writing) { decltypesDepUnreachable("getSimplifiedType — decltypes dep"); }
-Type* Checker::getSimplifiedTypeOrConstraint(Type* t) { decltypesDepUnreachable("getSimplifiedTypeOrConstraint — decltypes dep"); }
 // (deduped: getSingleCallSignature defined in cpp/internal/checker/checker_members.cpp)
 
 Symbol* Checker::getSpreadSymbol(Symbol* prop, bool readonly) { decltypesDepUnreachable("getSpreadSymbol — decltypes dep"); }

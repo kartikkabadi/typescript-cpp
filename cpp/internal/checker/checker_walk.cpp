@@ -1170,16 +1170,13 @@ void Checker::skippedGenericFunction(Node* node, CheckMode checkMode) {
 
 // widen slice landed in checker_widen.cpp — its stubs here were removed.
 
-// owner: members slice
-Signature* Checker::instantiateSignatureInContextOf(Signature* signature, Signature* contextualSignature, InferenceContext* inferenceContext, TypeMapper* compareTypes) { TSC_UNREACHABLE("instantiateSignatureInContextOf — members slice"); }
 
 // owner: signatures slice
 
 // owner: decltypes slice
 
-// owner: typeops slice
-bool Checker::maybeTypeOfKind(Type* type, TypeFlags flags) { TSC_UNREACHABLE("maybeTypeOfKind — typeops slice"); }
-void Checker::markPropertyAsReferenced(Symbol* symbol, Node* nodeForCheckWriteOnly, bool isSelfTypeAccess) { TSC_UNREACHABLE("markPropertyAsReferenced — typeops slice"); }
+// maybeTypeOfKind / markPropertyAsReferenced — ported in checker_typeops.cpp
+// (typeops slice).
 
 // owner: inference slice (inference.go)
 bool Checker::isSkipDirectInferenceNode(Node* node) { TSC_UNREACHABLE("isSkipDirectInferenceNode — inference slice"); }
