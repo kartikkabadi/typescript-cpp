@@ -115,7 +115,21 @@ std::vector<Diagnostic*> Checker::getDiagnostics(SourceFile* sourceFile, Diagnos
 	if (wasCanceled) {
 		return {};
 	}
-	return collection->GetDiagnosticsForFile(sourceFile);
+	auto diags = collection->GetDiagnosticsForFile(sourceFile);
+	// Go runs a pool of checkers; a diagnostic attributed to this file but
+	// produced while another file was being checked lands on that checker's
+	// private collection and is orphaned (never returned for this file).
+	// Hide the equivalents produced under a different activeCheckFile.
+	std::vector<Diagnostic*> visible;
+	visible.reserve(diags.size());
+	for (auto* d : diags) {
+		if (d->producedDuringCheckOf != nullptr &&
+			d->producedDuringCheckOf != sourceFile) {
+			continue;
+		}
+		visible.push_back(d);
+	}
+	return visible;
 }
 
 std::vector<Diagnostic*> Checker::GetGlobalDiagnostics() {
@@ -150,6 +164,10 @@ void Checker::checkSourceFile(SourceFile* sourceFile, bool checkUnused) {
 	// Go sets c.ctx = ctx and clears it at the end; the C++ port has no
 	// cancellation context (single-shot CLI), so isCanceled() reads wasCanceled.
 	SourceFileLinks* links = sourceFileLinks.Get(sourceFile);
+	// Tag diagnostics produced while this file is being checked so
+	// getDiagnostics can hide ones a pooled Go checker would have orphaned
+	// on a different checker instance (see Diagnostic::producedDuringCheckOf).
+	activeCheckFile = sourceFile;
 	if (!links->typeChecked) {
 		// TRACING: defer tr.Push(tracing.PhaseCheck, "checkSourceFile", {"path": sourceFile.FileName()}, true)
 		checkGrammarSourceFile(sourceFile);
@@ -177,6 +195,7 @@ void Checker::checkSourceFile(SourceFile* sourceFile, bool checkUnused) {
 	if (isCanceled()) {
 		wasCanceled = true;
 	}
+	activeCheckFile = nullptr;
 }
 
 void Checker::checkSourceElements(const std::vector<Node*>& nodes) {

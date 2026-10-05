@@ -2296,8 +2296,10 @@ std::vector<VarianceFlags> Checker::getVariancesWorker(
 				}
 				// If variance computation was restarted due to a circularity we
 				// may have already computed variances for this generic type. If
-				// so, we exit early. Go: `len(links.variances) != 0` — an
-				// empty (but stored) marker does NOT break the loop.
+				// so, we exit early.
+				// Go: len(links.variances) != 0 — the empty-slice circularity
+				// marker (has_value but empty) does NOT stop the outer frame
+				// from finishing its own computation.
 				if (links->variances.has_value() &&
 					!links->variances->empty()) {
 					break;
@@ -2305,8 +2307,10 @@ std::vector<VarianceFlags> Checker::getVariancesWorker(
 				variances[i] = variance;
 			}
 			// Store the results unless a restarted computation has already
-			// stored them. Go: `len(links.variances) == 0` — an empty
-			// circular marker stored by a nested call is overwritten.
+			// stored them.
+			// Go: len(links.variances) == 0 — also true for the empty-slice
+			// circularity marker, so a frame that was mid-computation when
+			// it got marked still stores its real variances afterwards.
 			if (!links->variances.has_value() ||
 				links->variances->empty()) {
 				links->variances = variances;
@@ -2338,7 +2342,8 @@ std::vector<VarianceFlags> Checker::getVariancesWorker(
 			}
 			// Store an empty slice to mark that we can't compute variances for
 			// this type. We treat type parameters as co-variant in this case.
-			// Go: `len(links.variances) == 0` covers nil and an empty marker.
+			// Go: len(links.variances) == 0 — skip only when a restarted
+			// computation already stored REAL variances.
 			if (!links->variances.has_value() ||
 				links->variances->empty()) {
 				links->variances = std::vector<VarianceFlags>{};

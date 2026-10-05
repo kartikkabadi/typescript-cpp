@@ -402,6 +402,15 @@ struct Diagnostic {
 	bool reportsDeprecated = false;
 	bool skippedOnNoEmit = false;
 	RepopulateDiagnosticInfo* repopulateInfo = nullptr;
+	// Go checker-pool emulation tag: the SourceFile whose checkSourceFile
+	// was running on the checker that produced this diagnostic. In Go each
+	// file's diagnostics are collected from the checker's own per-checker
+	// collection, so a diagnostic produced while checking a different file
+	// lands on that checker's collection and is only visible if the same
+	// checker also owns the attributed file — otherwise it is orphaned.
+	// The single-checker port records the producing file here and applies
+	// the same visibility rule in Checker::getDiagnostics.
+	SourceFile* producedDuringCheckOf = nullptr;
 
 	SourceFile* File() const { return file; }
 	int Pos() const { return loc.pos(); }
