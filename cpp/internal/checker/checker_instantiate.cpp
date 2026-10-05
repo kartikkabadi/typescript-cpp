@@ -34,8 +34,6 @@ CacheKey getTypeInstantiationKey(const std::vector<Type*>& typeArguments,
 	TypeAlias* alias, bool singleSignature);
 CacheKey getConditionalTypeKey(const std::vector<Type*>& typeArguments,
 	TypeAlias* alias, bool forConstraint);
-bool isReservedMemberName(const std::string& name);
-std::string quotedAndCommaSeparated(const std::vector<std::string>& items);
 
 namespace {
 
@@ -1325,12 +1323,6 @@ CacheKey getConditionalTypeKey(const std::vector<Type*>& typeArguments, TypeAlia
 // callers landed with this slice).
 // checker.go:27877-27894 getSubstitutionType / getOrCreateSubstitutionType +
 // 27866 isNoInferTargetType.
-bool isReservedMemberName(const std::string& name) {
-	TSC_UNREACHABLE("isReservedMemberName — instantiate dep");
-}
-std::string quotedAndCommaSeparated(const std::vector<std::string>& items) {
-	TSC_UNREACHABLE("quotedAndCommaSeparated — instantiate dep");
-}
 
 }  // namespace checker
 }  // namespace tsc

@@ -806,6 +806,13 @@ struct ResolvedModule {
 	bool resolvedUsingExtraExtensions{};
 };
 
+// DiagnosticDetails (utilities.go) — resolved diagnostic message + args,
+// shared between checker and incremental diagnostic repopulation.
+struct DiagnosticDetails {
+	const DiagnosticMessage* message{};
+	std::vector<std::string> args;
+};
+
 // Project-reference plumbing (program/projection redirects). Defaults return
 // "no redirect" so a resolver-less program needs no override.
 class RedirectInfo {
@@ -855,6 +862,20 @@ public:
 	virtual std::optional<ResolvedModule> GetResolvedModule(
 	    SourceFile* file, const std::string& moduleReference,
 	    ResolutionMode mode) = 0;
+	// program.go GetResolvedModules — flattened slim modules across all
+	// files/modes (checker::ResolvedModule values).
+	virtual std::vector<ResolvedModule> GetResolvedModules() { return {}; }
+	// program.go GetPackagesMap — lazily-cached package-name → bundles-types map.
+	virtual const std::unordered_map<std::string, bool>& GetPackagesMap() {
+		static const std::unordered_map<std::string, bool> empty{};
+		return empty;
+	}
+	// program.go GetSourceFileMetaData.
+	virtual const SourceFileMetaData& GetSourceFileMetaData(
+	    const std::string& /*path*/) const {
+		static const SourceFileMetaData empty{};
+		return empty;
+	}
 	virtual ResolutionMode GetModeForUsageLocation(SourceFile* file,
 	                                               Node* location) = 0;
 	virtual ResolutionMode GetDefaultResolutionModeForFile(
@@ -1323,7 +1344,7 @@ public:
 	std::unordered_set<Node*> skipDirectInferenceNodes;
 	bool withinUnreachableCode{};
 	OrderedSet<Node*> reportedUnreachableNodes;
-	std::unordered_map<std::string, bool> packagesMap;
+	std::optional<std::unordered_map<std::string, bool>> packagesMap;
 	std::vector<TypeMapper*> activeMappers;
 	std::vector<std::unordered_map<CacheKey, Type*, CacheKeyHash>*> activeTypeMappersCaches;
 	std::once_flag ambientModulesOnce;
@@ -3109,6 +3130,14 @@ public:
 	bool isUncalledFunctionReference(Node* node, Symbol* prop);             // expressions slice
 	bool isJSLiteralType(Type* t);                                          // decltypes slice
 	bool isDeprecatedSymbol(Symbol* symbol);                                // decltypes slice
+	// === slice: utilities ===
+	std::unordered_map<std::string, bool>& getPackagesMap();     // utilities.go:1722
+	bool typesPackageExists(const std::string& packageName);     // utilities.go:1737
+	bool packageBundlesTypes(const std::string& packageName);    // utilities.go:1743
+	bool containsNonMissingUndefinedType(Type* t);               // utilities.go:1647
+	Symbol* GetAliasedSymbol(Symbol* symbol);                    // checker.go:32660
+	bool callLikeExpressionMayHaveTypeArguments(Node* node);     // utilities.go:1132
+	// === end slice: utilities ===
 };  // class Checker
 
 // Free helpers used across checker translation units.
@@ -3456,5 +3485,42 @@ propertyNameNodeKind classifyPropertyName(const std::string& name,
 bool isNumericLiteralName(const std::string& name);
 bool isExternalModuleSymbol(Symbol* moduleSymbol);
 SymbolFlags getMeaningOfEntityNameReference(Node* entityName);
+
+// utilities.go free functions — canonical definitions in checker_utilities.cpp.
+TextRange rangeOfTypeParameters(SourceFile* sourceFile, NodeList* typeParameters);
+std::string tryGetPropertyAccessOrIdentifierToString(Node* expr);
+bool allDeclarationsInSameSourceFile(Symbol* symbol);
+Node* getAnyImportSyntax(Node* node);
+bool isReservedMemberName(const std::string& name);
+bool introducesArgumentsExoticObject(Node* node);
+std::vector<Symbol*> symbolsToArray(const SymbolTable& symbols);
+Symbol* SkipAlias(Symbol* symbol, Checker* checker);
+std::string ValueToString(
+	const std::variant<std::monostate, std::string, Number, bool, PseudoBigInt>& value);
+DiagnosticDetails CreateModuleNotFoundChain(Program* program, SourceFile* file,
+	const std::string& moduleReference, ResolutionMode mode,
+	const std::string& packageName);
+DiagnosticDetails CreateModeMismatchDetails(Program* program, SourceFile* file);
+Node* walkUpOuterExpressions(Node* node);
+std::string quotedAndCommaSeparated(const std::vector<std::string>& items);
+int getSortOrderFlags(Type* t);
+int compareTypeNames(Type* t1, Type* t2);
+Symbol* getTypeNameSymbol(Type* t);
+Symbol* getObjectTypeName(Type* t);
+int compareTupleTypes(TupleType* t1, TupleType* t2);
+int compareElementLabels(Node* n1, Node* n2);
+int compareTypeLists(const std::vector<Type*>& s1, const std::vector<Type*>& s2);
+int compareTypeMappers(TypeMapper* m1, TypeMapper* m2);
+bool isCompoundLikeAssignment(Node* assignment);
+bool isShorthandAmbientModuleSymbol(Symbol* moduleSymbol);
+bool isShorthandAmbientModule(Node* node);
+bool isExponentiationOperator(Kind kind);
+bool isMultiplicativeOperator(Kind kind);
+bool isMultiplicativeOperatorOrHigher(Kind kind);
+bool isAdditiveOperator(Kind kind);
+bool isAdditiveOperatorOrHigher(Kind kind);
+bool isShiftOperator(Kind kind);
+bool isShiftOperatorOrHigher(Kind kind);
+int CompareTypes(Type* t1, Type* t2);
 
 } // namespace tsc::checker

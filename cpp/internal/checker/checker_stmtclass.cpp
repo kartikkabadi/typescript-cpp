@@ -45,17 +45,7 @@ static Node* getIdentifierFromEntityNameExpression(Node* node) {
 	return nullptr;
 }
 
-// utilities.go:1923
-static std::string quotedAndCommaSeparated(const std::vector<std::string>& items) {
-	std::string result;
-	for (size_t i = 0; i < items.size(); i++) {
-		if (i != 0) {
-			result += ", ";
-		}
-		result += "'" + items[i] + "'";
-	}
-	return result;
-}
+// quotedAndCommaSeparated is shared (checker_utilities.cpp).
 
 // checker.go:22033 — isPrototypeProperty (free fn; owned by members slice)
 static bool isPrototypeProperty(Symbol* symbol) {

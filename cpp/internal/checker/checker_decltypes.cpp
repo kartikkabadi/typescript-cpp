@@ -142,10 +142,6 @@ bool isShorthandAmbientModule(Node* node) {
 	return node != nullptr && node->kind == Kind::ModuleDeclaration && node->body() == nullptr;
 }
 
-// isShorthandAmbientModuleSymbol — utilities.go:197
-bool isShorthandAmbientModuleSymbol(Symbol* symbol) {
-	return isShorthandAmbientModule(symbol->valueDeclaration);
-}
 
 // isRightSideOfAccessExpression — utilities.go:240
 bool isRightSideOfAccessExpression(Node* node) {

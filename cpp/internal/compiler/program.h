@@ -399,6 +399,7 @@ public:
 	std::unordered_map<tspath::Path,
 	                   module::ModeAwareCache<module::ResolvedModule*>>
 	    resolvedModules;
+	std::optional<std::unordered_map<std::string, bool>> packagesMap;
 	std::unordered_map<tspath::Path,
 	                   module::ModeAwareCache<module::ResolvedTypeReferenceDirective*>>
 	    typeResolutionsInFile;
@@ -445,6 +446,8 @@ public:
 	std::optional<checker::ResolvedModule> GetResolvedModule(
 	    SourceFile* file, const std::string& moduleReference,
 	    ResolutionMode mode) override;
+	std::vector<checker::ResolvedModule> GetResolvedModules() override;
+	const std::unordered_map<std::string, bool>& GetPackagesMap() override;
 	ResolutionMode GetModeForUsageLocation(SourceFile* file,
 	                                       Node* location) override;
 	ResolutionMode GetDefaultResolutionModeForFile(

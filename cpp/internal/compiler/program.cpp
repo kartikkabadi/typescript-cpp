@@ -1819,3 +1819,47 @@ std::vector<Diagnostic*> getDiagnosticsOfAnyProgram(
 }
 
 }  // namespace tsc::compiler
+
+namespace tsc::compiler {
+
+// program.go GetResolvedModules — flattened for the checker's slim view.
+std::vector<checker::ResolvedModule> SimpleProgram::GetResolvedModules() {
+	std::vector<checker::ResolvedModule> result;
+	for (auto& [path, cache] : resolvedModules) {
+		for (auto& [key, rm] : cache) {
+			if (rm != nullptr) {
+				checker::ResolvedModule out;
+				out.resolved = rm->IsResolved();
+				out.resolvedFileName = rm->ResolvedFileName;
+				out.resolvedUsingTsExtension = rm->ResolvedUsingTsExtension;
+				out.isExternalLibraryImport = rm->IsExternalLibraryImport;
+				out.extension = rm->Extension;
+				out.alternateResult = rm->AlternateResult;
+				out.packageId = checker::PackageId{rm->PackageId.Name};
+				out.resolvedUsingExtraExtensions =
+				    rm->ResolvedUsingExtraExtensions;
+				result.push_back(std::move(out));
+			}
+		}
+	}
+	return result;
+}
+
+// program.go GetPackagesMap — lazily-cached package name → bundles types.
+const std::unordered_map<std::string, bool>&
+SimpleProgram::GetPackagesMap() {
+	if (!packagesMap.has_value()) {
+		packagesMap.emplace();
+		for (auto& [path, resolvedModulesInFile] : resolvedModules) {
+			for (auto& [key, mod] : resolvedModulesInFile) {
+				if (mod != nullptr && !mod->PackageId.Name.empty()) {
+					(*packagesMap)[mod->PackageId.Name] =
+					    (*packagesMap)[mod->PackageId.Name] ||
+					    mod->Extension == tspath::extensionDts;
+				}
+			}
+		}
+	}
+	return *packagesMap;
+}
+}  // namespace tsc::compiler

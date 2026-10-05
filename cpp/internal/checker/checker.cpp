@@ -7542,12 +7542,6 @@ Diagnostic* Checker::createDiagnosticForNode(
 }
 
 
-// utilities.go:1677 isReservedMemberName
-static bool isReservedMemberName(const std::string& name) {
-	return name.size() >= 2 && name[0] == '\xFE' && name[1] != '@' &&
-	       name[1] != '#';
-}
-
 // checker.go:22479 isNamedMember
 bool Checker::isNamedMember(Symbol* symbol, const std::string& id) {
 	return !isReservedMemberName(id) && symbolIsValue(symbol);

@@ -118,7 +118,7 @@ bool hasOverrideModifier(Node* node) {
 
 // utilities.go: getSelectedModifierFlags (63)
 ModifierFlags getSelectedModifierFlags(Node* node, ModifierFlags flags) {
-	return static_cast<ModifierFlags>(node->modifierFlagsCache() & flags);
+	return static_cast<ModifierFlags>(node->modifierFlags() & flags);
 }
 
 // utilities.go: AssignmentKind (79)
@@ -425,10 +425,10 @@ int CompareTypes(Type* t1, Type* t2) {
 					// instantiateAnonymousType prepends a fresh type parameter mapping.
 					// Compare the effective instantiation, not the identity of that fresh parameter.
 					if (m1 != nullptr) {
-						m1 = static_cast<CompositeTypeMapper*>(m1->data())->m2;
+						m1 = static_cast<CompositeTypeMapper*>(m1)->m2;
 					}
 					if (m2 != nullptr) {
-						m2 = static_cast<CompositeTypeMapper*>(m2->data())->m2;
+						m2 = static_cast<CompositeTypeMapper*>(m2)->m2;
 					}
 				}
 				if (int c = compareTypeMappers(m1, m2); c != 0) {
@@ -440,7 +440,9 @@ int CompareTypes(Type* t1, Type* t2) {
 			Type* o1 = t1->AsUnionType()->origin;
 			Type* o2 = t2->AsUnionType()->origin;
 			if (o1 == nullptr && o2 == nullptr) {
-				if (int c = compareTypeLists(t1->types(), t2->types()); c != 0) {
+				if (int c = compareTypeLists(t1->AsUnionType()->types,
+											 t2->AsUnionType()->types);
+					c != 0) {
 					return c;
 				}
 			} else if (o1 == nullptr) {
@@ -454,7 +456,9 @@ int CompareTypes(Type* t1, Type* t2) {
 			}
 		} else if (t1->flags & TypeFlagsIntersection) {
 			// Intersections are ordered by their constituent type lists.
-			if (int c = compareTypeLists(t1->types(), t2->types()); c != 0) {
+			if (int c = compareTypeLists(t1->AsIntersectionType()->types,
+										 t2->AsIntersectionType()->types);
+				c != 0) {
 				return c;
 			}
 		} else if (t1->flags & (TypeFlagsEnum | TypeFlagsEnumLiteral | TypeFlagsUniqueESSymbol)) {
@@ -692,24 +696,24 @@ int compareTypeMappers(TypeMapper* m1, TypeMapper* m2) {
 	}
 	switch (kind1) {
 		case TypeMapperKind::Simple: {
-			auto* s1 = static_cast<SimpleTypeMapper*>(m1->data());
-			auto* s2 = static_cast<SimpleTypeMapper*>(m2->data());
+			auto* s1 = static_cast<SimpleTypeMapper*>(m1);
+			auto* s2 = static_cast<SimpleTypeMapper*>(m2);
 			if (int c = CompareTypes(s1->source, s2->source); c != 0) {
 				return c;
 			}
 			return CompareTypes(s1->target, s2->target);
 		}
 		case TypeMapperKind::Array: {
-			auto* a1 = static_cast<ArrayTypeMapper*>(m1->data());
-			auto* a2 = static_cast<ArrayTypeMapper*>(m2->data());
+			auto* a1 = static_cast<ArrayTypeMapper*>(m1);
+			auto* a2 = static_cast<ArrayTypeMapper*>(m2);
 			if (int c = compareTypeLists(a1->sources, a2->sources); c != 0) {
 				return c;
 			}
 			return compareTypeLists(a1->targets, a2->targets);
 		}
 		case TypeMapperKind::Merged: {
-			auto* g1 = static_cast<MergedTypeMapper*>(m1->data());
-			auto* g2 = static_cast<MergedTypeMapper*>(m2->data());
+			auto* g1 = static_cast<MergedTypeMapper*>(m1);
+			auto* g2 = static_cast<MergedTypeMapper*>(m2);
 			if (int c = compareTypeMappers(g1->m1, g2->m1); c != 0) {
 				return c;
 			}
@@ -886,7 +890,7 @@ bool isLiteralExpressionOfObject(Node* node) {
 
 // utilities.go: canHaveFlowNode (1116)
 bool canHaveFlowNode(Node* node) {
-	return node->flowNodeData() != nullptr;
+	return node->flowNodeData().flowNode != nullptr;
 }
 
 // utilities.go: isNonNullAccess (1120)
@@ -1039,3 +1043,274 @@ bool hasType(Node* node) {
 int getNonRestParameterCount(Signature* sig) {
 	return static_cast<int>(sig->parameters.size()) - (signatureHasRestParameter(sig) ? 1 : 0);
 }
+
+// utilities.go: rangeOfTypeParameters (1609)
+TextRange rangeOfTypeParameters(SourceFile* sourceFile, NodeList* typeParameters) {
+	return {typeParameters->pos() - 1,
+	        std::min<int>(static_cast<int>(sourceFile->text.size()),
+	                      skipTrivia(sourceFile->text, typeParameters->end()) + 1)};
+}
+
+// utilities.go: tryGetPropertyAccessOrIdentifierToString (1613) — canonical
+// shared definition (typeops previously had a static copy).
+std::string tryGetPropertyAccessOrIdentifierToString(Node* expr) {
+	if (isPropertyAccessExpression(expr)) {
+		std::string baseStr = tryGetPropertyAccessOrIdentifierToString(expr->expression());
+		if (!baseStr.empty()) {
+			return baseStr + "." + entityNameToString(expr->name());
+		}
+	} else if (isElementAccessExpression(expr)) {
+		std::string baseStr = tryGetPropertyAccessOrIdentifierToString(expr->expression());
+		if (!baseStr.empty() &&
+			isPropertyName(expr->as<ElementAccessExpression>()->ArgumentExpression)) {
+			return baseStr + "." +
+				getPropertyNameForPropertyNameNode(
+					expr->as<ElementAccessExpression>()->ArgumentExpression);
+		}
+	} else if (isIdentifier(expr)) {
+		return expr->text();
+	} else if (isJsxNamespacedName(expr)) {
+		return entityNameToString(expr);
+	}
+	return "";
+}
+
+// utilities.go: allDeclarationsInSameSourceFile (1633)
+bool allDeclarationsInSameSourceFile(Symbol* symbol) {
+	if (symbol->declarations.size() > 1) {
+		SourceFile* sourceFile = nullptr;
+		for (size_t i = 0; i < symbol->declarations.size(); i++) {
+			if (i == 0) {
+				sourceFile = getSourceFileOfNode(symbol->declarations[i]);
+			} else if (getSourceFileOfNode(symbol->declarations[i]) != sourceFile) {
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
+// utilities.go: containsNonMissingUndefinedType (1647)
+bool Checker::containsNonMissingUndefinedType(Type* t) {
+	Type* candidate = t;
+	if (t->flags & TypeFlagsUnion) {
+		candidate = t->AsUnionType()->types[0];
+	}
+	return (candidate->flags & TypeFlagsUndefined) != 0 &&
+	       candidate != missingType;
+}
+
+// utilities.go: getAnyImportSyntax (1657)
+Node* getAnyImportSyntax(Node* node) {
+	Node* importNode = nullptr;
+	switch (node->kind) {
+	case Kind::ImportEqualsDeclaration:
+		importNode = node;
+		break;
+	case Kind::ImportClause:
+		importNode = node->parent;
+		break;
+	case Kind::NamespaceImport:
+		importNode = node->parent->parent;
+		break;
+	case Kind::ImportSpecifier:
+		importNode = node->parent->parent->parent;
+		break;
+	default:
+		return nullptr;
+	}
+	return importNode;
+}
+
+// A reserved member name consists of the byte 0xFE (which is an invalid UTF-8
+// encoding) followed by one or more characters where the first character is not
+// '@' or '#'. The '@' character indicates that the name is denoted by a well
+// known ES Symbol instance and the '#' character indicates that the name is a
+// PrivateIdentifier.
+// utilities.go: isReservedMemberName (1677) — canonical shared definition.
+bool isReservedMemberName(const std::string& name) {
+	return name.size() >= 2 && name[0] == '\xFE' && name[1] != '@' &&
+	       name[1] != '#';
+}
+
+// utilities.go: introducesArgumentsExoticObject (1681)
+bool introducesArgumentsExoticObject(Node* node) {
+	switch (node->kind) {
+	case Kind::MethodDeclaration:
+	case Kind::MethodSignature:
+	case Kind::Constructor:
+	case Kind::GetAccessor:
+	case Kind::SetAccessor:
+	case Kind::FunctionDeclaration:
+	case Kind::FunctionExpression:
+		return true;
+	}
+	return false;
+}
+
+// utilities.go: symbolsToArray (1690)
+std::vector<Symbol*> symbolsToArray(const SymbolTable& symbols) {
+	std::vector<Symbol*> result;
+	for (auto& [id, symbol] : symbols) {
+		if (!isReservedMemberName(id)) {
+			result.push_back(symbol);
+		}
+	}
+	return result;
+}
+
+// checker.go:32660 GetAliasedSymbol (services tail; needed by SkipAlias)
+Symbol* Checker::GetAliasedSymbol(Symbol* symbol) {
+	return resolveAlias(symbol);
+}
+
+// utilities.go: SkipAlias (1700)
+Symbol* SkipAlias(Symbol* symbol, Checker* checker) {
+	if (symbol->flags & SymbolFlagsAlias) {
+		return checker->GetAliasedSymbol(symbol);
+	}
+	return symbol;
+}
+
+// utilities.go: getPackagesMap (1722)
+std::unordered_map<std::string, bool>& Checker::getPackagesMap() {
+	if (!packagesMap.has_value()) {
+		packagesMap.emplace();
+		for (auto& m : program->GetResolvedModules()) {
+			if (!m.packageId.name.empty()) {
+				packagesMap->operator[](m.packageId.name) =
+				    (*packagesMap)[m.packageId.name] ||
+				    m.extension == tspath::extensionDts;
+			}
+		}
+	}
+	return *packagesMap;
+}
+
+// utilities.go: typesPackageExists (1737)
+bool Checker::typesPackageExists(const std::string& packageName) {
+	auto& pkgs = getPackagesMap();
+	return pkgs.find(module::GetTypesPackageName(packageName)) != pkgs.end();
+}
+
+// utilities.go: packageBundlesTypes (1743)
+bool Checker::packageBundlesTypes(const std::string& packageName) {
+	auto& pkgs = getPackagesMap();
+	auto it = pkgs.find(packageName);
+	return it != pkgs.end() && it->second;
+}
+
+// utilities.go: ValueToString (1749)
+std::string ValueToString(
+	const std::variant<std::monostate, std::string, Number, bool, PseudoBigInt>&
+	    value) {
+	if (auto* s = std::get_if<std::string>(&value)) {
+		return "\"" + escapeString(*s, '"') + "\"";
+	}
+	if (auto* n = std::get_if<Number>(&value)) {
+		return n->string();
+	}
+	if (auto* b = std::get_if<bool>(&value)) {
+		return *b ? "true" : "false";
+	}
+	if (auto* p = std::get_if<PseudoBigInt>(&value)) {
+		return p->string() + "n";
+	}
+	TSC_UNREACHABLE("unhandled value type in valueToString");
+}
+
+// utilities.go: CreateModuleNotFoundChain (1839)
+DiagnosticDetails CreateModuleNotFoundChain(Program* program, SourceFile* file,
+	const std::string& moduleReference, ResolutionMode mode,
+	const std::string& packageName) {
+	auto resolvedModule = program->GetResolvedModule(file, moduleReference, mode);
+
+	if (resolvedModule.has_value() && !resolvedModule->alternateResult.empty()) {
+		std::string pkg = packageName;
+		if (resolvedModule->alternateResult.find("/node_modules/@types/") !=
+		    std::string::npos) {
+			pkg = "@types/" + module::MangleScopedPackageName(packageName);
+		}
+		return {
+			There_are_types_at_0_but_this_result_could_not_be_resolved_when_respecting_package_json_exports_The_1_library_may_need_to_update_its_package_json_or_typings,
+			{resolvedModule->alternateResult, pkg}};
+	}
+
+	auto& packagesMap = program->GetPackagesMap();
+	auto typesIt = packagesMap.find(module::GetTypesPackageName(packageName));
+	if (typesIt != packagesMap.end()) {
+		return {
+			If_the_0_package_actually_exposes_this_module_consider_sending_a_pull_request_to_amend_https_Colon_Slash_Slashgithub_com_SlashDefinitelyTyped_SlashDefinitelyTyped_Slashtree_Slashmaster_Slashtypes_Slash_1,
+			{packageName, module::MangleScopedPackageName(packageName)}};
+	}
+	auto pkgIt = packagesMap.find(packageName);
+	if (pkgIt != packagesMap.end() && pkgIt->second) {
+		return {
+			If_the_0_package_actually_exposes_this_module_try_adding_a_new_declaration_d_ts_file_containing_declare_module_1,
+			{packageName, moduleReference}};
+	}
+	return {
+		Try_npm_i_save_dev_types_Slash_1_if_it_exists_or_add_a_new_declaration_d_ts_file_containing_declare_module_0,
+		{moduleReference, module::MangleScopedPackageName(packageName)}};
+}
+
+// utilities.go: CreateModeMismatchDetails (1875)
+DiagnosticDetails CreateModeMismatchDetails(Program* program,
+                                            SourceFile* file) {
+	auto ext = tspath::tryGetExtensionFromPath(file->FileName());
+	std::string targetExt =
+	    ext == tspath::extensionTs
+	        ? std::string(tspath::extensionMts)
+	        : (ext == tspath::extensionJs ? std::string(tspath::extensionMjs)
+	                                    : "");
+	auto& meta = program->GetSourceFileMetaData(file->Path());
+	auto& packageJsonType = meta.PackageJsonType;
+	auto& packageJsonDirectory = meta.PackageJsonDirectory;
+
+	if (!packageJsonDirectory.empty() && packageJsonType.empty()) {
+		if (!targetExt.empty()) {
+			return {
+								    To_convert_this_file_to_an_ECMAScript_module_change_its_file_extension_to_0_or_add_the_field_type_Colon_module_to_1,
+				{targetExt,
+				 std::string(tspath::combinePaths(packageJsonDirectory,
+				                                  {"package.json"}))}};
+		}
+		return {
+			To_convert_this_file_to_an_ECMAScript_module_add_the_field_type_Colon_module_to_0,
+			{std::string(
+				tspath::combinePaths(packageJsonDirectory, {"package.json"}))}};
+	}
+	if (!targetExt.empty()) {
+		return {
+			To_convert_this_file_to_an_ECMAScript_module_change_its_file_extension_to_0_or_create_a_local_package_json_file_with_type_Colon_module,
+			{targetExt}};
+	}
+	return {
+		To_convert_this_file_to_an_ECMAScript_module_create_a_local_package_json_file_with_type_Colon_module,
+		{}};
+}
+
+// utilities.go: walkUpOuterExpressions (1906)
+Node* walkUpOuterExpressions(Node* node) {
+	Node* parent = node->parent;
+	while (parent != nullptr && isOuterExpression(parent, OEKAll)) {
+		parent = parent->parent;
+	}
+	return parent;
+}
+
+// utilities.go: quotedAndCommaSeparated (1923) — canonical shared definition.
+std::string quotedAndCommaSeparated(const std::vector<std::string>& items) {
+	std::string result;
+	for (size_t i = 0; i < items.size(); i++) {
+		if (i != 0) {
+			result += ", ";
+		}
+		result += "'" + items[i] + "'";
+	}
+	return result;
+}
+
+
+}  // namespace checker
+}  // namespace tsc

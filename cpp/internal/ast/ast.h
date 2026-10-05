@@ -1198,6 +1198,20 @@ bool isNullishCoalesce(Node* node);
 bool isDynamicName(Node* name);
 bool hasDynamicName(Node* declaration);
 bool isPropertyNameLiteral(Node* node);
+// utilities.go:279 — IsPropertyName (Identifier|PrivateIdentifier|String|
+// Numeric|ComputedPropertyName).
+inline bool isPropertyName(Node* node) {
+	switch (node->kind) {
+	case Kind::Identifier:
+	case Kind::PrivateIdentifier:
+	case Kind::StringLiteral:
+	case Kind::NumericLiteral:
+	case Kind::ComputedPropertyName:
+		return true;
+	}
+	return false;
+}
+
 Node* getPropertyNameForPropertyOrComputedPropertyName(Node* name);
 bool isLogicalOrCoalescingBinaryOperator(Kind token);
 bool isLogicalOrCoalescingBinaryExpression(Node* expr);
