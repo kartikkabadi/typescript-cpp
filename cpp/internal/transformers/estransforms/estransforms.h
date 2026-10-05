@@ -103,9 +103,6 @@ Transformer* GetESTransformer(TransformOptions* opts);
 
 // --- factories owned by other slices (dep-stubbed in definitions.cpp) --------
 
-// newESDecoratorTransformer — esdecorator.go:124 — owned by esdecorator slice
-Transformer* newESDecoratorTransformer(TransformOptions* opt);
-
 // newClassFieldsTransformer — classfields.go:140 — owned by classfields slice
 Transformer* newClassFieldsTransformer(TransformOptions* opt);
 
@@ -117,5 +114,43 @@ Transformer* newforawaitTransformer(TransformOptions* opt);
 
 // newAsyncTransformer — async.go:37 — owned by async slice
 Transformer* newAsyncTransformer(TransformOptions* opt);
+
+// === slice: esdecorator cluster ===
+
+// classthis.go
+// Gets whether a node is a `static {}` block containing only a single
+// assignment of the static `this` to the `_classThis` (or similar) variable
+// stored in the `classthis` property of the block's `EmitNode`.
+bool isClassThisAssignmentBlock(printer::EmitContext* emitContext, Node* node);
+
+// namedevaluation.go
+bool isClassNamedEvaluationHelperBlock(printer::EmitContext* emitContext,
+                                       Node* node);
+bool classHasExplicitlyAssignedName(printer::EmitContext* emitContext,
+                                    Node* node);
+bool classHasDeclaredOrExplicitlyAssignedName(printer::EmitContext* emitContext,
+                                              Node* node);
+bool isNamedEvaluation(printer::EmitContext* emitContext, Node* node);
+bool isNamedEvaluationAnd(printer::EmitContext* emitContext, Node* node,
+                          const std::function<bool(Node*)>& cb);
+Node* injectClassNamedEvaluationHelperBlockIfMissing(
+    printer::EmitContext* emitContext, Node* node, Node* assignedName,
+    Node* thisExpression);
+Node* transformNamedEvaluation(printer::EmitContext* emitContext, Node* node,
+                               bool ignoreEmptyStringLiteral,
+                               const std::string& assignedName);
+
+// esdecorator.go
+Transformer* newESDecoratorTransformer(TransformOptions* opts);
+
+// === dep stubs — removed when owner slice lands ===
+// classfields.go — owned by the classfields slice
+bool classHasClassThisAssignment(printer::EmitContext* emitContext, Node* node);
+BinaryExpression* findComputedPropertyNameCacheAssignment(
+    printer::EmitContext* emitContext, Node* name);
+Node* expandPreOrPostfixIncrementOrDecrementExpression(
+    printer::NodeFactory* f, printer::EmitContext* emitContext, Node* node,
+    Node* expression, Node* resultVariable);
+
 
 }  // namespace tsc::transformers::estransforms

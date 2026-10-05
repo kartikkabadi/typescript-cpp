@@ -97,6 +97,9 @@ add_library(tsc STATIC
 	internal/transformers/estransforms/objectrestspread.cpp
 	internal/transformers/estransforms/usestrict.cpp
 	internal/transformers/estransforms/definitions.cpp
+	internal/transformers/estransforms/classthis.cpp
+	internal/transformers/estransforms/namedevaluation.cpp
+	internal/transformers/estransforms/esdecorator.cpp
 	internal/transformers/tstransforms/utilities.cpp
 	internal/transformers/moduletransforms/utilities.cpp
 	internal/transformers/moduletransforms/externalmoduleinfo.cpp
