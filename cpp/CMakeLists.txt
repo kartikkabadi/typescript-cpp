@@ -22,6 +22,7 @@ add_library(tsc STATIC
 	internal/ast/utilities.cpp
 	internal/binder/binder.cpp
 	internal/binder/nameresolver.cpp
+	internal/binder/referenceresolver.cpp
 	internal/checker/checker.cpp
 	internal/checker/checker_walk.cpp
 	internal/checker/checker_jsdoc.cpp

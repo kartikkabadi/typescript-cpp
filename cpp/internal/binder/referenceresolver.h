@@ -1,6 +1,5 @@
 // Port of tsc/internal/binder/referenceresolver.go — interface + hooks surface.
-// The referenceResolver implementation is not ported yet; NewReferenceResolver
-// is a dep-stub (TSC_UNREACHABLE) owned by the referenceresolver slice.
+// The referenceResolver implementation lives in referenceresolver.cpp.
 #pragma once
 
 #include <functional>
