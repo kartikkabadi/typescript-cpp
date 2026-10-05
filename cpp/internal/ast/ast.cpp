@@ -2439,4 +2439,113 @@ Node* getHostSignatureFromJSDoc(Node* node) {
 	return nullptr;
 }
 
+// ast.go:2548 — OriginalText returns the untransformed source text for
+// content-mapped files, or Text() otherwise.
+const std::string& SourceFile::OriginalText() const {
+	if (!ContentMapper().empty()) {
+		return contentMapperInfo->OriginalText;
+	}
+	return text;
+}
+
+// ast.go:2556 — OriginalFileName returns the canonical filename associated
+// with a supplemental source file, or FileName() otherwise.
+std::string SourceFile::OriginalFileName() const {
+	if (SourceFile* canonical = CanonicalSourceFile(); canonical != nullptr) {
+		return canonical->FileName();
+	}
+	return FileName();
+}
+
+// ast.go:2566 — SpanMap returns the span map that maps positions in this
+// file's transformed Text() back to its original content, or nullptr.
+spanmap::SpanMap* SourceFile::SpanMap() const {
+	if (contentMapperInfo == nullptr) {
+		return nullptr;
+	}
+	return contentMapperInfo->SpanMap;
+}
+
+// ast.go:2575 — ContentMapper returns the identity of the content mapper
+// that produced this file, or "" if it was not produced by a content mapper.
+std::string SourceFile::ContentMapper() const {
+	if (contentMapperInfo == nullptr) {
+		return "";
+	}
+	return contentMapperInfo->ContentMapper;
+}
+
+// ast.go:2584 — IsContentMapperFailureStub reports whether this file is the
+// empty placeholder produced when a content mapper's transform failed.
+bool SourceFile::IsContentMapperFailureStub() const {
+	return !ContentMapper().empty() && SpanMap() == nullptr;
+}
+
+// ast.go:2588
+std::string SourceFile::ContentMapperTransformIdentity() const {
+	if (contentMapperInfo == nullptr) {
+		return "";
+	}
+	return contentMapperInfo->TransformIdentity;
+}
+
+// ast.go:2595
+std::string SourceFile::VirtualFileName() const {
+	if (contentMapperInfo == nullptr) {
+		return "";
+	}
+	return contentMapperInfo->VirtualFileName;
+}
+
+// ast.go:2631 — ContentMapperParseOptions returns the parse options used to
+// acquire this file from the mapped parse cache.
+SourceFileParseOptions SourceFile::ContentMapperParseOptions() const {
+	if (contentMapperInfo == nullptr) {
+		return SourceFileParseOptions{};
+	}
+	return contentMapperInfo->ParseOptions;
+}
+
+// ast.go:2639 — SetContentMapperInfo initializes all content-mapper metadata
+// before the source file is published.
+void SourceFile::SetContentMapperInfo(const ContentMapperSourceFileInfo& info) {
+	if (contentMapperInfo != nullptr) {
+		TSC_UNREACHABLE("content mapper source file info already set");
+	}
+	contentMapperInfo = new ContentMapperSourceFileInfo(info);
+}
+
+// ast.go:2646
+const std::vector<MappedDiagnosticDirective>* SourceFile::DiagnosticDirectives()
+    const {
+	if (contentMapperInfo == nullptr) {
+		return nullptr;
+	}
+	return &contentMapperInfo->DiagnosticDirectives;
+}
+
+// ast.go:2654 — SupplementalSourceFiles returns the additional outputs
+// produced from this canonical source file.
+const std::vector<SourceFile*>* SourceFile::SupplementalSourceFiles() const {
+	if (contentMapperInfo == nullptr) {
+		return nullptr;
+	}
+	return &contentMapperInfo->SupplementalSourceFiles;
+}
+
+// ast.go:2662 — CanonicalSourceFile returns the canonical output associated
+// with this supplemental source file.
+SourceFile* SourceFile::CanonicalSourceFile() const {
+	if (contentMapperInfo == nullptr) {
+		return nullptr;
+	}
+	return contentMapperInfo->CanonicalSourceFile;
+}
+
+// ast.go:2670 — IsContentMapperSupplemental reports whether this is an
+// unnamed supplemental mapper output.
+bool SourceFile::IsContentMapperSupplemental() const {
+	return CanonicalSourceFile() != nullptr;
+}
+
 }  // namespace tsc

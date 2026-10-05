@@ -25,6 +25,10 @@
 #include "internal/tsoptions/tsoptions.h"
 #include "internal/tspath/tspath.h"
 
+namespace tsc::sourcemap {
+struct RawSourceMap;
+}
+
 namespace tsc::compiler {
 
 class SimpleProgram;
@@ -51,6 +55,10 @@ public:
 	bool FileExists(std::string_view fileName) override;
 	bool DirectoryExists(std::string_view directory) override;
 	std::optional<std::string> ReadFile(std::string_view fileName) override;
+	// emitHost.go: WriteFile — Go `Host().FS().WriteFile` (OS fs write).
+	// Go returns error; std::nullopt == nil.
+	std::optional<std::string> WriteFile(std::string_view fileName,
+	                                     std::string_view text);
 	std::string Realpath(std::string_view path) override;
 	AccessibleEntries GetAccessibleEntries(std::string_view path) override;
 
@@ -387,6 +395,8 @@ struct filesLoader {
 };
 
 // === class SimpleProgram — checker.h `Program` + program.go ===
+struct EmitResult;
+struct EmitOptions;
 class SimpleProgram : public checker::Program {
 public:
 	CompilerHost* host{};
@@ -428,6 +438,13 @@ public:
 	std::unique_ptr<checker::Checker> checker_;
 	bool bindDone_{};
 	mutable std::optional<std::string> commonSourceDirectory_;
+
+	// program.go: hasEmitBlockingDiagnostics / sourceFilesToEmit (+Once).
+	std::unordered_set<tspath::Path> hasEmitBlockingDiagnostics;
+	bool sourceFilesToEmitComputed_{};
+	std::vector<SourceFile*> sourceFilesToEmit_;
+	mutable std::unordered_map<SourceFile*, std::vector<Diagnostic*>>
+	    declarationDiagnosticCache;
 
 	SimpleProgram(CompilerHost* host, const CompilerOptions& options,
 	              std::vector<std::string> rootFileNames,
@@ -525,6 +542,23 @@ public:
 	void verifyCompilerOptions();
 	void verifyProjectReferences();
 
+	// === slice: emit ===
+	// program.go:1390 IsEmitBlocked / :1384 blockEmittingOfFile
+	bool IsEmitBlocked(const std::string& file) const;
+	void blockEmittingOfFile(const std::string& emitFileName,
+	                       Diagnostic* diag);
+	// program.go:875 getSourceFilesToEmit (member, memoized for the
+	// nil-target case)
+	std::vector<SourceFile*> getSourceFilesToEmit(
+	    const std::vector<SourceFile*>* targetSourceFiles,
+	    bool forceDtsEmit, bool forceJsEmit);
+	// program.go:1867 Emit / :242 GetSourceFileFromReference — Emit returns
+	// a heap EmitResult like Go (nullptr == Go nil).
+	EmitResult* Emit(EmitOptions* options);
+	SourceFile* GetSourceFileFromReference(SourceFile* origin,
+	                                     FileReference* ref);
+	CompilerHost* Host() { return host; }
+
 	module::ResolvedModule* getResolvedModuleByPath(
 	    const tspath::Path& path, const std::string& moduleReference,
 	    ResolutionMode mode);
@@ -565,9 +599,75 @@ std::vector<Diagnostic*> filterNoEmitSemanticDiagnostics(
     std::vector<Diagnostic*> diags, const CompilerOptions* options);
 std::vector<Diagnostic*> getAdditionalJSSyntacticDiagnostics(
     SourceFile* file, const CompilerOptions* options);
-// emitter.go:493
-bool sourceFileMayBeEmitted(SourceFile* sourceFile, SimpleProgram* host,
-                            bool forceDtsEmit, bool forceJsEmit);
+// === slice: emit === — program.go:1837+ / emitter.go:24
+// EmitOnly — emitter.go:24
+enum class EmitOnly : uint8_t {
+	EmitAll,
+	EmitOnlyJs,
+	EmitOnlyDts,
+	EmitOnlyBuilderSignature,
+};
+
+// WriteFileData — program.go:1837. `BuildInfo` is Go `any` (the
+// incremental slice's BuildInfo type); opaque pointer here.
+struct WriteFileData {
+	int SourceMapUrlPos = 0;
+	void* BuildInfo = nullptr;
+	std::vector<Diagnostic*> Diagnostics;
+	bool SkippedDtsWrite = false;
+	SourceFile* SourceFile = nullptr;
+};
+
+// WriteFile — program.go:1845. Go `error` -> std::optional<std::string>
+// (nullopt == nil).
+using WriteFile =
+	std::function<std::optional<std::string>(const std::string& fileName,
+	                                         const std::string& text,
+	                                         WriteFileData* data)>;
+
+// EmitOptions — program.go:1847. TargetSourceFiles empty == Go nil
+// (emit all files).
+struct EmitOptions {
+	std::vector<SourceFile*> TargetSourceFiles;
+	EmitOnly EmitOnly = EmitOnly::EmitAll;
+	bool ForceEmit = false;
+	WriteFile WriteFile;
+};
+
+// SourceMapEmitResult — program.go:1860
+struct SourceMapEmitResult {
+	std::vector<std::string> InputSourceFileNames;
+	sourcemap::RawSourceMap* SourceMap = nullptr;
+	std::string GeneratedFile;
+};
+
+// EmitResult — program.go:1854
+struct EmitResult {
+	bool EmitSkipped = false;
+	std::vector<Diagnostic*> Diagnostics; // Contains declaration emit diagnostics
+	std::vector<std::string> EmittedFiles; // Array of files the compiler wrote to disk
+	std::vector<SourceMapEmitResult> SourceMaps; // Array of sourceMapData if compiler emitted sourcemaps
+};
+
+// emitter.go:493 sourceFileMayBeEmitted — the host is the Go
+// SourceFileMayBeEmittedHost interface; its methods are a subset of
+// checker::Program, which both SimpleProgram and emitHost satisfy.
+bool sourceFileMayBeEmitted(SourceFile* sourceFile,
+                            checker::Program* host, bool forceDtsEmit,
+                            bool forceJsEmit);
+// emitter.go:553 getSourceFilesToEmit — nullptr == Go nil (all files).
+std::vector<SourceFile*> getSourceFilesToEmit(
+    checker::Program* host,
+    const std::vector<SourceFile*>* targetSourceFiles, bool forceDtsEmit,
+    bool forceJsEmit);
+// program.go:1941 CombineEmitResults — Go returns *EmitResult (never nil).
+EmitResult* CombineEmitResults(const std::vector<EmitResult*>& results);
+// program.go:1966 HandleNoEmitOptions — files nullptr == Go nil;
+// emitBuildInfo nullptr == Go nil. Returns a heap EmitResult like Go
+// (nullptr result == Go nil return).
+EmitResult* HandleNoEmitOptions(
+    SimpleProgram* program, const std::vector<SourceFile*>* files,
+    const std::function<EmitResult*()>& emitBuildInfo);
 
 // fileloader.go mode workers (file-level).
 ResolutionMode getEmitSyntaxForUsageLocationWorker(

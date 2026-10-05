@@ -59,6 +59,7 @@ add_library(tsc STATIC
 	internal/checker/checker_relater.cpp
 	internal/checker/checker_emitresolver.cpp
 	internal/checker/mapper.cpp
+	internal/compiler/emitter.cpp
 	internal/compiler/fileloader.cpp
 	internal/compiler/host.cpp
 	internal/compiler/includeprocessor.cpp
@@ -83,6 +84,7 @@ add_library(tsc STATIC
 	internal/printer/syntheticfile.cpp
 	# === slice: transformers ===
 	internal/transformers/transformer.cpp
+	internal/transformers/declarations/declarations.cpp
 	internal/transformers/utilities.cpp
 	internal/transformers/destructuring.cpp
 	internal/transformers/estransforms/utilities.cpp
@@ -95,6 +97,8 @@ add_library(tsc STATIC
 	internal/module/cache.cpp
 	internal/module/resolver.cpp
 	internal/module/staticresolver.cpp
+	# === slice: outputpaths ===
+	internal/outputpaths/outputpaths.cpp
 	# === slice: modulespecifiers ===
 	internal/modulespecifiers/specifiers.cpp
 	internal/modulespecifiers/util.cpp

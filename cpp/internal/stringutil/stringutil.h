@@ -236,6 +236,101 @@ inline char32_t decodeJSStringRune(std::string_view s, size_t i, int* width) {
 	return kRuneError;
 }
 
+// util.go:160 upperhex
+inline constexpr char upperhex[] = "0123456789ABCDEF";
+
+// util.go:162 shouldEscapeForEncodeURI
+inline bool shouldEscapeForEncodeURI(char b) {
+	if ((b >= 'A' && b <= 'Z') || (b >= 'a' && b <= 'z') ||
+	    (b >= '0' && b <= '9')) {
+		return false;
+	}
+
+	switch (b) {
+	case ';':
+	case '/':
+	case '?':
+	case ':':
+	case '@':
+	case '&':
+	case '=':
+	case '+':
+	case '$':
+	case ',':
+	case '#':
+	case '-':
+	case '_':
+	case '.':
+	case '!':
+	case '~':
+	case '*':
+	case '\'':
+	case '(':
+	case ')':
+		return false;
+	default:
+		return true;
+	}
+}
+
+// util.go:144 EncodeURI
+// https://tc39.es/ecma262/multipage/global-object.html#sec-encodeuri-uri
+inline std::string encodeURI(std::string_view s) {
+	std::string builder;
+	builder.reserve(s.size());
+	for (size_t i = 0; i < s.size(); i++) {
+		char b = s[i];
+		if (!shouldEscapeForEncodeURI(b)) {
+			builder.push_back(b);
+			continue;
+		}
+
+		uint8_t escaped = static_cast<uint8_t>(b);
+		builder.push_back('%');
+		builder.push_back(upperhex[escaped >> 4]);
+		builder.push_back(upperhex[escaped & 0x0f]);
+	}
+	return builder;
+}
+
+// util.go:190 getByteOrderMarkLength
+inline int getByteOrderMarkLength(std::string_view text) {
+	if (!text.empty()) {
+		uint8_t ch0 = static_cast<uint8_t>(text[0]);
+		if (ch0 == 0xfe) {
+			if (text.size() >= 2 &&
+			    static_cast<uint8_t>(text[1]) == 0xff) {
+				return 2; // utf16be
+			}
+			return 0;
+		}
+		if (ch0 == 0xff) {
+			if (text.size() >= 2 &&
+			    static_cast<uint8_t>(text[1]) == 0xfe) {
+				return 2; // utf16le
+			}
+			return 0;
+		}
+		if (ch0 == 0xef) {
+			if (text.size() >= 3 &&
+			    static_cast<uint8_t>(text[1]) == 0xbb &&
+			    static_cast<uint8_t>(text[2]) == 0xbf) {
+				return 3; // utf8
+			}
+			return 0;
+		}
+	}
+	return 0;
+}
+
+// util.go:215 AddUTF8ByteOrderMark
+inline std::string addUTF8ByteOrderMark(std::string_view text) {
+	if (getByteOrderMarkLength(text) == 0) {
+		return "\xEF\xBB\xBF" + std::string(text);
+	}
+	return std::string(text);
+}
+
 // Removes a leading BOM; returns (textWithoutBOM, wasRemoved handled by caller).
 inline std::string_view removeByteOrderMark(std::string_view text) {
 	if (text.size() >= 3 &&

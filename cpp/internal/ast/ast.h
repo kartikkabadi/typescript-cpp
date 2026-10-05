@@ -326,6 +326,23 @@ struct MappedDiagnosticDirective {
 	std::string Source;
 };
 
+namespace spanmap {
+struct SpanMap;
+} // namespace spanmap
+
+// ContentMapperSourceFileInfo — ast.go:2618
+struct ContentMapperSourceFileInfo {
+	std::string ContentMapper;
+	std::string TransformIdentity;
+	SourceFileParseOptions ParseOptions;
+	std::string VirtualFileName;
+	std::string OriginalText;
+	spanmap::SpanMap* SpanMap = nullptr;
+	std::vector<MappedDiagnosticDirective> DiagnosticDirectives;
+	std::vector<SourceFile*> SupplementalSourceFiles;
+	SourceFile* CanonicalSourceFile = nullptr;
+};
+
 struct Uint128 {
 	uint64_t lo = 0, hi = 0;
 	bool operator==(const Uint128&) const = default;

@@ -18,6 +18,7 @@
 #include "internal/collections/collections.h"
 #include "internal/core/types.h"
 #include "internal/module/types.h"
+#include "internal/outputpaths/outputpaths.h"
 #include "internal/parser/parser.h" // getErrorSpanForNode
 #include "internal/tspath/tspath.h"
 
@@ -608,36 +609,8 @@ struct Glob {
 std::pair<Glob*, bool> Parse(std::string_view pattern);
 }  // namespace glob
 
-namespace outputpaths {  // dep-stub decls — owned by the outputpaths slice
-// outputpaths.go:9 — the methods ParsedCommandLine implements.
-struct OutputPathsHost {
-	virtual ~OutputPathsHost() = default;
-	virtual std::string CommonSourceDirectory() = 0;
-	virtual bool UseCaseSensitiveFileNames() = 0;
-	virtual std::string GetCurrentDirectory() = 0;
-};
-// commonsourcedirectory.go:59
-std::string GetCommonSourceDirectory(
-    const CompilerOptions* options, const std::function<std::vector<std::string>()>& files,
-    std::string_view currentDirectory, bool useCaseSensitiveFileNames,
-    const std::function<bool(const std::vector<std::string>&, std::string_view)>&
-        checkSourceFilesBelongToPath);
-// outputpaths.go:108
-std::string GetOutputDeclarationFileNameWorker(
-    std::string_view inputFileName, const CompilerOptions* options,
-    OutputPathsHost* host);
-// outputpaths.go:81
-std::string GetOutputJSFileName(std::string_view inputFileName,
-                                const CompilerOptions* options,
-                                OutputPathsHost* host);
-// outputpaths.go:200
-std::string GetSourceMapFilePath(std::string_view jsFilePath,
-                                 const CompilerOptions* options);
-// outputpaths.go:207
-std::string GetBuildInfoFileName(
-    const CompilerOptions* options,
-    const tspath::ComparePathsOptions& comparePathsOptions);
-}  // namespace outputpaths
+// outputpaths dep-stub block removed — the real outputpaths.h port is in
+// tsc::outputpaths; unqualified `outputpaths::` lookups below resolve to it.
 
 namespace locale {  // dep-stub decls — owned by the locale slice
 // locale.go — a BCP-47 language tag; zero value is Default.
@@ -843,7 +816,7 @@ struct ParsedCommandLine : module::ResolvedProjectReference,
 		return ParsedConfig->ProjectReferences;
 	}
 	std::vector<contentmapper::Mapper*> ContentMappers();
-	std::vector<std::string> ContentMapperExtensions();
+	std::vector<std::string> ContentMapperExtensions() override;
 	contentmapper::Mapper* GetContentMapperForFileName(
 	    std::string_view fileName);
 	std::vector<std::string> ResolvedProjectReferencePaths();

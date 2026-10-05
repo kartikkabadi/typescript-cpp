@@ -57,26 +57,6 @@ int compareNumberOfDirectorySeparators(std::string_view path1,
 	return count1 < count2 ? -1 : count1 > count2 ? 1 : 0;
 }
 
-// path.go:829 — tspath.GetRelativePathToDirectoryOrUrl.
-// (deduped: replicated file-locally until a tspath slice lands)
-std::string getRelativePathToDirectoryOrUrl(
-    std::string_view directoryPathOrUrl, std::string_view relativeOrAbsolutePath,
-    bool isAbsolutePathAnUrl, const tspath::ComparePathsOptions& options) {
-	auto pathComponents = tspath::getPathComponentsRelativeTo(
-	    directoryPathOrUrl, relativeOrAbsolutePath, options);
-
-	std::string firstComponent = pathComponents[0];
-	if (isAbsolutePathAnUrl && tspath::isRootedDiskPath(firstComponent)) {
-		std::string prefix =
-		    firstComponent[0] == '/' ? "file://" : "file:///";
-		pathComponents[0] = prefix + firstComponent;
-	}
-
-	std::vector<std::string_view> views(pathComponents.begin(),
-	                                    pathComponents.end());
-	return tspath::getPathFromPathComponents(views);
-}
-
 // strings.TrimSuffix.
 std::string trimSuffix(std::string_view s, std::string_view suffix) {
 	if (suffix.size() <= s.size() && s.substr(s.size() - suffix.size()) == suffix) {

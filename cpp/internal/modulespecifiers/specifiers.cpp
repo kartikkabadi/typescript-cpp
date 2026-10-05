@@ -1889,25 +1889,3 @@ std::string getModuleSpecifierWithPreferences(
 }
 
 } // namespace tsc::modulespecifiers
-
-// ---------------------------------------------------------------------------
-// dep stubs — removed when the owner slice lands
-// ---------------------------------------------------------------------------
-
-namespace tsc::outputpaths {
-
-// outputpaths.go:101 — GetOutputJSFileNameWorker.
-std::string GetOutputJSFileNameWorker(const std::string& /*inputFileName*/,
-                                      const CompilerOptions* /*options*/,
-                                      checker::Program* /*host*/) {
-	TSC_UNREACHABLE("GetOutputJSFileNameWorker — modulespecifiers dep");
-}
-
-// outputpaths.go:108 — GetOutputDeclarationFileNameWorker.
-std::string GetOutputDeclarationFileNameWorker(
-    const std::string& /*inputFileName*/, const CompilerOptions* /*options*/,
-    checker::Program* /*host*/) {
-	TSC_UNREACHABLE("GetOutputDeclarationFileNameWorker — modulespecifiers dep");
-}
-
-} // namespace tsc::outputpaths

@@ -1121,6 +1121,21 @@ struct SourceFile : Node {
 	void setHasLazyJSDoc(bool lazy) { hasLazyJSDoc = lazy; }
 	const std::string& FileName() const { return fileName; }
 	const std::string& Path() const { return fileName; }
+	const std::string& Text() const { return text; }
+	::tsc::SourceFileParseOptions ParseOptions() const { return parseOptions; }
+	const std::string& OriginalText() const;
+	std::string OriginalFileName() const;
+	::tsc::spanmap::SpanMap* SpanMap() const;
+	std::string ContentMapper() const;
+	bool IsContentMapperFailureStub() const;
+	std::string ContentMapperTransformIdentity() const;
+	std::string VirtualFileName() const;
+	::tsc::SourceFileParseOptions ContentMapperParseOptions() const;
+	void SetContentMapperInfo(const ::tsc::ContentMapperSourceFileInfo& info);
+	const std::vector<::tsc::MappedDiagnosticDirective>* DiagnosticDirectives() const;
+	const std::vector<::tsc::SourceFile*>* SupplementalSourceFiles() const;
+	::tsc::SourceFile* CanonicalSourceFile() const;
+	bool IsContentMapperSupplemental() const;
 	::tsc::Arena nodeArena;
 	::tsc::Arena jsdocArena;
 	void copyFrom(SourceFile* other);

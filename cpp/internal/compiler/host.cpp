@@ -12,6 +12,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <cerrno>
+#include <cstring>
 #include <fstream>
 #include <sstream>
 
@@ -104,6 +106,23 @@ std::optional<std::string> CompilerHost::ReadFile(std::string_view fileName) {
 	std::ostringstream ss;
 	ss << f.rdbuf();
 	return decodeBytes(ss.str());
+}
+
+// vfs WriteFile — OS fs write. Go returns error; std::nullopt == nil.
+std::optional<std::string> CompilerHost::WriteFile(std::string_view fileName,
+                                                   std::string_view text) {
+	std::ofstream f(std::string(fileName),
+	                std::ios::binary | std::ios::trunc);
+	if (!f) {
+		return "open " + std::string(fileName) + ": " +
+		       std::string(std::strerror(errno));
+	}
+	f.write(text.data(), static_cast<std::streamsize>(text.size()));
+	if (!f) {
+		return "write " + std::string(fileName) + ": " +
+		       std::string(std::strerror(errno));
+	}
+	return std::nullopt;
 }
 
 std::string CompilerHost::Realpath(std::string_view path) {

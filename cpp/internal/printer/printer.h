@@ -24,11 +24,18 @@
 #include <utility>
 #include <vector>
 
-namespace tsc {
-struct EmitResolver; // dep — emitresolver slice (checker.h has a stand-in)
+// Go has two EmitResolver types: printer.EmitResolver (interface,
+// printer/emitresolver.go:76) and checker.EmitResolver (the concrete impl,
+// checker/emitresolver.go:34). The interface has exactly one implementation,
+// so C++ maps it with an alias to the concrete checker::EmitResolver.
+namespace tsc::checker {
+struct EmitResolver;
+struct SourceOutputAndProjectReference;
 }
 
 namespace tsc::printer {
+
+using EmitResolver = ::tsc::checker::EmitResolver;
 
 // --- PrinterOptions / PrintHandlers (printer.go:35,55) ------------------------
 
@@ -135,7 +142,7 @@ EmitTextWriter* getTrailingSemicolonDeferringWriter(EmitTextWriter* writer);
 
 struct EmitHost {
 	virtual ~EmitHost() = default;
-	virtual CompilerOptions* Options() = 0;
+	virtual const CompilerOptions* Options() = 0;
 	virtual std::vector<SourceFile*> SourceFiles() = 0;
 	virtual bool UseCaseSensitiveFileNames() = 0;
 	virtual std::string GetCurrentDirectory() = 0;
@@ -145,10 +152,9 @@ struct EmitHost {
 	virtual std::optional<std::string> WriteFile(std::string_view fileName,
 	                                             std::string_view text) = 0;
 	virtual ModuleKind GetEmitModuleFormatOfFile(SourceFile* file) = 0;
-	virtual tsc::EmitResolver* GetEmitResolver() = 0;
-	// dep stub: GetProjectReferenceFromSource needs
-	// tsoptions.SourceOutputAndProjectReference — owned by the
-	// tsoptions/emitresolver slice.
+	virtual EmitResolver* GetEmitResolver() = 0;
+	virtual ::tsc::checker::SourceOutputAndProjectReference*
+	GetProjectReferenceFromSource(const tspath::Path& path) = 0;
 	virtual bool IsSourceFileFromExternalLibrary(SourceFile* file) = 0;
 };
 

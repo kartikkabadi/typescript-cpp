@@ -12,7 +12,9 @@
 
 #include "internal/compiler/program.h"
 #include "internal/binder/binder.h"
+#include "internal/compiler/emitter.h"
 #include "internal/diagnostics/messages_generated.h"
+#include "internal/outputpaths/outputpaths.h"
 #include "internal/scanner/scanner.h"
 
 #include <algorithm>
@@ -839,16 +841,21 @@ std::vector<Diagnostic*> SimpleProgram::GetGlobalDiagnostics() {
 	return checker_->diagnostics.GetGlobalDiagnostics();
 }
 
-// program.go:1454 GetDeclarationDiagnostics — only when NoEmit &&
-// GetEmitDeclarations; requires emit's getDeclarationDiagnostics — emit is
-// out of scope, unreachable for `tsc --noEmit` without --declaration.
+// program.go:1454 GetDeclarationDiagnostics
 std::vector<Diagnostic*> SimpleProgram::GetDeclarationDiagnostics(
     SourceFile* sourceFile) {
-	if (sourceFile->IsDeclarationFile) {
-		return {};
+	// Memoization is used in order to avoid emitting the declaration file
+	// twice
+	if (auto it = declarationDiagnosticCache.find(sourceFile);
+	    it != declarationDiagnosticCache.end()) {
+		return it->second;
 	}
-	TSC_UNREACHABLE(
-	    "getDeclarationDiagnosticsForFile — ported with the emit slice");
+
+	auto [eh, done] = newEmitHost(this, sourceFile);
+	auto diags = getDeclarationDiagnostics(eh.get(), sourceFile);
+	done();
+	declarationDiagnosticCache[sourceFile] = diags;
+	return diags;
 }
 
 // --- program.go: file/path accessors ---
@@ -989,57 +996,6 @@ ResolutionMode SimpleProgram::GetDefaultResolutionModeForFile(
 	    file->FileName(), sourceFileMetaDatas[file->Path()], &options);
 }
 
-// --- commonsourcedirectory.go ---
-
-// computeCommonSourceDirectoryOfFilenames
-static std::string computeCommonSourceDirectoryOfFilenames(
-    const std::vector<std::string>& fileNames,
-    const std::string& currentDirectory, bool useCaseSensitiveFileNames) {
-	std::vector<std::string> commonPathComponents;
-	bool first = true;
-	for (auto& sourceFile : fileNames) {
-		auto sourcePathComponents =
-		    tspath::getNormalizedPathComponents(sourceFile,
-		                                      currentDirectory);
-		// The base file name is not part of the common directory path
-		if (!sourcePathComponents.empty())
-			sourcePathComponents.pop_back();
-
-		if (first) {
-			commonPathComponents = std::move(sourcePathComponents);
-			first = false;
-			continue;
-		}
-
-		size_t n = std::min(commonPathComponents.size(),
-		                    sourcePathComponents.size());
-		for (size_t i = 0; i < n; i++) {
-			if (tspath::getCanonicalFileName(commonPathComponents[i],
-			                                 useCaseSensitiveFileNames) !=
-			    tspath::getCanonicalFileName(sourcePathComponents[i],
-			                                 useCaseSensitiveFileNames)) {
-				if (i == 0) {
-					return "";
-				}
-				commonPathComponents.resize(i);
-				break;
-			}
-		}
-		if (sourcePathComponents.size() < commonPathComponents.size()) {
-			commonPathComponents.resize(sourcePathComponents.size());
-		}
-	}
-
-	if (commonPathComponents.empty()) {
-		return currentDirectory;
-	}
-	std::vector<std::string_view> componentViews;
-	componentViews.reserve(commonPathComponents.size());
-	for (auto& c : commonPathComponents)
-		componentViews.emplace_back(c);
-	return tspath::getPathFromPathComponents(componentViews);
-}
-
 // program.go:1791 checkSourceFilesBelongToPath
 bool SimpleProgram::checkSourceFilesBelongToPath(
     const std::vector<std::string>& sourceFiles,
@@ -1065,83 +1021,245 @@ bool SimpleProgram::checkSourceFilesBelongToPath(
 	return allFilesBelongToPath;
 }
 
-// outputpaths.GetCommonSourceDirectory + program.go CommonSourceDirectory
-// (memoized).
+// program.go:1799 CommonSourceDirectory (memoized).
 std::string SimpleProgram::CommonSourceDirectory() {
 	if (commonSourceDirectory_.has_value()) {
 		return *commonSourceDirectory_;
 	}
 	// files() closure: emitted file names
-	std::vector<std::string> emittedFiles;
-	for (auto* file : files) {
-		if (sourceFileMayBeEmitted(file, this, false, false) &&
-		    !file->IsDeclarationFile) {
-			emittedFiles.push_back(file->FileName());
+	auto files = [this]() -> std::vector<std::string> {
+		std::vector<std::string> emittedFiles;
+		for (auto* file : this->files) {
+			if (sourceFileMayBeEmitted(file, this, false, false) &&
+			    !file->IsDeclarationFile) {
+				emittedFiles.push_back(file->FileName());
+			}
 		}
-	}
-	std::string commonSourceDirectory;
-	if (!options.RootDir.empty()) {
-		commonSourceDirectory = options.RootDir;
-		checkSourceFilesBelongToPath(emittedFiles, options.RootDir);
-	} else if (!options.ConfigFilePath.empty()) {
-		commonSourceDirectory =
-		    tspath::getDirectoryPath(options.ConfigFilePath);
-		checkSourceFilesBelongToPath(emittedFiles, commonSourceDirectory);
-	} else {
-		commonSourceDirectory = computeCommonSourceDirectoryOfFilenames(
-		    emittedFiles, GetCurrentDirectory(),
-		    UseCaseSensitiveFileNames());
-	}
-	if (!commonSourceDirectory.empty()) {
-		commonSourceDirectory =
-		    tspath::ensureTrailingDirectorySeparator(
-		        commonSourceDirectory);
-	}
-	commonSourceDirectory_ = commonSourceDirectory;
-	return commonSourceDirectory;
+		return emittedFiles;
+	};
+	commonSourceDirectory_ = outputpaths::GetCommonSourceDirectory(
+	    Options(), files, GetCurrentDirectory(), UseCaseSensitiveFileNames(),
+	    [this](const std::vector<std::string>& sourceFiles,
+	           std::string_view rootDirectory) {
+		    return checkSourceFilesBelongToPath(
+		        sourceFiles, std::string(rootDirectory));
+	    });
+	return *commonSourceDirectory_;
 }
 
-// --- emitter.go:493 sourceFileMayBeEmitted ---
+// program.go:1390 IsEmitBlocked / :1384 blockEmittingOfFile
+bool SimpleProgram::IsEmitBlocked(const std::string& emitFileName) const {
+	return hasEmitBlockingDiagnostics.contains(toPath(emitFileName));
+}
 
-bool sourceFileMayBeEmitted(SourceFile* sourceFile, SimpleProgram* host,
-                            bool forceDtsEmit, bool forceJsEmit) {
-	const CompilerOptions* options = host->Options();
-	if (!forceJsEmit &&
-	    options->NoEmitForJsFiles == Tristate::True &&
-	    isSourceFileJS(sourceFile)) {
-		return false;
+void SimpleProgram::blockEmittingOfFile(const std::string& emitFileName,
+                                        Diagnostic* diag) {
+	hasEmitBlockingDiagnostics.insert(toPath(emitFileName));
+	programDiagnostics.push_back(diag);
+}
+
+// program.go:875 getSourceFilesToEmit — memoized for the nil-target case
+// (Go sync.Once).
+std::vector<SourceFile*> SimpleProgram::getSourceFilesToEmit(
+    const std::vector<SourceFile*>* targetSourceFiles, bool forceDtsEmit,
+    bool forceJsEmit) {
+	if (targetSourceFiles == nullptr && !forceDtsEmit && !forceJsEmit) {
+		if (!sourceFilesToEmitComputed_) {
+			sourceFilesToEmitComputed_ = true;
+			sourceFilesToEmit_ =
+			    compiler::getSourceFilesToEmit(this, nullptr, false, false);
+		}
+		return sourceFilesToEmit_;
 	}
-	if (sourceFile->IsDeclarationFile) {
-		return false;
+	return compiler::getSourceFilesToEmit(this, targetSourceFiles,
+	                                      forceDtsEmit, forceJsEmit);
+}
+
+// program.go:242 GetSourceFileFromReference
+SourceFile* SimpleProgram::GetSourceFileFromReference(SourceFile* origin,
+                                                    FileReference* ref) {
+	std::string fileName = tspath::resolvePath(
+	    tspath::getDirectoryPath(origin->FileName()), {ref->FileName});
+	auto* supportedExtensionsBase = tsoptions::GetSupportedExtensions(
+	    &options, {}); // CommandLine().ContentMapperExtensions() — none here
+	auto* supportedExtensions =
+	    tsoptions::GetSupportedExtensionsWithJsonIfResolveJsonModule(
+	        &options, supportedExtensionsBase);
+	bool allowNonTsExtensions =
+	    options.AllowNonTsExtensions == Tristate::True;
+	if (tspath::hasExtension(fileName)) {
+		if (!allowNonTsExtensions) {
+			std::string canonicalFileName = tspath::getCanonicalFileName(
+			    fileName, UseCaseSensitiveFileNames());
+			bool supported = false;
+			for (const auto& group : *supportedExtensions) {
+				if (tspath::fileExtensionIsOneOf(canonicalFileName, group)) {
+					supported = true;
+					break;
+				}
+			}
+			if (!supported) {
+				return nullptr; // unsupported extensions are forced to fail
+			}
+		}
+
+		return GetSourceFileForResolvedModule(fileName);
 	}
-	// ContentMapper() != "" — no content mappers in this slice.
-	if (host->IsSourceFileFromExternalLibrary(sourceFile)) {
-		return false;
+	if (allowNonTsExtensions) {
+		auto* extensionless = GetSourceFileForResolvedModule(fileName);
+		if (extensionless != nullptr) {
+			return extensionless;
+		}
 	}
-	if (forceDtsEmit || forceJsEmit) {
-		return true;
+
+	// Only try adding extensions from the first supported group (which
+	// should be .ts/.tsx/.d.ts)
+	for (const auto& ext : (*supportedExtensions)[0]) {
+		auto* result = GetSourceFileForResolvedModule(
+		    fileName + std::string(ext));
+		if (result != nullptr) {
+			return result;
+		}
 	}
-	// GetProjectReferenceFromSource — none without project references.
-	if (!isJsonSourceFile(sourceFile)) {
-		return true;
-	}
-	if (options->OutDir.empty()) {
-		return false;
-	}
-	if (!options->RootDir.empty() || !options->ConfigFilePath.empty()) {
-		// Requires outputpaths.GetSourceFilePathInNewDirWorker — emit
-		// helpers not ported; unreachable for `tsc --noEmit` with neither
-		// RootDir nor config.
-		TSC_UNREACHABLE(
-		    "sourceFileMayBeEmitted json+RootDir — ported with the emit "
-		    "slice");
-	}
-	return true;
+	return nullptr;
 }
 
 bool SimpleProgram::SourceFileMayBeEmitted(SourceFile* sourceFile,
                                            bool forceDtsEmit) {
 	return sourceFileMayBeEmitted(sourceFile, this, forceDtsEmit, false);
+}
+
+// program.go:1867 Emit — Go runs file emits through a WorkGroup; this port
+// emits sequentially (identical observable results).
+EmitResult* SimpleProgram::Emit(EmitOptions* options) {
+	if (!options->ForceEmit &&
+	    options->EmitOnly != EmitOnly::EmitOnlyBuilderSignature) {
+		auto* result = HandleNoEmitOptions(
+		    this, &options->TargetSourceFiles, nullptr);
+		if (result != nullptr) {
+			return result;
+		}
+	}
+
+	const std::string newLine =
+	    Options()->NewLine == NewLineKind::CarriageReturnLineFeed
+	        ? "\r\n"
+	        : "\n";
+	std::unique_ptr<printer::EmitTextWriter> writer;
+	std::vector<std::unique_ptr<emitter>> emitters;
+	bool forceDtsEmit =
+	    options->EmitOnly == EmitOnly::EmitOnlyBuilderSignature ||
+	    (options->ForceEmit && options->EmitOnly == EmitOnly::EmitOnlyDts);
+	bool forceJsEmit =
+	    options->ForceEmit && options->EmitOnly == EmitOnly::EmitOnlyJs;
+	auto sourceFiles = getSourceFilesToEmit(
+	    options->TargetSourceFiles.empty() ? nullptr
+	                                       : &options->TargetSourceFiles,
+	    forceDtsEmit, forceJsEmit);
+
+	for (auto* sourceFile : sourceFiles) {
+		auto* e = emitters.emplace_back(new emitter).get();
+		e->sourceFile = sourceFile;
+		e->emitOnly = options->EmitOnly;
+		e->forceEmit = options->ForceEmit;
+		e->writeFile = options->WriteFile;
+
+		auto [host, done] = newEmitHost(this, sourceFile);
+		e->host = host.get();
+
+		// take an unused writer
+		if (writer == nullptr) {
+			writer.reset(printer::NewTextWriter(newLine, 0));
+		}
+		writer->Clear();
+
+		// attach writer and perform emit
+		e->writer = writer.get();
+		e->paths = outputpaths::GetOutputPathsFor(
+		    sourceFile, e->host->Options(), e->host,
+		    outputpaths::ForceEmitPaths{
+		        .Dts = forceDtsEmit,
+		        .Js = forceJsEmit,
+		        .DeclarationMap =
+		            options->ForceEmit &&
+		            options->EmitOnly == EmitOnly::EmitOnlyDts,
+		    });
+		e->emit();
+		e->writer = nullptr;
+		done();
+	}
+
+	// collect results from emit, preserving input order
+	std::vector<EmitResult*> results;
+	results.reserve(emitters.size());
+	for (auto& e : emitters) {
+		results.push_back(&e->emitResult);
+	}
+	return CombineEmitResults(results);
+}
+
+// program.go:1941 CombineEmitResults
+EmitResult* CombineEmitResults(const std::vector<EmitResult*>& results) {
+	auto* result = new EmitResult{};
+	for (auto* emitResult : results) {
+		if (emitResult == nullptr) {
+			continue; // Skip nil results
+		}
+		if (emitResult->EmitSkipped) {
+			result->EmitSkipped = true;
+		}
+		result->Diagnostics.insert(result->Diagnostics.end(),
+		                         emitResult->Diagnostics.begin(),
+		                         emitResult->Diagnostics.end());
+		result->EmittedFiles.insert(result->EmittedFiles.end(),
+		                          emitResult->EmittedFiles.begin(),
+		                          emitResult->EmittedFiles.end());
+		if (!emitResult->SourceMaps.empty()) {
+			result->SourceMaps.insert(result->SourceMaps.end(),
+			                          emitResult->SourceMaps.begin(),
+			                          emitResult->SourceMaps.end());
+		}
+	}
+	return result;
+}
+
+// program.go:1966 HandleNoEmitOptions — Go takes ProgramLike; SimpleProgram
+// is the only implementer this slice needs (the incremental slice can
+// generalize the parameter when it lands). emitBuildInfo nullptr == Go nil.
+EmitResult* HandleNoEmitOptions(
+    SimpleProgram* program, const std::vector<SourceFile*>* files,
+    const std::function<EmitResult*()>& emitBuildInfo) {
+	if (program->Options()->NoEmit != Tristate::True) {
+		if (program->Options()->NoEmitOnError != Tristate::True) {
+			return nullptr; // NoEmit is false and NoEmitOnError is also
+			                // false, so we can proceed with normal emit
+		}
+
+		auto diagnostics = getDiagnosticsOfAnyProgram(
+		    program, files == nullptr ? std::vector<SourceFile*>{} : *files,
+		    true);
+		if (diagnostics.empty()) {
+			return nullptr; // NoEmitOnError is enabled, but no
+			                // diagnostics were found, so we can proceed
+			                // with emitting
+		}
+		auto* result = new EmitResult{};
+		result->Diagnostics = diagnostics;
+		result->EmitSkipped = true;
+		return result;
+	}
+	if (files != nullptr) {
+		auto* result = new EmitResult{};
+		result->EmitSkipped = true;
+		return result;
+	}
+	if (emitBuildInfo != nullptr) {
+		auto* result = emitBuildInfo();
+		if (result != nullptr) {
+			return result;
+		}
+	}
+	return new EmitResult{};
 }
 
 // ==== verifyCompilerOptions ====  program.go:866+
@@ -1539,11 +1657,9 @@ void SimpleProgram::verifyCompilerOptions() {
 				emittedFiles.push_back(file->FileName());
 			}
 		}
-		std::string dir59 =
-		    tspath::ensureTrailingDirectorySeparator(
-		        computeCommonSourceDirectoryOfFilenames(
-		            emittedFiles, GetCurrentDirectory(),
-		            UseCaseSensitiveFileNames()));
+		std::string dir59 = outputpaths::GetComputedCommonSourceDirectory(
+		    emittedFiles, GetCurrentDirectory(),
+		    UseCaseSensitiveFileNames());
 		if (!dir59.empty() &&
 		    tspath::getCanonicalFileName(dir,
 		                                 UseCaseSensitiveFileNames()) !=
@@ -1752,13 +1868,66 @@ void SimpleProgram::verifyCompilerOptions() {
 	}
 
 	// If the emit is enabled make sure that every output file is unique and
-	// not overwriting any of the input files — emit is out of scope, and
-	// the block is unreachable with NoEmit.
+	// not overwriting any of the input files
 	if (options.NoEmit != Tristate::True &&
 	    options.SuppressOutputPathCheck != Tristate::True) {
-		TSC_UNREACHABLE(
-		    "verifyCompilerOptions emit-file uniqueness — ported with the "
-		    "emit slice");
+		std::unordered_set<std::string> emitFilesSeen;
+
+		// Verify that all the emit files are unique and don't overwrite
+		// input files
+		auto verifyEmitFilePath = [&](const std::string& emitFileName) {
+			if (!emitFileName.empty()) {
+				tspath::Path emitFilePath = toPath(emitFileName);
+				// Report error if the output overwrites input file
+				if (filesByPath.count(emitFilePath)) {
+					Diagnostic* diag = tsoptions::newCompilerDiagnostic(
+					    Cannot_write_file_0_because_it_would_overwrite_input_file,
+					    {emitFileName});
+					if (options.ConfigFilePath.empty()) {
+						// The program is from either an inferred project or
+						// an external project
+						diag->AddMessageChain(tsoptions::newCompilerDiagnostic(
+						    Adding_a_tsconfig_json_file_will_help_organize_projects_that_contain_both_TypeScript_and_JavaScript_files_Learn_more_at_https_Colon_Slash_Slashaka_ms_Slashtsconfig));
+					}
+					blockEmittingOfFile(emitFileName, diag);
+				}
+
+				std::string emitFileKey;
+				if (!UseCaseSensitiveFileNames()) {
+					emitFileKey = tspath::toFileNameLowerCase(
+					    std::string(emitFilePath));
+				} else {
+					emitFileKey = std::string(emitFilePath);
+				}
+
+				// Report error if multiple files write into same file
+				if (emitFilesSeen.count(emitFileKey)) {
+					// Already seen the same emit file - report error
+					blockEmittingOfFile(
+					    emitFileName,
+					    tsoptions::newCompilerDiagnostic(
+					        Cannot_write_file_0_because_it_would_be_overwritten_by_multiple_input_files,
+					        {emitFileName}));
+				} else {
+					emitFilesSeen.insert(emitFileKey);
+				}
+			}
+		};
+
+		outputpaths::ForEachEmittedFile(
+		    this, &options,
+		    [&](outputpaths::OutputPaths* emitFileNames,
+		        SourceFile* /*sourceFile*/) {
+			    verifyEmitFilePath(emitFileNames->jsFilePath);
+			    verifyEmitFilePath(emitFileNames->sourceMapFilePath);
+			    verifyEmitFilePath(emitFileNames->declarationFilePath);
+			    verifyEmitFilePath(emitFileNames->declarationMapPath);
+			    return false;
+		    },
+		    getSourceFilesToEmit(nullptr, false, false), false);
+		verifyEmitFilePath(
+		    outputpaths::GetBuildInfoFileName(&options,
+		                                      comparePathsOptions()));
 	}
 }
 

@@ -18,6 +18,7 @@
 #include "internal/ast/diagnostics_util.h"
 #include "internal/ast/flow.h"
 #include "internal/ast/symbol.h"
+#include "internal/outputpaths/outputpaths.h"
 #include "internal/checker/types.h"
 #include "internal/tracing/tracing.h"
 #include "internal/core/arena.h"
@@ -926,7 +927,7 @@ NodeBuilder* NewNodeBuilder(Checker* ch, printer::EmitContext* e);
 
 // EmitResolver — emitresolver.go:34. Go's checkerMu is elided: the C++ checker
 // is single-threaded, so every lock in emitresolver.go compiles away.
-struct EmitResolver {
+struct EmitResolver : binder::ReferenceResolver {
 	Checker* checker{};
 	std::function<bool(Node*)> isValueAliasDeclaration;
 	std::function<bool(Node*)> aliasMarkingVisitor;
@@ -962,15 +963,18 @@ struct EmitResolver {
 	bool IsTopLevelValueImportEqualsWithEntityName(Node* node);
 	void MarkLinkedReferencesRecursively(SourceFile* file);
 	SourceFile* GetExternalModuleFileFromDeclaration(Node* declaration);
-	Node* GetReferencedExportContainer(Node* node, bool prefixLocals);
+	Node* GetReferencedExportContainer(Node* node,
+	                                   bool prefixLocals) override;
 	void SetReferencedImportDeclaration(Node* node, Node* ref);
-	Node* GetReferencedImportDeclaration(Node* node);
-	Node* GetReferencedValueDeclaration(Node* node);
+	Node* GetReferencedImportDeclaration(Node* node) override;
+	Node* GetReferencedValueDeclaration(Node* node) override;
 	Node* GetReferencedValueDeclarationUnsafe(Node* node);
-	std::vector<Node*> GetReferencedValueDeclarations(Node* node);
+	std::vector<Node*> GetReferencedValueDeclarations(
+	    Node* node) override;
 	bool IsNameResolvable(Node* location, const std::string& name);
-	std::string GetElementAccessExpressionName(ElementAccessExpression* expression);
-	Node* GetReferencedMemberValueDeclaration(Node* node);
+	std::string GetElementAccessExpressionName(
+	    ElementAccessExpression* expression) override;
+	Node* GetReferencedMemberValueDeclaration(Node* node) override;
 	Node* CreateReturnTypeOfSignatureDeclaration(printer::EmitContext* emitContext, Node* signatureDeclaration, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
 	std::vector<Node*> CreateTypeParametersOfSignatureDeclaration(printer::EmitContext* emitContext, Node* signatureDeclaration, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
 	Node* CreateTypeOfDeclaration(printer::EmitContext* emitContext, Node* declaration, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
@@ -1044,9 +1048,8 @@ public:
 	virtual const CompilerOptions* CompilerOptions() = 0;
 };
 
-struct ProjectReferenceRedirect {
-	std::string outputDts{};
-};
+// (Go returns *tsoptions.SourceOutputAndProjectReference here; that struct is
+// declared just below and used directly.)
 
 // tsoptions.ProjectReference — only what the checker needs.
 class ProjectReference {
@@ -1064,7 +1067,9 @@ struct SourceOutputAndProjectReference {
 
 // Program interface — port of checker's Program/Host. Only the members the
 // checker actually calls are declared; a SimpleProgram implements them.
-class Program {
+// In Go, Program structurally satisfies outputpaths.OutputPathsHost — here it
+// inherits it so a Program* can be passed wherever OutputPathsHost* is wanted.
+class Program : public outputpaths::OutputPathsHost {
 public:
 	virtual ~Program() = default;
 	virtual const CompilerOptions* Options() = 0;
@@ -1112,14 +1117,18 @@ public:
 	virtual RedirectInfo* GetRedirectForResolution(SourceFile* sourceFile) {
 		return nullptr;
 	}
-	virtual const ProjectReferenceRedirect* GetProjectReferenceFromSource(
-	    const std::string& /*path*/) {
+	virtual SourceOutputAndProjectReference* GetProjectReferenceFromSource(
+	    const tspath::Path& /*path*/) {
 		return nullptr;
 	}
 	virtual const SourceOutputAndProjectReference* GetProjectReferenceFromOutputDts(
 	    const std::string& /*path*/) {
 		return nullptr;
 	}
+	// emitter.go SourceFileMayBeEmittedHost member — const here (SimpleProgram
+	// implements it const); printer::EmitHost declares the non-const twin, so
+	// emitHost overrides both.
+	virtual bool IsSourceFileFromExternalLibrary(SourceFile* file) const = 0;
 	// === slice: modulespecifiers === (ModuleSpecifierGenerationHost,
 	// modulespecifiers/types.go:44)
 	// program.go GetSymlinkCache — programs that don't track symlinked

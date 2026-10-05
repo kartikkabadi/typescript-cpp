@@ -6,6 +6,7 @@
 
 #include "internal/ast/ast.h"
 #include "internal/core/text.h"
+#include "internal/tspath/tspath.h"
 
 #include <string>
 #include <string_view>
@@ -22,6 +23,10 @@ struct Source {
 	virtual std::string_view Text() = 0;
 	virtual const std::vector<TextPos>& ECMALineMap() = 0;
 };
+
+// RawSourceMap (generator.go:56) — fwd decl; the sourcemap slice owns the
+// real definition.
+struct RawSourceMap;
 
 // Generator (generator.go) — dep-stubbed: the sourcemap slice owns the real
 // implementation. Methods are declared so the printer compiles; they are
@@ -52,6 +57,32 @@ struct Generator {
 	                          TextPos sourceCharacter, int nameIndex) {
 		TSC_UNREACHABLE("sourcemap::Generator::AddNamedSourceMapping — sourcemap slice");
 	}
+
+	// dep stubs — owned by the sourcemap slice; declared for emitter.cpp.
+	std::vector<std::string> Sources() {
+		TSC_UNREACHABLE("sourcemap::Generator::Sources — sourcemap slice");
+	}
+	struct RawSourceMap* RawSourceMap() {
+		TSC_UNREACHABLE("sourcemap::Generator::RawSourceMap — sourcemap slice");
+	}
+	std::string String() {
+		TSC_UNREACHABLE("sourcemap::Generator::String — sourcemap slice");
+	}
+	std::string Base64DataURL() {
+		TSC_UNREACHABLE("sourcemap::Generator::Base64DataURL — sourcemap slice");
+	}
 };
+
+} // namespace tsc::sourcemap
+
+namespace tsc::sourcemap {
+
+// NewGenerator (generator.go:66) — dep stub, owned by the sourcemap slice.
+inline Generator* NewGenerator(std::string_view /*file*/,
+                               std::string_view /*sourceRoot*/,
+                               std::string_view /*sourcesDirectoryPath*/,
+                               const tspath::ComparePathsOptions& /*options*/) {
+	TSC_UNREACHABLE("sourcemap::NewGenerator — sourcemap slice");
+}
 
 } // namespace tsc::sourcemap

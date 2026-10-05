@@ -199,6 +199,7 @@ inline constexpr std::string_view extensionDmts = ".d.mts";
 inline constexpr std::string_view extensionCjs = ".cjs";
 inline constexpr std::string_view extensionCts = ".cts";
 inline constexpr std::string_view extensionDcts = ".d.cts";
+inline constexpr std::string_view extensionTsBuildInfo = ".tsbuildinfo";
 
 inline const std::vector<std::string_view> supportedTSExtensionsFlat = {
 	extensionTs, extensionTsx, extensionDts, extensionCts, extensionDcts,
@@ -800,6 +801,62 @@ inline std::string getRelativePathFromFile(std::string_view from,
 	    getDirectoryPath(from), to, options));
 }
 
+// GetDeclarationEmitExtensionForPath — extension.go:137
+inline std::string_view getDeclarationEmitExtensionForPath(std::string_view path) {
+	if (fileExtensionIsOneOf(path, {extensionMjs, extensionMts})) {
+		return extensionDmts;
+	}
+	if (fileExtensionIsOneOf(path, {extensionCjs, extensionCts})) {
+		return extensionDcts;
+	}
+	if (fileExtensionIsOneOf(path, {extensionTs, extensionTsx, extensionJs,
+	                                extensionJsx})) {
+		return extensionDts;
+	}
+	std::string_view ext = getAnyExtensionFromPath(path, nullptr, false);
+	if (!ext.empty()) {
+		// ".d" + ext + ".ts" — needs a heap string, so the two special cases
+		// above are kept as string_view; callers use the std::string overload.
+		return {};
+	}
+	return extensionDts;
+}
+
+// GetDeclarationEmitExtensionForPath — extension.go:137 (custom-extension case)
+inline std::string getDeclarationEmitExtensionForPathString(std::string_view path) {
+	std::string_view result = getDeclarationEmitExtensionForPath(path);
+	if (!result.empty()) {
+		return std::string(result);
+	}
+	std::string_view ext = getAnyExtensionFromPath(path, nullptr, false);
+	if (!ext.empty()) {
+		return ".d" + std::string(ext) + ".ts";
+	}
+	return std::string(extensionDts);
+}
+
+// GetRelativePathToDirectoryOrUrl — path.go:829
+inline std::string getRelativePathToDirectoryOrUrl(
+    std::string_view directoryPathOrUrl,
+    std::string_view relativeOrAbsolutePath, bool isAbsolutePathAnUrl,
+    const ComparePathsOptions& options) {
+	auto pathComponents = getPathComponentsRelativeTo(
+	    directoryPathOrUrl, relativeOrAbsolutePath, options);
+	std::string firstComponent = pathComponents[0];
+	if (isAbsolutePathAnUrl && isRootedDiskPath(firstComponent)) {
+		std::string prefix;
+		if (firstComponent[0] == '/') {
+			prefix = "file://";
+		} else {
+			prefix = "file:///";
+		}
+		pathComponents[0] = prefix + firstComponent;
+	}
+	std::vector<std::string_view> views(pathComponents.begin(),
+	                                    pathComponents.end());
+	return getPathFromPathComponents(views);
+}
+
 // === slice: module — additional helpers the resolver needs ===
 
 // extension.go — additional extension tables.
@@ -1029,6 +1086,51 @@ inline std::string getCanonicalFileName(std::string_view fileName,
 	}
 	return toFileNameLowerCase(fileName);
 }
+
+// trimRuneCount — path.go:641. Returns the suffix of s after skipping up to
+// runeCount runes, clamping to the end of s if it has fewer runes.
+inline std::string trimRuneCount(std::string_view s, int runeCount) {
+	size_t i = 0;
+	for (int n = 0; n < runeCount; n++) {
+		if (i >= s.size()) {
+			break;
+		}
+		int width = 0;
+		decodeUtf8Rune(s.substr(i), &width);
+		i += width;
+	}
+	return std::string(s.substr(i));
+}
+
+// TrimFilePathPrefix — path.go:629. Removes prefix from the start of path,
+// honoring useCaseSensitiveFileNames the same way GetCanonicalFileName does.
+// Returns (remainder, true) if path starts with prefix; otherwise (path,
+// false). Must not slice by byte length: case-folding can change UTF-8 byte
+// length without changing rune count (e.g. the Kelvin sign).
+inline std::pair<std::string, bool> trimFilePathPrefix(
+    std::string_view path, std::string_view prefix,
+    bool useCaseSensitiveFileNames) {
+	if (useCaseSensitiveFileNames) {
+		if (path.starts_with(prefix)) {
+			return {std::string(path.substr(prefix.size())), true};
+		}
+		return {std::string(path), false};
+	}
+	std::string canonicalPrefix =
+	    getCanonicalFileName(prefix, /*useCaseSensitiveFileNames*/ false);
+	if (!getCanonicalFileName(path, false).starts_with(canonicalPrefix)) {
+		return {std::string(path), false};
+	}
+	int runeCount = 0;
+	for (size_t i = 0; i < canonicalPrefix.size();) {
+		int width = 0;
+		decodeUtf8Rune(std::string_view(canonicalPrefix).substr(i), &width);
+		i += width;
+		runeCount++;
+	}
+	return {trimRuneCount(path, runeCount), true};
+}
+
 
 // comparePaths — path.go ComparePaths.
 inline int comparePaths(std::string_view a, std::string_view b,

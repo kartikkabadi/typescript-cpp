@@ -6974,7 +6974,7 @@ Symbol* Checker::resolveExternalModule(
 	if (moduleNotFoundError != nullptr) {
 		// See if this was possibly a projectReference redirect
 		if (resolvedModule.resolved) {
-			const ProjectReferenceRedirect* redirect =
+			const SourceOutputAndProjectReference* redirect =
 			    program->GetProjectReferenceFromSource(tspath::toPath(
 			        resolvedModule.resolvedFileName,
 			        program->GetCurrentDirectory(),
