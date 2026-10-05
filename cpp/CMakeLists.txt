@@ -86,6 +86,9 @@ add_library(tsc STATIC
 	internal/transformers/utilities.cpp
 	internal/transformers/destructuring.cpp
 	internal/transformers/estransforms/utilities.cpp
+	internal/transformers/estransforms/classthis.cpp
+	internal/transformers/estransforms/namedevaluation.cpp
+	internal/transformers/estransforms/esdecorator.cpp
 	internal/transformers/tstransforms/utilities.cpp
 	internal/transformers/moduletransforms/utilities.cpp
 	internal/transformers/inliners/constenum.cpp
