@@ -1670,24 +1670,8 @@ void Checker::checkBlock(Node* node) {
 // definition lands. ===
 // ---------------------------------------------------------------------------
 
-// owner: declchecks varchecks range (checker.go:5929-6264)
-void Checker::checkVariableLikeDeclaration(Node* node) {
-	TSC_UNREACHABLE("checkVariableLikeDeclaration — varchecks slice");
-}
-void Checker::checkDecorators(Node* node) {
-	TSC_UNREACHABLE("checkDecorators — varchecks slice");
-}
-// owner: declchecks alias/type-params/unused range (checker.go:6906-7500)
-void Checker::checkTypeNameIsReserved(Node* name, const DiagnosticMessage* message) {
-	TSC_UNREACHABLE("checkTypeNameIsReserved — aliasunused slice");
-}
-void Checker::checkTypeParameters(const std::vector<Node*>& typeParameterDeclarations) {
-	TSC_UNREACHABLE("checkTypeParameters — aliasunused slice");
-}
-// owner: declchecks iterations range (checker.go:6265-6905)
-bool Checker::isReferenceToType(Type* t, Type* target) {
-	TSC_UNREACHABLE("isReferenceToType — iterations slice");
-}
+// (deduped: checkVariableLikeDeclaration, checkDecorators, checkTypeNameIsReserved, checkTypeParameters, isReferenceToType defined in cpp/internal/checker/checker_declchecks2.cpp)
+
 // owner: decltypes slice (checker.go:16720-19097)
 // (deduped: getConstraintOfTypeParameter defined in cpp/internal/checker/checker_decltypes.cpp)
 
@@ -1754,9 +1738,8 @@ Diagnostic* Checker::addDeprecatedSuggestion(Node* location,
 	TSC_UNREACHABLE("addDeprecatedSuggestion — diagtail slice");
 }
 // owner: checker.go ~7509-8090 (statement/expression checks outside this slice)
-void Checker::checkImportAttributes(Node* node) {
-	TSC_UNREACHABLE("checkImportAttributes — modulechecks slice");
-}
+// (deduped: checkImportAttributes defined in cpp/internal/checker/checker_declchecks2.cpp)
+
 ModifierFlags Checker::getTypeParameterModifiers(Type* typeParameter) {
 	TSC_UNREACHABLE("getTypeParameterModifiers — decltypes slice");
 }

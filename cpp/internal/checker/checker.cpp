@@ -4164,9 +4164,7 @@ Type* Checker::getFlowTypeOfReferenceEx(Node* reference, Type* declaredType,
 // getTypeWithThisArgument and getBaseTypes are defined in checker_members.cpp
 // (members slice).
 
-Type* Checker::getBuiltinIteratorReturnType() {
-	TSC_UNREACHABLE("getBuiltinIteratorReturnType — ported with checker.cpp:6570");
-}
+// (deduped: getBuiltinIteratorReturnType defined in cpp/internal/checker/checker_declchecks2.cpp)
 
 Type* Checker::checkExpressionWithTypeArguments(Node* node) {
 	TSC_UNREACHABLE(
@@ -7624,10 +7622,7 @@ std::vector<Symbol*> Checker::getNamedMembers(const SymbolTable& members,
 	return result;
 }
 
-Type* Checker::getTypeFromImportAttributes(Node* node) {
-	TSC_UNREACHABLE(
-	    "getTypeFromImportAttributes — ported with the type-node slice");
-}
+// (deduped: getTypeFromImportAttributes defined in cpp/internal/checker/checker_declchecks2.cpp)
 
 // (deduped: getTypeOfSymbol defined in cpp/internal/checker/checker_decltypes.cpp)
 

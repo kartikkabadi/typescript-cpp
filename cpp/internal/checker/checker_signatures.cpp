@@ -1039,8 +1039,8 @@ bool Checker::isConstContext(Node* /*node*/) { TSC_UNREACHABLE("isConstContext �
 
 // (deduped: isGenericType defined in cpp/internal/checker/checker_grammar.cpp)
 
-IterationTypes Checker::getIterationTypesOfIterable(Type* /*t*/, IterationUse /*use*/, Node* /*errorNode*/) { TSC_UNREACHABLE("getIterationTypesOfIterable — owned by iteration"); }
-Type* Checker::getIterationTypeOfGeneratorFunctionReturnType(IterationTypeKind /*typeKind*/, Type* /*returnType*/, bool /*isAsyncGenerator*/) { TSC_UNREACHABLE("getIterationTypeOfGeneratorFunctionReturnType — owned by iteration"); }
+// (deduped: getIterationTypesOfIterable defined in cpp/internal/checker/checker_declchecks2.cpp)
+// (deduped: getIterationTypeOfGeneratorFunctionReturnType defined in cpp/internal/checker/checker_declchecks2.cpp)
 bool Checker::isConstantReference(Node* /*node*/) { TSC_UNREACHABLE("isConstantReference — owned by flow"); }
 bool Checker::isReachableFlowNode(FlowNode* /*flow*/) { TSC_UNREACHABLE("isReachableFlowNode — owned by flow"); }
 bool Checker::isSymbolAssigned(Symbol* /*symbol*/) { TSC_UNREACHABLE("isSymbolAssigned — owned by flow"); }
