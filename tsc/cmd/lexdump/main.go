@@ -2,8 +2,8 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
+	"github.com/microsoft/TypeScript/tsc/internal/json"
 	"os"
 	"strings"
 
@@ -36,11 +36,15 @@ func main() {
 	out := []tok{}
 	for {
 		t := s.Scan()
-		out = append(out, tok{strings.TrimPrefix(ast.Kind(t).String(), "Kind"), s.TokenStart(), s.TokenEnd(), uint32(s.TokenFlags())})
+		out = append(out, tok{strings.TrimPrefix(t.String(), "Kind"), s.TokenStart(), s.TokenEnd(), uint32(s.TokenFlags())})
 		if t == ast.KindEndOfFile {
 			break
 		}
 	}
-	enc, _ := json.Marshal(out)
+	enc, err := json.Marshal(out)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
 	fmt.Println(string(enc))
 }

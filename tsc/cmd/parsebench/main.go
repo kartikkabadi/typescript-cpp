@@ -30,13 +30,14 @@ func main() {
 		var total int64
 		count := 0
 		t0 := time.Now()
-		filepath.Walk(os.Args[2], func(path string, info os.FileInfo, err error) error {
+		err := filepath.Walk(os.Args[2], func(path string, info os.FileInfo, err error) error {
 			if err != nil || info.IsDir() {
 				return nil
 			}
 			ext := strings.ToLower(filepath.Ext(path))
 			switch ext {
 			case ".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs":
+				// process below
 			default:
 				return nil
 			}
@@ -49,6 +50,10 @@ func main() {
 			count++
 			return nil
 		})
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(2)
+		}
 		ms := float64(time.Since(t0)) / 1e6
 		mb := float64(total) / (1024 * 1024)
 		fmt.Printf("go parse-all: %d files, %.1f MB: %.1f ms, %.1f MB/s\n",
@@ -61,10 +66,13 @@ func main() {
 	}
 	iters := 5
 	if len(os.Args) > 2 {
-		fmt.Sscanf(os.Args[2], "%d", &iters)
+		if _, err := fmt.Sscanf(os.Args[2], "%d", &iters); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(2)
+		}
 	}
 	best := 1e30
-	for i := 0; i < iters; i++ {
+	for range iters {
 		t0 := time.Now()
 		file := parser.ParseSourceFile(
 			ast.SourceFileParseOptions{FileName: os.Args[1], Path: tspath.Path(os.Args[1])},

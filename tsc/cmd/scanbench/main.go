@@ -20,11 +20,14 @@ func main() {
 	}
 	iters := 5
 	if len(os.Args) > 2 {
-		fmt.Sscanf(os.Args[2], "%d", &iters)
+		if _, err := fmt.Sscanf(os.Args[2], "%d", &iters); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(2)
+		}
 	}
 	best := 1e30
 	var tokens int
-	for i := 0; i < iters; i++ {
+	for range iters {
 		t0 := time.Now()
 		s := scanner.NewScanner()
 		s.SetText(string(src))
