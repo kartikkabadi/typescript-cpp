@@ -1816,9 +1816,8 @@ void Checker::checkDestructuringAssignment(Node* node, Type* sourceType,
 bool Checker::isTypeEqualityComparableTo(Type* source, Type* target) {
 	TSC_UNREACHABLE("isTypeEqualityComparableTo — expressions slice");
 }
-Node* Checker::getEffectiveCheckNode(Node* node) {
-	TSC_UNREACHABLE("getEffectiveCheckNode — expressions slice");
-}
+// (getEffectiveCheckNode landed — expr_a slice defines it in
+// checker_expressions_a.cpp.)
 std::string Checker::getTypeNameForErrorDisplay(Type* t) {
 	TSC_UNREACHABLE("getTypeNameForErrorDisplay — expressions slice");
 }
@@ -1846,11 +1845,8 @@ bool Checker::checkTypeComparableTo(Type* source, Type* target, Node* errorNode,
 }
 
 // owner: members slice (checker.go:19186-20143 + 20987-22284)
-ConstructorAccessibilityError* Checker::getConstructorAccessibilityError(
-    Node* node, const std::vector<Signature*>& signatures,
-    ModifierFlags modifiers) {
-	TSC_UNREACHABLE("getConstructorAccessibilityError — members slice");
-}
+// (getConstructorAccessibilityError landed — expr_a slice defines it in
+// checker_expressions_a.cpp.)
 
 
 // owner: decltypes slice (checker.go:16720-19097)

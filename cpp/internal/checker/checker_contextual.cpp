@@ -3673,15 +3673,8 @@ Type* Checker::getActualTypeVariable(Type* t) {
 
 // === dep stubs — removed when owner slice lands ===
 
-Signature* Checker::getResolvedSignature(
-	Node* /*node*/, std::vector<Signature*>* /*candidatesOutArray*/,
-	CheckMode /*checkMode*/) {
-	TSC_UNREACHABLE("getResolvedSignature — resolution slice (checker.go:8581)");
-}
-
-Signature* Checker::getContextualSignature(Node* /*node*/) {
-	TSC_UNREACHABLE("getContextualSignature — checker.go:10461 slice");
-}
+// (getResolvedSignature + getContextualSignature landed — expr_a slice
+// defines them in checker_expressions_a.cpp.)
 
 Type* Checker::getTypeOfNode(Node* /*node*/) {
 	TSC_UNREACHABLE("getTypeOfNode — services tail (checker.go:32419)");

@@ -1705,10 +1705,8 @@ bool Checker::isReferenceToType(Type* t, Type* target) {
 // owner: typenodes slice (checker.go:23220-25738)
 // (deduped: getNullableType defined in cpp/internal/checker/checker_decltypes.cpp)
 
-// owner: typeops slice (checker.go:26020-28654)
-void Checker::checkIndexedAccessIndexType(Type* t, Node* node) {
-	TSC_UNREACHABLE("checkIndexedAccessIndexType — typeops slice");
-}
+// owner: expr_a slice (checker.go:8392) — real definition in
+// checker_expressions_a.cpp; header decl fixed to Type*.
 // markrefs slice landed in checker_markrefs.cpp — checkExternalEmitHelpers moved there.
 // owner: relater slice (relater.go)
 Type* Checker::createMarkerType(Symbol* symbol, Type* source, Type* target) {

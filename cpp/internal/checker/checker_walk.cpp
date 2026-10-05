@@ -1111,15 +1111,8 @@ Type* Checker::checkPrivateIdentifierExpression(Node* node) {
 // (getSymbolForPrivateIdentifierExpression moved to the grammarchecks slice's
 // file — identical ports; theirs is the surviving definition.)
 
-// checker.go:10217
-void Checker::skippedGenericFunction(Node* node, CheckMode checkMode) {
-	if (checkMode & CheckModeInferential) {
-		// We have skipped a generic function during inferential typing. Obtain the inference context and
-		// indicate this has occurred such that we know a second pass of inference is be needed.
-		InferenceContext* context = getInferenceContext(node);
-		context->flags |= InferenceFlagsSkippedGenericFunction;
-	}
-}
+// (skippedGenericFunction moved to the expr_a slice's file — its real
+// definition lives in checker_expressions_a.cpp.)
 
 // ---------------------------------------------------------------------------
 // === dep stubs — owned by other slices; deleted from here when the owner's
@@ -1189,19 +1182,8 @@ void Checker::mergeInferences(std::vector<InferenceInfo*>& target, const std::ve
 Type* Checker::checkIdentifier(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkIdentifier — expressions slice"); }
 Type* Checker::checkThisExpression(Node* node) { TSC_UNREACHABLE("checkThisExpression — expressions slice"); }
 Type* Checker::checkSuperExpression(Node* node) { TSC_UNREACHABLE("checkSuperExpression — expressions slice"); }
-Type* Checker::checkTemplateExpression(Node* node) { TSC_UNREACHABLE("checkTemplateExpression — expressions slice"); }
-Type* Checker::checkRegularExpressionLiteral(Node* node) { TSC_UNREACHABLE("checkRegularExpressionLiteral — expressions slice"); }
-Type* Checker::checkArrayLiteral(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkArrayLiteral — expressions slice"); }
 Type* Checker::checkObjectLiteral(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkObjectLiteral — expressions slice"); }
 Type* Checker::checkPropertyAccessExpression(Node* node, CheckMode checkMode, bool writeOnly) { TSC_UNREACHABLE("checkPropertyAccessExpression — expressions slice"); }
-Type* Checker::checkQualifiedName(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkQualifiedName — expressions slice"); }
-Type* Checker::checkIndexedAccess(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkIndexedAccess — expressions slice"); }
-Type* Checker::checkCallExpression(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkCallExpression — expressions slice"); }
-Type* Checker::checkImportCallExpression(Node* node) { TSC_UNREACHABLE("checkImportCallExpression — expressions slice"); }
-Type* Checker::checkTaggedTemplateExpression(Node* node) { TSC_UNREACHABLE("checkTaggedTemplateExpression — expressions slice"); }
-Type* Checker::checkParenthesizedExpression(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkParenthesizedExpression — expressions slice"); }
-Type* Checker::checkClassExpression(Node* node) { TSC_UNREACHABLE("checkClassExpression — expressions slice"); }
-Type* Checker::checkFunctionExpressionOrObjectLiteralMethod(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkFunctionExpressionOrObjectLiteralMethod — expressions slice"); }
 Type* Checker::checkAssertion(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkAssertion — expressions slice"); }
 Type* Checker::checkTypeOfExpression(Node* node) { TSC_UNREACHABLE("checkTypeOfExpression — expressions slice"); }
 Type* Checker::checkNonNullAssertion(Node* node) { TSC_UNREACHABLE("checkNonNullAssertion — expressions slice"); }
@@ -1223,12 +1205,8 @@ Type* Checker::checkJsxSelfClosingElement(Node* node, CheckMode checkMode) { TSC
 Type* Checker::checkJsxFragment(Node* node) { TSC_UNREACHABLE("checkJsxFragment — jsx slice"); }
 Type* Checker::checkJsxAttributes(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkJsxAttributes — jsx slice"); }
 Type* Checker::checkNonNullExpression(Node* node) { TSC_UNREACHABLE("checkNonNullExpression — expressions slice"); }
-bool Checker::isSymbolOrSymbolForCall(Node* node) { TSC_UNREACHABLE("isSymbolOrSymbolForCall — expressions slice"); }
 
 // owner: deferred-check callees (wave-3)
-Signature* Checker::resolveUntypedCall(Node* node) { TSC_UNREACHABLE("resolveUntypedCall — call-resolution slice"); }
-void Checker::checkFunctionExpressionOrObjectLiteralMethodDeferred(Node* node) { TSC_UNREACHABLE("checkFunctionExpressionOrObjectLiteralMethodDeferred — expressions slice"); }
-void Checker::checkClassExpressionDeferred(Node* node) { TSC_UNREACHABLE("checkClassExpressionDeferred — expressions slice"); }
 void Checker::checkJsxSelfClosingElementDeferred(Node* node) { TSC_UNREACHABLE("checkJsxSelfClosingElementDeferred — jsx slice"); }
 void Checker::checkJsxElementDeferred(Node* node) { TSC_UNREACHABLE("checkJsxElementDeferred — jsx slice"); }
 void Checker::checkAssertionDeferred(Node* node) { TSC_UNREACHABLE("checkAssertionDeferred — expressions slice"); }
