@@ -935,6 +935,24 @@ def gen_nodes():
             if k not in struct_kinds.get(sname, []):
                 struct_kinds.setdefault(sname, []).append(k)
 
+    # Token covers every syntax-token kind (keywords, punctuation, operators)
+    # — Go creates them via NewToken(kind) with the kind passed through
+    # variables, so call-site scanning only finds literals. The authoritative
+    # set is subtractive: every Kind not claimed by another struct is a token.
+    # Trivia/sentinel kinds in the enum are never realized as nodes, and
+    # Token::computeSubtreeFacts returns None for them anyway, so over-
+    # assigning them here is harmless.
+    if "Token" in node_structs:
+        claimed = set()
+        for sname, ks in struct_kinds.items():
+            if sname != "Token":
+                claimed.update(ks)
+        # SyntaxList nodes are produced by newNodeList, not NewToken.
+        claimed.add("KindSyntaxList")
+        for k in sorted(load_kinds()[0]):
+            if k not in claimed and k not in struct_kinds.get("Token", []):
+                struct_kinds.setdefault("Token", []).append(k)
+
     print(f"{len(node_structs)} node structs, {len(factory_methods)} factory methods, "
           f"{len(predicates)} predicates, {len(foreach)} forEachChild, "
           f"{len(accessors)} accessors")
@@ -1655,18 +1673,43 @@ def gen_nodes():
             r"func \(node \*(\w+)\) computeSubtreeFacts\(\) SubtreeFacts \{\n(.*?)\n\}",
             src_all, re.S):
         compute[m.group(1)] = m.group(2)
+    # single-line bodies: `func (node *X) computeSubtreeFacts() SubtreeFacts { return Y }`
+    for m in re.finditer(
+            r"func \(node \*(\w+)\) computeSubtreeFacts\(\) SubtreeFacts \{ return (\w+) \}",
+            src_all):
+        compute.setdefault(m.group(1), f"return {m.group(2)}")
 
-    for sname in sorted(compute):
+    # Concrete structs that inherit computeSubtreeFacts from an embedded base
+    # (ClassLikeBase, AccessorDeclarationBase, TypeSyntaxBase, ...) resolve to
+    # the providing base; a function is generated per concrete struct using
+    # the base's body (fields are flattened identically).
+    provider = {}
+    for sname in node_structs:
+        if sname in compute:
+            continue
+        # NodeDefault/CompositeBase are universal roots whose
+        # computeSubtreeFacts is abstract (`panic("not implemented")`) — never
+        # a real provider; Go promotion picks the shallower base.
+        provs = [b for b in base_closure(sname)
+                 if b in compute and b not in ("NodeDefault", "CompositeBase")]
+        if provs:
+            if len(provs) > 1:
+                print(f"WARN: {sname} has multiple computeSubtreeFacts "
+                      f"providers {provs}; using {sorted(provs)[0]}")
+            provider[sname] = sorted(provs)[0]
+
+    for sname in sorted(set(compute) | set(provider)):
         if sname not in node_structs:
             continue
+        body = compute.get(sname) or compute[provider[sname]]
         out.append(f"inline SubtreeFacts computeSubtreeFacts_{sname}(const {sname}* n) {{\n")
-        for ln in facts_body(sname, compute[sname]):
+        for ln in facts_body(sname, body):
             out.append("\t" + ln + "\n")
         out.append("}\n\n")
 
     out.append("inline SubtreeFacts Node::computeSubtreeFacts() const {\n\tswitch (kind) {\n")
     seen_kinds = set()
-    for sname in sorted(compute):
+    for sname in sorted(set(compute) | set(provider)):
         if sname not in node_structs:
             continue
         out.append(kinds_case(sname, seen_kinds))

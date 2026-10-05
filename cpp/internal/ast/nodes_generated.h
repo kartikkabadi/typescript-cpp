@@ -7009,6 +7009,126 @@ inline Node* deepCloneNode(NodeFactory& f, const Node* node,
 		case Kind::InKeyword:
 		case Kind::DotToken:
 		case Kind::QuestionDotToken:
+		case Kind::AbstractKeyword:
+		case Kind::AccessorKeyword:
+		case Kind::AmpersandAmpersandEqualsToken:
+		case Kind::AmpersandEqualsToken:
+		case Kind::AmpersandToken:
+		case Kind::AsKeyword:
+		case Kind::AssertKeyword:
+		case Kind::AsteriskAsteriskEqualsToken:
+		case Kind::AsteriskAsteriskToken:
+		case Kind::AsteriskEqualsToken:
+		case Kind::AsyncKeyword:
+		case Kind::AtToken:
+		case Kind::AwaitKeyword:
+		case Kind::BacktickToken:
+		case Kind::BarBarEqualsToken:
+		case Kind::BarEqualsToken:
+		case Kind::BarToken:
+		case Kind::BreakKeyword:
+		case Kind::CaretEqualsToken:
+		case Kind::CaretToken:
+		case Kind::CaseKeyword:
+		case Kind::CatchKeyword:
+		case Kind::ClassKeyword:
+		case Kind::CloseBraceToken:
+		case Kind::CloseBracketToken:
+		case Kind::CloseParenToken:
+		case Kind::ConflictMarkerTrivia:
+		case Kind::ConstKeyword:
+		case Kind::ConstructorKeyword:
+		case Kind::ContinueKeyword:
+		case Kind::Count:
+		case Kind::DebuggerKeyword:
+		case Kind::DefaultKeyword:
+		case Kind::DeferKeyword:
+		case Kind::DeleteKeyword:
+		case Kind::DoKeyword:
+		case Kind::ElseKeyword:
+		case Kind::EnumKeyword:
+		case Kind::EqualsEqualsToken:
+		case Kind::ExclamationEqualsToken:
+		case Kind::ExclamationToken:
+		case Kind::ExtendsKeyword:
+		case Kind::FinallyKeyword:
+		case Kind::ForKeyword:
+		case Kind::FromKeyword:
+		case Kind::FunctionKeyword:
+		case Kind::GetKeyword:
+		case Kind::GlobalKeyword:
+		case Kind::GreaterThanEqualsToken:
+		case Kind::GreaterThanGreaterThanEqualsToken:
+		case Kind::GreaterThanGreaterThanGreaterThanEqualsToken:
+		case Kind::GreaterThanGreaterThanGreaterThanToken:
+		case Kind::GreaterThanGreaterThanToken:
+		case Kind::GreaterThanToken:
+		case Kind::HashToken:
+		case Kind::IfKeyword:
+		case Kind::ImmediateKeyword:
+		case Kind::ImplementsKeyword:
+		case Kind::ImportKeyword:
+		case Kind::InferKeyword:
+		case Kind::InstanceOfKeyword:
+		case Kind::InterfaceKeyword:
+		case Kind::IntrinsicKeyword:
+		case Kind::IsKeyword:
+		case Kind::JSDocCommentTextToken:
+		case Kind::JsxTextAllWhiteSpaces:
+		case Kind::KeyOfKeyword:
+		case Kind::LessThanEqualsToken:
+		case Kind::LessThanLessThanEqualsToken:
+		case Kind::LessThanLessThanToken:
+		case Kind::LessThanSlashToken:
+		case Kind::LessThanToken:
+		case Kind::LetKeyword:
+		case Kind::MinusEqualsToken:
+		case Kind::MinusMinusToken:
+		case Kind::MinusToken:
+		case Kind::ModuleKeyword:
+		case Kind::MultiLineCommentTrivia:
+		case Kind::NamespaceKeyword:
+		case Kind::NewKeyword:
+		case Kind::NewLineTrivia:
+		case Kind::NonTextFileMarkerTrivia:
+		case Kind::OfKeyword:
+		case Kind::OpenBraceToken:
+		case Kind::OpenBracketToken:
+		case Kind::OpenParenToken:
+		case Kind::OutKeyword:
+		case Kind::OverrideKeyword:
+		case Kind::PackageKeyword:
+		case Kind::PercentEqualsToken:
+		case Kind::PercentToken:
+		case Kind::PlusEqualsToken:
+		case Kind::PlusPlusToken:
+		case Kind::PrivateKeyword:
+		case Kind::ProtectedKeyword:
+		case Kind::PublicKeyword:
+		case Kind::QuestionQuestionEqualsToken:
+		case Kind::ReadonlyKeyword:
+		case Kind::RequireKeyword:
+		case Kind::ReturnKeyword:
+		case Kind::SatisfiesKeyword:
+		case Kind::SetKeyword:
+		case Kind::SingleLineCommentTrivia:
+		case Kind::SlashEqualsToken:
+		case Kind::SlashToken:
+		case Kind::StaticKeyword:
+		case Kind::SwitchKeyword:
+		case Kind::ThrowKeyword:
+		case Kind::TildeToken:
+		case Kind::TryKeyword:
+		case Kind::TypeKeyword:
+		case Kind::TypeOfKeyword:
+		case Kind::UniqueKeyword:
+		case Kind::Unknown:
+		case Kind::UsingKeyword:
+		case Kind::VarKeyword:
+		case Kind::WhileKeyword:
+		case Kind::WhitespaceTrivia:
+		case Kind::WithKeyword:
+		case Kind::YieldKeyword:
 		{
 			auto* n = static_cast<const Token*>(node);
 			auto* c = f.arena().alloc<Token>(*n);
@@ -8328,6 +8448,10 @@ inline SubtreeFacts computeSubtreeFacts_ArrayLiteralExpression(const ArrayLitera
 	return ::tsc::propagateNodeListSubtreeFacts(n->Elements, propagateSubtreeFacts);
 }
 
+inline SubtreeFacts computeSubtreeFacts_ArrayTypeNode(const ArrayTypeNode* n) {
+	return SubtreeContainsTypeScript;
+}
+
 inline SubtreeFacts computeSubtreeFacts_ArrowFunction(const ArrowFunction* n) {
 	return ::tsc::propagateModifierListSubtreeFacts(n->modifiers) | ::tsc::propagateEraseableSyntaxListSubtreeFacts(n->TypeParameters) | ::tsc::propagateNodeListSubtreeFacts(n->Parameters, propagateSubtreeFacts) | propagateEraseableSyntaxSubtreeFacts(n->Type) | propagateEraseableSyntaxSubtreeFacts(n->FullSignature) | ::tsc::propagateSubtreeFacts(n->Body) | ifElse((n->modifierFlags()&ModifierFlagsAsync) != 0, SubtreeContainsAnyAwait, SubtreeFactsNone);
 }
@@ -8377,6 +8501,10 @@ inline SubtreeFacts computeSubtreeFacts_CallExpression(const CallExpression* n) 
 	return ::tsc::propagateSubtreeFacts(n->Expression) | ::tsc::propagateSubtreeFacts(n->QuestionDotToken) | ::tsc::propagateEraseableSyntaxListSubtreeFacts(n->TypeArguments) | ::tsc::propagateNodeListSubtreeFacts(n->Arguments, propagateSubtreeFacts) | ifElse(n->Expression->kind == Kind::ImportKeyword, SubtreeContainsDynamicImport, SubtreeFactsNone);
 }
 
+inline SubtreeFacts computeSubtreeFacts_CallSignatureDeclaration(const CallSignatureDeclaration* n) {
+	return SubtreeContainsTypeScript;
+}
+
 inline SubtreeFacts computeSubtreeFacts_CaseBlock(const CaseBlock* n) {
 	return ::tsc::propagateNodeListSubtreeFacts(n->Clauses, propagateSubtreeFacts);
 }
@@ -8393,6 +8521,22 @@ inline SubtreeFacts computeSubtreeFacts_CatchClause(const CatchClause* n) {
 	return res;
 }
 
+inline SubtreeFacts computeSubtreeFacts_ClassDeclaration(const ClassDeclaration* n) {
+	if (n->modifiers != nullptr && ((n->modifiers ? n->modifiers->ModifierFlags : ModifierFlags{})&ModifierFlagsAmbient) != 0) {
+	return SubtreeContainsTypeScript;
+	} else {
+	return ::tsc::propagateModifierListSubtreeFacts(n->modifiers) | ::tsc::propagateSubtreeFacts(n->name) | ::tsc::propagateEraseableSyntaxListSubtreeFacts(n->TypeParameters) | ::tsc::propagateNodeListSubtreeFacts(n->HeritageClauses, propagateSubtreeFacts) | ::tsc::propagateNodeListSubtreeFacts(n->Members, propagateSubtreeFacts);
+	}
+}
+
+inline SubtreeFacts computeSubtreeFacts_ClassExpression(const ClassExpression* n) {
+	if (n->modifiers != nullptr && ((n->modifiers ? n->modifiers->ModifierFlags : ModifierFlags{})&ModifierFlagsAmbient) != 0) {
+	return SubtreeContainsTypeScript;
+	} else {
+	return ::tsc::propagateModifierListSubtreeFacts(n->modifiers) | ::tsc::propagateSubtreeFacts(n->name) | ::tsc::propagateEraseableSyntaxListSubtreeFacts(n->TypeParameters) | ::tsc::propagateNodeListSubtreeFacts(n->HeritageClauses, propagateSubtreeFacts) | ::tsc::propagateNodeListSubtreeFacts(n->Members, propagateSubtreeFacts);
+	}
+}
+
 inline SubtreeFacts computeSubtreeFacts_ClassStaticBlockDeclaration(const ClassStaticBlockDeclaration* n) {
 	return ::tsc::propagateModifierListSubtreeFacts(n->modifiers) | ::tsc::propagateSubtreeFacts(n->Body) | SubtreeContainsClassFields;
 }
@@ -8405,12 +8549,24 @@ inline SubtreeFacts computeSubtreeFacts_ConditionalExpression(const ConditionalE
 	return ::tsc::propagateSubtreeFacts(n->Condition) | ::tsc::propagateSubtreeFacts(n->QuestionToken) | ::tsc::propagateSubtreeFacts(n->WhenTrue) | ::tsc::propagateSubtreeFacts(n->ColonToken) | ::tsc::propagateSubtreeFacts(n->WhenFalse);
 }
 
+inline SubtreeFacts computeSubtreeFacts_ConditionalTypeNode(const ConditionalTypeNode* n) {
+	return SubtreeContainsTypeScript;
+}
+
+inline SubtreeFacts computeSubtreeFacts_ConstructSignatureDeclaration(const ConstructSignatureDeclaration* n) {
+	return SubtreeContainsTypeScript;
+}
+
 inline SubtreeFacts computeSubtreeFacts_ConstructorDeclaration(const ConstructorDeclaration* n) {
 	if (n->Body == nullptr) {
 	return SubtreeContainsTypeScript;
 	} else {
 	return ::tsc::propagateModifierListSubtreeFacts(n->modifiers) | ::tsc::propagateEraseableSyntaxListSubtreeFacts(n->TypeParameters) | ::tsc::propagateNodeListSubtreeFacts(n->Parameters, propagateSubtreeFacts) | propagateEraseableSyntaxSubtreeFacts(n->Type) | propagateEraseableSyntaxSubtreeFacts(n->FullSignature) | ::tsc::propagateSubtreeFacts(n->Body);
 	}
+}
+
+inline SubtreeFacts computeSubtreeFacts_ConstructorTypeNode(const ConstructorTypeNode* n) {
+	return SubtreeContainsTypeScript;
 }
 
 inline SubtreeFacts computeSubtreeFacts_Decorator(const Decorator* n) {
@@ -8493,6 +8649,18 @@ inline SubtreeFacts computeSubtreeFacts_FunctionExpression(const FunctionExpress
 	return ::tsc::propagateModifierListSubtreeFacts(n->modifiers) | ::tsc::propagateSubtreeFacts(n->AsteriskToken) | ::tsc::propagateSubtreeFacts(n->name) | ::tsc::propagateEraseableSyntaxListSubtreeFacts(n->TypeParameters) | ::tsc::propagateNodeListSubtreeFacts(n->Parameters, propagateSubtreeFacts) | propagateEraseableSyntaxSubtreeFacts(n->Type) | propagateEraseableSyntaxSubtreeFacts(n->FullSignature) | ::tsc::propagateSubtreeFacts(n->Body) | ifElse(isAsync && isGenerator, SubtreeContainsForAwaitOrAsyncGenerator, SubtreeFactsNone) | ifElse(isAsync && !isGenerator, SubtreeContainsAnyAwait, SubtreeFactsNone);
 }
 
+inline SubtreeFacts computeSubtreeFacts_FunctionTypeNode(const FunctionTypeNode* n) {
+	return SubtreeContainsTypeScript;
+}
+
+inline SubtreeFacts computeSubtreeFacts_GetAccessorDeclaration(const GetAccessorDeclaration* n) {
+	if (n->Body == nullptr) {
+	return SubtreeContainsTypeScript;
+	} else {
+	return ::tsc::propagateModifierListSubtreeFacts(n->modifiers) | ::tsc::propagateSubtreeFacts(n->name) | ::tsc::propagateEraseableSyntaxListSubtreeFacts(n->TypeParameters) | ::tsc::propagateNodeListSubtreeFacts(n->Parameters, propagateSubtreeFacts) | propagateEraseableSyntaxSubtreeFacts(n->Type) | propagateEraseableSyntaxSubtreeFacts(n->FullSignature) | ::tsc::propagateSubtreeFacts(n->Body);
+	}
+}
+
 inline SubtreeFacts computeSubtreeFacts_HeritageClause(const HeritageClause* n) {
 	switch (n->Token) {
 	case Kind::ExtendsKeyword:
@@ -8546,6 +8714,66 @@ inline SubtreeFacts computeSubtreeFacts_ImportSpecifier(const ImportSpecifier* n
 	} else {
 	return ::tsc::propagateSubtreeFacts(n->PropertyName) | ::tsc::propagateSubtreeFacts(n->name);
 	}
+}
+
+inline SubtreeFacts computeSubtreeFacts_ImportTypeNode(const ImportTypeNode* n) {
+	return SubtreeContainsTypeScript;
+}
+
+inline SubtreeFacts computeSubtreeFacts_IndexSignatureDeclaration(const IndexSignatureDeclaration* n) {
+	return SubtreeContainsTypeScript;
+}
+
+inline SubtreeFacts computeSubtreeFacts_IndexedAccessTypeNode(const IndexedAccessTypeNode* n) {
+	return SubtreeContainsTypeScript;
+}
+
+inline SubtreeFacts computeSubtreeFacts_InferTypeNode(const InferTypeNode* n) {
+	return SubtreeContainsTypeScript;
+}
+
+inline SubtreeFacts computeSubtreeFacts_InterfaceDeclaration(const InterfaceDeclaration* n) {
+	return SubtreeContainsTypeScript;
+}
+
+inline SubtreeFacts computeSubtreeFacts_IntersectionTypeNode(const IntersectionTypeNode* n) {
+	return SubtreeContainsTypeScript;
+}
+
+inline SubtreeFacts computeSubtreeFacts_JSDocAllType(const JSDocAllType* n) {
+	return SubtreeContainsTypeScript;
+}
+
+inline SubtreeFacts computeSubtreeFacts_JSDocNameReference(const JSDocNameReference* n) {
+	return SubtreeContainsTypeScript;
+}
+
+inline SubtreeFacts computeSubtreeFacts_JSDocNonNullableType(const JSDocNonNullableType* n) {
+	return SubtreeContainsTypeScript;
+}
+
+inline SubtreeFacts computeSubtreeFacts_JSDocNullableType(const JSDocNullableType* n) {
+	return SubtreeContainsTypeScript;
+}
+
+inline SubtreeFacts computeSubtreeFacts_JSDocOptionalType(const JSDocOptionalType* n) {
+	return SubtreeContainsTypeScript;
+}
+
+inline SubtreeFacts computeSubtreeFacts_JSDocSignature(const JSDocSignature* n) {
+	return SubtreeContainsTypeScript;
+}
+
+inline SubtreeFacts computeSubtreeFacts_JSDocTypeExpression(const JSDocTypeExpression* n) {
+	return SubtreeContainsTypeScript;
+}
+
+inline SubtreeFacts computeSubtreeFacts_JSDocTypeLiteral(const JSDocTypeLiteral* n) {
+	return SubtreeContainsTypeScript;
+}
+
+inline SubtreeFacts computeSubtreeFacts_JSDocVariadicType(const JSDocVariadicType* n) {
+	return SubtreeContainsTypeScript;
 }
 
 inline SubtreeFacts computeSubtreeFacts_JsxAttribute(const JsxAttribute* n) {
@@ -8610,8 +8838,20 @@ inline SubtreeFacts computeSubtreeFacts_KeywordExpression(const KeywordExpressio
 	return SubtreeFactsNone;
 }
 
+inline SubtreeFacts computeSubtreeFacts_KeywordTypeNode(const KeywordTypeNode* n) {
+	return SubtreeContainsTypeScript;
+}
+
 inline SubtreeFacts computeSubtreeFacts_LabeledStatement(const LabeledStatement* n) {
 	return ::tsc::propagateSubtreeFacts(n->Label) | ::tsc::propagateSubtreeFacts(n->Statement);
+}
+
+inline SubtreeFacts computeSubtreeFacts_LiteralTypeNode(const LiteralTypeNode* n) {
+	return SubtreeContainsTypeScript;
+}
+
+inline SubtreeFacts computeSubtreeFacts_MappedTypeNode(const MappedTypeNode* n) {
+	return SubtreeContainsTypeScript;
 }
 
 inline SubtreeFacts computeSubtreeFacts_MetaProperty(const MetaProperty* n) {
@@ -8626,6 +8866,10 @@ inline SubtreeFacts computeSubtreeFacts_MethodDeclaration(const MethodDeclaratio
 	auto isGenerator = n->AsteriskToken != nullptr;
 	return ::tsc::propagateModifierListSubtreeFacts(n->modifiers) | ::tsc::propagateSubtreeFacts(n->AsteriskToken) | ::tsc::propagateSubtreeFacts(n->name) | propagateEraseableSyntaxSubtreeFacts(n->PostfixToken) | ::tsc::propagateEraseableSyntaxListSubtreeFacts(n->TypeParameters) | ::tsc::propagateNodeListSubtreeFacts(n->Parameters, propagateSubtreeFacts) | ::tsc::propagateSubtreeFacts(n->Body) | propagateEraseableSyntaxSubtreeFacts(n->Type) | propagateEraseableSyntaxSubtreeFacts(n->FullSignature) | ifElse(isAsync && isGenerator, SubtreeContainsForAwaitOrAsyncGenerator, SubtreeFactsNone) | ifElse(isAsync && !isGenerator, SubtreeContainsAnyAwait, SubtreeFactsNone);
 	}
+}
+
+inline SubtreeFacts computeSubtreeFacts_MethodSignatureDeclaration(const MethodSignatureDeclaration* n) {
+	return SubtreeContainsTypeScript;
 }
 
 inline SubtreeFacts computeSubtreeFacts_ModuleBlock(const ModuleBlock* n) {
@@ -8648,8 +8892,16 @@ inline SubtreeFacts computeSubtreeFacts_NamedImports(const NamedImports* n) {
 	return ::tsc::propagateNodeListSubtreeFacts(n->Elements, propagateSubtreeFacts);
 }
 
+inline SubtreeFacts computeSubtreeFacts_NamedTupleMember(const NamedTupleMember* n) {
+	return SubtreeContainsTypeScript;
+}
+
 inline SubtreeFacts computeSubtreeFacts_NamespaceExport(const NamespaceExport* n) {
 	return ::tsc::propagateSubtreeFacts(n->name);
+}
+
+inline SubtreeFacts computeSubtreeFacts_NamespaceExportDeclaration(const NamespaceExportDeclaration* n) {
+	return SubtreeContainsTypeScript;
 }
 
 inline SubtreeFacts computeSubtreeFacts_NamespaceImport(const NamespaceImport* n) {
@@ -8675,6 +8927,10 @@ inline SubtreeFacts computeSubtreeFacts_ObjectLiteralExpression(const ObjectLite
 	return ::tsc::propagateNodeListSubtreeFacts(n->Properties, propagateSubtreeFacts);
 }
 
+inline SubtreeFacts computeSubtreeFacts_OptionalTypeNode(const OptionalTypeNode* n) {
+	return SubtreeContainsTypeScript;
+}
+
 inline SubtreeFacts computeSubtreeFacts_ParameterDeclaration(const ParameterDeclaration* n) {
 	if (n->name != nullptr && isThisIdentifier(n->name)) {
 	return SubtreeContainsTypeScript;
@@ -8685,6 +8941,10 @@ inline SubtreeFacts computeSubtreeFacts_ParameterDeclaration(const ParameterDecl
 
 inline SubtreeFacts computeSubtreeFacts_ParenthesizedExpression(const ParenthesizedExpression* n) {
 	return ::tsc::propagateSubtreeFacts(n->Expression);
+}
+
+inline SubtreeFacts computeSubtreeFacts_ParenthesizedTypeNode(const ParenthesizedTypeNode* n) {
+	return SubtreeContainsTypeScript;
 }
 
 inline SubtreeFacts computeSubtreeFacts_PartiallyEmittedExpression(const PartiallyEmittedExpression* n) {
@@ -8719,8 +8979,16 @@ inline SubtreeFacts computeSubtreeFacts_PropertyDeclaration(const PropertyDeclar
 	return ::tsc::propagateModifierListSubtreeFacts(n->modifiers) | ::tsc::propagateSubtreeFacts(n->name) | propagateEraseableSyntaxSubtreeFacts(n->PostfixToken) | propagateEraseableSyntaxSubtreeFacts(n->Type) | ::tsc::propagateSubtreeFacts(n->Initializer) | SubtreeContainsClassFields;
 }
 
+inline SubtreeFacts computeSubtreeFacts_PropertySignatureDeclaration(const PropertySignatureDeclaration* n) {
+	return SubtreeContainsTypeScript;
+}
+
 inline SubtreeFacts computeSubtreeFacts_QualifiedName(const QualifiedName* n) {
 	return ::tsc::propagateSubtreeFacts(n->Left) | ::tsc::propagateSubtreeFacts(n->Right);
+}
+
+inline SubtreeFacts computeSubtreeFacts_RestTypeNode(const RestTypeNode* n) {
+	return SubtreeContainsTypeScript;
 }
 
 inline SubtreeFacts computeSubtreeFacts_ReturnStatement(const ReturnStatement* n) {
@@ -8729,6 +8997,14 @@ inline SubtreeFacts computeSubtreeFacts_ReturnStatement(const ReturnStatement* n
 
 inline SubtreeFacts computeSubtreeFacts_SatisfiesExpression(const SatisfiesExpression* n) {
 	return ::tsc::propagateSubtreeFacts(n->Expression) | SubtreeContainsTypeScript;
+}
+
+inline SubtreeFacts computeSubtreeFacts_SetAccessorDeclaration(const SetAccessorDeclaration* n) {
+	if (n->Body == nullptr) {
+	return SubtreeContainsTypeScript;
+	} else {
+	return ::tsc::propagateModifierListSubtreeFacts(n->modifiers) | ::tsc::propagateSubtreeFacts(n->name) | ::tsc::propagateEraseableSyntaxListSubtreeFacts(n->TypeParameters) | ::tsc::propagateNodeListSubtreeFacts(n->Parameters, propagateSubtreeFacts) | propagateEraseableSyntaxSubtreeFacts(n->Type) | propagateEraseableSyntaxSubtreeFacts(n->FullSignature) | ::tsc::propagateSubtreeFacts(n->Body);
+	}
 }
 
 inline SubtreeFacts computeSubtreeFacts_ShorthandPropertyAssignment(const ShorthandPropertyAssignment* n) {
@@ -8770,6 +9046,14 @@ inline SubtreeFacts computeSubtreeFacts_TemplateHead(const TemplateHead* n) {
 	return SubtreeFactsNone;
 }
 
+inline SubtreeFacts computeSubtreeFacts_TemplateLiteralTypeNode(const TemplateLiteralTypeNode* n) {
+	return SubtreeContainsTypeScript;
+}
+
+inline SubtreeFacts computeSubtreeFacts_TemplateLiteralTypeSpan(const TemplateLiteralTypeSpan* n) {
+	return SubtreeContainsTypeScript;
+}
+
 inline SubtreeFacts computeSubtreeFacts_TemplateMiddle(const TemplateMiddle* n) {
 	if ((n->TemplateFlags&TokenFlagsContainsInvalidEscape) != 0) {
 	return SubtreeContainsInvalidTemplateEscape;
@@ -8786,6 +9070,10 @@ inline SubtreeFacts computeSubtreeFacts_TemplateTail(const TemplateTail* n) {
 	return SubtreeContainsInvalidTemplateEscape;
 	}
 	return SubtreeFactsNone;
+}
+
+inline SubtreeFacts computeSubtreeFacts_ThisTypeNode(const ThisTypeNode* n) {
+	return SubtreeContainsTypeScript;
 }
 
 inline SubtreeFacts computeSubtreeFacts_ThrowStatement(const ThrowStatement* n) {
@@ -8822,12 +9110,48 @@ inline SubtreeFacts computeSubtreeFacts_TryStatement(const TryStatement* n) {
 	return ::tsc::propagateSubtreeFacts(n->TryBlock) | ::tsc::propagateSubtreeFacts(n->CatchClause) | ::tsc::propagateSubtreeFacts(n->FinallyBlock);
 }
 
+inline SubtreeFacts computeSubtreeFacts_TupleTypeNode(const TupleTypeNode* n) {
+	return SubtreeContainsTypeScript;
+}
+
+inline SubtreeFacts computeSubtreeFacts_TypeAliasDeclaration(const TypeAliasDeclaration* n) {
+	return SubtreeContainsTypeScript;
+}
+
 inline SubtreeFacts computeSubtreeFacts_TypeAssertion(const TypeAssertion* n) {
 	return ::tsc::propagateSubtreeFacts(n->Expression) | SubtreeContainsTypeScript;
 }
 
+inline SubtreeFacts computeSubtreeFacts_TypeLiteralNode(const TypeLiteralNode* n) {
+	return SubtreeContainsTypeScript;
+}
+
 inline SubtreeFacts computeSubtreeFacts_TypeOfExpression(const TypeOfExpression* n) {
 	return ::tsc::propagateSubtreeFacts(n->Expression);
+}
+
+inline SubtreeFacts computeSubtreeFacts_TypeOperatorNode(const TypeOperatorNode* n) {
+	return SubtreeContainsTypeScript;
+}
+
+inline SubtreeFacts computeSubtreeFacts_TypeParameterDeclaration(const TypeParameterDeclaration* n) {
+	return SubtreeContainsTypeScript;
+}
+
+inline SubtreeFacts computeSubtreeFacts_TypePredicateNode(const TypePredicateNode* n) {
+	return SubtreeContainsTypeScript;
+}
+
+inline SubtreeFacts computeSubtreeFacts_TypeQueryNode(const TypeQueryNode* n) {
+	return SubtreeContainsTypeScript;
+}
+
+inline SubtreeFacts computeSubtreeFacts_TypeReferenceNode(const TypeReferenceNode* n) {
+	return SubtreeContainsTypeScript;
+}
+
+inline SubtreeFacts computeSubtreeFacts_UnionTypeNode(const UnionTypeNode* n) {
+	return SubtreeContainsTypeScript;
 }
 
 inline SubtreeFacts computeSubtreeFacts_VariableDeclaration(const VariableDeclaration* n) {
@@ -8866,6 +9190,8 @@ inline SubtreeFacts Node::computeSubtreeFacts() const {
 	switch (kind) {
 		case Kind::ArrayLiteralExpression:
 			return computeSubtreeFacts_ArrayLiteralExpression(static_cast<const ArrayLiteralExpression*>(this));
+		case Kind::ArrayType:
+			return computeSubtreeFacts_ArrayTypeNode(static_cast<const ArrayTypeNode*>(this));
 		case Kind::ArrowFunction:
 			return computeSubtreeFacts_ArrowFunction(static_cast<const ArrowFunction*>(this));
 		case Kind::AsExpression:
@@ -8885,6 +9211,8 @@ inline SubtreeFacts Node::computeSubtreeFacts() const {
 			return computeSubtreeFacts_Block(static_cast<const Block*>(this));
 		case Kind::CallExpression:
 			return computeSubtreeFacts_CallExpression(static_cast<const CallExpression*>(this));
+		case Kind::CallSignature:
+			return computeSubtreeFacts_CallSignatureDeclaration(static_cast<const CallSignatureDeclaration*>(this));
 		case Kind::CaseBlock:
 			return computeSubtreeFacts_CaseBlock(static_cast<const CaseBlock*>(this));
 		case Kind::CaseClause:
@@ -8892,14 +9220,24 @@ inline SubtreeFacts Node::computeSubtreeFacts() const {
 			return computeSubtreeFacts_CaseOrDefaultClause(static_cast<const CaseOrDefaultClause*>(this));
 		case Kind::CatchClause:
 			return computeSubtreeFacts_CatchClause(static_cast<const CatchClause*>(this));
+		case Kind::ClassDeclaration:
+			return computeSubtreeFacts_ClassDeclaration(static_cast<const ClassDeclaration*>(this));
+		case Kind::ClassExpression:
+			return computeSubtreeFacts_ClassExpression(static_cast<const ClassExpression*>(this));
 		case Kind::ClassStaticBlockDeclaration:
 			return computeSubtreeFacts_ClassStaticBlockDeclaration(static_cast<const ClassStaticBlockDeclaration*>(this));
 		case Kind::ComputedPropertyName:
 			return computeSubtreeFacts_ComputedPropertyName(static_cast<const ComputedPropertyName*>(this));
 		case Kind::ConditionalExpression:
 			return computeSubtreeFacts_ConditionalExpression(static_cast<const ConditionalExpression*>(this));
+		case Kind::ConditionalType:
+			return computeSubtreeFacts_ConditionalTypeNode(static_cast<const ConditionalTypeNode*>(this));
+		case Kind::ConstructSignature:
+			return computeSubtreeFacts_ConstructSignatureDeclaration(static_cast<const ConstructSignatureDeclaration*>(this));
 		case Kind::Constructor:
 			return computeSubtreeFacts_ConstructorDeclaration(static_cast<const ConstructorDeclaration*>(this));
+		case Kind::ConstructorType:
+			return computeSubtreeFacts_ConstructorTypeNode(static_cast<const ConstructorTypeNode*>(this));
 		case Kind::Decorator:
 			return computeSubtreeFacts_Decorator(static_cast<const Decorator*>(this));
 		case Kind::DeleteExpression:
@@ -8933,6 +9271,10 @@ inline SubtreeFacts Node::computeSubtreeFacts() const {
 			return computeSubtreeFacts_FunctionDeclaration(static_cast<const FunctionDeclaration*>(this));
 		case Kind::FunctionExpression:
 			return computeSubtreeFacts_FunctionExpression(static_cast<const FunctionExpression*>(this));
+		case Kind::FunctionType:
+			return computeSubtreeFacts_FunctionTypeNode(static_cast<const FunctionTypeNode*>(this));
+		case Kind::GetAccessor:
+			return computeSubtreeFacts_GetAccessorDeclaration(static_cast<const GetAccessorDeclaration*>(this));
 		case Kind::HeritageClause:
 			return computeSubtreeFacts_HeritageClause(static_cast<const HeritageClause*>(this));
 		case Kind::Identifier:
@@ -8952,6 +9294,36 @@ inline SubtreeFacts Node::computeSubtreeFacts() const {
 			return computeSubtreeFacts_ImportEqualsDeclaration(static_cast<const ImportEqualsDeclaration*>(this));
 		case Kind::ImportSpecifier:
 			return computeSubtreeFacts_ImportSpecifier(static_cast<const ImportSpecifier*>(this));
+		case Kind::ImportType:
+			return computeSubtreeFacts_ImportTypeNode(static_cast<const ImportTypeNode*>(this));
+		case Kind::IndexSignature:
+			return computeSubtreeFacts_IndexSignatureDeclaration(static_cast<const IndexSignatureDeclaration*>(this));
+		case Kind::IndexedAccessType:
+			return computeSubtreeFacts_IndexedAccessTypeNode(static_cast<const IndexedAccessTypeNode*>(this));
+		case Kind::InferType:
+			return computeSubtreeFacts_InferTypeNode(static_cast<const InferTypeNode*>(this));
+		case Kind::InterfaceDeclaration:
+			return computeSubtreeFacts_InterfaceDeclaration(static_cast<const InterfaceDeclaration*>(this));
+		case Kind::IntersectionType:
+			return computeSubtreeFacts_IntersectionTypeNode(static_cast<const IntersectionTypeNode*>(this));
+		case Kind::JSDocAllType:
+			return computeSubtreeFacts_JSDocAllType(static_cast<const JSDocAllType*>(this));
+		case Kind::JSDocNameReference:
+			return computeSubtreeFacts_JSDocNameReference(static_cast<const JSDocNameReference*>(this));
+		case Kind::JSDocNonNullableType:
+			return computeSubtreeFacts_JSDocNonNullableType(static_cast<const JSDocNonNullableType*>(this));
+		case Kind::JSDocNullableType:
+			return computeSubtreeFacts_JSDocNullableType(static_cast<const JSDocNullableType*>(this));
+		case Kind::JSDocOptionalType:
+			return computeSubtreeFacts_JSDocOptionalType(static_cast<const JSDocOptionalType*>(this));
+		case Kind::JSDocSignature:
+			return computeSubtreeFacts_JSDocSignature(static_cast<const JSDocSignature*>(this));
+		case Kind::JSDocTypeExpression:
+			return computeSubtreeFacts_JSDocTypeExpression(static_cast<const JSDocTypeExpression*>(this));
+		case Kind::JSDocTypeLiteral:
+			return computeSubtreeFacts_JSDocTypeLiteral(static_cast<const JSDocTypeLiteral*>(this));
+		case Kind::JSDocVariadicType:
+			return computeSubtreeFacts_JSDocVariadicType(static_cast<const JSDocVariadicType*>(this));
 		case Kind::JsxAttribute:
 			return computeSubtreeFacts_JsxAttribute(static_cast<const JsxAttribute*>(this));
 		case Kind::JsxAttributes:
@@ -8984,12 +9356,30 @@ inline SubtreeFacts Node::computeSubtreeFacts() const {
 		case Kind::FalseKeyword:
 		case Kind::SuperKeyword:
 			return computeSubtreeFacts_KeywordExpression(static_cast<const KeywordExpression*>(this));
+		case Kind::AnyKeyword:
+		case Kind::UnknownKeyword:
+		case Kind::UndefinedKeyword:
+		case Kind::NeverKeyword:
+		case Kind::StringKeyword:
+		case Kind::NumberKeyword:
+		case Kind::BigIntKeyword:
+		case Kind::BooleanKeyword:
+		case Kind::SymbolKeyword:
+		case Kind::VoidKeyword:
+		case Kind::ObjectKeyword:
+			return computeSubtreeFacts_KeywordTypeNode(static_cast<const KeywordTypeNode*>(this));
 		case Kind::LabeledStatement:
 			return computeSubtreeFacts_LabeledStatement(static_cast<const LabeledStatement*>(this));
+		case Kind::LiteralType:
+			return computeSubtreeFacts_LiteralTypeNode(static_cast<const LiteralTypeNode*>(this));
+		case Kind::MappedType:
+			return computeSubtreeFacts_MappedTypeNode(static_cast<const MappedTypeNode*>(this));
 		case Kind::MetaProperty:
 			return computeSubtreeFacts_MetaProperty(static_cast<const MetaProperty*>(this));
 		case Kind::MethodDeclaration:
 			return computeSubtreeFacts_MethodDeclaration(static_cast<const MethodDeclaration*>(this));
+		case Kind::MethodSignature:
+			return computeSubtreeFacts_MethodSignatureDeclaration(static_cast<const MethodSignatureDeclaration*>(this));
 		case Kind::ModuleBlock:
 			return computeSubtreeFacts_ModuleBlock(static_cast<const ModuleBlock*>(this));
 		case Kind::ModuleDeclaration:
@@ -8998,8 +9388,12 @@ inline SubtreeFacts Node::computeSubtreeFacts() const {
 			return computeSubtreeFacts_NamedExports(static_cast<const NamedExports*>(this));
 		case Kind::NamedImports:
 			return computeSubtreeFacts_NamedImports(static_cast<const NamedImports*>(this));
+		case Kind::NamedTupleMember:
+			return computeSubtreeFacts_NamedTupleMember(static_cast<const NamedTupleMember*>(this));
 		case Kind::NamespaceExport:
 			return computeSubtreeFacts_NamespaceExport(static_cast<const NamespaceExport*>(this));
+		case Kind::NamespaceExportDeclaration:
+			return computeSubtreeFacts_NamespaceExportDeclaration(static_cast<const NamespaceExportDeclaration*>(this));
 		case Kind::NamespaceImport:
 			return computeSubtreeFacts_NamespaceImport(static_cast<const NamespaceImport*>(this));
 		case Kind::NewExpression:
@@ -9010,10 +9404,14 @@ inline SubtreeFacts Node::computeSubtreeFacts() const {
 			return computeSubtreeFacts_NonNullExpression(static_cast<const NonNullExpression*>(this));
 		case Kind::ObjectLiteralExpression:
 			return computeSubtreeFacts_ObjectLiteralExpression(static_cast<const ObjectLiteralExpression*>(this));
+		case Kind::OptionalType:
+			return computeSubtreeFacts_OptionalTypeNode(static_cast<const OptionalTypeNode*>(this));
 		case Kind::Parameter:
 			return computeSubtreeFacts_ParameterDeclaration(static_cast<const ParameterDeclaration*>(this));
 		case Kind::ParenthesizedExpression:
 			return computeSubtreeFacts_ParenthesizedExpression(static_cast<const ParenthesizedExpression*>(this));
+		case Kind::ParenthesizedType:
+			return computeSubtreeFacts_ParenthesizedTypeNode(static_cast<const ParenthesizedTypeNode*>(this));
 		case Kind::PartiallyEmittedExpression:
 			return computeSubtreeFacts_PartiallyEmittedExpression(static_cast<const PartiallyEmittedExpression*>(this));
 		case Kind::PostfixUnaryExpression:
@@ -9028,12 +9426,18 @@ inline SubtreeFacts Node::computeSubtreeFacts() const {
 			return computeSubtreeFacts_PropertyAssignment(static_cast<const PropertyAssignment*>(this));
 		case Kind::PropertyDeclaration:
 			return computeSubtreeFacts_PropertyDeclaration(static_cast<const PropertyDeclaration*>(this));
+		case Kind::PropertySignature:
+			return computeSubtreeFacts_PropertySignatureDeclaration(static_cast<const PropertySignatureDeclaration*>(this));
 		case Kind::QualifiedName:
 			return computeSubtreeFacts_QualifiedName(static_cast<const QualifiedName*>(this));
+		case Kind::RestType:
+			return computeSubtreeFacts_RestTypeNode(static_cast<const RestTypeNode*>(this));
 		case Kind::ReturnStatement:
 			return computeSubtreeFacts_ReturnStatement(static_cast<const ReturnStatement*>(this));
 		case Kind::SatisfiesExpression:
 			return computeSubtreeFacts_SatisfiesExpression(static_cast<const SatisfiesExpression*>(this));
+		case Kind::SetAccessor:
+			return computeSubtreeFacts_SetAccessorDeclaration(static_cast<const SetAccessorDeclaration*>(this));
 		case Kind::ShorthandPropertyAssignment:
 			return computeSubtreeFacts_ShorthandPropertyAssignment(static_cast<const ShorthandPropertyAssignment*>(this));
 		case Kind::SourceFile:
@@ -9052,12 +9456,18 @@ inline SubtreeFacts Node::computeSubtreeFacts() const {
 			return computeSubtreeFacts_TemplateExpression(static_cast<const TemplateExpression*>(this));
 		case Kind::TemplateHead:
 			return computeSubtreeFacts_TemplateHead(static_cast<const TemplateHead*>(this));
+		case Kind::TemplateLiteralType:
+			return computeSubtreeFacts_TemplateLiteralTypeNode(static_cast<const TemplateLiteralTypeNode*>(this));
+		case Kind::TemplateLiteralTypeSpan:
+			return computeSubtreeFacts_TemplateLiteralTypeSpan(static_cast<const TemplateLiteralTypeSpan*>(this));
 		case Kind::TemplateMiddle:
 			return computeSubtreeFacts_TemplateMiddle(static_cast<const TemplateMiddle*>(this));
 		case Kind::TemplateSpan:
 			return computeSubtreeFacts_TemplateSpan(static_cast<const TemplateSpan*>(this));
 		case Kind::TemplateTail:
 			return computeSubtreeFacts_TemplateTail(static_cast<const TemplateTail*>(this));
+		case Kind::ThisType:
+			return computeSubtreeFacts_ThisTypeNode(static_cast<const ThisTypeNode*>(this));
 		case Kind::ThrowStatement:
 			return computeSubtreeFacts_ThrowStatement(static_cast<const ThrowStatement*>(this));
 		case Kind::ExportKeyword:
@@ -9081,13 +9491,152 @@ inline SubtreeFacts Node::computeSubtreeFacts() const {
 		case Kind::InKeyword:
 		case Kind::DotToken:
 		case Kind::QuestionDotToken:
+		case Kind::AbstractKeyword:
+		case Kind::AccessorKeyword:
+		case Kind::AmpersandAmpersandEqualsToken:
+		case Kind::AmpersandEqualsToken:
+		case Kind::AmpersandToken:
+		case Kind::AsKeyword:
+		case Kind::AssertKeyword:
+		case Kind::AsteriskAsteriskEqualsToken:
+		case Kind::AsteriskAsteriskToken:
+		case Kind::AsteriskEqualsToken:
+		case Kind::AsyncKeyword:
+		case Kind::AtToken:
+		case Kind::AwaitKeyword:
+		case Kind::BacktickToken:
+		case Kind::BarBarEqualsToken:
+		case Kind::BarEqualsToken:
+		case Kind::BarToken:
+		case Kind::BreakKeyword:
+		case Kind::CaretEqualsToken:
+		case Kind::CaretToken:
+		case Kind::CaseKeyword:
+		case Kind::CatchKeyword:
+		case Kind::ClassKeyword:
+		case Kind::CloseBraceToken:
+		case Kind::CloseBracketToken:
+		case Kind::CloseParenToken:
+		case Kind::ConflictMarkerTrivia:
+		case Kind::ConstKeyword:
+		case Kind::ConstructorKeyword:
+		case Kind::ContinueKeyword:
+		case Kind::Count:
+		case Kind::DebuggerKeyword:
+		case Kind::DefaultKeyword:
+		case Kind::DeferKeyword:
+		case Kind::DeleteKeyword:
+		case Kind::DoKeyword:
+		case Kind::ElseKeyword:
+		case Kind::EnumKeyword:
+		case Kind::EqualsEqualsToken:
+		case Kind::ExclamationEqualsToken:
+		case Kind::ExclamationToken:
+		case Kind::ExtendsKeyword:
+		case Kind::FinallyKeyword:
+		case Kind::ForKeyword:
+		case Kind::FromKeyword:
+		case Kind::FunctionKeyword:
+		case Kind::GetKeyword:
+		case Kind::GlobalKeyword:
+		case Kind::GreaterThanEqualsToken:
+		case Kind::GreaterThanGreaterThanEqualsToken:
+		case Kind::GreaterThanGreaterThanGreaterThanEqualsToken:
+		case Kind::GreaterThanGreaterThanGreaterThanToken:
+		case Kind::GreaterThanGreaterThanToken:
+		case Kind::GreaterThanToken:
+		case Kind::HashToken:
+		case Kind::IfKeyword:
+		case Kind::ImmediateKeyword:
+		case Kind::ImplementsKeyword:
+		case Kind::ImportKeyword:
+		case Kind::InferKeyword:
+		case Kind::InstanceOfKeyword:
+		case Kind::InterfaceKeyword:
+		case Kind::IntrinsicKeyword:
+		case Kind::IsKeyword:
+		case Kind::JSDocCommentTextToken:
+		case Kind::JsxTextAllWhiteSpaces:
+		case Kind::KeyOfKeyword:
+		case Kind::LessThanEqualsToken:
+		case Kind::LessThanLessThanEqualsToken:
+		case Kind::LessThanLessThanToken:
+		case Kind::LessThanSlashToken:
+		case Kind::LessThanToken:
+		case Kind::LetKeyword:
+		case Kind::MinusEqualsToken:
+		case Kind::MinusMinusToken:
+		case Kind::MinusToken:
+		case Kind::ModuleKeyword:
+		case Kind::MultiLineCommentTrivia:
+		case Kind::NamespaceKeyword:
+		case Kind::NewKeyword:
+		case Kind::NewLineTrivia:
+		case Kind::NonTextFileMarkerTrivia:
+		case Kind::OfKeyword:
+		case Kind::OpenBraceToken:
+		case Kind::OpenBracketToken:
+		case Kind::OpenParenToken:
+		case Kind::OutKeyword:
+		case Kind::OverrideKeyword:
+		case Kind::PackageKeyword:
+		case Kind::PercentEqualsToken:
+		case Kind::PercentToken:
+		case Kind::PlusEqualsToken:
+		case Kind::PlusPlusToken:
+		case Kind::PrivateKeyword:
+		case Kind::ProtectedKeyword:
+		case Kind::PublicKeyword:
+		case Kind::QuestionQuestionEqualsToken:
+		case Kind::ReadonlyKeyword:
+		case Kind::RequireKeyword:
+		case Kind::ReturnKeyword:
+		case Kind::SatisfiesKeyword:
+		case Kind::SetKeyword:
+		case Kind::SingleLineCommentTrivia:
+		case Kind::SlashEqualsToken:
+		case Kind::SlashToken:
+		case Kind::StaticKeyword:
+		case Kind::SwitchKeyword:
+		case Kind::ThrowKeyword:
+		case Kind::TildeToken:
+		case Kind::TryKeyword:
+		case Kind::TypeKeyword:
+		case Kind::TypeOfKeyword:
+		case Kind::UniqueKeyword:
+		case Kind::Unknown:
+		case Kind::UsingKeyword:
+		case Kind::VarKeyword:
+		case Kind::WhileKeyword:
+		case Kind::WhitespaceTrivia:
+		case Kind::WithKeyword:
+		case Kind::YieldKeyword:
 			return computeSubtreeFacts_Token(static_cast<const Token*>(this));
 		case Kind::TryStatement:
 			return computeSubtreeFacts_TryStatement(static_cast<const TryStatement*>(this));
+		case Kind::TupleType:
+			return computeSubtreeFacts_TupleTypeNode(static_cast<const TupleTypeNode*>(this));
+		case Kind::TypeAliasDeclaration:
+		case Kind::JSTypeAliasDeclaration:
+			return computeSubtreeFacts_TypeAliasDeclaration(static_cast<const TypeAliasDeclaration*>(this));
 		case Kind::TypeAssertionExpression:
 			return computeSubtreeFacts_TypeAssertion(static_cast<const TypeAssertion*>(this));
+		case Kind::TypeLiteral:
+			return computeSubtreeFacts_TypeLiteralNode(static_cast<const TypeLiteralNode*>(this));
 		case Kind::TypeOfExpression:
 			return computeSubtreeFacts_TypeOfExpression(static_cast<const TypeOfExpression*>(this));
+		case Kind::TypeOperator:
+			return computeSubtreeFacts_TypeOperatorNode(static_cast<const TypeOperatorNode*>(this));
+		case Kind::TypeParameter:
+			return computeSubtreeFacts_TypeParameterDeclaration(static_cast<const TypeParameterDeclaration*>(this));
+		case Kind::TypePredicate:
+			return computeSubtreeFacts_TypePredicateNode(static_cast<const TypePredicateNode*>(this));
+		case Kind::TypeQuery:
+			return computeSubtreeFacts_TypeQueryNode(static_cast<const TypeQueryNode*>(this));
+		case Kind::TypeReference:
+			return computeSubtreeFacts_TypeReferenceNode(static_cast<const TypeReferenceNode*>(this));
+		case Kind::UnionType:
+			return computeSubtreeFacts_UnionTypeNode(static_cast<const UnionTypeNode*>(this));
 		case Kind::VariableDeclaration:
 			return computeSubtreeFacts_VariableDeclaration(static_cast<const VariableDeclaration*>(this));
 		case Kind::VariableDeclarationList:

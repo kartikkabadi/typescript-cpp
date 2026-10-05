@@ -2543,8 +2543,12 @@ void Printer::emitBindingElement(Node* node) {
 		writePunctuation(":");
 		writeSpace();
 	}
-	emitBindingName(n->name);
-	emitInitializer(n->Initializer, n->name->end(), node);
+	// Old parser used `OmittedExpression` as a substitute for `Elision`. New
+	// parser uses a `BindingElement` with nil members
+	if (n->name != nullptr) {
+		emitBindingName(n->name);
+		emitInitializer(n->Initializer, n->name->end(), node);
+	}
 	exitNode(node, state);
 }
 
