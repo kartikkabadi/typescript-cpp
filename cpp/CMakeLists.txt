@@ -41,12 +41,14 @@ add_library(tsc STATIC
 	internal/checker/checker_widen.cpp
 	internal/checker/checker_decltypes.cpp
 	internal/checker/checker_contextual.cpp
+	internal/checker/checker_exports.cpp
 	internal/checker/checker_expressions_b.cpp
 	internal/checker/checker_expressions_a.cpp
 	internal/checker/checker_typeops.cpp
 	internal/checker/checker_expressions_c.cpp
 	internal/checker/checker_utilities.cpp
 	internal/checker/checker_services.cpp
+	internal/checker/checker_services2.cpp
 	internal/checker/checker_flow.cpp
 	internal/checker/mapper.cpp
 	internal/compiler/fileloader.cpp
