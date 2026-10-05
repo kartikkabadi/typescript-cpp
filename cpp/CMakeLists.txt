@@ -215,6 +215,8 @@ add_library(tsc STATIC
 	internal/vfs/osvfs/osvfs.cpp
 	internal/vfs/vfsmatch/vfsmatch.cpp
 	internal/vfs/vfstest/vfstest.cpp
+	# === slice: transpile ===
+	internal/transpile/transpile.cpp
 )
 
 target_link_libraries(tsc PUBLIC z) # zlib — pprof profile writer
