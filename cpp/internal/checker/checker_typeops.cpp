@@ -631,7 +631,11 @@ static bool isInvalidComputedPropertyName(Node* node) {
 // checker.go:27268
 Type* Checker::checkComputedPropertyName(Node* node) {
 	auto* links = typeNodeLinks.Get(node);
-	if (links->resolvedType == nullptr) {
+	if (links->resolvedType == nullptr ||
+		staleForCheckFile(links->resolvedTypeCheckFile)) {
+		// Go: fresh per-checker cache — recompute under this file.
+		links->resolvedType = nullptr;
+		links->resolvedTypeCheckFile = activeCheckFile;
 		links->resolvedType = circularConstraintType;
 		if (isInvalidComputedPropertyName(node)) {
 			links->resolvedType = errorType;
@@ -925,7 +929,9 @@ Type* Checker::getPropertyTypeForIndexType(Type* originalObjectType,
 					return nullptr;
 				}
 				if (accessFlags & AccessFlagsCacheSymbol) {
-					symbolNodeLinks.Get(accessNode)->resolvedSymbol = prop;
+					auto* accessLinks = symbolNodeLinks.Get(accessNode);
+					accessLinks->resolvedSymbol = prop;
+					accessLinks->resolvedSymbolCheckFile = activeCheckFile;
 				}
 				if (isThisPropertyAccessInConstructor(accessExpression, prop)) {
 					return autoType;

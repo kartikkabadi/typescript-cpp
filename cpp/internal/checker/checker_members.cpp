@@ -1668,12 +1668,16 @@ Symbol* Checker::instantiateSymbol(Symbol* symbol, TypeMapper* m) {
 	}
 	// If the type of the symbol is already resolved, and if that type could not possibly
 	// be affected by instantiation, simply return the symbol itself.
-	if (links->resolvedType != nullptr && !couldContainTypeVariables(links->resolvedType)) {
+	if (links->resolvedType != nullptr &&
+		!staleForCheckFile(links->resolvedTypeCheckFile) &&
+		!couldContainTypeVariables(links->resolvedType)) {
 		if (!(symbol->flags & SymbolFlagsSetAccessor)) {
 			return symbol;
 		}
 		// If we're a setter, check writeType.
-		if (links->writeType != nullptr && !couldContainTypeVariables(links->writeType)) {
+		if (links->writeType != nullptr &&
+			!staleForCheckFile(links->writeTypeCheckFile) &&
+			!couldContainTypeVariables(links->writeType)) {
 			return symbol;
 		}
 	}
@@ -1873,7 +1877,11 @@ void Checker::resolveMappedTypeMembers(Type* t) {
 
 Type* Checker::getTypeOfMappedSymbol(Symbol* symbol) {
 	ValueSymbolLinks* links = valueSymbolLinks.Get(symbol);
-	if (links->resolvedType == nullptr) {
+	if (links->resolvedType == nullptr ||
+		staleForCheckFile(links->resolvedTypeCheckFile)) {
+		// Go: fresh per-checker cache — recompute under this file.
+		links->resolvedType = nullptr;
+		links->resolvedTypeCheckFile = activeCheckFile;
 		Type* mappedType = links->containingType;
 		if (!pushTypeResolution(symbol, TypeSystemPropertyName::Type)) {
 			mappedType->AsMappedType()->containsError = true;

@@ -1269,10 +1269,13 @@ LiteralValue Checker::GetConstantValue(Node* node) {
 		return getEnumMemberValue(node).Value;
 	}
 
-	if (symbolNodeLinks.Get(node)->resolvedSymbol == nullptr) {
+	SymbolNodeLinks* links = symbolNodeLinks.Get(node);
+	if (links->resolvedSymbol == nullptr ||
+		staleForCheckFile(links->resolvedSymbolCheckFile)) {
 		checkExpressionCached(node);  // ensure cached resolved symbol is set
 	}
-	Symbol* symbol = symbolNodeLinks.Get(node)->resolvedSymbol;
+	Symbol* symbol = staleForCheckFile(links->resolvedSymbolCheckFile)
+						 ? nullptr : links->resolvedSymbol;
 	if (symbol == nullptr && isEntityNameExpression(node)) {
 		symbol = resolveEntityName(node, SymbolFlagsValue,
 								   true,  /*ignoreErrors*/

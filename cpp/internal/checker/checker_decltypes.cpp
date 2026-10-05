@@ -685,7 +685,11 @@ Type* Checker::GetTypeOfSymbolAtLocation(Symbol* symbol, Node* location) {
 				} else {
 					t = getTypeOfExpression(location);
 				}
-				if (getExportSymbolOfValueSymbolIfExported(symbolNodeLinks.Get(location)->resolvedSymbol) ==
+				SymbolNodeLinks* locLinks = symbolNodeLinks.Get(location);
+				Symbol* locSymbol =
+					staleForCheckFile(locLinks->resolvedSymbolCheckFile)
+						? nullptr : locLinks->resolvedSymbol;
+				if (getExportSymbolOfValueSymbolIfExported(locSymbol) ==
 					symbol) {
 					return removeOptionalTypeMarker(t);
 				}
@@ -749,7 +753,11 @@ Type* Checker::getNonMissingTypeOfSymbol(Symbol* symbol) {
 // getTypeOfInstantiatedSymbol — checker.go:16847
 Type* Checker::getTypeOfInstantiatedSymbol(Symbol* symbol) {
 	auto* links = valueSymbolLinks.Get(symbol);
-	if (links->resolvedType == nullptr) {
+	if (links->resolvedType == nullptr ||
+		staleForCheckFile(links->resolvedTypeCheckFile)) {
+		// Go: fresh per-checker cache — recompute under this file.
+		links->resolvedType = nullptr;
+		links->resolvedTypeCheckFile = activeCheckFile;
 		links->resolvedType = instantiateType(getTypeOfSymbol(links->target), links->mapper);
 	}
 	return links->resolvedType;
@@ -758,7 +766,11 @@ Type* Checker::getTypeOfInstantiatedSymbol(Symbol* symbol) {
 // getWriteTypeOfInstantiatedSymbol — checker.go:16855
 Type* Checker::getWriteTypeOfInstantiatedSymbol(Symbol* symbol) {
 	auto* links = valueSymbolLinks.Get(symbol);
-	if (links->writeType == nullptr) {
+	if (links->writeType == nullptr ||
+		staleForCheckFile(links->writeTypeCheckFile)) {
+		// Go: fresh per-checker cache — recompute under this file.
+		links->writeType = nullptr;
+		links->writeTypeCheckFile = activeCheckFile;
 		links->writeType = instantiateType(getWriteTypeOfSymbol(links->target), links->mapper);
 	}
 	return links->writeType;
@@ -767,7 +779,11 @@ Type* Checker::getWriteTypeOfInstantiatedSymbol(Symbol* symbol) {
 // getTypeOfVariableOrParameterOrProperty — checker.go:16863
 Type* Checker::getTypeOfVariableOrParameterOrProperty(Symbol* symbol) {
 	auto* links = valueSymbolLinks.Get(symbol);
-	if (links->resolvedType == nullptr) {
+	if (links->resolvedType == nullptr ||
+		staleForCheckFile(links->resolvedTypeCheckFile)) {
+		// Go: fresh per-checker cache — recompute under this file.
+		links->resolvedType = nullptr;
+		links->resolvedTypeCheckFile = activeCheckFile;
 		Type* t = getTypeOfVariableOrParameterOrPropertyWorker(symbol);
 		if (t == nullptr) {
 			TSC_UNREACHABLE("Unexpected nil type");
@@ -1195,7 +1211,11 @@ Type* Checker::getWidenedLiteralTypeForInitializer(Node* declaration, Type* t) {
 // getTypeOfFuncClassEnumModule — checker.go:17224
 Type* Checker::getTypeOfFuncClassEnumModule(Symbol* symbol) {
 	auto* links = valueSymbolLinks.Get(symbol);
-	if (links->resolvedType == nullptr) {
+	if (links->resolvedType == nullptr ||
+		staleForCheckFile(links->resolvedTypeCheckFile)) {
+		// Go: fresh per-checker cache — recompute under this file.
+		links->resolvedType = nullptr;
+		links->resolvedTypeCheckFile = activeCheckFile;
 		links->resolvedType = getTypeOfFuncClassEnumModuleWorker(symbol);
 	}
 	return links->resolvedType;
@@ -1715,9 +1735,11 @@ Type* Checker::getTypeForBindingElementParent(Node* node, CheckMode checkMode) {
 	if (checkMode == CheckModeNormal) {
 		// We can use a cached resolved type if no optionality was included in that type.
 		if (Symbol* symbol = getSymbolOfDeclaration(node); symbol != nullptr) {
-			if (Type* resolvedType = valueSymbolLinks.Get(symbol)->resolvedType;
-				resolvedType != nullptr && !(strictNullChecks && isOptionalDeclaration(node))) {
-				return resolvedType;
+			if (ValueSymbolLinks* symLinks = valueSymbolLinks.Get(symbol);
+				symLinks->resolvedType != nullptr &&
+				!staleForCheckFile(symLinks->resolvedTypeCheckFile) &&
+				!(strictNullChecks && isOptionalDeclaration(node))) {
+				return symLinks->resolvedType;
 			}
 		}
 	}
@@ -2715,7 +2737,11 @@ Symbol* Checker::getUndefinedProperty(Symbol* prop) {
 // getTypeOfEnumMember — checker.go:18843
 Type* Checker::getTypeOfEnumMember(Symbol* symbol) {
 	auto* links = valueSymbolLinks.Get(symbol);
-	if (links->resolvedType == nullptr) {
+	if (links->resolvedType == nullptr ||
+		staleForCheckFile(links->resolvedTypeCheckFile)) {
+		// Go: fresh per-checker cache — recompute under this file.
+		links->resolvedType = nullptr;
+		links->resolvedTypeCheckFile = activeCheckFile;
 		links->resolvedType = getDeclaredTypeOfEnumMember(symbol);
 	}
 	return links->resolvedType;
@@ -2724,7 +2750,11 @@ Type* Checker::getTypeOfEnumMember(Symbol* symbol) {
 // getTypeOfAccessors — checker.go:18851
 Type* Checker::getTypeOfAccessors(Symbol* symbol) {
 	auto* links = valueSymbolLinks.Get(symbol);
-	if (links->resolvedType == nullptr) {
+	if (links->resolvedType == nullptr ||
+		staleForCheckFile(links->resolvedTypeCheckFile)) {
+		// Go: fresh per-checker cache — recompute under this file.
+		links->resolvedType = nullptr;
+		links->resolvedTypeCheckFile = activeCheckFile;
 		if (!pushTypeResolution(symbol, TypeSystemPropertyName::Type)) {
 			return errorType;
 		}
@@ -2784,7 +2814,11 @@ Type* Checker::getTypeOfAccessors(Symbol* symbol) {
 			}
 			t = anyType;
 		}
-		if (links->resolvedType == nullptr) {
+		if (links->resolvedType == nullptr ||
+		staleForCheckFile(links->resolvedTypeCheckFile)) {
+		// Go: fresh per-checker cache — recompute under this file.
+		links->resolvedType = nullptr;
+		links->resolvedTypeCheckFile = activeCheckFile;
 			links->resolvedType = t;
 		}
 	}
@@ -2794,7 +2828,11 @@ Type* Checker::getTypeOfAccessors(Symbol* symbol) {
 // getWriteTypeOfAccessors — checker.go:18906
 Type* Checker::getWriteTypeOfAccessors(Symbol* symbol) {
 	auto* links = valueSymbolLinks.Get(symbol);
-	if (links->writeType == nullptr) {
+	if (links->writeType == nullptr ||
+		staleForCheckFile(links->writeTypeCheckFile)) {
+		// Go: fresh per-checker cache — recompute under this file.
+		links->writeType = nullptr;
+		links->writeTypeCheckFile = activeCheckFile;
 		if (!pushTypeResolution(symbol, TypeSystemPropertyName::WriteType)) {
 			return errorType;
 		}
@@ -2816,7 +2854,11 @@ Type* Checker::getWriteTypeOfAccessors(Symbol* symbol) {
 			writeType = anyType;
 		}
 		// Absent an explicit setter type annotation we use the read type of the accessor.
-		if (links->writeType == nullptr) {
+		if (links->writeType == nullptr ||
+		staleForCheckFile(links->writeTypeCheckFile)) {
+		// Go: fresh per-checker cache — recompute under this file.
+		links->writeType = nullptr;
+		links->writeTypeCheckFile = activeCheckFile;
 			if (writeType != nullptr) {
 				links->writeType = writeType;
 			} else {
@@ -2830,7 +2872,11 @@ Type* Checker::getWriteTypeOfAccessors(Symbol* symbol) {
 // getTypeOfAlias — checker.go:18938
 Type* Checker::getTypeOfAlias(Symbol* symbol) {
 	auto* links = valueSymbolLinks.Get(symbol);
-	if (links->resolvedType == nullptr) {
+	if (links->resolvedType == nullptr ||
+		staleForCheckFile(links->resolvedTypeCheckFile)) {
+		// Go: fresh per-checker cache — recompute under this file.
+		links->resolvedType = nullptr;
+		links->resolvedTypeCheckFile = activeCheckFile;
 		if (!pushTypeResolution(symbol, TypeSystemPropertyName::Type)) {
 			return errorType;
 		}
@@ -2841,7 +2887,11 @@ Type* Checker::getTypeOfAlias(Symbol* symbol) {
 		// type symbol, call getDeclaredTypeOfSymbol.
 		// This check is important because without it, a call to getTypeOfSymbol could end
 		// up recursively calling getTypeOfAlias, causing a stack overflow.
-		if (links->resolvedType == nullptr) {
+		if (links->resolvedType == nullptr ||
+		staleForCheckFile(links->resolvedTypeCheckFile)) {
+		// Go: fresh per-checker cache — recompute under this file.
+		links->resolvedType = nullptr;
+		links->resolvedTypeCheckFile = activeCheckFile;
 			if ((getSymbolFlags(targetSymbol) & SymbolFlagsValue) != 0) {
 				links->resolvedType = getTypeOfSymbol(targetSymbol);
 			} else {
@@ -2850,7 +2900,11 @@ Type* Checker::getTypeOfAlias(Symbol* symbol) {
 		}
 		if (!popTypeResolution()) {
 			reportCircularityError(orElse(exportSymbol, symbol));
-			if (links->resolvedType == nullptr) {
+			if (links->resolvedType == nullptr ||
+		staleForCheckFile(links->resolvedTypeCheckFile)) {
+		// Go: fresh per-checker cache — recompute under this file.
+		links->resolvedType = nullptr;
+		links->resolvedTypeCheckFile = activeCheckFile;
 				links->resolvedType = errorType;
 			}
 			return links->resolvedType;

@@ -3103,9 +3103,10 @@ Type* Checker::getTypeOfInitializer(Node* node) {
 	// from its initializer, we'll already have cached the type. Otherwise we compute it now
 	// without caching such that transient types are reflected.
 	if (typeNodeLinks.Has(node)) {
-		Type* t = typeNodeLinks.Get(node)->resolvedType;
-		if (t != nullptr) {
-			return t;
+		TypeNodeLinks* links = typeNodeLinks.Get(node);
+		if (links->resolvedType != nullptr &&
+			!staleForCheckFile(links->resolvedTypeCheckFile)) {
+			return links->resolvedType;
 		}
 	}
 	return getTypeOfExpression(node);

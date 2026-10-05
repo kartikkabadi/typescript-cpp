@@ -388,9 +388,12 @@ Symbol* Checker::getSymbolOfNameOrPropertyAccessExpression(Node* name) {
 		} else if (isPropertyAccessExpression(name) ||
 		           isQualifiedName(name)) {
 			auto* links = symbolNodeLinks.Get(name);
-			if (links->resolvedSymbol != nullptr) {
+			if (links->resolvedSymbol != nullptr &&
+				!staleForCheckFile(links->resolvedSymbolCheckFile)) {
 				return links->resolvedSymbol;
 			}
+			links->resolvedSymbol = nullptr;
+			links->resolvedSymbolCheckFile = activeCheckFile;
 			if (isPropertyAccessExpression(name)) {
 				checkPropertyAccessExpression(name, CheckModeNormal,
 				                              false /*writeOnly*/);

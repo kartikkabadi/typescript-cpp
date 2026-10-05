@@ -477,8 +477,10 @@ void Checker::checkInterfaceDeclaration(Node* node) {
 	Symbol* symbol = getSymbolOfDeclaration(node);
 	checkTypeParameterListsIdentical(symbol);
 	// Only check this symbol once
-	if (DeclaredTypeLinks* links = declaredTypeLinks.Get(symbol); !links->interfaceChecked) {
-		links->interfaceChecked = true;
+	if (DeclaredTypeLinks* links = declaredTypeLinks.Get(symbol);
+		links->interfaceCheckedFile == nullptr ||
+		staleForCheckFile(links->interfaceCheckedFile)) {
+		links->interfaceCheckedFile = activeCheckFile;
 		Type* t = getDeclaredTypeOfSymbol(symbol);
 		Type* typeWithThis = getTypeWithThisArgument(t, nullptr, false);
 		// run subsequent checks only if first set succeeded
@@ -573,8 +575,10 @@ void Checker::checkEnumDeclaration(Node* node) {
 	//
 	// Only perform this check once per symbol
 	Symbol* enumSymbol = getSymbolOfDeclaration(node);
-	if (DeclaredTypeLinks* links = declaredTypeLinks.Get(enumSymbol); !links->enumChecked) {
-		links->enumChecked = true;
+	if (DeclaredTypeLinks* links = declaredTypeLinks.Get(enumSymbol);
+		links->enumCheckedFile == nullptr ||
+		staleForCheckFile(links->enumCheckedFile)) {
+		links->enumCheckedFile = activeCheckFile;
 		if (enumSymbol->declarations.size() > 1) {
 			bool enumIsConst = isEnumConst(node);
 			// check that const is placed\omitted on all enum declarations
@@ -980,7 +984,11 @@ Type* Checker::getTypeFromImportAttributes(Node* node) {
 // checker.go:5579 — checkImportAttributesExpression
 Type* Checker::checkImportAttributesExpression(Node* node) {
 	TypeNodeLinks* links = typeNodeLinks.Get(node);
-	if (links->resolvedType == nullptr) {
+	if (links->resolvedType == nullptr ||
+		staleForCheckFile(links->resolvedTypeCheckFile)) {
+		// Go: fresh per-checker cache — recompute under this file.
+		links->resolvedType = nullptr;
+		links->resolvedTypeCheckFile = activeCheckFile;
 		Symbol* symbol = newSymbol(SymbolFlagsObjectLiteral, InternalSymbolNameImportAttributes);
 		SymbolTable members;
 		for (Node* attribute : node->as<ImportAttributes>()->Attributes->nodes) {
@@ -1300,7 +1308,8 @@ void Checker::checkExportAssignment(Node* node) {
 void Checker::checkExternalModuleExports(Node* node) {
 	Symbol* moduleSymbol = getSymbolOfDeclaration(node);
 	ModuleSymbolLinks* links = moduleSymbolLinks.Get(moduleSymbol);
-	if (!links->exportsChecked) {
+	if (links->exportsCheckedFile == nullptr ||
+		staleForCheckFile(links->exportsCheckedFile)) {
 		Symbol* exportEqualsSymbol = nullptr;
 		if (auto it = moduleSymbol->exports.find(InternalSymbolNameExportEquals); it != moduleSymbol->exports.end()) {
 			exportEqualsSymbol = it->second;
@@ -1347,7 +1356,7 @@ void Checker::checkExternalModuleExports(Node* node) {
 				}
 			}
 		}
-		links->exportsChecked = true;
+		links->exportsCheckedFile = activeCheckFile;
 	}
 }
 

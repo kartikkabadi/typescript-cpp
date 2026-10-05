@@ -577,9 +577,12 @@ void Checker::assignNonContextualParameterTypes(Signature* signature) {
 
 void Checker::assignParameterType(Symbol* parameter, Type* contextualType) {
 	ValueSymbolLinks* links = valueSymbolLinks.Get(parameter);
-	if (links->resolvedType != nullptr) {
+	if (links->resolvedType != nullptr &&
+		!staleForCheckFile(links->resolvedTypeCheckFile)) {
 		return;
 	}
+	links->resolvedType = nullptr;
+	links->resolvedTypeCheckFile = activeCheckFile;
 	Node* declaration = parameter->valueDeclaration;
 	Type* t = contextualType;
 	if (t == nullptr) {
@@ -613,7 +616,9 @@ void Checker::assignBindingElementTypes(Node* pattern, Type* parentType) {
 			Type* t = getBindingElementTypeFromParentType(element, parentType,
 			                                            false /*noTupleBoundsCheck*/);
 			if (isIdentifier(name)) {
-				valueSymbolLinks.Get(getSymbolOfDeclaration(element))->resolvedType = t;
+				auto* elLinks = valueSymbolLinks.Get(getSymbolOfDeclaration(element));
+				elLinks->resolvedType = t;
+				elLinks->resolvedTypeCheckFile = activeCheckFile;
 			} else {
 				assignBindingElementTypes(name, t);
 			}
@@ -1845,7 +1850,9 @@ Type* Checker::checkPropertyAccessExpressionOrQualifiedName(
 		checkPropertyNotUsedBeforeDeclaration(prop, node, right);
 		markPropertyAsReferenced(prop, node,
 		                         isSelfTypeAccess(left, parentSymbol));
-		symbolNodeLinks.Get(node)->resolvedSymbol = prop;
+		auto* propLinks = symbolNodeLinks.Get(node);
+		propLinks->resolvedSymbol = prop;
+		propLinks->resolvedSymbolCheckFile = activeCheckFile;
 		checkPropertyAccessibility(node, left->kind == Kind::SuperKeyword,
 		                           isWriteAccess(node), apparentType, prop);
 		if (isAssignmentToReadonlyEntity(node, prop, assignmentKind)) {

@@ -2498,7 +2498,8 @@ Type* Checker::getTypeFromIndexInfosOfContextualType(Type* t,
 bool Checker::isCircularMappedProperty(Symbol* symbol) {
 	if (symbol->checkFlags & CheckFlagsMapped) {
 		ValueSymbolLinks* links = valueSymbolLinks.Get(symbol);
-		return links->resolvedType == nullptr &&
+		return (links->resolvedType == nullptr ||
+				staleForCheckFile(links->resolvedTypeCheckFile)) &&
 			   findResolutionCycleStartIndex(
 				   symbol, TypeSystemPropertyName::Type) >= 0;
 	}

@@ -1433,6 +1433,14 @@ public:
 	// hide diagnostics that a pooled Go checker would have orphaned on a
 	// different checker instance.
 	SourceFile* activeCheckFile = nullptr;
+	// True when `stamp` records a link value produced under a different
+	// file's check. Go's per-checker link caches would be empty on this
+	// file's checker, so the value must be recomputed (re-emitting its
+	// diagnostics). A nullptr stamp is populated outside any file check and
+	// is valid in every context; a nullptr activeCheckFile accepts any stamp.
+	bool staleForCheckFile(const SourceFile* stamp) const {
+		return stamp != nullptr && activeCheckFile != nullptr && stamp != activeCheckFile;
+	}
 	Arena symbolArena;
 	Arena signatureArena;
 	Arena indexInfoArena;
