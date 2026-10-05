@@ -1745,6 +1745,219 @@ public:
 	Type* instantiateType(Type* t, TypeMapper* mapper);
 	void inferFromIntraExpressionSites(InferenceContext* context);
 	Type* getInferredType(InferenceContext* context, size_t index);
+
+	// === slice: members ===
+	// checker.go:19186-20143 (getPropertiesOfType … getSignaturesOfSymbol)
+	std::vector<Symbol*> getPropertiesOfObjectType(Type* t);
+	std::vector<Symbol*> getPropertiesOfUnionOrIntersectionType(Type* t);
+	Symbol* getPropertyOfTypeEx(Type* t, const std::string& name,
+		bool skipObjectFunctionPropertyAugment, bool includeTypeOnlyMembers);
+	std::vector<Signature*> getSignaturesOfStructuredType(Type* t, SignatureKind kind);
+	std::vector<IndexInfo*> getIndexInfosOfStructuredType(Type* t);
+	IndexInfo* getIndexInfoOfType(Type* t, Type* keyType);
+	Type* getIndexTypeOfType(Type* t, Type* keyType);
+	Type* getIndexTypeOfTypeEx(Type* t, Type* keyType, Type* defaultType);
+	IndexInfo* getApplicableIndexInfo(Type* t, Type* keyType);
+	IndexInfo* getApplicableIndexInfoForName(Type* t, const std::string& name);
+	IndexInfo* findApplicableIndexInfo(const std::vector<IndexInfo*>& indexInfos,
+		Type* keyType);
+	bool isApplicableIndexType(Type* source, Type* target);
+	void resolveTypeReferenceMembers(Type* t);
+	void resolveClassOrInterfaceMembers(Type* t);
+	void resolveObjectTypeMembers(Type* t, Type* source,
+		const std::vector<Type*>& typeParameters,
+		const std::vector<Type*>& typeArguments);
+	IndexInfo* findIndexInfo(const std::vector<IndexInfo*>& indexInfos,
+		Type* keyType);
+	Type* getTupleBaseType(Type* t);
+	void resolveBaseTypesOfClass(Type* t);
+	void resolveBaseTypesOfInterface(Type* t);
+	bool areAllOuterTypeParametersApplied(Type* t);
+	void reportCircularBaseType(Node* node, Type* t);
+	bool isValidBaseType(Type* t);
+	bool hasBaseType(Type* t, Type* checkBase);
+	std::vector<Signature*> getInstantiatedConstructorsForTypeArguments(
+		Type* t, const std::vector<Node*>& typeArgumentNodes, Node* location);
+	std::vector<Signature*> getConstructorsForTypeArguments(
+		Type* t, const std::vector<Node*>& typeArgumentNodes, Node* location);
+	Signature* getSignatureInstantiation(Signature* sig,
+		const std::vector<Type*>& typeArguments, bool isJavaScript,
+		const std::vector<Type*>& inferredTypeParameters);
+	Signature* cloneSignature(Signature* sig);
+	Signature* getSignatureInstantiationWithoutFillingInTypeArguments(
+		Signature* sig, const std::vector<Type*>& typeArguments);
+	Signature* createSignatureInstantiation(Signature* sig,
+		const std::vector<Type*>& typeArguments);
+	TypeMapper* createSignatureTypeMapper(Signature* sig,
+		const std::vector<Type*>& typeArguments);
+	std::vector<Type*> getTypeParametersForMapper(Signature* sig);
+	Signature* getSingleCallSignature(Type* t);
+	Signature* getSingleCallOrConstructSignature(Type* t);
+	Signature* getSingleSignature(Type* t, SignatureKind kind, bool allowMembers);
+	Type* getOrCreateTypeFromSignature(Signature* sig);
+	Signature* getErasedSignature(Signature* signature);
+	Signature* getCanonicalSignature(Signature* signature);
+	Signature* createCanonicalSignature(Signature* signature);
+	Signature* getBaseSignature(Signature* signature);
+	Signature* instantiateSignatureInContextOf(Signature* signature,
+		Signature* contextualSignature, InferenceContext* inferenceContext,
+		TypeComparer compareTypes);
+	SymbolTable addInheritedMembers(SymbolTable symbols,
+		const std::vector<Symbol*>& baseSymbols);
+	InterfaceType* resolveDeclaredMembers(Type* t);
+	std::vector<IndexInfo*> getIndexInfosOfSymbol(Symbol* symbol);
+	std::vector<IndexInfo*> getIndexInfosOfIndexSymbol(
+		Symbol* indexSymbol, const std::vector<Symbol*>& siblingSymbols);
+	IndexInfo* getObjectLiteralIndexInfo(bool isReadonly,
+		const std::vector<Symbol*>& properties, Type* keyType);
+	bool isSymbolWithSymbolName(Symbol* symbol);
+	bool isSymbolWithNumericName(Symbol* symbol);
+	bool isSymbolWithComputedName(Symbol* symbol);
+	bool isNumericName(Node* name);
+	bool isNumericComputedName(Node* name);
+	bool isValidIndexKeyType(Type* t);
+	Symbol* getIndexSymbol(Symbol* symbol);
+	std::vector<Signature*> getSignaturesOfSymbol(Symbol* symbol);
+	// checker.go:20987-22284 (resolveAnonymousTypeMembers … isConflictingPrivateProperty)
+	void resolveAnonymousTypeMembers(Type* t);
+	SymbolTable createInstantiatedSymbolTable(const std::vector<Symbol*>& symbols,
+		TypeMapper* m);
+	SymbolTable instantiateSymbolTable(const SymbolTable& symbols, TypeMapper* m);
+	Symbol* instantiateSymbol(Symbol* symbol, TypeMapper* m);
+	std::vector<Signature*> getDefaultConstructSignatures(Type* classType);
+	void resolveMappedTypeMembers(Type* t);
+	Type* getTypeOfMappedSymbol(Symbol* symbol);
+	Type* getLowerBoundOfKeyType(Type* t);
+	void resolveUnionTypeMembers(Type* t);
+	std::vector<Signature*> getArrayMemberCallSignatures(Type* t);
+	bool isArrayOrTupleSymbol(Symbol* symbol);
+	bool isReadonlyArraySymbol(Symbol* symbol);
+	std::vector<Signature*> getUnionSignatures(
+		const std::vector<std::vector<Signature*>>& signatureLists);
+	Signature* combineUnionOrIntersectionMemberSignatures(Signature* left,
+		Signature* right, bool isUnion);
+	std::vector<Symbol*> combineUnionOrIntersectionParameters(Signature* left,
+		Signature* right, TypeMapper* mapper, bool isUnion);
+	Symbol* combineUnionOrIntersectionThisParam(Symbol* left, Symbol* right,
+		TypeMapper* mapper, bool isUnion);
+	void resolveIntersectionTypeMembers(Type* t);
+	std::vector<Signature*> appendSignatures(std::vector<Signature*> signatures,
+		const std::vector<Signature*>& newSignatures);
+	std::vector<IndexInfo*> appendIndexInfo(std::vector<IndexInfo*> indexInfos,
+		IndexInfo* newInfo, bool isUnion);
+	std::pair<std::vector<bool>, int> findMixins(const std::vector<Type*>& types);
+	Type* includeMixinType(Type* t, const std::vector<Type*>& types,
+		const std::vector<bool>& mixinFlags, int index);
+	Symbol* getPropertyOfObjectType(Type* t, const std::string& name);
+	Symbol* getPropertyOfUnionOrIntersectionType(Type* t, const std::string& name,
+		bool skipObjectFunctionPropertyAugment);
+	Symbol* getUnionOrIntersectionProperty(Type* t, const std::string& name,
+		bool skipObjectFunctionPropertyAugment);
+	Symbol* createUnionOrIntersectionProperty(Type* containingType,
+		const std::string& name, bool skipObjectFunctionPropertyAugment);
+	Symbol* getTargetSymbol(Symbol* s);
+	bool hasCommonDeclaration(OrderedSet<Symbol*>* symbols);
+	Symbol* createSymbolWithType(Symbol* source, Type* t);
+	bool isMappedTypeGenericIndexedAccess(Type* t);
+	Type* getApparentTypeOfMappedType(Type* t);
+	Type* getResolvedApparentTypeOfMappedType(Type* t);
+	Type* getApparentTypeOfIntersectionType(Type* t, Type* thisArgument);
+	Type* getReducedApparentType(Type* t);
+	bool isMappingOfSameObjectType(const std::vector<Type*>& types);
+	bool somePropertyReducesToNever(Type* t);
+	Type* getReducedUnionType(Type* unionType);
+	bool isNeverReducedProperty(Symbol* prop);
+	Diagnostic* elaborateNeverIntersection(Diagnostic* chain, Node* node, Type* t);
+	bool isDiscriminantWithNeverType(Symbol* prop);
+
+	// members-slice dep stubs — defined TSC_UNREACHABLE in checker_members.cpp
+	std::vector<Type*> getTypeArguments(Type* t);
+	bool isNamedMember(Symbol* symbol, const std::string& id);
+	bool symbolIsValue(Symbol* symbol);
+	bool symbolIsValueEx(Symbol* symbol, bool includeTypeOnlyMembers);
+	Type* getBaseConstructorTypeOfClass(Type* t);
+	Type* getTypeFromClassOrInterfaceReference(Node* node, Symbol* symbol);
+	Type* getReturnTypeOfSignature(Signature* sig);
+	Signature* getSignatureFromDeclaration(Node* declaration);
+	Signature* getSignatureOfFullSignatureType(Node* node);
+	int getMinTypeArgumentCount(const std::vector<Type*>& typeParameters);
+	std::vector<Type*> fillMissingTypeArguments(std::vector<Type*> typeArguments,
+		const std::vector<Type*>& typeParameters, int minTypeArgumentCount,
+		bool isJavaScriptImplicitAny);
+	Signature* instantiateSignature(Signature* sig, TypeMapper* m);
+	Signature* instantiateSignatureEx(Signature* sig, TypeMapper* m,
+		bool eraseTypeParameters);
+	std::vector<Signature*> instantiateSignatures(
+		const std::vector<Signature*>& signatures, TypeMapper* m);
+	std::vector<IndexInfo*> instantiateIndexInfos(
+		const std::vector<IndexInfo*>& indexInfos, TypeMapper* m);
+	InferenceContext* newInferenceContext(const std::vector<Type*>& typeParameters,
+		Signature* signature, InferenceFlags flags, TypeComparer compareTypes);
+	std::vector<Type*> getInferredTypes(InferenceContext* n);
+	void inferTypes(const std::vector<InferenceInfo*>& inferences,
+		Type* originalSource, Type* originalTarget, InferencePriority priority,
+		bool contravariant);
+	void applyToParameterTypes(Signature* source, Signature* target,
+		const std::function<void(Type*, Type*)>& callback);
+	void applyToReturnTypes(Signature* source, Signature* target,
+		const std::function<void(Type*, Type*)>& callback);
+	Type* getEffectiveRestType(Signature* signature);
+	Type* getConstraintOfTypeParameter(Type* typeParameter);
+	bool isTypeAssignableToKind(Type* source, TypeFlags kind);
+	bool isGenericType(Type* t);
+	bool isGenericTupleType(Type* t);
+	Type* getKnownKeysOfTupleType(Type* t);
+	Type* getConditionalTypeInstantiation(Type* t, TypeMapper* mapper,
+		bool forConstraint, TypeAlias* alias);
+	Type* getRestTypeOfTupleType(Type* t);
+	bool isArrayOrTupleType(Type* t);
+	bool isArrayOrTupleOrIntersection(Type* t);
+	Type* getHomomorphicTypeVariable(Type* t);
+	Type* getTypeParameterFromMappedType(Type* t);
+	Type* getConstraintTypeFromMappedType(Type* t);
+	Type* getNameTypeFromMappedType(Type* t);
+	MappedTypeNameTypeKind getMappedTypeNameTypeKind(Type* t);
+	Type* getTemplateTypeFromMappedType(Type* t);
+	Type* getModifiersTypeFromMappedType(Type* t);
+	bool isMappedTypeWithKeyofConstraintDeclaration(Type* t);
+	void forEachMappedTypePropertyKeyTypeAndIndexSignatureKeyType(Type* t,
+		TypeFlags include, bool stringsOnly, const std::function<void(Type*)>& cb);
+	bool isReadonlySymbol(Symbol* symbol);
+	Type* removeMissingOrUndefinedType(Type* t);
+	std::vector<IndexInfo*> getUnionIndexInfos(const std::vector<Type*>& types);
+	void resolveReverseMappedTypeMembers(Type* t);
+	Signature* findMatchingSignature(const std::vector<Signature*>& signatureList,
+		Signature* signature, bool partialMatch, bool ignoreThisTypes,
+		bool ignoreReturnTypes);
+	std::vector<Signature*> findMatchingSignatures(
+		const std::vector<std::vector<Signature*>>& signatureLists,
+		Signature* signature, int listIndex);
+	Signature* createUnionSignature(Signature* sig,
+		const std::vector<Signature*>& unionSignatures);
+	bool compareTypeParametersIdentical(const std::vector<Type*>& sourceParams,
+		const std::vector<Type*>& targetParams);
+	Ternary compareSignaturesIdentical(Signature* source, Signature* target,
+		bool partialMatch, bool ignoreThisTypes, bool ignoreReturnTypes,
+		const std::function<Ternary(Type*, Type*)>& compareTypes);
+	Ternary compareTypesIdentical(Type* source, Type* target);
+	Ternary compareProperties(Symbol* sourceProp, Symbol* targetProp,
+		const std::function<Ternary(Type*, Type*)>& compareTypes);
+	bool isMixinConstructorType(Type* t);
+	int getParameterCount(Signature* signature);
+	bool hasEffectiveRestParameter(Signature* signature);
+	Type* tryGetTypeAtPosition(Signature* signature, int pos);
+	Type* getTypeAtPosition(Signature* signature, int pos);
+	int getMinArgumentCount(Signature* signature);
+	std::string getParameterNameAtPosition(Signature* signature, int pos);
+	std::vector<Type*> getEffectiveTypeArguments(
+		Node* node, const std::vector<Type*>& typeParameters);
+	std::vector<Type*> getTypeArgumentsFromNode(Node* node);
+	Type* getIndexedAccessType(Type* objectType, Type* indexType);
+	Type* getIndexType(Type* t);
+	std::string TypeToString(Type* t);
+	std::string typeToStringEx(Type* t, Node* enclosingDeclaration,
+		TypeFormatFlags flags, void* vc);
+	// === end slice: members ===
 };
 
 // Free helpers used across checker translation units.
