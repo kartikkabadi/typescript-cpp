@@ -1119,19 +1119,20 @@ struct SourceFile : Node {
 	const std::vector<::tsc::TextPos>& ecmaLineMap();
 	std::vector<::tsc::Node*> resolveJSDoc(::tsc::Node* n);
 	void setHasLazyJSDoc(bool lazy) { hasLazyJSDoc = lazy; }
+	const std::string& FileName() const { return fileName; }
+	const std::string& Path() const { return fileName; }
+	::tsc::Arena nodeArena;
+	void copyFrom(SourceFile* other);
 	::tsc::Symbol* Symbol{};
 	::tsc::SymbolTable Locals;
 	::tsc::Node* NextContainer{};
 	mutable CopyableAtomic<uint32_t> facts{};
 	std::string fileName;
-	const std::string& FileName() const { return fileName; }
-	const std::string& Path() const { return fileName; }
 	::tsc::SourceFileParseOptions parseOptions;
 	std::string text;
 	::tsc::ContentMapperSourceFileInfo* contentMapperInfo{};
 	::tsc::NodeList* Statements{};
 	::tsc::Node* EndOfFileToken{};
-	::tsc::Arena nodeArena;
 	std::mutex dataMu;
 	std::vector<::tsc::Diagnostic*> diagnostics;
 	std::vector<::tsc::Diagnostic*> jsDiagnostics;
@@ -2876,6 +2877,1194 @@ inline Node* NodeFactory::newJSDocParameterOrPropertyTag(::tsc::Kind kind, ::tsc
 	return newNode(kind, data);
 }
 
+// Update* methods (generated from Update* in
+// ast_generated.go + ast.go).
+
+inline Node* NodeFactory::updateArrayLiteralExpression(ArrayLiteralExpression* node, ::tsc::NodeList* elements, bool multiLine) {
+	if (elements != node->Elements || multiLine != node->MultiLine) {
+		return updateNode(newArrayLiteralExpression(elements, multiLine), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateArrayTypeNode(ArrayTypeNode* node, ::tsc::Node* elementType) {
+	if (elementType != node->ElementType) {
+		return updateNode(newArrayTypeNode(elementType), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateArrowFunction(ArrowFunction* node, ::tsc::ModifierList* modifiers, ::tsc::NodeList* typeParameters, ::tsc::NodeList* parameters, ::tsc::Node* typeNode, ::tsc::Node* fullSignature, ::tsc::Node* equalsGreaterThanToken, ::tsc::Node* body) {
+	if (modifiers != node->modifiers || typeParameters != node->TypeParameters || parameters != node->Parameters || typeNode != node->Type || fullSignature != node->FullSignature || equalsGreaterThanToken != node->EqualsGreaterThanToken || body != node->Body) {
+		return updateNode(newArrowFunction(modifiers, typeParameters, parameters, typeNode, fullSignature, equalsGreaterThanToken, body), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateAsExpression(AsExpression* node, ::tsc::Node* expression, ::tsc::Node* typeNode) {
+	if (expression != node->Expression || typeNode != node->Type) {
+		return updateNode(newAsExpression(expression, typeNode), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateAwaitExpression(AwaitExpression* node, ::tsc::Node* expression) {
+	if (expression != node->Expression) {
+		return updateNode(newAwaitExpression(expression), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateBinaryExpression(BinaryExpression* node, ::tsc::ModifierList* modifiers, ::tsc::Node* left, ::tsc::Node* typeNode, ::tsc::Node* operatorToken, ::tsc::Node* right) {
+	if (modifiers != node->modifiers || left != node->Left || typeNode != node->Type || operatorToken != node->OperatorToken || right != node->Right) {
+		return updateNode(newBinaryExpression(modifiers, left, typeNode, operatorToken, right), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateBindingElement(BindingElement* node, ::tsc::Node* dotDotDotToken, ::tsc::Node* propertyName, ::tsc::Node* name, ::tsc::Node* initializer) {
+	if (dotDotDotToken != node->DotDotDotToken || propertyName != node->PropertyName || name != node->name || initializer != node->Initializer) {
+		return updateNode(newBindingElement(dotDotDotToken, propertyName, name, initializer), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateBindingPattern(BindingPattern* node, ::tsc::NodeList* elements) {
+	if (elements != node->Elements) {
+		return updateNode(newBindingPattern(node->kind, elements), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateBlock(Block* node, ::tsc::NodeList* statements, bool multiLine) {
+	if (statements != node->Statements || multiLine != node->MultiLine) {
+		return updateNode(newBlock(statements, multiLine), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateBreakStatement(BreakStatement* node, ::tsc::Node* label) {
+	if (label != node->Label) {
+		return updateNode(newBreakStatement(label), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateCallExpression(CallExpression* node, ::tsc::Node* expression, ::tsc::Node* questionDotToken, ::tsc::NodeList* typeArguments, ::tsc::NodeList* arguments, ::tsc::NodeFlags flags) {
+	if (expression != node->Expression || questionDotToken != node->QuestionDotToken || typeArguments != node->TypeArguments || arguments != node->Arguments || flags != node->flags) {
+		return updateNode(newCallExpression(expression, questionDotToken, typeArguments, arguments, flags), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateCallSignatureDeclaration(CallSignatureDeclaration* node, ::tsc::NodeList* typeParameters, ::tsc::NodeList* parameters, ::tsc::Node* typeNode) {
+	if (typeParameters != node->TypeParameters || parameters != node->Parameters || typeNode != node->Type) {
+		return updateNode(newCallSignatureDeclaration(typeParameters, parameters, typeNode), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateCaseBlock(CaseBlock* node, ::tsc::NodeList* clauses) {
+	if (clauses != node->Clauses) {
+		return updateNode(newCaseBlock(clauses), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateCaseOrDefaultClause(CaseOrDefaultClause* node, ::tsc::Node* expression, ::tsc::NodeList* statements) {
+	if (expression != node->Expression || statements != node->Statements) {
+		return updateNode(newCaseOrDefaultClause(node->kind, expression, statements), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateCatchClause(CatchClause* node, ::tsc::Node* variableDeclaration, ::tsc::Node* block) {
+	if (variableDeclaration != node->VariableDeclaration || block != node->Block) {
+		return updateNode(newCatchClause(variableDeclaration, block), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateClassDeclaration(ClassDeclaration* node, ::tsc::ModifierList* modifiers, ::tsc::Node* name, ::tsc::NodeList* typeParameters, ::tsc::NodeList* heritageClauses, ::tsc::NodeList* members) {
+	if (modifiers != node->modifiers || name != node->name || typeParameters != node->TypeParameters || heritageClauses != node->HeritageClauses || members != node->Members) {
+		return updateNode(newClassDeclaration(modifiers, name, typeParameters, heritageClauses, members), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateClassExpression(ClassExpression* node, ::tsc::ModifierList* modifiers, ::tsc::Node* name, ::tsc::NodeList* typeParameters, ::tsc::NodeList* heritageClauses, ::tsc::NodeList* members) {
+	if (modifiers != node->modifiers || name != node->name || typeParameters != node->TypeParameters || heritageClauses != node->HeritageClauses || members != node->Members) {
+		return updateNode(newClassExpression(modifiers, name, typeParameters, heritageClauses, members), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateClassStaticBlockDeclaration(ClassStaticBlockDeclaration* node, ::tsc::ModifierList* modifiers, ::tsc::Node* body) {
+	if (modifiers != node->modifiers || body != node->Body) {
+		return updateNode(newClassStaticBlockDeclaration(modifiers, body), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateComputedPropertyName(ComputedPropertyName* node, ::tsc::Node* expression) {
+	if (expression != node->Expression) {
+		return updateNode(newComputedPropertyName(expression), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateConditionalExpression(ConditionalExpression* node, ::tsc::Node* condition, ::tsc::Node* questionToken, ::tsc::Node* whenTrue, ::tsc::Node* colonToken, ::tsc::Node* whenFalse) {
+	if (condition != node->Condition || questionToken != node->QuestionToken || whenTrue != node->WhenTrue || colonToken != node->ColonToken || whenFalse != node->WhenFalse) {
+		return updateNode(newConditionalExpression(condition, questionToken, whenTrue, colonToken, whenFalse), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateConditionalTypeNode(ConditionalTypeNode* node, ::tsc::Node* checkType, ::tsc::Node* extendsType, ::tsc::Node* trueType, ::tsc::Node* falseType) {
+	if (checkType != node->CheckType || extendsType != node->ExtendsType || trueType != node->TrueType || falseType != node->FalseType) {
+		return updateNode(newConditionalTypeNode(checkType, extendsType, trueType, falseType), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateConstructSignatureDeclaration(ConstructSignatureDeclaration* node, ::tsc::NodeList* typeParameters, ::tsc::NodeList* parameters, ::tsc::Node* typeNode) {
+	if (typeParameters != node->TypeParameters || parameters != node->Parameters || typeNode != node->Type) {
+		return updateNode(newConstructSignatureDeclaration(typeParameters, parameters, typeNode), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateConstructorDeclaration(ConstructorDeclaration* node, ::tsc::ModifierList* modifiers, ::tsc::NodeList* typeParameters, ::tsc::NodeList* parameters, ::tsc::Node* typeNode, ::tsc::Node* fullSignature, ::tsc::Node* body) {
+	if (modifiers != node->modifiers || typeParameters != node->TypeParameters || parameters != node->Parameters || typeNode != node->Type || fullSignature != node->FullSignature || body != node->Body) {
+		return updateNode(newConstructorDeclaration(modifiers, typeParameters, parameters, typeNode, fullSignature, body), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateConstructorTypeNode(ConstructorTypeNode* node, ::tsc::ModifierList* modifiers, ::tsc::NodeList* typeParameters, ::tsc::NodeList* parameters, ::tsc::Node* typeNode) {
+	if (modifiers != node->modifiers || typeParameters != node->TypeParameters || parameters != node->Parameters || typeNode != node->Type) {
+		return updateNode(newConstructorTypeNode(modifiers, typeParameters, parameters, typeNode), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateContinueStatement(ContinueStatement* node, ::tsc::Node* label) {
+	if (label != node->Label) {
+		return updateNode(newContinueStatement(label), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateDecorator(Decorator* node, ::tsc::Node* expression) {
+	if (expression != node->Expression) {
+		return updateNode(newDecorator(expression), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateDeleteExpression(DeleteExpression* node, ::tsc::Node* expression) {
+	if (expression != node->Expression) {
+		return updateNode(newDeleteExpression(expression), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateDoStatement(DoStatement* node, ::tsc::Node* statement, ::tsc::Node* expression) {
+	if (statement != node->Statement || expression != node->Expression) {
+		return updateNode(newDoStatement(statement, expression), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateElementAccessExpression(ElementAccessExpression* node, ::tsc::Node* expression, ::tsc::Node* questionDotToken, ::tsc::Node* argumentExpression, ::tsc::NodeFlags flags) {
+	if (expression != node->Expression || questionDotToken != node->QuestionDotToken || argumentExpression != node->ArgumentExpression || flags != node->flags) {
+		return updateNode(newElementAccessExpression(expression, questionDotToken, argumentExpression, flags), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateEnumDeclaration(EnumDeclaration* node, ::tsc::ModifierList* modifiers, ::tsc::Node* name, ::tsc::NodeList* members) {
+	if (modifiers != node->modifiers || name != node->name || members != node->Members) {
+		return updateNode(newEnumDeclaration(modifiers, name, members), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateEnumMember(EnumMember* node, ::tsc::Node* name, ::tsc::Node* initializer) {
+	if (name != node->name || initializer != node->Initializer) {
+		return updateNode(newEnumMember(name, initializer), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateExportAssignment(ExportAssignment* node, ::tsc::ModifierList* modifiers, bool isExportEquals, ::tsc::Node* typeNode, ::tsc::Node* expression) {
+	if (modifiers != node->modifiers || isExportEquals != node->IsExportEquals || typeNode != node->Type || expression != node->Expression) {
+		return updateNode(newExportAssignment(modifiers, isExportEquals, typeNode, expression), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateExportDeclaration(ExportDeclaration* node, ::tsc::ModifierList* modifiers, bool isTypeOnly, ::tsc::Node* exportClause, ::tsc::Node* moduleSpecifier, ::tsc::Node* attributes) {
+	if (modifiers != node->modifiers || isTypeOnly != node->IsTypeOnly || exportClause != node->ExportClause || moduleSpecifier != node->ModuleSpecifier || attributes != node->Attributes) {
+		return updateNode(newExportDeclaration(modifiers, isTypeOnly, exportClause, moduleSpecifier, attributes), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateExportSpecifier(ExportSpecifier* node, bool isTypeOnly, ::tsc::Node* propertyName, ::tsc::Node* name) {
+	if (isTypeOnly != node->IsTypeOnly || propertyName != node->PropertyName || name != node->name) {
+		return updateNode(newExportSpecifier(isTypeOnly, propertyName, name), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateExpressionStatement(ExpressionStatement* node, ::tsc::Node* expression) {
+	if (expression != node->Expression) {
+		return updateNode(newExpressionStatement(expression), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateExpressionWithTypeArguments(ExpressionWithTypeArguments* node, ::tsc::Node* expression, ::tsc::NodeList* typeArguments) {
+	if (expression != node->Expression || typeArguments != node->TypeArguments) {
+		return updateNode(newExpressionWithTypeArguments(expression, typeArguments), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateExternalModuleReference(ExternalModuleReference* node, ::tsc::Node* expression) {
+	if (expression != node->Expression) {
+		return updateNode(newExternalModuleReference(expression), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateForInOrOfStatement(ForInOrOfStatement* node, ::tsc::Node* awaitModifier, ::tsc::Node* initializer, ::tsc::Node* expression, ::tsc::Node* statement) {
+	if (awaitModifier != node->AwaitModifier || initializer != node->Initializer || expression != node->Expression || statement != node->Statement) {
+		return updateNode(newForInOrOfStatement(node->kind, awaitModifier, initializer, expression, statement), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateForStatement(ForStatement* node, ::tsc::Node* initializer, ::tsc::Node* condition, ::tsc::Node* incrementor, ::tsc::Node* statement) {
+	if (initializer != node->Initializer || condition != node->Condition || incrementor != node->Incrementor || statement != node->Statement) {
+		return updateNode(newForStatement(initializer, condition, incrementor, statement), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateFunctionDeclaration(FunctionDeclaration* node, ::tsc::ModifierList* modifiers, ::tsc::Node* asteriskToken, ::tsc::Node* name, ::tsc::NodeList* typeParameters, ::tsc::NodeList* parameters, ::tsc::Node* typeNode, ::tsc::Node* fullSignature, ::tsc::Node* body) {
+	if (modifiers != node->modifiers || asteriskToken != node->AsteriskToken || name != node->name || typeParameters != node->TypeParameters || parameters != node->Parameters || typeNode != node->Type || fullSignature != node->FullSignature || body != node->Body) {
+		return updateNode(newFunctionDeclaration(modifiers, asteriskToken, name, typeParameters, parameters, typeNode, fullSignature, body), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateFunctionExpression(FunctionExpression* node, ::tsc::ModifierList* modifiers, ::tsc::Node* asteriskToken, ::tsc::Node* name, ::tsc::NodeList* typeParameters, ::tsc::NodeList* parameters, ::tsc::Node* typeNode, ::tsc::Node* fullSignature, ::tsc::Node* body) {
+	if (modifiers != node->modifiers || asteriskToken != node->AsteriskToken || name != node->name || typeParameters != node->TypeParameters || parameters != node->Parameters || typeNode != node->Type || fullSignature != node->FullSignature || body != node->Body) {
+		return updateNode(newFunctionExpression(modifiers, asteriskToken, name, typeParameters, parameters, typeNode, fullSignature, body), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateFunctionTypeNode(FunctionTypeNode* node, ::tsc::NodeList* typeParameters, ::tsc::NodeList* parameters, ::tsc::Node* typeNode) {
+	if (typeParameters != node->TypeParameters || parameters != node->Parameters || typeNode != node->Type) {
+		return updateNode(newFunctionTypeNode(typeParameters, parameters, typeNode), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateGetAccessorDeclaration(GetAccessorDeclaration* node, ::tsc::ModifierList* modifiers, ::tsc::Node* name, ::tsc::NodeList* typeParameters, ::tsc::NodeList* parameters, ::tsc::Node* typeNode, ::tsc::Node* fullSignature, ::tsc::Node* body) {
+	if (modifiers != node->modifiers || name != node->name || typeParameters != node->TypeParameters || parameters != node->Parameters || typeNode != node->Type || fullSignature != node->FullSignature || body != node->Body) {
+		return updateNode(newGetAccessorDeclaration(modifiers, name, typeParameters, parameters, typeNode, fullSignature, body), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateHeritageClause(HeritageClause* node, ::tsc::Kind token, ::tsc::NodeList* types) {
+	if (token != node->Token || types != node->Types) {
+		return updateNode(newHeritageClause(token, types), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateIfStatement(IfStatement* node, ::tsc::Node* expression, ::tsc::Node* thenStatement, ::tsc::Node* elseStatement) {
+	if (expression != node->Expression || thenStatement != node->ThenStatement || elseStatement != node->ElseStatement) {
+		return updateNode(newIfStatement(expression, thenStatement, elseStatement), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateImportAttribute(ImportAttribute* node, ::tsc::Node* name, ::tsc::Node* value) {
+	if (name != node->name || value != node->Value) {
+		return updateNode(newImportAttribute(name, value), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateImportAttributes(ImportAttributes* node, ::tsc::Kind token, ::tsc::NodeList* attributes, bool multiLine) {
+	if (token != node->Token || attributes != node->Attributes || multiLine != node->MultiLine) {
+		return updateNode(newImportAttributes(token, attributes, multiLine), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateImportClause(ImportClause* node, Kind phaseModifier, ::tsc::Node* name, ::tsc::Node* namedBindings) {
+	if (phaseModifier != node->PhaseModifier || name != node->name || namedBindings != node->NamedBindings) {
+		return updateNode(newImportClause(phaseModifier, name, namedBindings), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateImportDeclaration(ImportDeclaration* node, ::tsc::ModifierList* modifiers, ::tsc::Node* importClause, ::tsc::Node* moduleSpecifier, ::tsc::Node* attributes) {
+	if (modifiers != node->modifiers || importClause != node->ImportClause || moduleSpecifier != node->ModuleSpecifier || attributes != node->Attributes) {
+		switch (node->kind) {
+		case Kind::ImportDeclaration:
+			return updateNode(newImportDeclaration(modifiers, importClause, moduleSpecifier, attributes), node, hooks);
+		case Kind::JSImportDeclaration:
+			return updateNode(newJSImportDeclaration(modifiers, importClause, moduleSpecifier, attributes), node, hooks);
+		default:
+			TSC_UNREACHABLE("unexpected kind in updateImportDeclaration");
+		}
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateImportEqualsDeclaration(ImportEqualsDeclaration* node, ::tsc::ModifierList* modifiers, bool isTypeOnly, ::tsc::Node* name, ::tsc::Node* moduleReference) {
+	if (modifiers != node->modifiers || isTypeOnly != node->IsTypeOnly || name != node->name || moduleReference != node->ModuleReference) {
+		return updateNode(newImportEqualsDeclaration(modifiers, isTypeOnly, name, moduleReference), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateImportSpecifier(ImportSpecifier* node, bool isTypeOnly, ::tsc::Node* propertyName, ::tsc::Node* name) {
+	if (isTypeOnly != node->IsTypeOnly || propertyName != node->PropertyName || name != node->name) {
+		return updateNode(newImportSpecifier(isTypeOnly, propertyName, name), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateImportTypeNode(ImportTypeNode* node, bool isTypeOf, ::tsc::Node* argument, ::tsc::Node* attributes, ::tsc::Node* qualifier, ::tsc::NodeList* typeArguments) {
+	if (isTypeOf != node->IsTypeOf || argument != node->Argument || attributes != node->Attributes || qualifier != node->Qualifier || typeArguments != node->TypeArguments) {
+		return updateNode(newImportTypeNode(isTypeOf, argument, attributes, qualifier, typeArguments), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateIndexSignatureDeclaration(IndexSignatureDeclaration* node, ::tsc::ModifierList* modifiers, ::tsc::NodeList* parameters, ::tsc::Node* typeNode) {
+	if (modifiers != node->modifiers || parameters != node->Parameters || typeNode != node->Type) {
+		return updateNode(newIndexSignatureDeclaration(modifiers, parameters, typeNode), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateIndexedAccessTypeNode(IndexedAccessTypeNode* node, ::tsc::Node* objectType, ::tsc::Node* indexType) {
+	if (objectType != node->ObjectType || indexType != node->IndexType) {
+		return updateNode(newIndexedAccessTypeNode(objectType, indexType), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateInferTypeNode(InferTypeNode* node, ::tsc::Node* typeParameter) {
+	if (typeParameter != node->TypeParameter) {
+		return updateNode(newInferTypeNode(typeParameter), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateInterfaceDeclaration(InterfaceDeclaration* node, ::tsc::ModifierList* modifiers, ::tsc::Node* name, ::tsc::NodeList* typeParameters, ::tsc::NodeList* heritageClauses, ::tsc::NodeList* members) {
+	if (modifiers != node->modifiers || name != node->name || typeParameters != node->TypeParameters || heritageClauses != node->HeritageClauses || members != node->Members) {
+		return updateNode(newInterfaceDeclaration(modifiers, name, typeParameters, heritageClauses, members), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateIntersectionTypeNode(IntersectionTypeNode* node, ::tsc::NodeList* types) {
+	if (types != node->Types) {
+		return updateNode(newIntersectionTypeNode(types), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJSDoc(JSDoc* node, ::tsc::NodeList* comment, ::tsc::NodeList* tags) {
+	if (comment != node->Comment || tags != node->Tags) {
+		return updateNode(newJSDoc(comment, tags), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJSDocAugmentsTag(JSDocAugmentsTag* node, ::tsc::Node* tagName, ::tsc::Node* className, ::tsc::NodeList* comment) {
+	if (tagName != node->TagName || className != node->ClassName || comment != node->Comment) {
+		return updateNode(newJSDocAugmentsTag(tagName, className, comment), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJSDocCallbackTag(JSDocCallbackTag* node, ::tsc::Node* tagName, ::tsc::Node* typeExpression, ::tsc::Node* name, ::tsc::NodeList* comment) {
+	if (tagName != node->TagName || typeExpression != node->TypeExpression || name != node->name || comment != node->Comment) {
+		return updateNode(newJSDocCallbackTag(tagName, typeExpression, name, comment), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJSDocDeprecatedTag(JSDocDeprecatedTag* node, ::tsc::Node* tagName, ::tsc::NodeList* comment) {
+	if (tagName != node->TagName || comment != node->Comment) {
+		return updateNode(newJSDocDeprecatedTag(tagName, comment), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJSDocImplementsTag(JSDocImplementsTag* node, ::tsc::Node* tagName, ::tsc::Node* className, ::tsc::NodeList* comment) {
+	if (tagName != node->TagName || className != node->ClassName || comment != node->Comment) {
+		return updateNode(newJSDocImplementsTag(tagName, className, comment), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJSDocImportTag(JSDocImportTag* node, ::tsc::Node* tagName, ::tsc::Node* importClause, ::tsc::Node* moduleSpecifier, ::tsc::Node* attributes, ::tsc::NodeList* comment) {
+	if (tagName != node->TagName || importClause != node->ImportClause || moduleSpecifier != node->ModuleSpecifier || attributes != node->Attributes || comment != node->Comment) {
+		return updateNode(newJSDocImportTag(tagName, importClause, moduleSpecifier, attributes, comment), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJSDocLink(JSDocLink* node, ::tsc::Node* name, std::vector<std::string> text) {
+	if (name != node->name || (text != node->text)) {
+		return updateNode(newJSDocLink(name, text), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJSDocLinkCode(JSDocLinkCode* node, ::tsc::Node* name, std::vector<std::string> text) {
+	if (name != node->name || (text != node->text)) {
+		return updateNode(newJSDocLinkCode(name, text), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJSDocLinkPlain(JSDocLinkPlain* node, ::tsc::Node* name, std::vector<std::string> text) {
+	if (name != node->name || (text != node->text)) {
+		return updateNode(newJSDocLinkPlain(name, text), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJSDocNameReference(JSDocNameReference* node, ::tsc::Node* name) {
+	if (name != node->name) {
+		return updateNode(newJSDocNameReference(name), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJSDocNonNullableType(JSDocNonNullableType* node, ::tsc::Node* typeNode) {
+	if (typeNode != node->Type) {
+		return updateNode(newJSDocNonNullableType(typeNode), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJSDocNullableType(JSDocNullableType* node, ::tsc::Node* typeNode) {
+	if (typeNode != node->Type) {
+		return updateNode(newJSDocNullableType(typeNode), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJSDocOptionalType(JSDocOptionalType* node, ::tsc::Node* typeNode) {
+	if (typeNode != node->Type) {
+		return updateNode(newJSDocOptionalType(typeNode), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJSDocOverloadTag(JSDocOverloadTag* node, ::tsc::Node* tagName, ::tsc::Node* typeExpression, ::tsc::NodeList* comment) {
+	if (tagName != node->TagName || typeExpression != node->TypeExpression || comment != node->Comment) {
+		return updateNode(newJSDocOverloadTag(tagName, typeExpression, comment), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJSDocOverrideTag(JSDocOverrideTag* node, ::tsc::Node* tagName, ::tsc::NodeList* comment) {
+	if (tagName != node->TagName || comment != node->Comment) {
+		return updateNode(newJSDocOverrideTag(tagName, comment), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJSDocParameterOrPropertyTag(JSDocParameterOrPropertyTag* node, ::tsc::Node* tagName, ::tsc::Node* name, bool isBracketed, ::tsc::Node* typeExpression, bool isNameFirst, ::tsc::NodeList* comment) {
+	if (tagName != node->TagName || name != node->name || isBracketed != node->IsBracketed || typeExpression != node->TypeExpression || isNameFirst != node->IsNameFirst || comment != node->Comment) {
+		return updateNode(newJSDocParameterOrPropertyTag(node->kind, tagName, name, isBracketed, typeExpression, isNameFirst, comment), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJSDocPrivateTag(JSDocPrivateTag* node, ::tsc::Node* tagName, ::tsc::NodeList* comment) {
+	if (tagName != node->TagName || comment != node->Comment) {
+		return updateNode(newJSDocPrivateTag(tagName, comment), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJSDocProtectedTag(JSDocProtectedTag* node, ::tsc::Node* tagName, ::tsc::NodeList* comment) {
+	if (tagName != node->TagName || comment != node->Comment) {
+		return updateNode(newJSDocProtectedTag(tagName, comment), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJSDocPublicTag(JSDocPublicTag* node, ::tsc::Node* tagName, ::tsc::NodeList* comment) {
+	if (tagName != node->TagName || comment != node->Comment) {
+		return updateNode(newJSDocPublicTag(tagName, comment), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJSDocReadonlyTag(JSDocReadonlyTag* node, ::tsc::Node* tagName, ::tsc::NodeList* comment) {
+	if (tagName != node->TagName || comment != node->Comment) {
+		return updateNode(newJSDocReadonlyTag(tagName, comment), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJSDocReturnTag(JSDocReturnTag* node, ::tsc::Node* tagName, ::tsc::Node* typeExpression, ::tsc::NodeList* comment) {
+	if (tagName != node->TagName || typeExpression != node->TypeExpression || comment != node->Comment) {
+		return updateNode(newJSDocReturnTag(tagName, typeExpression, comment), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJSDocSatisfiesTag(JSDocSatisfiesTag* node, ::tsc::Node* tagName, ::tsc::Node* typeExpression, ::tsc::NodeList* comment) {
+	if (tagName != node->TagName || typeExpression != node->TypeExpression || comment != node->Comment) {
+		return updateNode(newJSDocSatisfiesTag(tagName, typeExpression, comment), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJSDocSeeTag(JSDocSeeTag* node, ::tsc::Node* tagName, ::tsc::Node* nameExpression, ::tsc::NodeList* comment) {
+	if (tagName != node->TagName || nameExpression != node->NameExpression || comment != node->Comment) {
+		return updateNode(newJSDocSeeTag(tagName, nameExpression, comment), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJSDocSignature(JSDocSignature* node, ::tsc::NodeList* typeParameters, ::tsc::NodeList* parameters, ::tsc::Node* typeNode) {
+	if (typeParameters != node->TypeParameters || parameters != node->Parameters || typeNode != node->Type) {
+		return updateNode(newJSDocSignature(typeParameters, parameters, typeNode), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJSDocTemplateTag(JSDocTemplateTag* node, ::tsc::Node* tagName, ::tsc::Node* constraint, ::tsc::NodeList* typeParameters, ::tsc::NodeList* comment) {
+	if (tagName != node->TagName || constraint != node->Constraint || typeParameters != node->TypeParameters || comment != node->Comment) {
+		return updateNode(newJSDocTemplateTag(tagName, constraint, typeParameters, comment), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJSDocThisTag(JSDocThisTag* node, ::tsc::Node* tagName, ::tsc::Node* typeExpression, ::tsc::NodeList* comment) {
+	if (tagName != node->TagName || typeExpression != node->TypeExpression || comment != node->Comment) {
+		return updateNode(newJSDocThisTag(tagName, typeExpression, comment), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJSDocThrowsTag(JSDocThrowsTag* node, ::tsc::Node* tagName, ::tsc::Node* typeExpression, ::tsc::NodeList* comment) {
+	if (tagName != node->TagName || typeExpression != node->TypeExpression || comment != node->Comment) {
+		return updateNode(newJSDocThrowsTag(tagName, typeExpression, comment), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJSDocTypeExpression(JSDocTypeExpression* node, ::tsc::Node* typeNode) {
+	if (typeNode != node->Type) {
+		return updateNode(newJSDocTypeExpression(typeNode), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJSDocTypeLiteral(JSDocTypeLiteral* node, std::vector<::tsc::Node*> jsdocPropertyTags, bool isArrayType) {
+	if ((jsdocPropertyTags != node->JSDocPropertyTags) || isArrayType != node->IsArrayType) {
+		return updateNode(newJSDocTypeLiteral(jsdocPropertyTags, isArrayType), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJSDocTypeTag(JSDocTypeTag* node, ::tsc::Node* tagName, ::tsc::Node* typeExpression, ::tsc::NodeList* comment) {
+	if (tagName != node->TagName || typeExpression != node->TypeExpression || comment != node->Comment) {
+		return updateNode(newJSDocTypeTag(tagName, typeExpression, comment), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJSDocTypedefTag(JSDocTypedefTag* node, ::tsc::Node* tagName, ::tsc::Node* typeExpression, ::tsc::Node* name, ::tsc::NodeList* comment) {
+	if (tagName != node->TagName || typeExpression != node->TypeExpression || name != node->name || comment != node->Comment) {
+		return updateNode(newJSDocTypedefTag(tagName, typeExpression, name, comment), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJSDocUnknownTag(JSDocUnknownTag* node, ::tsc::Node* tagName, ::tsc::NodeList* comment) {
+	if (tagName != node->TagName || comment != node->Comment) {
+		return updateNode(newJSDocUnknownTag(tagName, comment), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJSDocVariadicType(JSDocVariadicType* node, ::tsc::Node* typeNode) {
+	if (typeNode != node->Type) {
+		return updateNode(newJSDocVariadicType(typeNode), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJsxAttribute(JsxAttribute* node, ::tsc::Node* name, ::tsc::Node* initializer) {
+	if (name != node->name || initializer != node->Initializer) {
+		return updateNode(newJsxAttribute(name, initializer), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJsxAttributes(JsxAttributes* node, ::tsc::NodeList* properties) {
+	if (properties != node->Properties) {
+		return updateNode(newJsxAttributes(properties), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJsxClosingElement(JsxClosingElement* node, ::tsc::Node* tagName) {
+	if (tagName != node->TagName) {
+		return updateNode(newJsxClosingElement(tagName), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJsxElement(JsxElement* node, ::tsc::Node* openingElement, ::tsc::NodeList* children, ::tsc::Node* closingElement) {
+	if (openingElement != node->OpeningElement || children != node->Children || closingElement != node->ClosingElement) {
+		return updateNode(newJsxElement(openingElement, children, closingElement), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJsxExpression(JsxExpression* node, ::tsc::Node* dotDotDotToken, ::tsc::Node* expression) {
+	if (dotDotDotToken != node->DotDotDotToken || expression != node->Expression) {
+		return updateNode(newJsxExpression(dotDotDotToken, expression), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJsxFragment(JsxFragment* node, ::tsc::Node* openingFragment, ::tsc::NodeList* children, ::tsc::Node* closingFragment) {
+	if (openingFragment != node->OpeningFragment || children != node->Children || closingFragment != node->ClosingFragment) {
+		return updateNode(newJsxFragment(openingFragment, children, closingFragment), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJsxNamespacedName(JsxNamespacedName* node, ::tsc::Node* namespace_, ::tsc::Node* name) {
+	if (namespace_ != node->Namespace || name != node->name) {
+		return updateNode(newJsxNamespacedName(namespace_, name), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJsxOpeningElement(JsxOpeningElement* node, ::tsc::Node* tagName, ::tsc::NodeList* typeArguments, ::tsc::Node* attributes) {
+	if (tagName != node->TagName || typeArguments != node->TypeArguments || attributes != node->Attributes) {
+		return updateNode(newJsxOpeningElement(tagName, typeArguments, attributes), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJsxSelfClosingElement(JsxSelfClosingElement* node, ::tsc::Node* tagName, ::tsc::NodeList* typeArguments, ::tsc::Node* attributes) {
+	if (tagName != node->TagName || typeArguments != node->TypeArguments || attributes != node->Attributes) {
+		return updateNode(newJsxSelfClosingElement(tagName, typeArguments, attributes), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateJsxSpreadAttribute(JsxSpreadAttribute* node, ::tsc::Node* expression) {
+	if (expression != node->Expression) {
+		return updateNode(newJsxSpreadAttribute(expression), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateLabeledStatement(LabeledStatement* node, ::tsc::Node* label, ::tsc::Node* statement) {
+	if (label != node->Label || statement != node->Statement) {
+		return updateNode(newLabeledStatement(label, statement), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateLiteralTypeNode(LiteralTypeNode* node, ::tsc::Node* literal) {
+	if (literal != node->Literal) {
+		return updateNode(newLiteralTypeNode(literal), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateMappedTypeNode(MappedTypeNode* node, ::tsc::Node* readonlyToken, ::tsc::Node* typeParameter, ::tsc::Node* nameType, ::tsc::Node* questionToken, ::tsc::Node* typeNode, ::tsc::NodeList* members) {
+	if (readonlyToken != node->ReadonlyToken || typeParameter != node->TypeParameter || nameType != node->NameType || questionToken != node->QuestionToken || typeNode != node->Type || members != node->Members) {
+		return updateNode(newMappedTypeNode(readonlyToken, typeParameter, nameType, questionToken, typeNode, members), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateMetaProperty(MetaProperty* node, ::tsc::Kind keywordToken, ::tsc::Node* name) {
+	if (keywordToken != node->KeywordToken || name != node->name) {
+		return updateNode(newMetaProperty(keywordToken, name), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateMethodDeclaration(MethodDeclaration* node, ::tsc::ModifierList* modifiers, ::tsc::Node* asteriskToken, ::tsc::Node* name, ::tsc::Node* postfixToken, ::tsc::NodeList* typeParameters, ::tsc::NodeList* parameters, ::tsc::Node* typeNode, ::tsc::Node* fullSignature, ::tsc::Node* body) {
+	if (modifiers != node->modifiers || asteriskToken != node->AsteriskToken || name != node->name || postfixToken != node->PostfixToken || typeParameters != node->TypeParameters || parameters != node->Parameters || typeNode != node->Type || fullSignature != node->FullSignature || body != node->Body) {
+		return updateNode(newMethodDeclaration(modifiers, asteriskToken, name, postfixToken, typeParameters, parameters, typeNode, fullSignature, body), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateMethodSignatureDeclaration(MethodSignatureDeclaration* node, ::tsc::ModifierList* modifiers, ::tsc::Node* name, ::tsc::Node* postfixToken, ::tsc::NodeList* typeParameters, ::tsc::NodeList* parameters, ::tsc::Node* typeNode) {
+	if (modifiers != node->modifiers || name != node->name || postfixToken != node->PostfixToken || typeParameters != node->TypeParameters || parameters != node->Parameters || typeNode != node->Type) {
+		return updateNode(newMethodSignatureDeclaration(modifiers, name, postfixToken, typeParameters, parameters, typeNode), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateMissingDeclaration(MissingDeclaration* node, ::tsc::ModifierList* modifiers) {
+	if (modifiers != node->modifiers) {
+		return updateNode(newMissingDeclaration(modifiers), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateModuleBlock(ModuleBlock* node, ::tsc::NodeList* statements) {
+	if (statements != node->Statements) {
+		return updateNode(newModuleBlock(statements), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateModuleDeclaration(ModuleDeclaration* node, ::tsc::ModifierList* modifiers, ::tsc::Kind keyword, ::tsc::Node* name, ::tsc::Node* attributes, ::tsc::Node* body) {
+	if (modifiers != node->modifiers || keyword != node->Keyword || name != node->name || attributes != node->Attributes || body != node->Body) {
+		return updateNode(newModuleDeclaration(modifiers, keyword, name, attributes, body), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateNamedExports(NamedExports* node, ::tsc::NodeList* elements) {
+	if (elements != node->Elements) {
+		return updateNode(newNamedExports(elements), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateNamedImports(NamedImports* node, ::tsc::NodeList* elements) {
+	if (elements != node->Elements) {
+		return updateNode(newNamedImports(elements), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateNamedTupleMember(NamedTupleMember* node, ::tsc::Node* dotDotDotToken, ::tsc::Node* name, ::tsc::Node* questionToken, ::tsc::Node* typeNode) {
+	if (dotDotDotToken != node->DotDotDotToken || name != node->name || questionToken != node->QuestionToken || typeNode != node->Type) {
+		return updateNode(newNamedTupleMember(dotDotDotToken, name, questionToken, typeNode), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateNamespaceExport(NamespaceExport* node, ::tsc::Node* name) {
+	if (name != node->name) {
+		return updateNode(newNamespaceExport(name), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateNamespaceExportDeclaration(NamespaceExportDeclaration* node, ::tsc::ModifierList* modifiers, ::tsc::Node* name) {
+	if (modifiers != node->modifiers || name != node->name) {
+		return updateNode(newNamespaceExportDeclaration(modifiers, name), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateNamespaceImport(NamespaceImport* node, ::tsc::Node* name) {
+	if (name != node->name) {
+		return updateNode(newNamespaceImport(name), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateNewExpression(NewExpression* node, ::tsc::Node* expression, ::tsc::NodeList* typeArguments, ::tsc::NodeList* arguments) {
+	if (expression != node->Expression || typeArguments != node->TypeArguments || arguments != node->Arguments) {
+		return updateNode(newNewExpression(expression, typeArguments, arguments), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateNonNullExpression(NonNullExpression* node, ::tsc::Node* expression, ::tsc::NodeFlags flags) {
+	if (expression != node->Expression || flags != node->flags) {
+		return updateNode(newNonNullExpression(expression, flags), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateObjectLiteralExpression(ObjectLiteralExpression* node, ::tsc::NodeList* properties, bool multiLine) {
+	if (properties != node->Properties || multiLine != node->MultiLine) {
+		return updateNode(newObjectLiteralExpression(properties, multiLine), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateOptionalTypeNode(OptionalTypeNode* node, ::tsc::Node* typeNode) {
+	if (typeNode != node->Type) {
+		return updateNode(newOptionalTypeNode(typeNode), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateParameterDeclaration(ParameterDeclaration* node, ::tsc::ModifierList* modifiers, ::tsc::Node* dotDotDotToken, ::tsc::Node* name, ::tsc::Node* questionToken, ::tsc::Node* typeNode, ::tsc::Node* initializer) {
+	if (modifiers != node->modifiers || dotDotDotToken != node->DotDotDotToken || name != node->name || questionToken != node->QuestionToken || typeNode != node->Type || initializer != node->Initializer) {
+		return updateNode(newParameterDeclaration(modifiers, dotDotDotToken, name, questionToken, typeNode, initializer), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateParenthesizedExpression(ParenthesizedExpression* node, ::tsc::Node* expression) {
+	if (expression != node->Expression) {
+		return updateNode(newParenthesizedExpression(expression), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateParenthesizedTypeNode(ParenthesizedTypeNode* node, ::tsc::Node* typeNode) {
+	if (typeNode != node->Type) {
+		return updateNode(newParenthesizedTypeNode(typeNode), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updatePartiallyEmittedExpression(PartiallyEmittedExpression* node, ::tsc::Node* expression) {
+	if (expression != node->Expression) {
+		return updateNode(newPartiallyEmittedExpression(expression), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updatePostfixUnaryExpression(PostfixUnaryExpression* node, ::tsc::Node* operand, ::tsc::Kind op) {
+	if (operand != node->Operand || op != node->Operator) {
+		return updateNode(newPostfixUnaryExpression(operand, op), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updatePrefixUnaryExpression(PrefixUnaryExpression* node, ::tsc::Kind op, ::tsc::Node* operand) {
+	if (op != node->Operator || operand != node->Operand) {
+		return updateNode(newPrefixUnaryExpression(op, operand), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updatePropertyAccessExpression(PropertyAccessExpression* node, ::tsc::Node* expression, ::tsc::Node* questionDotToken, ::tsc::Node* name, ::tsc::NodeFlags flags) {
+	if (expression != node->Expression || questionDotToken != node->QuestionDotToken || name != node->name || flags != node->flags) {
+		return updateNode(newPropertyAccessExpression(expression, questionDotToken, name, flags), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updatePropertyAssignment(PropertyAssignment* node, ::tsc::ModifierList* modifiers, ::tsc::Node* name, ::tsc::Node* postfixToken, ::tsc::Node* typeNode, ::tsc::Node* initializer) {
+	if (modifiers != node->modifiers || name != node->name || postfixToken != node->PostfixToken || typeNode != node->Type || initializer != node->Initializer) {
+		return updateNode(newPropertyAssignment(modifiers, name, postfixToken, typeNode, initializer), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updatePropertyDeclaration(PropertyDeclaration* node, ::tsc::ModifierList* modifiers, ::tsc::Node* name, ::tsc::Node* postfixToken, ::tsc::Node* typeNode, ::tsc::Node* initializer) {
+	if (modifiers != node->modifiers || name != node->name || postfixToken != node->PostfixToken || typeNode != node->Type || initializer != node->Initializer) {
+		return updateNode(newPropertyDeclaration(modifiers, name, postfixToken, typeNode, initializer), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updatePropertySignatureDeclaration(PropertySignatureDeclaration* node, ::tsc::ModifierList* modifiers, ::tsc::Node* name, ::tsc::Node* postfixToken, ::tsc::Node* typeNode, ::tsc::Node* initializer) {
+	if (modifiers != node->modifiers || name != node->name || postfixToken != node->PostfixToken || typeNode != node->Type || initializer != node->Initializer) {
+		return updateNode(newPropertySignatureDeclaration(modifiers, name, postfixToken, typeNode, initializer), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateQualifiedName(QualifiedName* node, ::tsc::Node* left, ::tsc::Node* right) {
+	if (left != node->Left || right != node->Right) {
+		return updateNode(newQualifiedName(left, right), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateRestTypeNode(RestTypeNode* node, ::tsc::Node* typeNode) {
+	if (typeNode != node->Type) {
+		return updateNode(newRestTypeNode(typeNode), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateReturnStatement(ReturnStatement* node, ::tsc::Node* expression) {
+	if (expression != node->Expression) {
+		return updateNode(newReturnStatement(expression), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateSatisfiesExpression(SatisfiesExpression* node, ::tsc::Node* expression, ::tsc::Node* typeNode) {
+	if (expression != node->Expression || typeNode != node->Type) {
+		return updateNode(newSatisfiesExpression(expression, typeNode), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateSetAccessorDeclaration(SetAccessorDeclaration* node, ::tsc::ModifierList* modifiers, ::tsc::Node* name, ::tsc::NodeList* typeParameters, ::tsc::NodeList* parameters, ::tsc::Node* typeNode, ::tsc::Node* fullSignature, ::tsc::Node* body) {
+	if (modifiers != node->modifiers || name != node->name || typeParameters != node->TypeParameters || parameters != node->Parameters || typeNode != node->Type || fullSignature != node->FullSignature || body != node->Body) {
+		return updateNode(newSetAccessorDeclaration(modifiers, name, typeParameters, parameters, typeNode, fullSignature, body), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateShorthandPropertyAssignment(ShorthandPropertyAssignment* node, ::tsc::ModifierList* modifiers, ::tsc::Node* name, ::tsc::Node* postfixToken, ::tsc::Node* typeNode, ::tsc::Node* equalsToken, ::tsc::Node* objectAssignmentInitializer) {
+	if (modifiers != node->modifiers || name != node->name || postfixToken != node->PostfixToken || typeNode != node->Type || equalsToken != node->EqualsToken || objectAssignmentInitializer != node->ObjectAssignmentInitializer) {
+		return updateNode(newShorthandPropertyAssignment(modifiers, name, postfixToken, typeNode, equalsToken, objectAssignmentInitializer), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateSourceFile(SourceFile* node, ::tsc::NodeList* statements, ::tsc::Node* endOfFileToken) {
+	if (statements != node->Statements || endOfFileToken != node->EndOfFileToken) {
+		auto* updated = newSourceFile(node->parseOptions, node->text, statements, endOfFileToken)->as<SourceFile>();
+		updated->copyFrom(node);
+		return updateNode(updated, node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateSpreadAssignment(SpreadAssignment* node, ::tsc::Node* expression) {
+	if (expression != node->Expression) {
+		return updateNode(newSpreadAssignment(expression), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateSpreadElement(SpreadElement* node, ::tsc::Node* expression) {
+	if (expression != node->Expression) {
+		return updateNode(newSpreadElement(expression), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateSwitchStatement(SwitchStatement* node, ::tsc::Node* expression, ::tsc::Node* caseBlock) {
+	if (expression != node->Expression || caseBlock != node->CaseBlock) {
+		return updateNode(newSwitchStatement(expression, caseBlock), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateSyntaxList(SyntaxList* node, std::vector<::tsc::Node*> children) {
+	if ((children != node->Children)) {
+		return updateNode(newSyntaxList(children), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateSyntheticExpression(SyntheticExpression* node, void* typeNode, bool isSpread, ::tsc::Node* tupleNameSource) {
+	if (typeNode != node->Type || isSpread != node->IsSpread || tupleNameSource != node->TupleNameSource) {
+		return updateNode(newSyntheticExpression(typeNode, isSpread, tupleNameSource), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateSyntheticReferenceExpression(SyntheticReferenceExpression* node, ::tsc::Node* expression, ::tsc::Node* thisArg) {
+	if (expression != node->Expression || thisArg != node->ThisArg) {
+		return updateNode(newSyntheticReferenceExpression(expression, thisArg), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateTaggedTemplateExpression(TaggedTemplateExpression* node, ::tsc::Node* tag, ::tsc::Node* questionDotToken, ::tsc::NodeList* typeArguments, ::tsc::Node* template_, ::tsc::NodeFlags flags) {
+	if (tag != node->Tag || questionDotToken != node->QuestionDotToken || typeArguments != node->TypeArguments || template_ != node->Template || flags != node->flags) {
+		return updateNode(newTaggedTemplateExpression(tag, questionDotToken, typeArguments, template_, flags), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateTemplateExpression(TemplateExpression* node, ::tsc::Node* head, ::tsc::NodeList* templateSpans) {
+	if (head != node->Head || templateSpans != node->TemplateSpans) {
+		return updateNode(newTemplateExpression(head, templateSpans), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateTemplateLiteralTypeNode(TemplateLiteralTypeNode* node, ::tsc::Node* head, ::tsc::NodeList* templateSpans) {
+	if (head != node->Head || templateSpans != node->TemplateSpans) {
+		return updateNode(newTemplateLiteralTypeNode(head, templateSpans), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateTemplateLiteralTypeSpan(TemplateLiteralTypeSpan* node, ::tsc::Node* typeNode, ::tsc::Node* literal) {
+	if (typeNode != node->Type || literal != node->Literal) {
+		return updateNode(newTemplateLiteralTypeSpan(typeNode, literal), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateTemplateSpan(TemplateSpan* node, ::tsc::Node* expression, ::tsc::Node* literal) {
+	if (expression != node->Expression || literal != node->Literal) {
+		return updateNode(newTemplateSpan(expression, literal), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateThrowStatement(ThrowStatement* node, ::tsc::Node* expression) {
+	if (expression != node->Expression) {
+		return updateNode(newThrowStatement(expression), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateTryStatement(TryStatement* node, ::tsc::Node* tryBlock, ::tsc::Node* catchClause, ::tsc::Node* finallyBlock) {
+	if (tryBlock != node->TryBlock || catchClause != node->CatchClause || finallyBlock != node->FinallyBlock) {
+		return updateNode(newTryStatement(tryBlock, catchClause, finallyBlock), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateTupleTypeNode(TupleTypeNode* node, ::tsc::NodeList* elements) {
+	if (elements != node->Elements) {
+		return updateNode(newTupleTypeNode(elements), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateTypeAliasDeclaration(TypeAliasDeclaration* node, ::tsc::ModifierList* modifiers, ::tsc::Node* name, ::tsc::NodeList* typeParameters, ::tsc::Node* typeNode) {
+	if (modifiers != node->modifiers || name != node->name || typeParameters != node->TypeParameters || typeNode != node->Type) {
+		switch (node->kind) {
+		case Kind::TypeAliasDeclaration:
+			return updateNode(newTypeAliasDeclaration(modifiers, name, typeParameters, typeNode), node, hooks);
+		case Kind::JSTypeAliasDeclaration:
+			return updateNode(newJSTypeAliasDeclaration(modifiers, name, typeParameters, typeNode), node, hooks);
+		default:
+			TSC_UNREACHABLE("unexpected kind in updateTypeAliasDeclaration");
+		}
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateTypeAssertion(TypeAssertion* node, ::tsc::Node* typeNode, ::tsc::Node* expression) {
+	if (typeNode != node->Type || expression != node->Expression) {
+		return updateNode(newTypeAssertion(typeNode, expression), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateTypeLiteralNode(TypeLiteralNode* node, ::tsc::NodeList* members) {
+	if (members != node->Members) {
+		return updateNode(newTypeLiteralNode(members), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateTypeOfExpression(TypeOfExpression* node, ::tsc::Node* expression) {
+	if (expression != node->Expression) {
+		return updateNode(newTypeOfExpression(expression), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateTypeOperatorNode(TypeOperatorNode* node, ::tsc::Kind op, ::tsc::Node* typeNode) {
+	if (op != node->Operator || typeNode != node->Type) {
+		return updateNode(newTypeOperatorNode(op, typeNode), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateTypeParameterDeclaration(TypeParameterDeclaration* node, ::tsc::ModifierList* modifiers, ::tsc::Node* name, ::tsc::Node* constraint, ::tsc::Node* expression, ::tsc::Node* defaultType) {
+	if (modifiers != node->modifiers || name != node->name || constraint != node->Constraint || expression != node->Expression || defaultType != node->DefaultType) {
+		return updateNode(newTypeParameterDeclaration(modifiers, name, constraint, expression, defaultType), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateTypePredicateNode(TypePredicateNode* node, ::tsc::Node* assertsModifier, ::tsc::Node* parameterName, ::tsc::Node* typeNode) {
+	if (assertsModifier != node->AssertsModifier || parameterName != node->ParameterName || typeNode != node->Type) {
+		return updateNode(newTypePredicateNode(assertsModifier, parameterName, typeNode), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateTypeQueryNode(TypeQueryNode* node, ::tsc::Node* exprName, ::tsc::NodeList* typeArguments) {
+	if (exprName != node->ExprName || typeArguments != node->TypeArguments) {
+		return updateNode(newTypeQueryNode(exprName, typeArguments), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateTypeReferenceNode(TypeReferenceNode* node, ::tsc::Node* typeName, ::tsc::NodeList* typeArguments) {
+	if (typeName != node->TypeName || typeArguments != node->TypeArguments) {
+		return updateNode(newTypeReferenceNode(typeName, typeArguments), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateUnionTypeNode(UnionTypeNode* node, ::tsc::NodeList* types) {
+	if (types != node->Types) {
+		return updateNode(newUnionTypeNode(types), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateVariableDeclaration(VariableDeclaration* node, ::tsc::Node* name, ::tsc::Node* exclamationToken, ::tsc::Node* typeNode, ::tsc::Node* initializer) {
+	if (name != node->name || exclamationToken != node->ExclamationToken || typeNode != node->Type || initializer != node->Initializer) {
+		return updateNode(newVariableDeclaration(name, exclamationToken, typeNode, initializer), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateVariableDeclarationList(VariableDeclarationList* node, ::tsc::NodeList* declarations, ::tsc::NodeFlags flags) {
+	if (declarations != node->Declarations || flags != node->flags) {
+		return updateNode(newVariableDeclarationList(declarations, flags), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateVariableStatement(VariableStatement* node, ::tsc::ModifierList* modifiers, ::tsc::Node* declarationList) {
+	if (modifiers != node->modifiers || declarationList != node->DeclarationList) {
+		return updateNode(newVariableStatement(modifiers, declarationList), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateVoidExpression(VoidExpression* node, ::tsc::Node* expression) {
+	if (expression != node->Expression) {
+		return updateNode(newVoidExpression(expression), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateWhileStatement(WhileStatement* node, ::tsc::Node* expression, ::tsc::Node* statement) {
+	if (expression != node->Expression || statement != node->Statement) {
+		return updateNode(newWhileStatement(expression, statement), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateWithStatement(WithStatement* node, ::tsc::Node* expression, ::tsc::Node* statement) {
+	if (expression != node->Expression || statement != node->Statement) {
+		return updateNode(newWithStatement(expression, statement), node, hooks);
+	}
+	return node;
+}
+
+inline Node* NodeFactory::updateYieldExpression(YieldExpression* node, ::tsc::Node* asteriskToken, ::tsc::Node* expression) {
+	if (asteriskToken != node->AsteriskToken || expression != node->Expression) {
+		return updateNode(newYieldExpression(asteriskToken, expression), node, hooks);
+	}
+	return node;
+}
+
 // forEachChild / name / modifiers dispatch (generated).
 
 template <class F>
@@ -2930,8 +4119,8 @@ bool Node::forEachChild(F&& v) const {
 				visitChild(v, n->name) ||
 				visitChild(v, n->Initializer);
 		}
-		case Kind::ArrayBindingPattern:
 		case Kind::ObjectBindingPattern:
+		case Kind::ArrayBindingPattern:
 		{
 			auto* n = static_cast<const BindingPattern*>(this);
 			return visitChildList(v, n->Elements);
@@ -4059,8 +5248,8 @@ inline Node* deepCloneNode(NodeFactory& f, const Node* node) {
 			c->Initializer = deepCloneNode(f, n->Initializer);
 			return c;
 		}
-		case Kind::ArrayBindingPattern:
 		case Kind::ObjectBindingPattern:
+		case Kind::ArrayBindingPattern:
 		{
 			auto* n = static_cast<const BindingPattern*>(node);
 			auto* c = f.arena().alloc<BindingPattern>(*n);
@@ -4907,10 +6096,10 @@ inline Node* deepCloneNode(NodeFactory& f, const Node* node) {
 			auto* c = f.arena().alloc<JsxText>(*n);
 			return c;
 		}
+		case Kind::ThisKeyword:
+		case Kind::NullKeyword:
 		case Kind::TrueKeyword:
 		case Kind::FalseKeyword:
-		case Kind::NullKeyword:
-		case Kind::ThisKeyword:
 		case Kind::SuperKeyword:
 		{
 			auto* n = static_cast<const KeywordExpression*>(node);
@@ -4918,15 +6107,15 @@ inline Node* deepCloneNode(NodeFactory& f, const Node* node) {
 			return c;
 		}
 		case Kind::AnyKeyword:
-		case Kind::NeverKeyword:
 		case Kind::UnknownKeyword:
+		case Kind::UndefinedKeyword:
+		case Kind::NeverKeyword:
 		case Kind::StringKeyword:
 		case Kind::NumberKeyword:
 		case Kind::BigIntKeyword:
 		case Kind::BooleanKeyword:
 		case Kind::SymbolKeyword:
 		case Kind::VoidKeyword:
-		case Kind::UndefinedKeyword:
 		case Kind::ObjectKeyword:
 		{
 			auto* n = static_cast<const KeywordTypeNode*>(node);
@@ -5412,27 +6601,27 @@ inline Node* deepCloneNode(NodeFactory& f, const Node* node) {
 			c->Expression = deepCloneNode(f, n->Expression);
 			return c;
 		}
-		case Kind::AssertsKeyword:
-		case Kind::DotDotDotToken:
-		case Kind::QuestionToken:
-		case Kind::CommaToken:
-		case Kind::EqualsToken:
-		case Kind::BarBarToken:
-		case Kind::AmpersandAmpersandToken:
-		case Kind::EqualsEqualsEqualsToken:
-		case Kind::ExclamationEqualsEqualsToken:
-		case Kind::EqualsGreaterThanToken:
-		case Kind::ColonToken:
-		case Kind::PlusToken:
-		case Kind::AsteriskToken:
-		case Kind::InKeyword:
-		case Kind::EndOfFile:
-		case Kind::QuestionDotToken:
-		case Kind::DotToken:
-		case Kind::QuestionQuestionToken:
 		case Kind::ExportKeyword:
 		case Kind::DeclareKeyword:
+		case Kind::EqualsEqualsEqualsToken:
+		case Kind::QuestionToken:
+		case Kind::ColonToken:
+		case Kind::DotDotDotToken:
 		case Kind::SemicolonToken:
+		case Kind::AssertsKeyword:
+		case Kind::CommaToken:
+		case Kind::EndOfFile:
+		case Kind::EqualsToken:
+		case Kind::EqualsGreaterThanToken:
+		case Kind::AmpersandAmpersandToken:
+		case Kind::AsteriskToken:
+		case Kind::QuestionQuestionToken:
+		case Kind::BarBarToken:
+		case Kind::ExclamationEqualsEqualsToken:
+		case Kind::PlusToken:
+		case Kind::InKeyword:
+		case Kind::DotToken:
+		case Kind::QuestionDotToken:
 		{
 			auto* n = static_cast<const Token*>(node);
 			auto* c = f.arena().alloc<Token>(*n);
@@ -6035,10 +7224,10 @@ inline FlowNodeDataRef Node::flowNodeData() {
 			{ auto* n = static_cast<ImportEqualsDeclaration*>(this); return { &n->FlowNode }; }
 		case Kind::InterfaceDeclaration:
 			{ auto* n = static_cast<InterfaceDeclaration*>(this); return { &n->FlowNode }; }
+		case Kind::ThisKeyword:
+		case Kind::NullKeyword:
 		case Kind::TrueKeyword:
 		case Kind::FalseKeyword:
-		case Kind::NullKeyword:
-		case Kind::ThisKeyword:
 		case Kind::SuperKeyword:
 			{ auto* n = static_cast<KeywordExpression*>(this); return { &n->FlowNode }; }
 		case Kind::LabeledStatement:
@@ -6358,8 +7547,8 @@ inline SubtreeFacts Node::propagateSubtreeFacts() const {
 			{ auto* n = static_cast<const ArrowFunction*>(this); return subtreeFacts() & ~SubtreeExclusionsArrowFunction; }
 		case Kind::AsExpression:
 			{ auto* n = static_cast<const AsExpression*>(this); return subtreeFacts() & ~SubtreeExclusionsOuterExpression; }
-		case Kind::ArrayBindingPattern:
 		case Kind::ObjectBindingPattern:
+		case Kind::ArrayBindingPattern:
 			{ auto* n = static_cast<const BindingPattern*>(this); return subtreeFacts() & ~SubtreeExclusionsBindingPattern; }
 		case Kind::CallExpression:
 			{ auto* n = static_cast<const CallExpression*>(this); return subtreeFacts() & ~SubtreeExclusionsCall; }
@@ -6420,15 +7609,15 @@ inline SubtreeFacts Node::propagateSubtreeFacts() const {
 		case Kind::JSDocVariadicType:
 			return SubtreeContainsTypeScript;
 		case Kind::AnyKeyword:
-		case Kind::NeverKeyword:
 		case Kind::UnknownKeyword:
+		case Kind::UndefinedKeyword:
+		case Kind::NeverKeyword:
 		case Kind::StringKeyword:
 		case Kind::NumberKeyword:
 		case Kind::BigIntKeyword:
 		case Kind::BooleanKeyword:
 		case Kind::SymbolKeyword:
 		case Kind::VoidKeyword:
-		case Kind::UndefinedKeyword:
 		case Kind::ObjectKeyword:
 			return SubtreeContainsTypeScript;
 		case Kind::LiteralType:
@@ -6508,12 +7697,7 @@ inline bool isWriteAccess(const Node*) { return false; /* TODO: IsWriteAccess */
 inline bool isWriteAccessForReference(const Node*) { return false; /* TODO: IsWriteAccessForReference */ }
 inline bool isArrayLiteralOrObjectLiteralDestructuringPattern(const Node*) { return false; /* TODO: IsArrayLiteralOrObjectLiteralDestructuringPattern */ }
 inline bool isDeclarationNode(const Node*) { return false; /* TODO: IsDeclarationNode */ }
-inline bool isLocalsContainer(Node* n) {
-	return n->localsContainerData().locals != nullptr;
-}
-inline bool isLocalsContainer(const Node* n) {
-	return const_cast<Node*>(n)->localsContainerData().locals != nullptr;
-}
+inline bool isLocalsContainer(const Node*) { return false; /* TODO: IsLocalsContainer */ }
 inline bool isTypeOrJSTypeAliasDeclaration(const Node* n) { return n->kind == Kind::TypeAliasDeclaration || n->kind == Kind::JSTypeAliasDeclaration; }
 inline bool isImportDeclarationOrJSImportDeclaration(const Node* n) { return n->kind == Kind::ImportDeclaration || n->kind == Kind::JSImportDeclaration; }
 inline bool isAnyExportAssignment(const Node* n) { return n->kind == Kind::ExportAssignment; }
@@ -7270,8 +8454,8 @@ inline SubtreeFacts Node::computeSubtreeFacts() const {
 			return computeSubtreeFacts_BinaryExpression(static_cast<const BinaryExpression*>(this));
 		case Kind::BindingElement:
 			return computeSubtreeFacts_BindingElement(static_cast<const BindingElement*>(this));
-		case Kind::ArrayBindingPattern:
 		case Kind::ObjectBindingPattern:
+		case Kind::ArrayBindingPattern:
 			return computeSubtreeFacts_BindingPattern(static_cast<const BindingPattern*>(this));
 		case Kind::Block:
 			return computeSubtreeFacts_Block(static_cast<const Block*>(this));
@@ -7370,10 +8554,10 @@ inline SubtreeFacts Node::computeSubtreeFacts() const {
 			return computeSubtreeFacts_JsxSpreadAttribute(static_cast<const JsxSpreadAttribute*>(this));
 		case Kind::JsxText:
 			return computeSubtreeFacts_JsxText(static_cast<const JsxText*>(this));
+		case Kind::ThisKeyword:
+		case Kind::NullKeyword:
 		case Kind::TrueKeyword:
 		case Kind::FalseKeyword:
-		case Kind::NullKeyword:
-		case Kind::ThisKeyword:
 		case Kind::SuperKeyword:
 			return computeSubtreeFacts_KeywordExpression(static_cast<const KeywordExpression*>(this));
 		case Kind::LabeledStatement:
@@ -7452,27 +8636,27 @@ inline SubtreeFacts Node::computeSubtreeFacts() const {
 			return computeSubtreeFacts_TemplateTail(static_cast<const TemplateTail*>(this));
 		case Kind::ThrowStatement:
 			return computeSubtreeFacts_ThrowStatement(static_cast<const ThrowStatement*>(this));
-		case Kind::AssertsKeyword:
-		case Kind::DotDotDotToken:
-		case Kind::QuestionToken:
-		case Kind::CommaToken:
-		case Kind::EqualsToken:
-		case Kind::BarBarToken:
-		case Kind::AmpersandAmpersandToken:
-		case Kind::EqualsEqualsEqualsToken:
-		case Kind::ExclamationEqualsEqualsToken:
-		case Kind::EqualsGreaterThanToken:
-		case Kind::ColonToken:
-		case Kind::PlusToken:
-		case Kind::AsteriskToken:
-		case Kind::InKeyword:
-		case Kind::EndOfFile:
-		case Kind::QuestionDotToken:
-		case Kind::DotToken:
-		case Kind::QuestionQuestionToken:
 		case Kind::ExportKeyword:
 		case Kind::DeclareKeyword:
+		case Kind::EqualsEqualsEqualsToken:
+		case Kind::QuestionToken:
+		case Kind::ColonToken:
+		case Kind::DotDotDotToken:
 		case Kind::SemicolonToken:
+		case Kind::AssertsKeyword:
+		case Kind::CommaToken:
+		case Kind::EndOfFile:
+		case Kind::EqualsToken:
+		case Kind::EqualsGreaterThanToken:
+		case Kind::AmpersandAmpersandToken:
+		case Kind::AsteriskToken:
+		case Kind::QuestionQuestionToken:
+		case Kind::BarBarToken:
+		case Kind::ExclamationEqualsEqualsToken:
+		case Kind::PlusToken:
+		case Kind::InKeyword:
+		case Kind::DotToken:
+		case Kind::QuestionDotToken:
 			return computeSubtreeFacts_Token(static_cast<const Token*>(this));
 		case Kind::TryStatement:
 			return computeSubtreeFacts_TryStatement(static_cast<const TryStatement*>(this));
@@ -7533,8 +8717,8 @@ inline SubtreeFacts Node::subtreeFacts() const {
 					n->facts.store(f, std::memory_order_release);
 				}
 				return f & ~SubtreeFactsComputed; }
-		case Kind::ArrayBindingPattern:
 		case Kind::ObjectBindingPattern:
+		case Kind::ArrayBindingPattern:
 			{ auto* n = static_cast<const BindingPattern*>(this);
 				uint32_t f = n->facts.load(std::memory_order_acquire);
 				if (!(f & SubtreeFactsComputed)) {

@@ -22,3 +22,5 @@
 	SubtreeFacts propagateSubtreeFacts() const;
 	SubtreeFacts computeSubtreeFacts() const;
 	SubtreeFacts subtreeFacts() const;
+	Node* clone(NodeFactory& f);
+	Node* visitEachChild(NodeVisitor& v);

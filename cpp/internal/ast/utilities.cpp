@@ -1184,6 +1184,21 @@ bool isComputedNonLiteralName(Node* name) {
 		   !isStringOrNumericLiteralLike(name->expression());
 }
 
+// utilities.go: IsDeclaration
+bool isDeclaration(Node* node) {
+	if (node->kind == Kind::TypeParameter) {
+		return node->parent != nullptr;
+	}
+	return isDeclarationNode(node);
+}
+
+// utilities.go: IsDeclarationName — true if `name` is the name of a
+// declaration node.
+bool isDeclarationName(Node* name) {
+	return !isSourceFile(name) && !isBindingPattern(name) &&
+		   isDeclaration(name->parent) && name->parent->name() == name;
+}
+
 bool tryGetTextOfPropertyName(Node* name, std::string& out) {
 	switch (name->kind) {
 	case Kind::Identifier:

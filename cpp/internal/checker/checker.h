@@ -24,6 +24,8 @@
 #include "internal/core/types.h"
 #include "internal/jsnum/jsnum.h"
 #include "internal/scanner/scanner.h"
+#include "internal/nodebuilder/types.h"
+#include "internal/printer/emitcontext.h"
 
 namespace tsc::checker {
 
@@ -2150,6 +2152,12 @@ public:
 	    const std::vector<Node*>& declarations, const std::vector<Type*>& targetParameters,
 	    const std::function<std::vector<Node*>(Node*)>& getTypeParameterDeclarations);
 	ModifierFlags getTypeParameterModifiers(Type* typeParameter);
+||||||| 73b7201e13
+
+	// === slice: nodecopy ===
+	printer::SymbolAccessibilityResult isSymbolAccessible(
+		Symbol* symbol, Node* enclosingDeclaration, SymbolFlags meaning,
+		bool shouldComputeAliasesToMakeVisible);
 };
 
 // Free helpers used across checker translation units.
@@ -2166,5 +2174,336 @@ std::vector<std::string> FormatTypeFlags(TypeFlags flags); // types.go:556
 // === slice: jsdoc ===
 std::vector<Node*> getAllJSDocTags(Node* node);
 std::string entityNameToString(Node* name); // utilities.go — defined in checker.cpp
+
+// === slice: nodecopy ===
+// NodeBuilder machinery shared by nodecopy.go + the future nodebuilderimpl
+// slice (types from nodebuilderimpl.go, module/types.go, collections/cow.go).
+
+// CopyOnWriteMap (collections/cow.go): shares its backing store with a parent
+// scope and clones on first mutation. EnterScope returns a restore closure.
+template <class K, class V>
+struct CopyOnWriteMap {
+	std::shared_ptr<std::unordered_map<K, V>> m =
+		std::make_shared<std::unordered_map<K, V>>();
+	bool owned = true;
+
+	std::pair<V, bool> Get(const K& k) const {
+		auto it = m->find(k);
+		if (it == m->end()) {
+			return {V{}, false};
+		}
+		return {it->second, true};
+	}
+	bool Has(const K& k) const { return m->find(k) != m->end(); }
+	void Set(const K& k, const V& v) {
+		ensureOwned();
+		(*m)[k] = v;
+	}
+	void ensureOwned() {
+		if (owned) {
+			return;
+		}
+		m = std::make_shared<std::unordered_map<K, V>>(*m);
+		owned = true;
+	}
+	std::function<void()> EnterScope() {
+		CopyOnWriteMap saved = *this;
+		owned = false;
+		return [this, saved]() { *this = saved; };
+	}
+};
+
+template <class K>
+struct CopyOnWriteSet {
+	CopyOnWriteMap<K, char> m;
+
+	bool Has(const K& k) const { return m.Has(k); }
+	void Add(const K& k) { m.Set(k, 0); }
+	std::function<void()> EnterScope() { return m.EnterScope(); }
+};
+
+// ModeAwareCacheKey (module/types.go).
+struct ModeAwareCacheKey {
+	std::string Name;
+	ResolutionMode Mode = ResolutionModeNone;
+	bool operator==(const ModeAwareCacheKey&) const = default;
+};
+
+struct ModeAwareCacheKeyHash {
+	size_t operator()(const ModeAwareCacheKey& k) const {
+		size_t h = std::hash<std::string>()(k.Name);
+		return h * 0x9E3779B97F4A7C15ull ^ static_cast<size_t>(k.Mode);
+	}
+};
+
+// ModeAwareCache (module/cache.go): map[ModeAwareCacheKey]T.
+template <class T>
+using ModeAwareCache =
+	std::unordered_map<ModeAwareCacheKey, T, ModeAwareCacheKeyHash>;
+
+// moduleSpecifierResult (nodebuilderimpl.go).
+struct moduleSpecifierResult {
+	std::string specifier;
+	Type* importAttributesType = nullptr;
+};
+
+// CompositeSymbolIdentity (nodebuilderimpl.go).
+struct CompositeSymbolIdentity {
+	bool isConstructorNode = false;
+	SymbolId symbolId = 0;
+	NodeId nodeId = 0;
+	bool operator==(const CompositeSymbolIdentity&) const = default;
+};
+
+struct CompositeSymbolIdentityHash {
+	size_t operator()(const CompositeSymbolIdentity& k) const {
+		size_t h = static_cast<size_t>(k.isConstructorNode);
+		h = h * 0x9E3779B97F4A7C15ull ^ static_cast<size_t>(k.symbolId);
+		return h * 0x9E3779B97F4A7C15ull ^ static_cast<size_t>(k.nodeId);
+	}
+};
+
+// TrackedSymbolArgs (nodebuilderimpl.go).
+struct TrackedSymbolArgs {
+	Symbol* symbol = nullptr;
+	Node* enclosingDeclaration = nullptr;
+	SymbolFlags meaning = 0;
+};
+
+// SerializedTypeEntry (nodebuilderimpl.go).
+struct SerializedTypeEntry {
+	Node* node = nullptr;
+	bool truncating = false;
+	int addedLength = 0;
+	std::vector<TrackedSymbolArgs*> trackedSymbols;
+};
+
+// CompositeTypeCacheIdentity (nodebuilderimpl.go).
+struct CompositeTypeCacheIdentity {
+	TypeId typeId = 0;
+	nodebuilder::Flags flags = 0;
+	nodebuilder::InternalFlags internalFlags = 0;
+	bool operator==(const CompositeTypeCacheIdentity&) const = default;
+};
+
+struct CompositeTypeCacheIdentityHash {
+	size_t operator()(const CompositeTypeCacheIdentity& k) const {
+		size_t h = static_cast<size_t>(k.typeId);
+		h = h * 0x9E3779B97F4A7C15ull ^ static_cast<size_t>(k.flags);
+		return h * 0x9E3779B97F4A7C15ull ^ static_cast<size_t>(k.internalFlags);
+	}
+};
+
+// NodeBuilderLinks (nodebuilderimpl.go).
+struct NodeBuilderLinks {
+	// Collection of types serialized at this location
+	std::unordered_map<CompositeTypeCacheIdentity, SerializedTypeEntry*,
+	                   CompositeTypeCacheIdentityHash>
+		serializedTypes;
+	// If present, this is a fake scope injected into an enclosing declaration
+	// chain.
+	std::optional<std::string> fakeScopeForSignatureDeclaration;
+};
+
+// NodeBuilderSymbolLinks (nodebuilderimpl.go).
+struct NodeBuilderSymbolLinks {
+	ModeAwareCache<moduleSpecifierResult> specifierCache;
+};
+
+// NodeBuilderContext (nodebuilderimpl.go).
+struct NodeBuilderContext {
+	void* host = nullptr; // modulespecifiers Host — not ported yet
+	nodebuilder::SymbolTracker* tracker = nullptr;
+	int approximateLength = 0;
+	int maxTruncationLength = 0;
+	bool encounteredError = false;
+	bool truncating = false;
+	bool reportedDiagnostic = false;
+	nodebuilder::Flags flags = 0;
+	nodebuilder::InternalFlags internalFlags = 0;
+	int depth = 0;
+	int maxExpansionDepth = 0; // -1 means no expansion, 0+ = verbosity levels
+	std::vector<Type*> typeStack;
+	bool canIncreaseExpansionDepth = false;
+	bool expansionTruncated = false;
+	Node* enclosingDeclaration = nullptr;
+	SourceFile* enclosingFile = nullptr;
+	std::vector<Type*> inferTypeParameters;
+	std::unordered_set<TypeId> visitedTypes;
+	std::unordered_map<CompositeSymbolIdentity, int,
+	                   CompositeSymbolIdentityHash>
+		symbolDepth;
+	std::vector<TrackedSymbolArgs*> trackedSymbols;
+	TypeMapper* mapper = nullptr;
+	std::vector<Symbol*> reverseMappedStack;
+	std::unordered_map<SymbolId, Type*> enclosingSymbolTypes;
+	bool suppressReportInferenceFallback = false;
+	std::unordered_map<SymbolId, Symbol*> remappedSymbolReferences;
+
+	// per signature scope state
+	CopyOnWriteMap<TypeId, Node*> typeParameterNames;
+	CopyOnWriteSet<std::string> typeParameterNamesByText;
+	CopyOnWriteMap<std::string, int> typeParameterNamesByTextNextNameCount;
+	CopyOnWriteSet<SymbolId> typeParameterSymbolList;
+};
+
+// propertyNameNodeKind (nodebuilderimpl.go).
+enum class propertyNameNodeKind : int32_t {
+	Identifier = 0,
+	NumericLiteral = 1,
+	StringLiteral = 2,
+};
+
+struct NodeBuilderImpl;
+struct recoveryBoundary;
+struct SymbolTrackerImpl;
+
+// NodeBuilderImpl (nodebuilderimpl.go) — the node builder facade.
+struct NodeBuilderImpl {
+	// host members
+	NodeFactory* f = nullptr;
+	Checker* ch = nullptr;
+	printer::EmitContext* e = nullptr;
+	void* pc = nullptr; // *pseudochecker.PseudoChecker — not ported
+
+	// cache
+	Arena linksArena;
+	Arena symbolLinksArena;
+	LinkStore<Node*, NodeBuilderLinks> links{&linksArena};
+	LinkStore<Symbol*, NodeBuilderSymbolLinks> symbolLinks{&symbolLinksArena};
+
+	// state
+	NodeBuilderContext* ctx = nullptr;
+
+	// reusable visitor
+	NodeVisitor* cloneBindingNameVisitor = nullptr;
+
+	// symbols for synthesized identifiers, needed for e.g. inlay hints
+	std::unordered_map<Node*, Symbol*> idToSymbol;
+
+	// --- nodecopy.go ---
+	Node* reuseNode(Node* node);
+	Node* tryJSTypeNodeToTypeNode(Node* node);
+	Node* reuseName(Node* node, bool isMethod);
+	Node* reuseTypeNode(Node* node);
+	void walkNodeForExpandability(Node* node);
+	recoveryBoundary* createRecoveryBoundary();
+	bool finalizeBoundary(recoveryBoundary* bound);
+	Node* tryReuseExistingNodeHelper(Node* existing);
+	std::string getModuleSpecifierOverride(Node* parent, Node* lit);
+	Node* rewriteModuleSpecifier(Node* parent, Node* lit);
+	Node* getEnclosingDeclarationIgnoringFakeScope();
+
+	// --- nodebuilderimpl.go deps used by nodecopy.go (ported for real where
+	// their own deps already exist, otherwise stubbed) ---
+	Node* setTextRange(Node* range_, Node* location);
+	Node* newIdentifier(const std::string& text, Symbol* symbol);
+	Type* getTypeFromTypeNode(Node* node, bool noMappedTypes);
+	Node* typeToTypeNode(Type* t);
+	void checkTypeExpandability(Type* t);
+	std::function<void()> enterNewScope(Node* declaration,
+	                                  std::vector<Symbol*> expandedParams,
+	                                  std::vector<Type*> typeParameters,
+	                                  std::vector<Symbol*> originalParameters,
+	                                  TypeMapper* mapper);
+	Node* serializeTypeName(Node* node, bool isTypeOf, NodeList* typeArguments);
+	bool canReuseExistingJSTypeNode(Node* existing, Type* t);
+	Symbol* tryGetResolvedSymbolFromTypeNode(Node* node);
+	std::vector<Symbol*> lookupSymbolChain(Symbol* symbol, SymbolFlags meaning,
+	                                     bool yieldModuleSymbol);
+	moduleSpecifierResult getSpecifierForModuleSymbol(
+		Symbol* symbol, ResolutionMode overrideImportMode);
+	Node* typeParameterToName(Type* typeParameter);
+};
+
+// originalRecoveryScopeState (nodecopy.go).
+struct originalRecoveryScopeState {
+	int trackedSymbolsTop = 0;
+	int unreportedErrorsTop = 0;
+	bool hadError = false;
+};
+
+// recoveryBoundary (nodecopy.go).
+struct recoveryBoundary {
+	NodeBuilderContext* ctx = nullptr;
+	bool hadError = false;
+	std::vector<std::function<void()>> deferredReports;
+	nodebuilder::SymbolTracker* oldTracker = nullptr;
+	std::vector<TrackedSymbolArgs*> oldTrackedSymbols;
+	std::vector<TrackedSymbolArgs*> trackedSymbols;
+	bool oldEncounteredError = false;
+	int oldApproximateLength = 0;
+
+	void markError(std::function<void()> f);
+	originalRecoveryScopeState startRecoveryScope();
+	void endRecoveryScope(originalRecoveryScopeState state);
+};
+
+// wrappingTracker (nodecopy.go) — defers diagnostic reports until the bound
+// recovery boundary is finalized.
+struct wrappingTracker : nodebuilder::SymbolTracker {
+	nodebuilder::SymbolTracker* wrapped = nullptr;
+	recoveryBoundary* bound = nullptr;
+
+	void PopErrorFallbackNode() override;
+	void PushErrorFallbackNode(Node* node) override;
+	void ReportCyclicStructureError() override;
+	void ReportInaccessibleThisError() override;
+	void ReportInaccessibleUniqueSymbolError() override;
+	void ReportInferenceFallback(Node* node) override;
+	void ReportLikelyUnsafeImportRequiredError(
+		const std::string& specifier, const std::string& symbolName) override;
+	void ReportNonSerializableProperty(const std::string& propertyName) override;
+	void ReportNonlocalAugmentation(SourceFile* containingFile,
+	                                Symbol* parentSymbol,
+	                                Symbol* augmentingSymbol) override;
+	void ReportPrivateInBaseOfClassExpression(
+		const std::string& propertyName) override;
+	void ReportTruncationError() override;
+	bool TrackSymbol(Symbol* symbol, Node* enclosingDeclaration,
+	                 SymbolFlags meaning) override;
+};
+
+// SymbolTrackerImpl (symboltracker.go).
+struct SymbolTrackerImpl : nodebuilder::SymbolTracker {
+	NodeBuilderContext* context = nullptr;
+	nodebuilder::SymbolTracker* inner = nullptr;
+	bool DisableTrackSymbol = false;
+
+	bool TrackSymbol(Symbol* symbol, Node* enclosingDeclaration,
+	                 SymbolFlags meaning) override;
+	void ReportInaccessibleThisError() override;
+	void ReportPrivateInBaseOfClassExpression(
+		const std::string& propertyName) override;
+	void ReportInaccessibleUniqueSymbolError() override;
+	void ReportCyclicStructureError() override;
+	void ReportLikelyUnsafeImportRequiredError(
+		const std::string& specifier, const std::string& symbolName) override;
+	void ReportTruncationError() override;
+	void ReportNonlocalAugmentation(SourceFile* containingFile,
+	                                Symbol* parentSymbol,
+	                                Symbol* augmentingSymbol) override;
+	void ReportNonSerializableProperty(
+		const std::string& propertyName) override;
+	void ReportInferenceFallback(Node* node) override;
+	void PushErrorFallbackNode(Node* node) override;
+	void PopErrorFallbackNode() override;
+
+	void onDiagnosticReported() { context->reportedDiagnostic = true; }
+};
+
+wrappingTracker* newWrappingTracker(nodebuilder::SymbolTracker* inner,
+                                    recoveryBoundary* bound);
+SymbolTrackerImpl* newSymbolTrackerImpl(
+	NodeBuilderContext* context, nodebuilder::SymbolTracker* tracker);
+NodeVisitor* getExistingNodeTreeVisitor(NodeBuilderImpl* b,
+                                      recoveryBoundary* bound);
+
+// property name classification (nodebuilderimpl.go) + emitresolver helpers.
+propertyNameNodeKind classifyPropertyName(const std::string& name,
+                                        bool stringNamed, bool isMethod);
+bool isNumericLiteralName(const std::string& name);
+bool isExternalModuleSymbol(Symbol* moduleSymbol);
+SymbolFlags getMeaningOfEntityNameReference(Node* entityName);
 
 } // namespace tsc::checker
