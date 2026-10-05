@@ -654,33 +654,6 @@ IndexInfo* Checker::newIndexInfo(Type* keyType, Type* valueType, bool isReadonly
 	return info;
 }
 
-Type* Checker::getRegularTypeOfLiteralType(Type* t) {
-	if (t->flags & TypeFlagsFreshable) {
-		return t->AsLiteralType()->regularType;
-	}
-	if (t->flags & TypeFlagsUnion) {
-		UnionType* u = t->AsUnionType();
-		if (u->regularType == nullptr) {
-			u->regularType = mapType(t, [this](Type* s) { return getRegularTypeOfLiteralType(s); });
-		}
-		return u->regularType;
-	}
-	return t;
-}
-
-Type* Checker::getFreshTypeOfLiteralType(Type* t) {
-	if (t->flags & TypeFlagsFreshable) {
-		LiteralType* d = t->AsLiteralType();
-		if (d->freshType == nullptr) {
-			Type* f = newLiteralType(t->flags, d->value, t);
-			f->symbol = t->symbol;
-			f->AsLiteralType()->freshType = f;
-			d->freshType = f;
-		}
-		return d->freshType;
-	}
-	return t;
-}
 
 namespace {
 const std::unordered_map<std::string, IntrinsicTypeKind> intrinsicTypeKinds = {
@@ -698,41 +671,16 @@ constexpr int maxTemplateLiteralTypeSpans = 100'000;
 // Literal factories
 // ---------------------------------------------------------------------------
 
-Type* Checker::getStringLiteralType(const std::string& value) {
-	Type* t = stringLiteralTypes[value];
-	if (t == nullptr) {
-		t = newLiteralType(TypeFlagsStringLiteral, value, nullptr);
-		stringLiteralTypes[value] = t;
-	}
-	return t;
-}
-
-Type* Checker::getNumberLiteralType(Number value) {
-	// NaN is not a usable map key (NaN != NaN), so cache the NaN type separately.
-	if (value.isNaN()) {
-		if (nanType == nullptr) {
-			nanType = newLiteralType(TypeFlagsNumberLiteral, value, nullptr);
-		}
-		return nanType;
-	}
-	uint64_t bits = std::bit_cast<uint64_t>(value.v);
-	Type* t = numberLiteralTypes[bits];
-	if (t == nullptr) {
-		t = newLiteralType(TypeFlagsNumberLiteral, value, nullptr);
-		numberLiteralTypes[bits] = t;
-	}
-	return t;
-}
-
-Type* Checker::getBigIntLiteralType(const PseudoBigInt& value) {
-	std::string key = value.string();
-	Type* t = bigintLiteralTypes[key];
-	if (t == nullptr) {
-		t = newLiteralType(TypeFlagsBigIntLiteral, value, nullptr);
-		bigintLiteralTypes[key] = t;
-	}
-	return t;
-}
+// The widen slice (checker.go:25739-26019) moved to checker_widen.cpp:
+// getRegularTypeOfLiteralType, getFreshTypeOfLiteralType, getStringLiteralType,
+// getNumberLiteralType, getBigIntLiteralType, parseBigIntLiteralType,
+// getEnumLiteralType, isUnitLikeType, extractUnitType, getBaseTypeOfLiteralType,
+// getBaseTypeOfLiteralTypeForComparison, getBaseTypeOfEnumLikeType,
+// getBaseTypeOfLiteralTypeUnion, getWidenedLiteralType,
+// getWidenedUniqueESSymbolType, getWidenedLiteralLikeTypeForContextualType,
+// isLiteralOfContextualType. The static literal helpers below stay here because
+// remaining checker.cpp code still uses them (checker_widen.cpp has its own
+// file-local copies).
 
 static std::string anyToString(const LiteralValue& v) {
 	if (const std::string* s = std::get_if<std::string>(&v)) {
@@ -766,41 +714,6 @@ static bool getBooleanLiteralValue(Type* t) {
 	return std::get<bool>(t->AsLiteralType()->value);
 }
 
-Type* Checker::getEnumLiteralType(const LiteralValue& value, Symbol* enumSymbol, Symbol* symbol) {
-	TypeFlags flags;
-	if (std::holds_alternative<std::string>(value)) {
-		flags = TypeFlagsEnumLiteral | TypeFlagsStringLiteral;
-	} else if (std::holds_alternative<Number>(value)) {
-		flags = TypeFlagsEnumLiteral | TypeFlagsNumberLiteral;
-		if (std::get<Number>(value).isNaN()) {
-			Type* t = enumNaNLiteralTypes[enumSymbol];
-			if (t == nullptr) {
-				t = newLiteralType(flags, value, nullptr);
-				t->symbol = symbol;
-				enumNaNLiteralTypes[enumSymbol] = t;
-			}
-			return t;
-		}
-	} else {
-		TSC_UNREACHABLE("Unhandled case in getEnumLiteralType");
-	}
-	EnumLiteralKey key{enumSymbol};
-	if (const std::string* sv = std::get_if<std::string>(&value)) {
-		key.value = *sv;
-	} else if (const Number* nv = std::get_if<Number>(&value)) {
-		key.value = *nv;
-	} else {
-		key.value = std::get<PseudoBigInt>(value);
-	}
-	Type* t = enumLiteralTypes[key];
-	if (t == nullptr) {
-		t = newLiteralType(flags, value, nullptr);
-		t->symbol = symbol;
-		enumLiteralTypes[key] = t;
-	}
-	return t;
-}
-
 static bool isUnitType(Type* t) {
 	return (t->flags & TypeFlagsUnit) != 0;
 }
@@ -816,160 +729,6 @@ static bool isLiteralType(Type* t) {
 		return everyType(t, isUnitType);
 	}
 	return isUnitType(t);
-}
-
-bool Checker::isUnitLikeType(Type* t) {
-	t = getBaseConstraintOrType(t);
-	if (t->flags & TypeFlagsIntersection) {
-		return someType(t, isUnitType);
-	}
-	return isUnitType(t);
-}
-
-Type* Checker::extractUnitType(Type* t) {
-	if (t->flags & TypeFlagsIntersection) {
-		for (Type* u : t->types()) {
-			if (isUnitType(u)) {
-				return u;
-			}
-		}
-	}
-	return t;
-}
-
-Type* Checker::getBaseTypeOfLiteralType(Type* t) {
-	if (t->flags & TypeFlagsEnumLike) {
-		return getBaseTypeOfEnumLikeType(t);
-	}
-	if (t->flags & (TypeFlagsStringLiteral | TypeFlagsTemplateLiteral | TypeFlagsStringMapping)) {
-		return stringType;
-	}
-	if (t->flags & TypeFlagsNumberLiteral) {
-		return numberType;
-	}
-	if (t->flags & TypeFlagsBigIntLiteral) {
-		return bigintType;
-	}
-	if (t->flags & TypeFlagsBooleanLiteral) {
-		return booleanType;
-	}
-	if (t->flags & TypeFlagsUnion) {
-		return getBaseTypeOfLiteralTypeUnion(t);
-	}
-	return t;
-}
-
-Type* Checker::getBaseTypeOfLiteralTypeForComparison(Type* t) {
-	if (t->flags & (TypeFlagsStringLiteral | TypeFlagsTemplateLiteral | TypeFlagsStringMapping)) {
-		return stringType;
-	}
-	if (t->flags & (TypeFlagsNumberLiteral | TypeFlagsEnum)) {
-		return numberType;
-	}
-	if (t->flags & TypeFlagsBigIntLiteral) {
-		return bigintType;
-	}
-	if (t->flags & TypeFlagsBooleanLiteral) {
-		return booleanType;
-	}
-	if (t->flags & TypeFlagsUnion) {
-		return mapType(t,
-			[this](Type* u) { return getBaseTypeOfLiteralTypeForComparison(u); });
-	}
-	return t;
-}
-
-Type* Checker::getBaseTypeOfEnumLikeType(Type* t) {
-	if ((t->flags & TypeFlagsEnumLike) && (t->symbol->flags & SymbolFlagsEnumMember)) {
-		return getDeclaredTypeOfSymbol(getParentOfSymbol(t->symbol));
-	}
-	return t;
-}
-
-Type* Checker::getBaseTypeOfLiteralTypeUnion(Type* t) {
-	CachedTypeKey key{CachedTypeKind::LiteralUnionBaseType, t->id};
-	if (auto it = cachedTypes.find(key); it != cachedTypes.end()) {
-		return it->second;
-	}
-	Type* result = mapType(t, [this](Type* u) { return getBaseTypeOfLiteralType(u); });
-	cachedTypes[key] = result;
-	return result;
-}
-
-Type* Checker::getWidenedLiteralType(Type* t) {
-	if ((t->flags & TypeFlagsEnumLike) && isFreshLiteralType(t)) {
-		return getBaseTypeOfEnumLikeType(t);
-	}
-	if ((t->flags & TypeFlagsStringLiteral) && isFreshLiteralType(t)) {
-		return stringType;
-	}
-	if ((t->flags & TypeFlagsNumberLiteral) && isFreshLiteralType(t)) {
-		return numberType;
-	}
-	if ((t->flags & TypeFlagsBigIntLiteral) && isFreshLiteralType(t)) {
-		return bigintType;
-	}
-	if ((t->flags & TypeFlagsBooleanLiteral) && isFreshLiteralType(t)) {
-		return booleanType;
-	}
-	if (t->flags & TypeFlagsUnion) {
-		return mapType(t, [this](Type* u) { return getWidenedLiteralType(u); });
-	}
-	return t;
-}
-
-Type* Checker::getWidenedUniqueESSymbolType(Type* t) {
-	if (t->flags & TypeFlagsUniqueESSymbol) {
-		return esSymbolType;
-	}
-	if (t->flags & TypeFlagsUnion) {
-		return mapType(t, [this](Type* u) { return getWidenedUniqueESSymbolType(u); });
-	}
-	return t;
-}
-
-Type* Checker::getWidenedLiteralLikeTypeForContextualType(Type* t, Type* contextualType) {
-	if (!isLiteralOfContextualType(t, contextualType)) {
-		t = getWidenedUniqueESSymbolType(getWidenedLiteralType(t));
-	}
-	return getRegularTypeOfLiteralType(t);
-}
-
-bool Checker::isLiteralOfContextualType(Type* candidateType, Type* contextualType) {
-	if (contextualType != nullptr) {
-		if (contextualType->flags & TypeFlagsUnionOrIntersection) {
-			return someType(contextualType, [this, candidateType](Type* t) {
-				return isLiteralOfContextualType(candidateType, t);
-			});
-		}
-		if (contextualType->flags & TypeFlagsInstantiableNonPrimitive) {
-			Type* constraint = getBaseConstraintOfType(contextualType);
-			if (constraint == nullptr) {
-				constraint = unknownType;
-			}
-			return maybeTypeOfKind(constraint, TypeFlagsString) &&
-					maybeTypeOfKind(candidateType, TypeFlagsStringLiteral) ||
-				maybeTypeOfKind(constraint, TypeFlagsNumber) &&
-					maybeTypeOfKind(candidateType, TypeFlagsNumberLiteral) ||
-				maybeTypeOfKind(constraint, TypeFlagsBigInt) &&
-					maybeTypeOfKind(candidateType, TypeFlagsBigIntLiteral) ||
-				maybeTypeOfKind(constraint, TypeFlagsESSymbol) &&
-					maybeTypeOfKind(candidateType, TypeFlagsUniqueESSymbol) ||
-				isLiteralOfContextualType(candidateType, constraint);
-		}
-		return (contextualType->flags & (TypeFlagsStringLiteral | TypeFlagsIndex |
-					TypeFlagsTemplateLiteral | TypeFlagsStringMapping)) &&
-				maybeTypeOfKind(candidateType, TypeFlagsStringLiteral) ||
-			(contextualType->flags & TypeFlagsNumberLiteral) &&
-				maybeTypeOfKind(candidateType, TypeFlagsNumberLiteral) ||
-			(contextualType->flags & TypeFlagsBigIntLiteral) &&
-				maybeTypeOfKind(candidateType, TypeFlagsBigIntLiteral) ||
-			(contextualType->flags & TypeFlagsBooleanLiteral) &&
-				maybeTypeOfKind(candidateType, TypeFlagsBooleanLiteral) ||
-			(contextualType->flags & TypeFlagsUniqueESSymbol) &&
-				maybeTypeOfKind(candidateType, TypeFlagsUniqueESSymbol);
-	}
-	return false;
 }
 
 // ---------------------------------------------------------------------------

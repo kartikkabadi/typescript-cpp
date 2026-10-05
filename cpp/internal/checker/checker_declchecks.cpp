@@ -1781,12 +1781,10 @@ Type* Checker::getNullableType(Type* t, TypeFlags flags) {
 void Checker::checkIndexedAccessIndexType(Type* t, Node* node) {
 	TSC_UNREACHABLE("checkIndexedAccessIndexType — typeops slice");
 }
-// owner: markLinkedReferences range (checker.go:28655-29384)
-void Checker::checkExternalEmitHelpers(Node* location, ExternalEmitHelpers helpers) {
-	TSC_UNREACHABLE("checkExternalEmitHelpers — markrefs slice");
-}
+// markrefs slice landed in checker_markrefs.cpp — checkExternalEmitHelpers moved there.
+// owner: relater slice (relater.go)
 Type* Checker::createMarkerType(Symbol* symbol, Type* source, Type* target) {
-	TSC_UNREACHABLE("createMarkerType — markrefs slice");
+	TSC_UNREACHABLE("createMarkerType — relater slice");
 }
 // owner: contextual slice (checker.go:29385-32069)
 bool Checker::checkGeneratorInstantiationAssignabilityToReturnType(

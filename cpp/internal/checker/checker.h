@@ -860,6 +860,11 @@ public:
 	    const std::string& /*path*/) {
 		return nullptr;
 	}
+	// program.go GetImportHelpersImportSpecifier — the `import "tslib"` specifier
+	// the program synthesized for this file, if any.
+	virtual Node* GetImportHelpersImportSpecifier(const std::string& /*path*/) {
+		return nullptr;
+	}
 };
 
 // nodeLinkStore / symbolArenaLinkStore (links.go)
@@ -2157,6 +2162,56 @@ public:
 	printer::SymbolAccessibilityResult isSymbolAccessible(
 		Symbol* symbol, Node* enclosingDeclaration, SymbolFlags meaning,
 		bool shouldComputeAliasesToMakeVisible);
+
+	// === slice: widen ===
+	// checker.go:25739-26019 — literal-type widening machinery. Bodies live in
+	// checker_widen.cpp; all other in-range methods were already declared above.
+	Type* parseBigIntLiteralType(const std::string& text);
+
+	// === slice: markrefs ===
+	// checker.go:28655-29384 — declaration reference marking (markLinkedReferences
+	// and everything in the range). Bodies live in checker_markrefs.cpp.
+	void markLinkedReferences(Node* location, ReferenceHint hint, Symbol* propSymbol,
+		Type* parentType);
+	void markIdentifierAliasReferenced(Node* location);
+	void markPropertyAliasReferenced(Node* location, Symbol* propSymbol,
+		Type* parentType);
+	void markExportAssignmentAliasReferenced(Node* location);
+	void markJsxAliasReferenced(Node* node);
+	void markImportEqualsAliasReferenced(Node* location);
+	void markExportSpecifierAliasReferenced(Node* location);
+	bool hasSignatureWithArityGreaterThan(Symbol* symbol, int arity);
+	std::vector<std::string> getHelperNames(ExternalEmitHelpers helper);
+	Symbol* resolveHelpersModule(SourceFile* file, Node* errorNode);
+	void markDecoratorAliasReferenced(Node* node);
+	Node* getParameterTypeNodeForDecoratorCheck(Node* node);
+	void markDecoratorMedataDataTypeNodeAsReferenced(Node* node);
+	Node* getEntityNameForDecoratorMetadata(Node* node);
+	Node* getEntityNameForDecoratorMetadataFromTypeList(std::vector<Node*> typeNodes);
+	void markAliasReferenced(Symbol* symbol, Node* location);
+	void markAliasSymbolAsReferenced(Symbol* symbol);
+	void markExportAsReferenced(Node* node);
+	void markEntityNameOrEntityExpressionAsReference(Node* typeName,
+		bool forDecoratorMetadata);
+	void markTypeNodeAsReferenced(Node* node);
+
+	// === dep decls — checker_markrefs.cpp callers, owned by other slices ===
+	// owner: expressions slice (checker.go:8090-14185)
+	bool isMethodAccessForCall(Node* node);
+	Symbol* getPrivateIdentifierPropertyOfType(Type* leftType,
+		Symbol* lexicallyScopedIdentifier);
+	// owner: jsx slice (jsx.go)
+	Symbol* getJsxNamespaceContainerForImplicitImport(Node* location);
+	std::string getJsxNamespace(Node* location);
+	Node* getJsxFactoryEntity(Node* location);
+	// owner: relater slice (relater.go)
+	int getParameterCount(Signature* signature);
+	// owner: signatures slice (checker.go:20143-20986)
+	Node* getAnnotatedAccessorTypeNode(Node* accessor);
+	// owner: declchecks slice (checker.go:5081-5929)
+	bool checkExternalImportOrExportDeclaration(Node* node);
+	// owner: instantiate slice (checker.go:22285-23219)
+	bool symbolIsValue(Symbol* symbol);
 };
 
 // Free helpers used across checker translation units.
