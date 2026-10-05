@@ -1,18 +1,21 @@
 // bindump — Go oracle bind dumper: identical text shape to `tscpp bind`.
 // Emits, in pre-order:
-//   N <kind> <pos> <end> <flags>                       — node + post-bind flags
-//   S <name> <flags> <ndelecs> <vpos:vend|-> <pname:pflags|->  — node.symbol
-//   X <name> <flags>                                   — exportable localSymbol
-//   F <flowFlags> <kind pos end|->                     — node's FlowNode
-//   E <flowFlags|->                                    — endFlowNode/returnFlowNode
-//   L <name:flags;name:flags;...>                      — sorted locals table
-//   Q <pos> <end|->                                    — nextContainer
+//
+//	N <kind> <pos> <end> <flags>                       — node + post-bind flags
+//	S <name> <flags> <ndelecs> <vpos:vend|-> <pname:pflags|->  — node.symbol
+//	X <name> <flags>                                   — exportable localSymbol
+//	F <flowFlags> <kind pos end|->                     — node's FlowNode
+//	E <flowFlags|->                                    — endFlowNode/returnFlowNode
+//	L <name:flags;name:flags;...>                      — sorted locals table
+//	Q <pos> <end|->                                    — nextContainer
+//
 // after the tree:
-//   M <hasCommonJS> <hasExternal>
-//   K <symbolCount>
-//   P <pattern> <name:flags>                           — per PatternAmbientModule
-//   G <name> <flags>                                   — per sorted GlobalExport
-//   B <code> <pos> <end>                               — bind diagnostics
+//
+//	M <hasCommonJS> <hasExternal>
+//	K <symbolCount>
+//	P <pattern> <name:flags>                           — per PatternAmbientModule
+//	G <name> <flags>                                   — per sorted GlobalExport
+//	B <code> <pos> <end>                               — bind diagnostics
 package main
 
 import (

@@ -2,9 +2,9 @@
 // Runs `tsc --noEmit <args...>` semantics (same ParseCommandLine + program
 // pipeline as the real CLI) and emits a canonical, diffable diagnostic dump:
 //
-//   G <code>                     — diagnostics with no file location
-//   F <fileName>                 — per source file that has diagnostics
-//   T <code> <pos> <end>         — diagnostics located in that file
+//	G <code>                     — diagnostics with no file location
+//	F <fileName>                 — per source file that has diagnostics
+//	T <code> <pos> <end>         — diagnostics located in that file
 //
 // G lines are sorted by code, F sections by file name, T lines by
 // (pos, end, code). Command-line parse errors (e.g. unknown flags) are
