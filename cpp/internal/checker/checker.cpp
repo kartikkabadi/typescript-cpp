@@ -2054,6 +2054,7 @@ Diagnostic* NewDiagnosticChainForNode(Diagnostic* chain, Node* node,
 Diagnostic* Checker::addDiagnostic(Diagnostic* diagnostic) {
 	// Discard diagnostics created while at the maximum number of recursive TypeToString invocations.
 	if (serializationLevel < maxSerializationLevel) {
+		diagnostic->producedDuringCheckOf = activeCheckFile;
 		return diagnostics.Add(diagnostic);
 	}
 	return diagnostic;
@@ -2061,6 +2062,7 @@ Diagnostic* Checker::addDiagnostic(Diagnostic* diagnostic) {
 
 Diagnostic* Checker::addSuggestionDiagnostic(Diagnostic* diagnostic) {
 	if (serializationLevel < maxSerializationLevel) {
+		diagnostic->producedDuringCheckOf = activeCheckFile;
 		return suggestionDiagnostics.Add(diagnostic);
 	}
 	return diagnostic;
@@ -5243,7 +5245,10 @@ getFeatureMap() {
 			   {"findLastIndex", "findLast", "toReversed", "toSorted",
 			    "toSpliced", "with"}}}},
 			{"Int32Array",
-			 {{"es2022", {"at"}}, {"es2024", {"groupBy"}}}},
+			 {{"es2022", {"at"}},
+			  {"es2023",
+			   {"findLastIndex", "findLast", "toReversed", "toSorted",
+			    "toSpliced", "with"}}}},
 			{"Set",
 			 {{"es2015", {"entries", "keys", "values"}},
 			  {"es2025",
@@ -5322,6 +5327,36 @@ getFeatureMap() {
 			  {"es2023",
 			   {"findLastIndex", "findLast", "toReversed", "toSorted",
 			    "toSpliced", "with"}}}},
+			{"Uint32Array",
+			 {{"es2022", {"at"}},
+			  {"es2023",
+			   {"findLastIndex", "findLast", "toReversed", "toSorted",
+			    "toSpliced", "with"}}}},
+			{"Float16Array", {{"es2025", {}}}},
+			{"Float32Array",
+			 {{"es2022", {"at"}},
+			  {"es2023",
+			   {"findLastIndex", "findLast", "toReversed", "toSorted",
+			    "toSpliced", "with"}}}},
+			{"BigInt64Array",
+			 {{"es2020", {}},
+			  {"es2022", {"at"}},
+			  {"es2023",
+			   {"findLastIndex", "findLast", "toReversed", "toSorted",
+			    "toSpliced", "with"}}}},
+			{"BigUint64Array",
+			 {{"es2020", {}},
+			  {"es2022", {"at"}},
+			  {"es2023",
+			   {"findLastIndex", "findLast", "toReversed", "toSorted",
+			    "toSpliced", "with"}}}},
+			{"Error", {{"es2022", {"cause"}}}},
+			{"ErrorConstructor", {{"es2026", {"isError"}}}},
+			{"Uint8ArrayConstructor",
+			 {{"es2026", {"fromBase64", "fromHex"}}}},
+			{"DisposableStack", {{"esnext", {}}}},
+			{"AsyncDisposableStack", {{"esnext", {}}}},
+			{"Date", {{"esnext", {"toTemporalInstant"}}}},
 		};
 	return map;
 }
@@ -6296,10 +6331,15 @@ void Checker::init(Program* p) {
 	initializeClosures();
 	initializeIterationResolvers();
 	initializeChecker();
-	// Go: c.globalThisSymbol.Exports = c.globals aliases the globals map, so
-	// merges done by initializeChecker remain visible through the symbol. Our
-	// Symbol::exports is a value member — refresh it now that globals is fully
-	// populated (no entries are inserted into globals after initialization).
+	// Go: c.globalThisSymbol.Exports = c.globals aliases the globals map — the
+	// two tables are the same map, so writes to either side appear in both.
+	// Our Symbol::exports is a value member, so entries that augmentation
+	// merges landed only in the symbol's table (e.g. `var x` inside
+	// `namespace globalThis` in a `declare global` block) never reach
+	// `globals`, and copies of `globals` lack them. Merge both tables to a
+	// union first, then refresh the alias.
+	mergeSymbolTable(globals, globalThisSymbol->exports,
+	                 false /*unidirectional*/, nullptr /*parent*/);
 	globalThisSymbol->exports = globals;
 }
 

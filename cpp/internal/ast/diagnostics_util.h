@@ -217,10 +217,22 @@ struct DiagnosticsCollection {
 		auto it = diagnosticIndex.find(key);
 		if (it != diagnosticIndex.end() && it->second != nullptr) {
 			if (EqualDiagnostics(it->second, diagnostic)) {
+				// Go checker-pool emulation: if this re-add was produced
+				// during the attributed file's own checkSourceFile, the Go
+				// equivalent landed on that file's checker — keep that tag
+				// so Checker::getDiagnostics doesn't hide it.
+				if (diagnostic->producedDuringCheckOf != nullptr &&
+					diagnostic->producedDuringCheckOf == diagnostic->File()) {
+					it->second->producedDuringCheckOf = diagnostic->producedDuringCheckOf;
+				}
 				return it->second;
 			}
 			for (auto* collision : diagnosticCollisions[key]) {
 				if (EqualDiagnostics(collision, diagnostic)) {
+					if (diagnostic->producedDuringCheckOf != nullptr &&
+						diagnostic->producedDuringCheckOf == diagnostic->File()) {
+						collision->producedDuringCheckOf = diagnostic->producedDuringCheckOf;
+					}
 					return collision;
 				}
 			}

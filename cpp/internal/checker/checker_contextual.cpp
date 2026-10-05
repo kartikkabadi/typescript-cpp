@@ -3666,7 +3666,7 @@ Type* Checker::getActualTypeVariable(Type* t) {
 			return getIndexedAccessType(objectType, indexType);
 		}
 	}
-	return t;
+	return getNonDistributedTypeParameter(t);
 }
 
 // === dep stubs — removed when owner slice lands ===
