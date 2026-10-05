@@ -7896,11 +7896,7 @@ bool Checker::isTypeSubtypeOf(Type* source, Type* target) {
 	TSC_UNREACHABLE("isTypeSubtypeOf — ported with the <slice> slice");
 }
 
-void Checker::inferFromIntraExpressionSites(InferenceContext* context) {
-	TSC_UNREACHABLE("inferFromIntraExpressionSites — ported with the inference slice");
-}
-Type* Checker::getInferredType(InferenceContext* context, size_t index) {
-	TSC_UNREACHABLE("getInferredType — ported with the inference slice");
-}
+// (deduped: inferFromIntraExpressionSites, getInferredType — inference slice,
+// defined in cpp/internal/checker/checker_inference.cpp)
 }  // namespace checker
 }  // namespace tsc

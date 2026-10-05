@@ -447,18 +447,6 @@ struct InferenceContext {
 	std::vector<IntraExpressionInferenceSite> intraExpressionInferenceSites;
 };
 
-// InferenceState (free-list pooled)
-
-struct InferenceState {
-	InferenceContext* context{};
-	std::vector<InferenceInfo*> inferences;
-	std::vector<Type*> typeParameters;
-	std::vector<InferencePriority> priorities;
-	std::vector<Type*> inferred;
-	std::vector<InferenceInfo*> fixed;
-	InferenceState* next{};
-};
-
 // DeclarationMeaning
 
 using DeclarationMeaning = uint32_t;
@@ -691,6 +679,36 @@ inline constexpr ExpandingFlags ExpandingFlagsNone = 0;
 inline constexpr ExpandingFlags ExpandingFlagsSource = 1 << 0;
 inline constexpr ExpandingFlags ExpandingFlagsTarget = 1 << 1;
 inline constexpr ExpandingFlags ExpandingFlagsBoth = ExpandingFlagsSource | ExpandingFlagsTarget;
+
+// InferenceKey / InferenceState (free-list pooled) — inference.go:11-30
+
+struct InferenceKey {
+	TypeId s{};
+	TypeId t{};
+	bool operator==(const InferenceKey&) const = default;
+};
+
+struct InferenceKeyHash {
+	size_t operator()(const InferenceKey& k) const noexcept {
+		return (static_cast<size_t>(k.s) << 32) | static_cast<size_t>(k.t);
+	}
+};
+
+struct InferenceState {
+	std::vector<InferenceInfo*> inferences;
+	Type* originalSource{};
+	Type* originalTarget{};
+	InferencePriority priority{};
+	InferencePriority inferencePriority{};
+	bool contravariant{};
+	bool bivariant{};
+	ExpandingFlags expandingFlags{};
+	Type* propagationType{};
+	std::unordered_map<InferenceKey, InferencePriority, InferenceKeyHash> visited;
+	std::vector<Type*> sourceStack;
+	std::vector<Type*> targetStack;
+	InferenceState* next{};
+};
 
 // Relation kinds
 
@@ -3109,6 +3127,90 @@ public:
 	bool isUncalledFunctionReference(Node* node, Symbol* prop);             // expressions slice
 	bool isJSLiteralType(Type* t);                                          // decltypes slice
 	bool isDeprecatedSymbol(Symbol* symbol);                                // decltypes slice
+
+	// === slice: inference === (checker_inference.cpp — inference.go)
+	InferenceState* getInferenceState();
+	void putInferenceState(InferenceState* n);
+	void inferFromTypes(InferenceState* n, Type* source, Type* target);
+	void inferFromTypeArguments(InferenceState* n, const std::vector<Type*>& sourceTypes,
+								const std::vector<Type*>& targetTypes,
+								const std::vector<VarianceFlags>& variances);
+	void inferWithPriority(InferenceState* n, Type* source, Type* target,
+						   InferencePriority newPriority);
+	void inferFromContravariantTypesWithPriority(InferenceState* n, Type* source,
+											   Type* target, InferencePriority newPriority);
+	void inferFromContravariantTypes(InferenceState* n, Type* source, Type* target);
+	void inferFromContravariantTypesIfStrictFunctionTypes(InferenceState* n, Type* source,
+														Type* target);
+	void invokeOnce(InferenceState* n, Type* source, Type* target,
+					void (Checker::*action)(InferenceState*, Type*, Type*));
+	std::pair<std::vector<Type*>, std::vector<Type*>> inferFromMatchingTypes(
+		InferenceState* n, std::vector<Type*> sources, std::vector<Type*> targets,
+		bool (Checker::*matches)(Type*, Type*), bool sort);
+	void inferToMultipleTypes(InferenceState* n, Type* source,
+							  const std::vector<Type*>& targets, TypeFlags targetFlags);
+	void inferToMultipleTypesWithPriority(InferenceState* n, Type* source,
+										  const std::vector<Type*>& targets,
+										  TypeFlags targetFlags, InferencePriority newPriority);
+	void inferToConditionalType(InferenceState* n, Type* source, Type* target);
+	void inferToTemplateLiteralType(InferenceState* n, Type* source,
+									TemplateLiteralType* target);
+	void inferFromGenericMappedTypes(InferenceState* n, Type* source, Type* target);
+	void inferFromObjectTypes(InferenceState* n, Type* source, Type* target);
+	void inferFromProperties(InferenceState* n, Type* source, Type* target);
+	void inferFromSignatures(InferenceState* n, Type* source, Type* target,
+							 SignatureKind kind);
+	void inferFromSignature(InferenceState* n, Signature* source, Signature* target);
+	void inferFromIndexTypes(InferenceState* n, Type* source, Type* target);
+	bool inferToMappedType(InferenceState* n, Type* source, Type* target,
+						   Type* constraintType);
+	Type* createReverseMappedType(Type* source, Type* target, Type* constraint);
+	bool isPartiallyInferableType(Type* t);
+	Type* inferReverseMappedType(Type* source, Type* target, Type* constraint);
+	Type* inferReverseMappedTypeWorker(Type* source, Type* target, Type* constraint);
+	Type* getLimitedConstraint(Type* t);
+	Type* replaceIndexedAccess(Type* instantiable, Type* t, Type* replacement);
+	bool typesDefinitelyUnrelated(Type* source, Type* target);
+	bool isTupleTypeStructureMatching(Type* t1, Type* t2);
+	bool isTypeOrBaseIdenticalTo(Type* s, Type* t);
+	bool isTypeCloselyMatchedBy(Type* s, Type* t);
+	Type* createEmptyObjectTypeFromStringLiteral(Type* t);
+	InferenceContext* cloneInferenceContext(InferenceContext* n, InferenceFlags extraFlags);
+	InferenceContext* cloneInferredPartOfContext(InferenceContext* n);
+	InferenceContext* newInferenceContextWorker(std::vector<InferenceInfo*> inferences,
+												Signature* signature, InferenceFlags flags,
+												TypeComparer compareTypes);
+	void addIntraExpressionInferenceSite(InferenceContext* n, Node* node, Type* t);
+	TypeMapper* getMapperFromContext(InferenceContext* n);
+	TypeMapper* createOuterReturnMapper(InferenceContext* context);
+	Type* getCovariantInference(InferenceInfo* inference, Signature* signature);
+	Type* getContravariantInference(InferenceInfo* inference);
+	std::vector<Type*> unionObjectAndArrayLiteralCandidates(
+		const std::vector<Type*>& candidates);
+	bool hasPrimitiveConstraint(Type* t);
+	bool isTypeParameterAtTopLevel(Type* t, Type* tp, int depth);
+	bool isTypeParameterAtTopLevelInReturnType(Signature* signature, Type* typeParameter);
+	Type* getTypeFromInference(InferenceInfo* inference);
+	Type* getCommonSupertype(std::vector<Type*> types);
+	Type* getSingleCommonSupertype(std::vector<Type*> types);
+	Type* findLeftmostType(const std::vector<Type*>& types,
+						   bool (Checker::*f)(Type*, Type*));
+	Type* getCommonSubtype(const std::vector<Type*>& types);
+	TypeFlags getCombinedTypeFlags(const std::vector<Type*>& types);
+	bool literalTypesWithSameBaseType(const std::vector<Type*>& types);
+	bool isFromInferenceBlockedSource(Type* t);
+
+	// inference-slice dep decls — owned by other slices; bodies stubbed in
+	// checker_inference.cpp under "dep stubs".
+	std::vector<VarianceFlags> getVariances(Type* t);                                    // relater slice
+	std::vector<VarianceFlags> getAliasVariances(Symbol* symbol);                        // relater slice
+	bool isDeeplyNestedType(Type* t, const std::vector<Type*>& stack, int maxDepth);     // relater slice
+	Symbol* getUnmatchedProperty(Type* source, Type* target, bool requireOptionalProperties,
+							   bool matchDiscriminantProperties);                        // relater slice
+	bool typePredicateKindsMatch(TypePredicate* a, TypePredicate* b);                    // relater slice
+	bool isObjectTypeWithInferableIndex(Type* t);                                        // relater slice
+	bool isNonGenericObjectType(Type* t);                                                // checker.go:13743 slice
+	// === end slice: inference ===
 };  // class Checker
 
 // Free helpers used across checker translation units.

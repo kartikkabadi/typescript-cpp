@@ -1178,12 +1178,10 @@ void Checker::skippedGenericFunction(Node* node, CheckMode checkMode) {
 // maybeTypeOfKind / markPropertyAsReferenced — ported in checker_typeops.cpp
 // (typeops slice).
 
-// owner: inference slice (inference.go)
-bool Checker::isSkipDirectInferenceNode(Node* node) { TSC_UNREACHABLE("isSkipDirectInferenceNode — inference slice"); }
-bool Checker::hasOverlappingInferences(std::vector<InferenceInfo*>& a, std::vector<InferenceInfo*>& b) { TSC_UNREACHABLE("hasOverlappingInferences — inference slice"); }
-void Checker::mergeInferences(std::vector<InferenceInfo*>& target, const std::vector<InferenceInfo*>& source) { TSC_UNREACHABLE("mergeInferences — inference slice"); }
-// `newInferenceInfo` / `hasInferenceCandidates` are free fns (inference.go:1626,1651):
-// defined statically above until the inference slice lands its own copies.
+// (deduped: isSkipDirectInferenceNode, hasOverlappingInferences, mergeInferences —
+// inference slice, defined in cpp/internal/checker/checker_inference.cpp)
+// `hasInferenceCandidates` is a free fn (inference.go:1651) defined in
+// checker_contextual.cpp; `newInferenceInfo` lives in checker_inference.cpp.
 
 // owner: expression-check slices (wave-3)
 Type* Checker::checkIdentifier(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkIdentifier — expressions slice"); }
