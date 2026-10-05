@@ -2831,6 +2831,17 @@ SymbolTable Checker::combineSymbolTables(const SymbolTable& first, const SymbolT
 Symbol* Checker::resolveAlias(Symbol* symbol) {
 	TSC_ASSERT(symbol->flags & SymbolFlagsAlias, "Should only get alias here");
 	auto* links = aliasSymbolLinks.Get(symbol);
+	// checker.go:16076 — Go's per-checker link store means a target cached
+	// while a different file was being checked must not short-circuit this
+	// file's own resolution: resolve fresh so its diagnostics are produced on
+	// the checker that owns the file. Drop the foreign-context entry so the
+	// symbol is genuinely unresolved here — typeResolutionHasProperty relies
+	// on aliasTarget being nil during resolution to detect cycles.
+	if (links->aliasTarget != nullptr &&
+		links->aliasTargetCheckFile != nullptr && activeCheckFile != nullptr &&
+		links->aliasTargetCheckFile != activeCheckFile) {
+		links->aliasTarget = nullptr;
+	}
 	if (links->aliasTarget == nullptr) {
 		if (!pushTypeResolution(symbol, TypeSystemPropertyName::AliasTarget)) {
 			return unknownSymbol;
@@ -2843,6 +2854,7 @@ Symbol* Checker::resolveAlias(Symbol* symbol) {
 			target = resolveIndirectionAlias(symbol, target);
 		}
 		links->aliasTarget = target != nullptr ? target : unknownSymbol;
+		links->aliasTargetCheckFile = activeCheckFile;
 		if (!popTypeResolution()) {
 			error(node, Circular_definition_of_import_alias_0, {symbolToString(symbol)});
 			links->aliasTarget = unknownSymbol;
@@ -2863,7 +2875,9 @@ Symbol* Checker::resolveIndirectionAlias(Symbol* source, Symbol* target) {
 
 Symbol* Checker::tryResolveAlias(Symbol* symbol) {
 	auto* links = aliasSymbolLinks.Get(symbol);
-	if (links->aliasTarget != nullptr ||
+	if ((links->aliasTarget != nullptr &&
+		 (activeCheckFile == nullptr || links->aliasTargetCheckFile == nullptr ||
+		  links->aliasTargetCheckFile == activeCheckFile)) ||
 		findResolutionCycleStartIndex(symbol, TypeSystemPropertyName::AliasTarget) < 0) {
 		return resolveAlias(symbol);
 	}
@@ -5856,12 +5870,19 @@ Node* Checker::getTypeOnlyAliasDeclarationEx(Symbol* symbol,
 Symbol* Checker::getImmediateAliasedSymbol(Symbol* symbol) {
 	TSC_ASSERT(symbol->flags & SymbolFlagsAlias, "Should only get Alias here.");
 	AliasSymbolLinks* links = aliasSymbolLinks.Get(symbol);
+	// Same per-checker cache semantics as resolveAlias above.
+	if (links->immediateTarget != nullptr &&
+		links->immediateTargetCheckFile != nullptr && activeCheckFile != nullptr &&
+		links->immediateTargetCheckFile != activeCheckFile) {
+		links->immediateTarget = nullptr;
+	}
 	if (links->immediateTarget == nullptr) {
 		Node* node = getDeclarationOfAliasSymbol(symbol);
 		if (node == nullptr) {
 			TSC_UNREACHABLE("Unexpected nil in getImmediateAliasedSymbol");
 		}
 		links->immediateTarget = getTargetOfAliasDeclaration(node);
+		links->immediateTargetCheckFile = activeCheckFile;
 	}
 	return links->immediateTarget;
 }
