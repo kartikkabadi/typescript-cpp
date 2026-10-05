@@ -418,6 +418,29 @@ std::optional<checker::ResolvedModule> SimpleProgram::GetResolvedModule(
 	return out;
 }
 
+// === slice: modulespecifiers ===
+// program.go GetNearestAncestorDirectoryWithPackageJson.
+std::string SimpleProgram::GetNearestAncestorDirectoryWithPackageJson(
+    const std::string& dirname) {
+	auto scoped = resolver_->GetPackageScopeForPath(dirname);
+	if (scoped && scoped->Exists()) {
+		return scoped->PackageDirectory;
+	}
+	return "";
+}
+
+// program.go GetPackageJsonInfo.
+std::shared_ptr<packagejson::InfoCacheEntry>
+SimpleProgram::GetPackageJsonInfo(const std::string& pkgJsonPath) {
+	auto directory = tspath::getDirectoryPath(pkgJsonPath);
+	auto scoped = resolver_->GetPackageScopeForPath(directory);
+	if (scoped && scoped->Exists() && scoped->PackageDirectory == directory) {
+		return scoped;
+	}
+	return nullptr;
+}
+// === end slice: modulespecifiers ===
+
 module::ResolvedModule* SimpleProgram::GetResolvedModuleFromModuleSpecifier(
     SourceFile* file, Node* moduleSpecifier) {
 	if (!isStringLiteralLike(moduleSpecifier)) {

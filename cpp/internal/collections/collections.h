@@ -157,6 +157,49 @@ public:
 	}
 };
 
+// === slice: modulespecifiers ===
+// SyncSet — mirrors tsc/internal/collections/syncset.go (mutex-guarded set
+// built on SyncMap; the bool value stands in for Go's struct{}).
+template <typename T>
+struct SyncSet {
+private:
+	SyncMap<T, bool> m;
+
+public:
+	bool Has(const T& key) { return m.Load(key).second; }
+
+	void Add(const T& key) { AddIfAbsent(key); }
+
+	// AddIfAbsent — returns true if the key was not already present
+	// (opposite of the return value of LoadOrStore).
+	bool AddIfAbsent(const T& key) {
+		auto [_, loaded] = m.LoadOrStore(key, false);
+		return !loaded;
+	}
+
+	bool Delete(const T& key) { return m.Delete(key); }
+
+	// Range — iterates until fn returns false.
+	void Range(const std::function<bool(const T&)>& fn) {
+		m.Range([&](const T& key, const bool&) { return fn(key); });
+	}
+
+	// Size — approximate count (may race with concurrent modification).
+	size_t Size() { return m.Size(); }
+
+	bool IsEmpty() { return Size() == 0; }
+
+	std::vector<T> ToSlice() {
+		std::vector<T> arr;
+		arr.reserve(Size());
+		Range([&](const T& key) {
+			arr.push_back(key);
+			return true;
+		});
+		return arr;
+	}
+};
+
 // Set — mirrors tsc/internal/collections/set.go.
 template <typename T>
 struct Set {

@@ -496,7 +496,23 @@ public:
 	                                  const std::string& typeDirectiveName,
 	                                  ResolutionMode mode);
 	module::ResolvedModule* GetResolvedModuleFromModuleSpecifier(
-	    SourceFile* file, Node* moduleSpecifier);
+	    SourceFile* file, Node* moduleSpecifier) override;
+	// === slice: modulespecifiers ===
+	// program.go GetRedirectTargets — redirectTargetsMap lookup (empty when
+	// the path has no package-id redirects).
+	std::vector<std::string> GetRedirectTargets(
+	    const tspath::Path& path) override {
+		auto it = redirectTargetsMap.find(path);
+		return it != redirectTargetsMap.end() ? it->second
+		                                    : std::vector<std::string>{};
+	}
+	// program.go GetNearestAncestorDirectoryWithPackageJson /
+	// GetPackageJsonInfo — backed by the resolver's package-json scope cache.
+	std::string GetNearestAncestorDirectoryWithPackageJson(
+	    const std::string& dirname) override;
+	std::shared_ptr<packagejson::InfoCacheEntry> GetPackageJsonInfo(
+	    const std::string& pkgJsonPath) override;
+	// === end slice: modulespecifiers ===
 	const std::vector<const FileIncludeReason*>* GetIncludeReasons(
 	    const tspath::Path& path) const;
 	tspath::Path toPath(const std::string& fileName) const;

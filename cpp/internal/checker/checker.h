@@ -38,6 +38,18 @@ struct PseudoType;
 } // namespace tsc::pseudochecker
 // === end slice: nodebuilder ===
 
+// === slice: modulespecifiers ===
+namespace tsc::module {
+struct ResolvedModule;
+} // namespace tsc::module
+namespace tsc::packagejson {
+struct InfoCacheEntry;
+} // namespace tsc::packagejson
+namespace tsc::symlinks {
+class KnownSymlinks;
+} // namespace tsc::symlinks
+// === end slice: modulespecifiers ===
+
 namespace tsc::checker {
 // === slice: nodebuilder ===
 struct NodeBuilder;
@@ -1106,6 +1118,47 @@ public:
 	    const std::string& /*path*/) {
 		return nullptr;
 	}
+	// === slice: modulespecifiers === (ModuleSpecifierGenerationHost,
+	// modulespecifiers/types.go:44)
+	// program.go GetSymlinkCache — programs that don't track symlinked
+	// resolutions have no cache; callers nil-check like Go.
+	virtual symlinks::KnownSymlinks* GetSymlinkCache() { return nullptr; }
+	// program.go ContentMapperExtensions — extensions registered by the
+	// config's content mappers (none for a command-line program).
+	virtual std::vector<std::string> ContentMapperExtensions() { return {}; }
+	// program.go GetGlobalTypingsCacheLocation — ProgramOptions.TypingsLocation.
+	virtual std::string GetGlobalTypingsCacheLocation() { return ""; }
+	// program.go GetRedirectTargets — files redirecting to `path` through
+	// package-id (name@version) deduplication.
+	virtual std::vector<std::string> GetRedirectTargets(
+	    const tspath::Path& /*path*/) {
+		return {};
+	}
+	// program.go GetSourceOfProjectReferenceIfOutputIncluded — original
+	// source file name for an included project-reference output, else the
+	// file's own name.
+	virtual std::string GetSourceOfProjectReferenceIfOutputIncluded(
+	    SourceFile* file) {
+		return file->FileName();
+	}
+	// program.go GetNearestAncestorDirectoryWithPackageJson.
+	virtual std::string GetNearestAncestorDirectoryWithPackageJson(
+	    const std::string& /*dirname*/) {
+		return "";
+	}
+	// program.go GetPackageJsonInfo — package.json cache entry for
+	// pkgJsonPath (whose package directory must match).
+	virtual std::shared_ptr<packagejson::InfoCacheEntry> GetPackageJsonInfo(
+	    const std::string& /*pkgJsonPath*/) {
+		return nullptr;
+	}
+	// program.go GetResolvedModuleFromModuleSpecifier — the resolved module
+	// for a specifier literal in `file`.
+	virtual module::ResolvedModule* GetResolvedModuleFromModuleSpecifier(
+	    SourceFile* /*file*/, Node* /*moduleSpecifier*/) {
+		return nullptr;
+	}
+	// === end slice: modulespecifiers ===
 	// program.go GetImportHelpersImportSpecifier — the `import "tslib"` specifier
 	// the program synthesized for this file, if any.
 	virtual Node* GetImportHelpersImportSpecifier(const std::string& /*path*/) {
