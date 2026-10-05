@@ -2594,9 +2594,74 @@ std::string Checker::TypeToStringEx(Type* t, Node* enclosingDeclaration,
 	TSC_UNREACHABLE("TypeToStringEx — typenodes dep");
 }
 
-Node* Checker::getConstraintDeclaration(Type* type) {
-	TSC_UNREACHABLE("getConstraintDeclaration — typenodes dep");
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+// (deduped: getActualTypeVariable defined in cpp/internal/checker/checker_contextual.cpp)
+
+
+// (deduped: getConstraintDeclaration defined in cpp/internal/checker/checker_contextual.cpp)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// (deduped: getPropertyOfTypeEx defined in cpp/internal/checker/checker_members.cpp)
+
+
+// (deduped: instantiateTypeWithAlias defined in cpp/internal/checker/checker_instantiate.cpp)
+
+
+// (deduped: instantiateTypeAlias defined in cpp/internal/checker/checker_instantiate.cpp)
+
+
+
+// (deduped: inferTypes defined in cpp/internal/checker/checker_members.cpp)
+
+
+// (deduped: isTypeParameterPossiblyReferenced defined in cpp/internal/checker/checker_instantiate.cpp)
+
+
+// (deduped: getHomomorphicTypeVariable defined in cpp/internal/checker/checker_instantiate.cpp)
+
+
+// (deduped: getTypeParameterFromMappedType defined in cpp/internal/checker/checker.cpp)
+
+
+// (deduped: getConstraintTypeFromMappedType defined in cpp/internal/checker/checker.cpp)
+
+
+// (deduped: getNameTypeFromMappedType defined in cpp/internal/checker/checker.cpp)
+
+
+// (deduped: getConstraintOfTypeParameter defined in cpp/internal/checker/checker_decltypes.cpp)
+
+
+// (deduped: getSubstitutionType defined in cpp/internal/checker/checker_instantiate.cpp)
+
 
 Type* Checker::getInstantiationExpressionType(Type* exprType, Node* node) {
 	TSC_UNREACHABLE("getInstantiationExpressionType — typenodes dep");

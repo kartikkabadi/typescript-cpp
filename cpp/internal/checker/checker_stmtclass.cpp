@@ -1868,11 +1868,6 @@ Type* Checker::getExtractStringType(Type* t) {
 	TSC_UNREACHABLE("getExtractStringType — typeops slice");
 }
 
-// owner: contextual slice (checker.go:29385-32069)
-Type* Checker::getAwaitedTypeOfPromise(Type* t) {
-	TSC_UNREACHABLE("getAwaitedTypeOfPromise — contextual slice");
-}
-
 // owner: services tail (checker.go:32070-32660)
 Symbol* Checker::getSymbolAtLocation(Node* node, bool ignoreErrors) {
 	TSC_UNREACHABLE("getSymbolAtLocation — services tail");
@@ -1886,11 +1881,6 @@ std::vector<IndexInfo*> Checker::getApplicableIndexInfos(Type* t,
 // in aliasunused range)
 void Checker::checkExportsOnMergedDeclarations(Node* node) {
 	TSC_UNREACHABLE("checkExportsOnMergedDeclarations — aliasunused slice");
-}
-
-// owner: contextual slice (checker.go:31463)
-bool Checker::hasTypeFacts(Type* t, TypeFacts mask) {
-	TSC_UNREACHABLE("hasTypeFacts — contextual slice");
 }
 
 // owner: decltypes slice (checker.go:17277)

@@ -1313,9 +1313,8 @@ Type* Checker::inferTypeForHomomorphicMappedType(Type* source, Type* target,
 												 Type* constraint) {
 	TSC_UNREACHABLE("inferTypeForHomomorphicMappedType — instantiate dep");
 }
-Type* Checker::getActualTypeVariable(Type* t) {
-	TSC_UNREACHABLE("getActualTypeVariable — instantiate dep");
-}
+// (deduped: getActualTypeVariable defined in cpp/internal/checker/checker_contextual.cpp)
+
 
 // Free-function dep stubs (checker package / utilities.go).
 

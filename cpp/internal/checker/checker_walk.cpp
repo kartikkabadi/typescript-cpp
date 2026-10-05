@@ -1131,15 +1131,37 @@ void Checker::skippedGenericFunction(Node* node, CheckMode checkMode) {
 // owner: flow slice (flow.go)
 
 // owner: contextual slice
-Type* Checker::getAwaitedType(Type* t) { TSC_UNREACHABLE("getAwaitedType — contextual slice"); }
-Type* Checker::getOptionalExpressionType(Type* exprType, Node* expression) { TSC_UNREACHABLE("getOptionalExpressionType — contextual slice"); }
-Type* Checker::propagateOptionalTypeMarker(Type* t, Node* node, bool wasOptional) { TSC_UNREACHABLE("propagateOptionalTypeMarker — contextual slice"); }
-Type* Checker::getApparentTypeOfContextualType(Node* node, ContextFlags contextFlags) { TSC_UNREACHABLE("getApparentTypeOfContextualType — contextual slice"); }
-void Checker::pushContextualType(Node* node, Type* t, bool isCache) { TSC_UNREACHABLE("pushContextualType — contextual slice"); }
-void Checker::popContextualType() { TSC_UNREACHABLE("popContextualType — contextual slice"); }
-void Checker::pushInferenceContext(Node* node, InferenceContext* inferenceContext) { TSC_UNREACHABLE("pushInferenceContext — contextual slice"); }
-void Checker::popInferenceContext() { TSC_UNREACHABLE("popInferenceContext — contextual slice"); }
-InferenceContext* Checker::getInferenceContext(Node* node) { TSC_UNREACHABLE("getInferenceContext — contextual slice"); }
+
+
+
+
+
+
+
+
+
+
+// owner: contextual slice
+// (deduped: getAwaitedType defined in cpp/internal/checker/checker_contextual.cpp)
+
+// (deduped: getOptionalExpressionType defined in cpp/internal/checker/checker_contextual.cpp)
+
+// (deduped: propagateOptionalTypeMarker defined in cpp/internal/checker/checker_contextual.cpp)
+
+// (deduped: getApparentTypeOfContextualType defined in cpp/internal/checker/checker_contextual.cpp)
+
+// (deduped: pushContextualType defined in cpp/internal/checker/checker_contextual.cpp)
+
+// (deduped: popContextualType defined in cpp/internal/checker/checker_contextual.cpp)
+
+// (deduped: pushInferenceContext defined in cpp/internal/checker/checker_contextual.cpp)
+
+// (deduped: popInferenceContext defined in cpp/internal/checker/checker_contextual.cpp)
+
+// (deduped: getInferenceContext defined in cpp/internal/checker/checker_contextual.cpp)
+
+// (deduped: instantiateContextualType defined in cpp/internal/checker/checker_contextual.cpp)
+
 
 // owner: typenodes slice
 

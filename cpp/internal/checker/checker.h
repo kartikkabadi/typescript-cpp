@@ -1011,6 +1011,14 @@ public:
 		size_t operator()(const std::pair<NodeId, TypeId>& k) const noexcept {
 			return static_cast<size_t>(k.first) ^ (static_cast<size_t>(k.second) << 21);
 		}
+		// === slice: contextual ===
+		size_t operator()(const DiscriminatedContextualTypeKey& k) const noexcept {
+			return static_cast<size_t>(k.nodeId) ^ (static_cast<size_t>(k.typeId) << 21);
+		}
+		size_t operator()(const InstantiationExpressionKey& k) const noexcept {
+			return static_cast<size_t>(k.nodeId) ^ (static_cast<size_t>(k.typeId) << 21);
+		}
+		// === end slice: contextual ===
 	};
 	std::unordered_map<DiscriminatedContextualTypeKey, Type*, PairKeyHash>
 		discriminatedContextualTypes;
@@ -1559,8 +1567,10 @@ public:
 	// nameresolver hooks)
 	Symbol* getSymbol(SymbolTable& symbols, const std::string& name,
 	                SymbolFlags meaning);
+	// aligned to Go signature getAwaitedTypeEx(t, errorNode, diagnosticMessage, args ...any)
 	Type* getAwaitedTypeEx(Type* type, Node* errorNode,
-	                       const DiagnosticMessage* diagnostic);
+	                       const DiagnosticMessage* diagnostic,
+	                       const std::vector<std::string>& args = {});
 	Symbol* resolveExternalModuleNameWorker(Node* location,
 	                                        Node* moduleReferenceExpression,
 	                                        const DiagnosticMessage* moduleNotFoundError,
@@ -2844,6 +2854,177 @@ public:
 	Type* removeMissingType(Type* t, bool isOptional);
 	Type* removeOptionalTypeMarker(Type* t);
 	Type* substituteIndexedMappedType(Type* objectType, Type* indexType);
+	// === slice: contextual (checker.go:29385-32069) ===
+	Type* getPromisedTypeOfPromiseEx(Type* t, Node* errorNode,
+									 Type** thisTypeForErrorOut);
+	Type* getTypeOfFirstParameterOfSignatureWithFallback(Signature* signature,
+													   Type* fallbackType);
+	int getCombinedMappedTypeOptionality(Type* t);
+	Type* removeDefinitelyFalsyTypes(Type* t);
+	Type* extractDefinitelyFalsyTypes(Type* t);
+	Type* getDefinitelyFalsyPartOfType(Type* t);
+	bool couldAccessOptionalProperty(Type* objectType, Type* indexType);
+	Type* getTypeOfPropertyOrIndexSignatureOfType(Type* t,
+												const std::string& name);
+	Type* getContextualTypeForInitializerExpression(Node* node,
+													ContextFlags contextFlags);
+	Type* getContextualTypeForVariableLikeDeclaration(Node* declaration,
+													  ContextFlags contextFlags);
+	Type* getSpreadArgumentType(const std::vector<Node*>& args, int index,
+								int argCount, Type* restType,
+								InferenceContext* context, CheckMode checkMode);
+	Type* getMutableArrayOrTupleType(Type* t);
+	Type* getContextualTypeForBindingElement(Node* declaration,
+											 ContextFlags contextFlags);
+	Type* getContextualTypeForStaticPropertyDeclaration(Node* declaration,
+														ContextFlags contextFlags);
+	Type* getContextualTypeForReturnExpression(Node* node,
+											   ContextFlags contextFlags);
+	Type* getContextualTypeForYieldOperand(Node* node,
+										   ContextFlags contextFlags);
+	Type* getContextualTypeForAwaitOperand(Node* node,
+										   ContextFlags contextFlags);
+	Type* getContextualTypeForArgument(Node* callTarget, Node* arg);
+	Type* getContextualTypeForArgumentAtIndex(Node* callTarget, int argIndex);
+	Type* getContextualTypeForDecorator(Node* decorator);
+	Type* getContextualTypeForBinaryOperand(Node* node,
+											ContextFlags contextFlags);
+	Type* getContextualTypeForAssignmentExpression(BinaryExpression* binary);
+	Type* getContextualTypeForObjectLiteralElement(Node* element,
+												   ContextFlags contextFlags);
+	Type* getContextualTypeForObjectLiteralMethod(Node* node,
+												  ContextFlags contextFlags);
+	Type* getContextualTypeForElementExpression(Type* t, int index, int length,
+												int firstSpreadIndex,
+												int lastSpreadIndex);
+	Type* getContextualTypeForConditionalOperand(Node* node,
+												 ContextFlags contextFlags);
+	Type* getContextualTypeForSubstitutionExpression(Node* templateNode,
+													 Node* substitutionExpression);
+	Type* getContextualImportAttributeType(Node* node);
+	std::vector<Node*> getEffectiveCallArguments(Node* node);
+	int getSpreadArgumentIndex(const std::vector<Node*>& args);
+	Node* createSyntheticExpression(Node* parent, Type* t, bool isSpread,
+									Node* tupleNameSource);
+	std::pair<int, int> getSpreadIndices(Node* node);
+	std::vector<Node*> getEffectiveDecoratorArguments(Node* node);
+	Signature* getDecoratorCallSignature(Node* decorator);
+	Signature* getLegacyDecoratorCallSignature(Node* decorator);
+	Signature* getESDecoratorCallSignature(Node* decorator);
+	Type* newClassDecoratorContextType(Type* classType);
+	Type* newClassMethodDecoratorContextType(Type* classType, Type* valueType);
+	Type* newClassGetterDecoratorContextType(Type* classType, Type* valueType);
+	Type* newClassSetterDecoratorContextType(Type* classType, Type* valueType);
+	Type* newClassAccessorDecoratorContextType(Type* thisType, Type* valueType);
+	Type* newClassFieldDecoratorContextType(Type* thisType, Type* valueType);
+	Type* getClassMemberDecoratorContextOverrideType(Type* nameType,
+													 bool isPrivate,
+													 bool isStatic);
+	Type* newClassMemberDecoratorContextTypeForNode(Node* node, Type* thisType,
+													Type* valueType);
+	Type* newClassAccessorDecoratorTargetType(Type* thisType, Type* valueType);
+	Type* newClassAccessorDecoratorResultType(Type* thisType, Type* valueType);
+	Type* newClassFieldDecoratorInitializerMutatorType(Type* thisType,
+													   Type* valueType);
+	Signature* newESDecoratorCallSignature(Type* targetType, Type* contextType,
+										   Type* nonOptionalReturnType);
+	Type* newFunctionType(const std::vector<Type*>& typeParameters,
+						  Symbol* thisParameter,
+						  const std::vector<Symbol*>& parameters,
+						  Type* returnType);
+	Type* newGetterFunctionType(Type* t);
+	Type* newSetterFunctionType(Type* t);
+	Signature* newCallSignature(const std::vector<Type*>& typeParameters,
+								Symbol* thisParameter,
+								const std::vector<Symbol*>& parameters,
+								Type* returnType);
+	Type* newTypedPropertyDescriptorType(Type* propertyType);
+	Type* getParentTypeOfClassElement(Node* node);
+	Type* getClassElementPropertyKeyType(Node* element);
+	Type* getTypeOfPropertyOfContextualType(Type* t, const std::string& name);
+	Type* getTypeOfPropertyOfContextualTypeEx(Type* t, const std::string& name,
+											  Type* nameType);
+	Type* getIndexedMappedTypeSubstitutedTypeOfContextualType(
+		Type* t, const std::string& name, Type* nameType);
+	bool isExcludedMappedPropertyName(Type* t, Type* propertyNameType);
+	Type* getTypeOfConcretePropertyOfContextualType(Type* t,
+													const std::string& name);
+	Type* getTypeFromIndexInfosOfContextualType(Type* t, const std::string& name,
+												Type* nameType);
+	bool isCircularMappedProperty(Symbol* symbol);
+	std::vector<Type*> appendContextualPropertyTypeConstituent(
+		std::vector<Type*> types, Type* t);
+	Type* discriminateContextualTypeByObjectMembers(Node* node,
+													Type* contextualType);
+	Type* getMatchingUnionConstituentForObjectLiteral(Type* unionType,
+													  Node* node);
+	bool isPossiblyDiscriminantValue(Node* node);
+	Type* instantiateInstantiableTypes(Type* t, TypeMapper* mapper);
+	void pushCachedContextualType(Node* node);
+	int findContextualNode(Node* node, bool includeCaches);
+	bool isContextSensitiveFunctionLikeDeclaration(Node* node);
+	bool hasContextSensitiveReturnExpression(Node* node);
+	bool hasContextSensitiveYieldExpression(Node* node);
+	TypeFacts getTypeFacts(Type* t, TypeFacts mask);
+	TypeFacts getTypeFactsWorker(Type* t, TypeFacts callerOnlyNeeds);
+	TypeFacts getIntersectionTypeFacts(Type* t, TypeFacts callerOnlyNeeds);
+	bool isFunctionObjectType(Type* t);
+	Type* removeNullableByIntersection(Type* t, TypeFacts targetFacts,
+									   TypeFacts otherFacts,
+									   TypeFacts otherIncludesFacts,
+									   Type* otherType);
+	Type* recombineUnknownType(Type* t);
+	Type* getGlobalNonNullableTypeInstantiation(Type* t);
+	Type* convertAutoToAny(Type* t);
+	Type* getAwaitedTypeNoAliasEx(Type* t, Node* errorNode,
+								  const DiagnosticMessage* diagnosticMessage,
+								  const std::vector<std::string>& args = {});
+	bool isAwaitedTypeInstantiation(Type* t);
+	bool isAwaitedTypeNeeded(Type* t);
+	Type* createAwaitedTypeIfNeeded(Type* t);
+	Type* tryCreateAwaitedType(Type* t);
+	bool isThenableType(Type* t);
+	Type* getAwaitedTypeOfPromiseEx(Type* t, Node* errorNode,
+									const DiagnosticMessage* diagnosticMessage,
+									const std::vector<std::string>& args = {});
+	bool isSomeSymbolAssigned(Node* rootDeclaration);
+	bool isSomeSymbolAssignedWorker(Node* node);
+	Type* getNarrowableTypeForReference(Type* t, Node* reference,
+										CheckMode checkMode);
+	bool isConstraintPosition(Type* t, Node* node);
+	bool isGenericTypeWithUnionConstraint(Type* t);
+	bool isGenericTypeWithoutNullableConstraint(Type* t);
+	bool hasContextualTypeWithNoGenericTypes(Node* node, CheckMode checkMode);
+	bool isGenericTypeWithUndefinedConstraint(Type* t);
+	// contextual-slice dep stubs — defined TSC_UNREACHABLE in checker_contextual.cpp
+	Signature* getResolvedSignature(Node* node,
+									std::vector<Signature*>* candidatesOutArray,
+									CheckMode checkMode);
+	Signature* getContextualSignature(Node* node);
+	Type* getTypeOfNode(Node* node);
+	Type* getThisTypeOfSignature(Signature* signature);
+	Type* getIteratedTypeOrElementType(IterationUse use, Type* inputType,
+									   Type* sentType, Node* errorNode,
+									   bool checkAssignability);
+	IterationTypes getIterationTypesOfGeneratorFunctionReturnType(
+		Type* t, bool isAsyncGenerator);
+	std::string getKeyPropertyName(Type* t);
+	Type* getConstituentTypeForKeyType(Type* t, Type* keyType);
+	bool isDiscriminantProperty(Type* t, const std::string& name);
+	Type* discriminateTypeByDiscriminableItems(Type* target,
+											   Discriminator& discriminator);
+	bool isConstTypeVariable(Type* t, int depth);
+	Type* discriminateContextualTypeByJSXAttributes(Node* node,
+													Type* contextualType);
+	Type* getContextualJsxElementAttributesType(Node* node,
+												ContextFlags contextFlags);
+	Type* getContextualTypeForJsxAttribute(Node* attribute,
+										   ContextFlags contextFlags);
+	Type* getContextualTypeForJsxExpression(Node* node,
+											ContextFlags contextFlags);
+	Type* getEffectiveFirstArgumentForJsxSignature(Signature* signature,
+												   Node* node);
+	// === end slice: contextual ===
 };  // class Checker
 
 // Free helpers used across checker translation units.
@@ -2908,25 +3089,6 @@ struct CopyOnWriteSet {
 	std::function<void()> EnterScope() { return m.EnterScope(); }
 };
 
-// ModeAwareCacheKey (module/types.go).
-struct ModeAwareCacheKey {
-	std::string Name;
-	ResolutionMode Mode = ResolutionModeNone;
-	bool operator==(const ModeAwareCacheKey&) const = default;
-};
-
-struct ModeAwareCacheKeyHash {
-	size_t operator()(const ModeAwareCacheKey& k) const {
-		size_t h = std::hash<std::string>()(k.Name);
-		return h * 0x9E3779B97F4A7C15ull ^ static_cast<size_t>(k.Mode);
-	}
-};
-
-// ModeAwareCache (module/cache.go): map[ModeAwareCacheKey]T.
-template <class T>
-using ModeAwareCache =
-	std::unordered_map<ModeAwareCacheKey, T, ModeAwareCacheKeyHash>;
-
 // moduleSpecifierResult (nodebuilderimpl.go).
 struct moduleSpecifierResult {
 	std::string specifier;
@@ -2990,6 +3152,25 @@ struct NodeBuilderLinks {
 	// chain.
 	std::optional<std::string> fakeScopeForSignatureDeclaration;
 };
+
+// ModeAwareCacheKey (module/types.go).
+struct ModeAwareCacheKey {
+	std::string Name;
+	ResolutionMode Mode = ResolutionModeNone;
+	bool operator==(const ModeAwareCacheKey&) const = default;
+};
+
+struct ModeAwareCacheKeyHash {
+	size_t operator()(const ModeAwareCacheKey& k) const {
+		size_t h = std::hash<std::string>()(k.Name);
+		return h * 0x9E3779B97F4A7C15ull ^ static_cast<size_t>(k.Mode);
+	}
+};
+
+// ModeAwareCache (module/cache.go): map[ModeAwareCacheKey]T.
+template <class T>
+using ModeAwareCache =
+	std::unordered_map<ModeAwareCacheKey, T, ModeAwareCacheKeyHash>;
 
 // NodeBuilderSymbolLinks (nodebuilderimpl.go).
 struct NodeBuilderSymbolLinks {

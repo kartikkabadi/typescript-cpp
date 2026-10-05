@@ -992,13 +992,53 @@ TypePredicate* Checker::newTypePredicate(TypePredicateKind /*kind*/, const std::
 bool Checker::isResolvingReturnTypeOfSignature(Signature* /*signature*/) { TSC_UNREACHABLE("isResolvingReturnTypeOfSignature — owned by typeops/relater"); }
 Type* Checker::getYieldedTypeOfYieldExpression(Node* /*node*/, Type* /*expressionType*/, Type* /*sentType*/, bool /*isAsync*/) { TSC_UNREACHABLE("getYieldedTypeOfYieldExpression — signatures dep"); }
 bool Checker::isConstContext(Node* /*node*/) { TSC_UNREACHABLE("isConstContext — signatures dep"); }
-Type* Checker::GetPromisedTypeOfPromise(Type* /*t*/) { TSC_UNREACHABLE("GetPromisedTypeOfPromise — owned by typeops"); }
-Type* Checker::getContextualType(Node* /*node*/, ContextFlags /*contextFlags*/) { TSC_UNREACHABLE("getContextualType — owned by contextual"); }
-Type* Checker::getContextualIterationType(IterationTypeKind /*kind*/, Node* /*functionDecl*/) { TSC_UNREACHABLE("getContextualIterationType — owned by contextual"); }
-Type* Checker::getContextualReturnType(Node* /*functionDecl*/, ContextFlags /*contextFlags*/) { TSC_UNREACHABLE("getContextualReturnType — owned by contextual"); }
-Signature* Checker::getContextualSignatureForFunctionLikeDeclaration(Node* /*node*/) { TSC_UNREACHABLE("getContextualSignatureForFunctionLikeDeclaration — owned by contextual"); }
-Type* Checker::instantiateContextualType(Type* /*contextualType*/, Node* /*node*/, ContextFlags /*contextFlags*/) { TSC_UNREACHABLE("instantiateContextualType — owned by contextual"); }
-Type* Checker::unwrapAwaitedType(Type* /*t*/) { TSC_UNREACHABLE("unwrapAwaitedType — owned by async/awaited"); }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// (deduped: GetPromisedTypeOfPromise defined in cpp/internal/checker/checker_contextual.cpp)
+
+// (deduped: getContextualType defined in cpp/internal/checker/checker_contextual.cpp)
+
+// (deduped: getContextualIterationType defined in cpp/internal/checker/checker_contextual.cpp)
+
+// (deduped: getContextualReturnType defined in cpp/internal/checker/checker_contextual.cpp)
+
+// (deduped: getContextualSignatureForFunctionLikeDeclaration defined in cpp/internal/checker/checker_contextual.cpp)
+
+// (deduped: instantiateContextualType defined in cpp/internal/checker/checker_contextual.cpp)
+
+// (deduped: checkAwaitedType defined in cpp/internal/checker/checker_contextual.cpp)
+
+// (deduped: getAwaitedTypeNoAlias defined in cpp/internal/checker/checker_contextual.cpp)
+
+// (deduped: unwrapAwaitedType defined in cpp/internal/checker/checker_contextual.cpp)
+
+// (deduped: reportImplicitAny defined in cpp/internal/checker/checker_decltypes.cpp)
+
+// (deduped: getPropertiesOfObjectType defined in cpp/internal/checker/checker_members.cpp)
+
+// (deduped: instantiateSymbol defined in cpp/internal/checker/checker_members.cpp)
+
+// (deduped: getTypeArguments defined in cpp/internal/checker/checker_instantiate.cpp)
+
+// (deduped: cloneTypeParameter defined in cpp/internal/checker/checker_instantiate.cpp)
+
+// (deduped: isArrayOrTupleType defined in cpp/internal/checker/checker_typenodes.cpp)
+
+// (deduped: isGenericType defined in cpp/internal/checker/checker_grammar.cpp)
+
 IterationTypes Checker::getIterationTypesOfIterable(Type* /*t*/, IterationUse /*use*/, Node* /*errorNode*/) { TSC_UNREACHABLE("getIterationTypesOfIterable — owned by iteration"); }
 Type* Checker::getIterationTypeOfGeneratorFunctionReturnType(IterationTypeKind /*typeKind*/, Type* /*returnType*/, bool /*isAsyncGenerator*/) { TSC_UNREACHABLE("getIterationTypeOfGeneratorFunctionReturnType — owned by iteration"); }
 bool Checker::isConstantReference(Node* /*node*/) { TSC_UNREACHABLE("isConstantReference — owned by flow"); }

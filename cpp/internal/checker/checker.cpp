@@ -4142,10 +4142,6 @@ bool Checker::isBlockScopedNameDeclaredBeforeUse(Node* declaration, Node* usage)
 
 // getSignaturesOfType is defined in checker_members.cpp (members slice).
 
-bool Checker::isContextSensitive(Node* node) {
-	TSC_UNREACHABLE("isContextSensitive — ported with checker.cpp:31382 slice");
-}
-
 Type* Checker::checkExpression(Node* node) {
 	TSC_UNREACHABLE("checkExpression — ported with the expression-checking slice");
 }
@@ -6326,11 +6322,6 @@ Type* Checker::getTypeOfModuleDeclarationImportAttributes(Node* attributes) {
 // Interim stubs — filled by their owning slices
 // ---------------------------------------------------------------------------
 
-Type* Checker::getAwaitedTypeEx(Type* type, Node* errorNode,
-                                const DiagnosticMessage* diagnostic) {
-	TSC_UNREACHABLE("getAwaitedTypeEx — ported with checker.go:31742 slice");
-}
-
 Symbol* Checker::resolveExternalModuleNameWorker(
 	Node* location, Node* moduleReferenceExpression,
 	const DiagnosticMessage* moduleNotFoundError, bool ignoreErrors,
@@ -7859,18 +7850,44 @@ size_t Checker::UnionOfUnionKeyHash::operator()(const UnionOfUnionKey& k) const 
 	return static_cast<size_t>(h);
 }
 
+size_t Checker::CachedSignatureKeyHash::operator()(const CachedSignatureKey& k) const noexcept {
+	uint64_t h = 1469598103934665603ull;
+	h = checkerHashStep(h, reinterpret_cast<uintptr_t>(k.sig));
+	h = checkerHashStep(h, CacheKeyHash{}(k.key));
+	return static_cast<size_t>(h);
+}
+
+size_t Checker::StringMappingKeyHash::operator()(const StringMappingKey& k) const noexcept {
+	uint64_t h = 1469598103934665603ull;
+	h = checkerHashStep(h, reinterpret_cast<uintptr_t>(k.s));
+	h = checkerHashStep(h, reinterpret_cast<uintptr_t>(k.t));
+	return static_cast<size_t>(h);
+}
+
+// checker.go:14318
+Symbol* Checker::newParameter(const std::string& name, Type* t) {
+	Symbol* symbol = newSymbol(SymbolFlagsFunctionScopedVariable, name);
+	valueSymbolLinks.Get(symbol)->resolvedType = t;
+	return symbol;
+}
+
+// checker.go:14324
+Symbol* Checker::newProperty(const std::string& name, Type* t) {
+	Symbol* symbol = newSymbol(SymbolFlagsProperty, name);
+	valueSymbolLinks.Get(symbol)->resolvedType = t;
+	return symbol;
+}
+
 Type* Checker::getBaseConstraintOrType(Type* t) {
 	TSC_UNREACHABLE("getBaseConstraintOrType — ported with the <slice> slice");
 }
 std::vector<Symbol*> Checker::getPropertiesOfType(Type* t) {
 	TSC_UNREACHABLE("getPropertiesOfType — ported with the <slice> slice");
 }
-Type* Checker::getStringMappingTypeForGenericType(Symbol* symbol, Type* t) {
-	TSC_UNREACHABLE("getStringMappingTypeForGenericType — ported with the <slice> slice");
-}
-Type* Checker::getTargetType(Type* t) {
-	TSC_UNREACHABLE("getTargetType — ported with the <slice> slice");
-}
+// (deduped: getStringMappingTypeForGenericType defined in cpp/internal/checker/checker_contextual.cpp)
+
+// (deduped: getTargetType defined in cpp/internal/checker/checker_contextual.cpp)
+
 Type* Checker::instantiateType(Type* t, TypeMapper* mapper) {
 	TSC_UNREACHABLE("instantiateType — ported with the <slice> slice");
 }
