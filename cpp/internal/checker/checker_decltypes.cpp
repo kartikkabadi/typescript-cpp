@@ -3037,7 +3037,8 @@ Symbol* Checker::getSpreadSymbol(Symbol* prop, bool readonly) { decltypesDepUnre
 // (deduped: getTypeOfMappedSymbol defined in cpp/internal/checker/checker_members.cpp)
 
 Type* Checker::getTypeOfPropertyInBaseClass(Symbol* symbol) { decltypesDepUnreachable("getTypeOfPropertyInBaseClass — decltypes dep"); }
-Type* Checker::getTypeOfReverseMappedSymbol(Symbol* symbol) { decltypesDepUnreachable("getTypeOfReverseMappedSymbol — decltypes dep"); }
+// (deduped: getTypeOfReverseMappedSymbol — inference slice, defined in
+// cpp/internal/checker/checker_inference.cpp)
 // (deduped: getTypeReferenceArity defined in cpp/internal/checker/checker_typenodes.cpp)
 
 // (deduped: getTypeWithFacts defined in cpp/internal/checker/checker_contextual.cpp)

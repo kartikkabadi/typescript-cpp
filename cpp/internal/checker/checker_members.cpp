@@ -2965,27 +2965,10 @@ bool Checker::isDiscriminantWithNeverType(Symbol* prop) {
 
 // (deduped: getBaseConstructorTypeOfClass defined in cpp/internal/checker/checker_decltypes.cpp)
 
-InferenceContext* Checker::newInferenceContext(
-	const std::vector<Type*>& typeParameters, Signature* signature,
-	InferenceFlags flags, TypeComparer compareTypes) {
-	TSC_UNREACHABLE("newInferenceContext — owned by inference.go slice");
-}
-std::vector<Type*> Checker::getInferredTypes(InferenceContext* n) {
-	TSC_UNREACHABLE("getInferredTypes — owned by inference.go slice");
-}
-void Checker::inferTypes(std::vector<InferenceInfo*>& inferences,
-	Type* originalSource, Type* originalTarget, InferencePriority priority,
-	bool contravariant) {
-	TSC_UNREACHABLE("inferTypes — owned by inference.go slice");
-}
-void Checker::applyToParameterTypes(Signature* source, Signature* target,
-	const std::function<void(Type*, Type*)>& callback) {
-	TSC_UNREACHABLE("applyToParameterTypes — owned by inference.go slice");
-}
-void Checker::applyToReturnTypes(Signature* source, Signature* target,
-	const std::function<void(Type*, Type*)>& callback) {
-	TSC_UNREACHABLE("applyToReturnTypes — owned by inference.go slice");
-}
+// (deduped: newInferenceContext, getInferredTypes, inferTypes,
+// applyToParameterTypes, applyToReturnTypes — inference slice, defined in
+// cpp/internal/checker/checker_inference.cpp)
+
 Type* Checker::getEffectiveRestType(Signature* signature) {
 	TSC_UNREACHABLE("getEffectiveRestType — owned by relater.go slice");
 }
@@ -2998,9 +2981,8 @@ bool Checker::isReadonlySymbol(Symbol* symbol) {
 std::vector<IndexInfo*> Checker::getUnionIndexInfos(const std::vector<Type*>& types) {
 	TSC_UNREACHABLE("getUnionIndexInfos — owned by checker.go:13727 slice");
 }
-void Checker::resolveReverseMappedTypeMembers(Type* t) {
-	TSC_UNREACHABLE("resolveReverseMappedTypeMembers — owned by inference.go slice");
-}
+// (deduped: resolveReverseMappedTypeMembers — inference slice, defined in
+// cpp/internal/checker/checker_inference.cpp)
 Signature* Checker::findMatchingSignature(const std::vector<Signature*>& signatureList,
 	Signature* signature, bool partialMatch, bool ignoreThisTypes,
 	bool ignoreReturnTypes) {

@@ -1302,10 +1302,8 @@ Type* Checker::createTupleTypeEx(std::vector<Type*> elementTypes,
 }
 // (deduped: addOptionalityEx defined in cpp/internal/checker/checker_decltypes.cpp)
 
-Type* Checker::inferTypeForHomomorphicMappedType(Type* source, Type* target,
-												 Type* constraint) {
-	TSC_UNREACHABLE("inferTypeForHomomorphicMappedType — instantiate dep");
-}
+// (deduped: inferTypeForHomomorphicMappedType — inference slice, defined in
+// cpp/internal/checker/checker_inference.cpp)
 // (deduped: getActualTypeVariable defined in cpp/internal/checker/checker_contextual.cpp)
 
 

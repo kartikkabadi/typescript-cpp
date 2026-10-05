@@ -33,6 +33,7 @@ add_library(tsc STATIC
 	internal/checker/checker_nodecopy.cpp
 	internal/checker/checker_signatures.cpp
 	internal/checker/checker_typenodes.cpp
+	internal/checker/checker_inference.cpp
 	internal/checker/checker_instantiate.cpp
 	internal/checker/checker_members.cpp
 	internal/checker/checker_widen.cpp
