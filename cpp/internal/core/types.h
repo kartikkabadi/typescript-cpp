@@ -409,6 +409,15 @@ struct CompilerOptions {
 		}
 		return false;
 	}
+
+	// === slice: module ===
+	// compileroptions.go — implementations live in core/compileroptions.cpp
+	// since they need tspath.
+	// GetEffectiveTypeRoots — (result, fromConfig).
+	std::pair<std::vector<std::string>, bool> GetEffectiveTypeRoots(
+	    std::string_view currentDirectory) const;
+	// GetPathsBasePath — "" when Paths is unset.
+	std::string GetPathsBasePath(std::string_view currentDirectory) const;
 };
 
 }  // namespace tsc

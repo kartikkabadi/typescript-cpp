@@ -32,6 +32,13 @@ add_library(tsc STATIC
 	internal/parser/jsdoc.cpp
 	internal/parser/reparser.cpp
 	internal/parser/references.cpp
+	# === slice: module ===
+	internal/core/compileroptions.cpp
+	internal/module/util.cpp
+	internal/module/cache.cpp
+	internal/module/resolver.cpp
+	internal/module/staticresolver.cpp
+	internal/packagejson/packagejson.cpp
 )
 
 add_executable(tscpp cmd/tscpp/main.cpp)
