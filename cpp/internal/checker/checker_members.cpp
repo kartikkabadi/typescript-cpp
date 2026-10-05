@@ -1260,10 +1260,22 @@ bool Checker::isValidBaseType(Type* t) {
 
 // TODO: GH#18217 If `checkBase` is undefined, we should not call this because this will always return false.
 bool Checker::hasBaseType(Type* t, Type* checkBase) {
+	// `expanded` prunes re-visits of the same expansion target within a single
+	// query. A node's outgoing edges are fixed the first time it is visited
+	// during a call (a resolved type's base list is immutable; an unresolved
+	// one is resolved on first visit; an in-process one stays frozen at its
+	// partial list for the whole call), so re-expanding can only reproduce the
+	// exact same subtree result. On deep shared DAGs of class bases (mixin
+	// chains over intersection heritage) Go's memo-free DFS degenerates to
+	// exponential re-walking; the dedup keeps the identical reachability
+	// answer in linear time.
+	std::unordered_set<Type*> expanded;
 	std::function<bool(Type*)> check = [&](Type* u) -> bool {
 		if (u->objectFlags & (ObjectFlagsClassOrInterface | ObjectFlagsReference)) {
 			Type* target = members_detail::getTargetType(u);
-			return target == checkBase || someList(getBaseTypes(target), check);
+			return target == checkBase ||
+				(expanded.insert(target).second &&
+				 someList(getBaseTypes(target), check));
 		}
 		if (u->flags & TypeFlagsIntersection) {
 			return someList(u->types(), check);
