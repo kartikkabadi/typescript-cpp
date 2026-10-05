@@ -68,7 +68,7 @@ static void collectModuleReferences(SourceFile* file, Node* node,
 	    (inAmbientModule ||
 	     hasSyntacticModifier(node, ModifierFlagsAmbient) ||
 	     file->IsDeclarationFile)) {
-		std::string_view nameText =
+		std::string nameText =
 		    node->as<ModuleDeclaration>()->name->text();
 		// Ambient module declarations can be interpreted as augmentations for
 		// some existing external modules. This will happen in two cases:

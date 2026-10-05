@@ -1759,7 +1759,12 @@ bool Checker::isEmptyObjectType(Type* t) {
 		return someType(t, [this](Type* u) { return isEmptyObjectType(u); });
 	}
 	if (t->flags & TypeFlagsIntersection) {
-		return everyType(t, [this](Type* u) { return isEmptyObjectType(u); });
+		for (Type* u : t->types()) {  // core.Every(t.Types(), ...)
+			if (!isEmptyObjectType(u)) {
+				return false;
+			}
+		}
+		return true;
 	}
 	return false;
 }
@@ -6597,25 +6602,10 @@ static Node* getAliasDeclarationFromName(Node* node) {
 	}
 }
 
-// utilities.go: entityNameToString
+// utilities.go:217 — entityNameToString = ast.EntityNameToString(name, scanner.GetTextOfNode)
 std::string entityNameToString(Node* name) {
-	Node* current = name;
-	std::vector<std::string_view> parts;
-	for (; current; current = current->kind == Kind::QualifiedName
-	                              ? current->as<QualifiedName>()->Left
-	                              : nullptr) {
-		if (current->kind == Kind::QualifiedName) {
-			parts.push_back(current->as<QualifiedName>()->Right->text());
-		} else {
-			parts.push_back(current->text());
-		}
-	}
-	std::string result;
-	for (auto it = parts.rbegin(); it != parts.rend(); ++it) {
-		if (!result.empty()) result += '.';
-		result += *it;
-	}
-	return result;
+	return EntityNameToString(
+		name, [](const Node* n) { return getTextOfNode(n); });
 }
 
 // utilities.go: getContainingQualifiedNameNode

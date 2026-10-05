@@ -1026,7 +1026,10 @@ Type* Checker::createJsxAttributesTypeFromAttributesProperty(
 			} else {
 				debugAssert(attributeDecl->kind == Kind::JsxSpreadAttribute);
 				if (!attributesTable.empty()) {
-					spread = getSpreadType(spread, createJsxAttributesType(),
+					// createJsxAttributesType() mutates objectFlags (adds FreshLiteral);
+					// evaluate it before reading objectFlags — Go's L->R arg order.
+					Type* attributesType = createJsxAttributesType();
+					spread = getSpreadType(spread, attributesType,
 						attributesSymbol, objectFlags, false /*readonly*/);
 					attributesTable.clear();
 				}
@@ -1055,7 +1058,8 @@ Type* Checker::createJsxAttributesTypeFromAttributesProperty(
 		}
 		if (!hasSpreadAnyType) {
 			if (!attributesTable.empty()) {
-				spread = getSpreadType(spread, createJsxAttributesType(),
+				Type* attributesType = createJsxAttributesType();
+				spread = getSpreadType(spread, attributesType,
 					attributesSymbol, objectFlags, false /*readonly*/);
 			}
 		}

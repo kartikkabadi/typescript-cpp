@@ -1674,7 +1674,7 @@ bool hasSamePropertyAccessName(Node* node1, Node* node2) {
 
 Node* NodeFactory::deepCloneReparse(Node* node) {
 	if (node != nullptr) {
-		node = deepCloneNode(*this, node);
+		node = deepCloneNode(*this, node, /*syntheticLocation*/ false);
 		setParentInChildren(node);
 		node->flags |= NodeFlagsReparsed;
 	}
@@ -1682,7 +1682,7 @@ Node* NodeFactory::deepCloneReparse(Node* node) {
 }
 
 ModifierList* NodeFactory::deepCloneReparseModifiers(ModifierList* modifiers) {
-	return deepCloneModifierList(*this, modifiers);
+	return deepCloneModifierList(*this, modifiers, /*syntheticLocation*/ false);
 }
 
 // ---------------------------------------------------------------------------

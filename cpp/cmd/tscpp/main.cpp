@@ -14,6 +14,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -335,12 +336,11 @@ static void checkFile(int argc, char** argv) {
 	    tspath::normalizePath(std::filesystem::current_path().string());
 	host.bundledLibsRoot = findBundledLibsRoot();
 
-	// `tsc --noEmit <argv[1:]>` — checkdump passes every arg (the literal
-	// "check" included) through ParseCommandLine, so each becomes a root
-	// filename: a non-file arg like "check" resolves as a root file and
-	// produces the same G 6231 resolution diagnostic the oracle emits.
+	// `tsc --noEmit <argv[2:]>` — "check" is our own subcommand, not a root
+	// filename (checkdump is invoked as `checkdump <file>`); every
+	// remaining arg becomes a root file via ParseCommandLine.
 	std::vector<std::string> rootFileNames;
-	for (int i = 1; i < argc; i++) {
+	for (int i = 2; i < argc; i++) {
 		rootFileNames.push_back(argv[i]);
 	}
 
@@ -397,6 +397,33 @@ static void checkFile(int argc, char** argv) {
 		}
 	}
 	std::fwrite(out.data(), 1, out.size(), stdout);
+
+	// Verbose diagnostics (TSC_FULL_DIAGS=1): formatted text + chains for
+	// divergence triage. Not part of the oracle-aligned dump.
+	if (std::getenv("TSC_FULL_DIAGS") != nullptr) {
+		std::string v;
+		std::function<void(const Diagnostic*, int)> dump =
+		    [&](const Diagnostic* d, int depth) {
+			    for (int i = 0; i < depth; i++) v += "  ";
+			    char hb[512];
+			    const std::string fn =
+			        d->File() != nullptr ? d->File()->FileName() : "";
+			    std::snprintf(hb, sizeof(hb), "TS%d %s:%d:%d ", d->Code(),
+			                  fn.c_str(), d->Pos(), d->End());
+			    v += hb;
+			    if (!d->MessageText().empty()) {
+				    v += d->MessageText();
+			    } else if (d->message != nullptr) {
+				    v += formatDiagnosticMessage(*d->message,
+				                                 d->MessageArgs());
+			    }
+			    v += '\n';
+			    for (auto* c : d->messageChain) dump(c, depth + 1);
+			    for (auto* r : d->relatedInformation) dump(r, depth + 1);
+		    };
+		for (auto* d : diags) dump(d, 0);
+		std::fwrite(v.data(), 1, v.size(), stderr);
+	}
 }
 
 static void parseFile(const char* path, const std::string& src) {

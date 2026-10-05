@@ -1210,6 +1210,9 @@ inline bool isAccessor(Node* node) {
 inline bool isEntityName(Node* node) {
 	return node->kind == Kind::Identifier || node->kind == Kind::QualifiedName;
 }
+// utilities.go:2158 — EntityNameToString
+std::string EntityNameToString(
+	Node* name, const std::function<std::string(const Node*)>& getTextOfNode);
 Node* getHeritageClause(Node* node, Kind kind);
 std::vector<Node*> getHeritageElements(Node* node, Kind kind);
 inline std::vector<Node*> getExtendsHeritageClauseElements(Node* node) {

@@ -7996,9 +7996,12 @@ NodeBuilder* NewNodeBuilderEx(Checker* ch, printer::EmitContext* e,
 // getNodeBuilder (nodebuilder.go:291).
 std::pair<NodeBuilder*, std::function<void()>> Checker::getNodeBuilder() {
 	std::function<void()> releaseNodes = [this]() {
-		typeToStringNodebuilder->EmitContext()->factory
-		    .releaseArenas(); // Allow any allocated nodes to be freed if
-		                      // they're no longer in a cache
+		// Go: EmitContext().Factory.ReleaseArenas() — lets GC reclaim arena
+		// memory no longer referenced. Our bump arena cannot tell referenced
+		// nodes apart, so EmitContext::releaseArenas keeps the blocks alive
+		// (serializedTypes caches hold factory-arena nodes) and only reset()s
+		// the context's node-keyed maps.
+		typeToStringNodebuilder->EmitContext()->releaseArenas();
 	};
 	if (typeToStringNodebuilder != nullptr) {
 		return {typeToStringNodebuilder, releaseNodes};

@@ -2548,7 +2548,7 @@ bool Checker::isGenericType(Type* t) {
 bool Checker::isValidIndexKeyType(Type* t) {
 	return (t->flags & (TypeFlagsString | TypeFlagsNumber | TypeFlagsESSymbol)) != 0 ||
 		   isPatternLiteralType(t) ||
-		   ((t->flags & TypeFlagsIntersection) != 0 && !isGenericType(t) && everyInSlice(t->types(), [this](Type* u) { return isValidIndexKeyType(u); }));
+		   ((t->flags & TypeFlagsIntersection) != 0 && !isGenericType(t) && someInSlice(t->types(), [this](Type* u) { return isValidIndexKeyType(u); }));
 }
 
 } // namespace checker

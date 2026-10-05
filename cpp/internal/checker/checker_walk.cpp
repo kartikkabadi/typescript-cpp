@@ -526,7 +526,10 @@ void Checker::checkNodeDeferred(Node* node) {
 
 void Checker::checkDeferredNodes(SourceFile* context) {
 	SourceFileLinks* links = sourceFileLinks.Get(context);
-	for (Node* node : links->deferredNodes) {
+	// Index iteration, not range-for: Go's OrderedSet.Values() yields nodes
+	// appended by checkDeferredNode itself during the iteration.
+	for (size_t i = 0; i < links->deferredNodes.size(); i++) {
+		Node* node = links->deferredNodes[i];
 		if (isCanceled()) {
 			break;
 		}

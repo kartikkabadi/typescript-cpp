@@ -802,7 +802,17 @@ struct EmitContext {
 	Node* newNotEmittedStatement(Node* node);
 
 	// nodebuilder.go — e.Factory.ReleaseArenas()
-	void releaseArenas() { factory.releaseArenas(); }
+	// Go's Factory.ReleaseArenas frees only arena memory the GC can prove
+	// unreachable — nodes still referenced from caches (e.g. NodeBuilderLinks
+	// serializedTypes) stay alive. Our bump arena cannot distinguish, so the
+	// faithful equivalent frees nothing: arena blocks stay live for the
+	// context's lifetime, which also keeps node addresses unique so no
+	// node-keyed map (original_, emitNodes, autoGenerate) can see a stale-key
+	// collision. It must NOT reset() the context maps: Go's emitNodes map
+	// persists across calls, and cached serializedTypes TypeNodes rely on
+	// their emit flags (e.g. EFSingleLine) surviving between typeToString
+	// calls.
+	void releaseArenas() {}
 };
 
 // NewEmitContext (emitcontext.go:45).

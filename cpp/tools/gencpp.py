@@ -304,6 +304,332 @@ def sanitize(name):
     return CPP_RESERVED.get(name, name)
 
 
+# Hand-maintained ports of ast.go helpers the generator cannot auto-translate
+# (non-kind-check predicates and the AccessKind machinery). Emitted verbatim at
+# the end of nodes_generated.h. Keep in sync with tsc/internal/ast/ast.go.
+MANUAL_AST_HELPERS = """
+// ---------------------------------------------------------------------------
+// Hand-maintained ports of the non-trivial ast.go helpers (accessKind, the
+// write-access family, GetDeclarationFromName, and the data-presence
+// predicates). The generator only auto-ports pure kind-check predicates; these
+// are emitted verbatim by gencpp.py. Keep in sync with
+// tsc/internal/ast/ast.go.
+// ---------------------------------------------------------------------------
+
+// isAssignmentOperator is defined later in ast.h, after this header's
+// inclusion point; forward-declared so accessKind can call it.
+bool isAssignmentOperator(Kind kind);
+
+// AccessKind — ast.go:1494
+enum class AccessKind : int32_t {
+	AccessKindRead,      // Only reads from a variable
+	AccessKindWrite,     // Only writes to a variable without ever reading it
+	AccessKindReadWrite, // Reads from and writes to a variable
+};
+
+// reverseAccessKind — ast.go:1484
+inline AccessKind reverseAccessKind(AccessKind a) {
+	switch (a) {
+	case AccessKind::AccessKindRead:
+		return AccessKind::AccessKindWrite;
+	case AccessKind::AccessKindWrite:
+		return AccessKind::AccessKindRead;
+	case AccessKind::AccessKindReadWrite:
+		return AccessKind::AccessKindReadWrite;
+	}
+	TSC_UNREACHABLE("Unhandled case in reverseAccessKind");
+}
+
+// accessKind — ast.go:1424
+inline AccessKind accessKind(Node* node) {
+	Node* parent = node->parent;
+	if (parent == nullptr) {
+		return AccessKind::AccessKindRead;
+	}
+	switch (parent->kind) {
+	case Kind::ParenthesizedExpression:
+		return accessKind(parent);
+	case Kind::PrefixUnaryExpression: {
+		Kind op = parent->as<PrefixUnaryExpression>()->Operator;
+		if (op == Kind::PlusPlusToken || op == Kind::MinusMinusToken) {
+			return AccessKind::AccessKindReadWrite;
+		}
+		return AccessKind::AccessKindRead;
+	}
+	case Kind::PostfixUnaryExpression: {
+		Kind op = parent->as<PostfixUnaryExpression>()->Operator;
+		if (op == Kind::PlusPlusToken || op == Kind::MinusMinusToken) {
+			return AccessKind::AccessKindReadWrite;
+		}
+		return AccessKind::AccessKindRead;
+	}
+	case Kind::BinaryExpression:
+		if (parent->as<BinaryExpression>()->Left == node) {
+			Node* opTok = parent->as<BinaryExpression>()->OperatorToken;
+			if (isAssignmentOperator(opTok->kind)) {
+				if (opTok->kind == Kind::EqualsToken) {
+					return AccessKind::AccessKindWrite;
+				}
+				return AccessKind::AccessKindReadWrite;
+			}
+		}
+		return AccessKind::AccessKindRead;
+	case Kind::PropertyAccessExpression:
+		if (parent->name() != node) {
+			return AccessKind::AccessKindRead;
+		}
+		return accessKind(parent);
+	case Kind::PropertyAssignment: {
+		AccessKind parentAccess = accessKind(parent->parent);
+		// In `({ x: varname }) = { x: 1 }`, the left `x` is a read, the right
+		// `x` is a write.
+		if (node == parent->as<PropertyAssignment>()->name) {
+			return reverseAccessKind(parentAccess);
+		}
+		return parentAccess;
+	}
+	case Kind::ShorthandPropertyAssignment:
+		// Assume it's the local variable being accessed, since we don't check
+		// public properties for --noUnusedLocals.
+		if (node ==
+		    parent->as<ShorthandPropertyAssignment>()
+		        ->ObjectAssignmentInitializer) {
+			return AccessKind::AccessKindRead;
+		}
+		return accessKind(parent->parent);
+	case Kind::ArrayLiteralExpression:
+		return accessKind(parent);
+	case Kind::ForInStatement:
+	case Kind::ForOfStatement:
+		if (node == parent->as<ForInOrOfStatement>()->Initializer) {
+			return AccessKind::AccessKindWrite;
+		}
+		return AccessKind::AccessKindRead;
+	default:
+		return AccessKind::AccessKindRead;
+	}
+}
+
+// IsWriteOnlyAccess — ast.go:1268
+inline bool isWriteOnlyAccess(Node* node) {
+	return accessKind(node) == AccessKind::AccessKindWrite;
+}
+inline bool isWriteOnlyAccess(const Node* node) {
+	return isWriteOnlyAccess(const_cast<Node*>(node));
+}
+
+// IsWriteAccess — ast.go:1272
+inline bool isWriteAccess(Node* node) {
+	return accessKind(node) != AccessKind::AccessKindRead;
+}
+inline bool isWriteAccess(const Node* node) {
+	return isWriteAccess(const_cast<Node*>(node));
+}
+
+// IsArrayLiteralOrObjectLiteralDestructuringPattern — ast.go:1406
+inline bool isArrayLiteralOrObjectLiteralDestructuringPattern(Node* node) {
+	if (!(isArrayLiteralExpression(node) || isObjectLiteralExpression(node))) {
+		return false;
+	}
+	Node* parent = node->parent;
+	// [a,b,c] from:
+	// [a, b, c] = someExpression;
+	if (isBinaryExpression(parent) &&
+	    parent->as<BinaryExpression>()->Left == node &&
+	    parent->as<BinaryExpression>()->OperatorToken->kind ==
+	        Kind::EqualsToken) {
+		return true;
+	}
+	// [a, b, c] from:
+	// for([a, b, c] of expression)
+	if (isForOfStatement(parent) && parent->initializer() == node) {
+		return true;
+	}
+	// {x, a: {a, b, c} } = someExpression
+	if (isPropertyAssignment(parent)) {
+		return isArrayLiteralOrObjectLiteralDestructuringPattern(parent->parent);
+	}
+	// [a, b, c] of
+	// [x, [a, b, c] ] = someExpression
+	return isArrayLiteralOrObjectLiteralDestructuringPattern(parent);
+}
+inline bool isArrayLiteralOrObjectLiteralDestructuringPattern(
+    const Node* node) {
+	return isArrayLiteralOrObjectLiteralDestructuringPattern(
+	    const_cast<Node*>(node));
+}
+
+// GetDeclarationFromName — ast.go:1281
+inline Node* getDeclarationFromName(Node* name) {
+	if (name == nullptr || name->parent == nullptr) {
+		return nullptr;
+	}
+	Node* parent = name->parent;
+	switch (name->kind) {
+	case Kind::StringLiteral:
+	case Kind::NoSubstitutionTemplateLiteral:
+	case Kind::NumericLiteral:
+		if (isComputedPropertyName(parent)) {
+			return parent->parent;
+		}
+		[[fallthrough]];
+	case Kind::Identifier:
+		if (isDeclaration(parent)) {
+			if (parent->name() == name) {
+				return parent;
+			}
+			return nullptr;
+		}
+		if (isQualifiedName(parent)) {
+			Node* tag = parent->parent;
+			if (isJSDocParameterTag(tag) && tag->name() == parent) {
+				return tag;
+			}
+			return nullptr;
+		}
+		{
+			Node* binExp = parent->parent;
+			if (isBinaryExpression(binExp) &&
+			    getAssignmentDeclarationKind(binExp) != JSDeclarationKind::None) {
+				// (binExp.left as BindableStaticNameExpression).symbol ||
+				// binExp.symbol
+				bool leftHasSymbol =
+				    binExp->as<BinaryExpression>()->Left != nullptr &&
+				    binExp->as<BinaryExpression>()->Left->symbol() != nullptr;
+				if (leftHasSymbol || binExp->symbol() != nullptr) {
+					if (getNameOfDeclaration(binExp) == name) {
+						return binExp;
+					}
+				}
+			}
+		}
+		break;
+	case Kind::PrivateIdentifier:
+		if (isDeclaration(parent) && parent->name() == name) {
+			return parent;
+		}
+		break;
+	}
+	return nullptr;
+}
+
+// declarationIsWriteAccess — ast.go:1327
+inline bool declarationIsWriteAccess(Node* decl) {
+	if (decl == nullptr) {
+		return false;
+	}
+	// Consider anything in an ambient declaration to be a write access since it
+	// may be coming from JS.
+	if ((decl->flags & NodeFlagsAmbient) != 0) {
+		return true;
+	}
+
+	switch (decl->kind) {
+	case Kind::BinaryExpression:
+	case Kind::BindingElement:
+	case Kind::ClassDeclaration:
+	case Kind::ClassExpression:
+	case Kind::DefaultKeyword:
+	case Kind::EnumDeclaration:
+	case Kind::EnumMember:
+	case Kind::ExportSpecifier:
+	case Kind::ImportClause: // default import
+	case Kind::ImportEqualsDeclaration:
+	case Kind::ImportSpecifier:
+	case Kind::InterfaceDeclaration:
+	case Kind::JSDocCallbackTag:
+	case Kind::JSDocTypedefTag:
+	case Kind::JsxAttribute:
+	case Kind::ModuleDeclaration:
+	case Kind::NamespaceExportDeclaration:
+	case Kind::NamespaceImport:
+	case Kind::NamespaceExport:
+	case Kind::Parameter:
+	case Kind::ShorthandPropertyAssignment:
+	case Kind::TypeAliasDeclaration:
+	case Kind::JSTypeAliasDeclaration:
+	case Kind::TypeParameter:
+		return true;
+
+	case Kind::PropertyAssignment:
+		// In `({ x: y } = 0);`, `x` is not a write access.
+		return !isArrayLiteralOrObjectLiteralDestructuringPattern(decl->parent);
+
+	case Kind::FunctionDeclaration:
+	case Kind::FunctionExpression:
+	case Kind::Constructor:
+	case Kind::MethodDeclaration:
+	case Kind::GetAccessor:
+	case Kind::SetAccessor:
+		// functions considered write if they provide a value (have a body)
+		switch (decl->kind) {
+		case Kind::FunctionDeclaration:
+			return decl->as<FunctionDeclaration>()->Body != nullptr;
+		case Kind::FunctionExpression:
+			return decl->as<FunctionExpression>()->Body != nullptr;
+		case Kind::Constructor:
+			return decl->as<ConstructorDeclaration>()->Body != nullptr;
+		case Kind::MethodDeclaration:
+			return decl->as<MethodDeclaration>()->Body != nullptr;
+		case Kind::GetAccessor:
+			return decl->as<GetAccessorDeclaration>()->Body != nullptr;
+		case Kind::SetAccessor:
+			return decl->as<SetAccessorDeclaration>()->Body != nullptr;
+		}
+		return false;
+
+	case Kind::VariableDeclaration:
+	case Kind::PropertyDeclaration: {
+		// variable/property write if initializer present or is in catch clause
+		bool hasInit;
+		if (decl->kind == Kind::VariableDeclaration) {
+			hasInit = decl->as<VariableDeclaration>()->Initializer != nullptr;
+		} else {
+			hasInit = decl->as<PropertyDeclaration>()->Initializer != nullptr;
+		}
+		return hasInit || isCatchClause(decl->parent);
+	}
+
+	case Kind::MethodSignature:
+	case Kind::PropertySignature:
+	case Kind::JSDocPropertyTag:
+	case Kind::JSDocParameterTag:
+		return false;
+
+	default:
+		TSC_UNREACHABLE("Unhandled case in declarationIsWriteAccess");
+	}
+}
+
+// IsWriteAccessForReference — ast.go:1276
+inline bool isWriteAccessForReference(Node* node) {
+	Node* decl = getDeclarationFromName(node);
+	return (decl != nullptr && declarationIsWriteAccess(decl)) ||
+	       node->kind == Kind::DefaultKeyword || isWriteAccess(node);
+}
+inline bool isWriteAccessForReference(const Node* node) {
+	return isWriteAccessForReference(const_cast<Node*>(node));
+}
+
+// IsDeclarationNode — ast.go:1505 (node.DeclarationData() != nil)
+inline bool isDeclarationNode(const Node* node) {
+	return const_cast<Node*>(node)->declarationData().symbol != nullptr;
+}
+inline bool isDeclarationNode(Node* node) {
+	return node->declarationData().symbol != nullptr;
+}
+
+// IsLocalsContainer — ast.go:1532 (node.LocalsContainerData() != nil)
+inline bool isLocalsContainer(const Node* node) {
+	return const_cast<Node*>(node)->localsContainerData().locals != nullptr;
+}
+inline bool isLocalsContainer(Node* node) {
+	return node->localsContainerData().locals != nullptr;
+}
+
+"""
+
+
 def parse_structs(*files):
     """Parse `type X struct { ... }` and `type X = Y` aliases; returns
     (structs: {name: [(field_name, go_type, is_embedded)]}, aliases: {name: target}).
@@ -833,26 +1159,49 @@ def gen_nodes():
 
     # deepClone dispatch (generated): one case per struct, cloning every child
     # field per the same visit* list used by forEachChild.
+    # syntheticLocation mirrors Go's getDeepCloneVisitor: true forces every
+    # clone (and cloned list) to Loc (-1,-1) / last node (-2,-2) when the list
+    # has a trailing comma; false (DeepCloneReparse) preserves locations.
+    # onClone mirrors Go's Node.Clone -> updateNode -> hooks.OnClone, which is
+    # how the EmitContext copies emitNode data onto clones.
     out.append("// deepClone dispatch (generated).\n\n")
-    out.append("inline Node* deepCloneNode(NodeFactory& f, const Node* node);\n")
+    out.append("inline Node* deepCloneNode(NodeFactory& f, const Node* node,\n"
+               "                           bool syntheticLocation = true);\n")
     out.append("inline NodeList* deepCloneNodeList(NodeFactory& f,\n"
-               "                                   const NodeList* l);\n")
+               "                                   const NodeList* l,\n"
+               "                                   bool syntheticLocation = true);\n")
     out.append("inline ModifierList* deepCloneModifierList(NodeFactory& f,\n"
-               "                                           const ModifierList* m);\n\n")
+               "                                           const ModifierList* m,\n"
+               "                                           bool syntheticLocation = true);\n\n")
     out.append("inline NodeList* deepCloneNodeList(NodeFactory& f,\n"
-               "                                   const NodeList* l) {\n"
+               "                                   const NodeList* l,\n"
+               "                                   bool syntheticLocation) {\n"
                "\tif (l == nullptr) return nullptr;\n"
                "\tauto* c = f.arena().alloc<NodeList>(*l);\n"
-               "\tfor (auto& n : c->nodes) n = deepCloneNode(f, n);\n"
+               "\tfor (auto& n : c->nodes) n = deepCloneNode(f, n, syntheticLocation);\n"
+               "\tif (syntheticLocation) {\n"
+               "\t\tc->loc = TextRange{-1, -1};\n"
+               "\t\tif (c->hasTrailingComma()) {\n"
+               "\t\t\tc->nodes.back()->loc = TextRange{-2, -2};\n"
+               "\t\t}\n"
+               "\t}\n"
                "\treturn c;\n}\n\n")
     out.append("inline ModifierList* deepCloneModifierList(NodeFactory& f,\n"
-               "                                           const ModifierList* m) {\n"
+               "                                           const ModifierList* m,\n"
+               "                                           bool syntheticLocation) {\n"
                "\tif (m == nullptr) return nullptr;\n"
                "\tauto* c = f.arena().alloc<ModifierList>(*m);\n"
-               "\tfor (auto& n : c->nodes) n = deepCloneNode(f, n);\n"
+               "\tfor (auto& n : c->nodes) n = deepCloneNode(f, n, syntheticLocation);\n"
                "\tc->ModifierFlags = NodeFactory::modifiersToFlags(c->nodes);\n"
+               "\tif (syntheticLocation) {\n"
+               "\t\tc->loc = TextRange{-1, -1};\n"
+               "\t\tif (c->hasTrailingComma()) {\n"
+               "\t\t\tc->nodes.back()->loc = TextRange{-2, -2};\n"
+               "\t\t}\n"
+               "\t}\n"
                "\treturn c;\n}\n\n")
-    out.append("inline Node* deepCloneNode(NodeFactory& f, const Node* node) {\n"
+    out.append("inline Node* deepCloneNode(NodeFactory& f, const Node* node,\n"
+               "                           bool syntheticLocation) {\n"
                "\tif (node == nullptr) return nullptr;\n"
                "\tswitch (node->kind) {\n")
     seen_kinds = set()
@@ -873,14 +1222,19 @@ def gen_nodes():
             tgt = {"visit": "deepCloneNode",
                    "visitNodeList": "deepCloneNodeList",
                    "visitModifiers": "deepCloneModifierList"}[fn]
-            out.append(f"\t\t\tc->{cf} = {tgt}(f, n->{cf});\n")
-        out.append("\t\t\treturn c;\n\t\t}\n")
+            out.append(f"\t\t\tc->{cf} = {tgt}(f, n->{cf}, syntheticLocation);\n")
+        out.append("\t\t\tif (syntheticLocation) c->loc = TextRange{-1, -1};\n"
+                   "\t\t\tif (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));\n"
+                   "\t\t\treturn c;\n\t\t}\n")
     out.append("\t\tdefault:\n"
                "\t\t\t// Leaf token kinds clone as plain Token nodes (they have\n"
                "\t\t\t// no children and carry no extra fields).\n"
                "\t\t\tif (node->kind <= KindLastToken) {\n"
                "\t\t\t\tauto* n = static_cast<const Token*>(node);\n"
-               "\t\t\t\treturn f.arena().alloc<Token>(*n);\n"
+               "\t\t\t\tauto* c = f.arena().alloc<Token>(*n);\n"
+               "\t\t\t\tif (syntheticLocation) c->loc = TextRange{-1, -1};\n"
+               "\t\t\t\tif (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));\n"
+               "\t\t\t\treturn c;\n"
                "\t\t\t}\n"
                "\t\t\treturn nullptr;\n"
                "\t}\n}\n\n")
@@ -1230,9 +1584,18 @@ def gen_nodes():
     def map_kind(k):
         return f"Kind::{k[4:]}" if k in enum_names else k
 
+    # Predicates with real bodies ported by hand in MANUAL_AST_HELPERS below;
+    # skip them here so the generated stubs don't collide.
+    manual_predicates = {
+        "IsWriteOnlyAccess", "IsWriteAccess", "IsWriteAccessForReference",
+        "IsArrayLiteralOrObjectLiteralDestructuringPattern",
+        "IsDeclarationNode", "IsLocalsContainer"}
+
     out.append("// is* predicates (generated).\n\n")
     for name, body in predicates:
         cxx = name[0].lower() + name[1:]
+        if name in manual_predicates:
+            continue
         # emit a kind-union only when the body is a pure kind-check
         ids = set(re.findall(r"\b([A-Za-z_]\w*)\b", body)) - {
             "node", "Kind", "return", "case", "switch", "default", "if",
@@ -1427,6 +1790,11 @@ def gen_nodes():
     vout.append("\t\tdefault:\n\t\t\treturn this;\n\t}\n}\n\n")
 
     vout.append("\n}  // namespace tsc\n")
+
+    # Hand-maintained ports of the non-trivial ast.go helpers the generator
+    # cannot auto-translate: the AccessKind machinery and the predicates whose
+    # bodies are not pure kind checks. Keep in sync with tsc/internal/ast/ast.go.
+    out.append(MANUAL_AST_HELPERS)
 
     out.append("\n}  // namespace tsc\n")
     def fix_flag_cmp(t):

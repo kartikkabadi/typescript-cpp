@@ -2487,7 +2487,7 @@ Ternary Checker::compareSignaturesRelated(
 		Type* targetThisType = getThisTypeOfSignature(target);
 		if (targetThisType != nullptr) {
 			// void sources are assignable to anything.
-			Ternary related;
+			Ternary related = Ternary::False;
 			if (!strictVariance) {
 				related = compareTypes(sourceThisType, targetThisType,
 									   false /*reportErrors*/);
@@ -2563,7 +2563,7 @@ Ternary Checker::compareSignaturesRelated(
 							 getTypePredicateOfSignature(targetSig) == nullptr &&
 							 getTypeFacts(sourceType, TypeFactsIsUndefinedOrNull) ==
 								 getTypeFacts(targetType, TypeFactsIsUndefinedOrNull);
-			Ternary related;
+			Ternary related = Ternary::False;
 			if (callbacks) {
 				related = compareSignaturesRelated(
 					targetSig, sourceSig,
@@ -2636,7 +2636,7 @@ Ternary Checker::compareSignaturesRelated(
 			// types bi-variantly as otherwise the containing type wouldn't be
 			// co-variant. For example, interface Foo<T> { add(cb: () => T):
 			// void } wouldn't be co-variant for T without this rule.
-			Ternary related;
+			Ternary related = Ternary::False;
 			if ((checkMode & SignatureCheckModeBivariantCallback) != 0) {
 				related = compareTypes(targetReturnType, sourceReturnType,
 									   false /*reportErrors*/);
@@ -2688,7 +2688,7 @@ Ternary Checker::compareTypePredicateRelatedTo(
 						  {typePredicateToString(source),
 						   typePredicateToString(target)});
 		}
-		return Ternary::False;
+				return Ternary::False;
 	}
 	if (source->kind == TypePredicateKind::Identifier ||
 		source->kind == TypePredicateKind::AssertsIdentifier) {
@@ -2706,7 +2706,7 @@ Ternary Checker::compareTypePredicateRelatedTo(
 			return Ternary::False;
 		}
 	}
-	Ternary related;
+	Ternary related = Ternary::False;
 	if (source->t == target->t) {
 		related = Ternary::True;
 	} else if (source->t != nullptr && target->t != nullptr) {
@@ -4256,7 +4256,7 @@ Ternary Relater::isRelatedToEx(Type* originalSource, Type* originalTarget,
 			((target->flags & TypeFlagsUnion) != 0 &&
 			 target->types().size() < 4 &&
 			 (source->flags & TypeFlagsStructuredOrInstantiable) == 0);
-		Ternary result;
+		Ternary result = Ternary::False;
 		if (skipCaching) {
 			result = unionOrIntersectionRelatedTo(source, target, reportErrors,
 												  intersectionState);
@@ -4834,7 +4834,7 @@ Ternary Relater::recursiveTypeRelatedTo(Type* source, Type* target,
 	}
 	RelationComparisonResult saveReliabilityFlags = c->reliabilityFlags;
 	c->reliabilityFlags = RelationComparisonResult::None;
-	Ternary result;
+	Ternary result = Ternary::False;
 	if (expandingFlags == ExpandingFlagsBoth) {
 		if (Tracer* tr = c->tracer; tr != nullptr) {
 			tr->Instant(tsc::tracing::PhaseCheckTypes,
@@ -5024,7 +5024,7 @@ bool Relater::isSourceIntersectionNeedingExtraCheck(Type* source, Type* target) 
 Ternary Relater::structuredTypeRelatedToWorker(Type* source, Type* target,
 											   bool reportErrors,
 											   IntersectionState intersectionState) {
-	Ternary result;
+	Ternary result = Ternary::False;
 	bool varianceCheckFailed = false;
 	ErrorChain* originalErrorChain = nullptr;
 	errorState saveErrorState = getErrorState();
@@ -5954,7 +5954,7 @@ Ternary Relater::typeArgumentsRelatedTo(
 		if (variance != VarianceFlagsIndependent) {
 			Type* s = sources[i];
 			Type* t = targets[i];
-			Ternary related;
+			Ternary related = Ternary::False;
 			if ((varianceFlags & VarianceFlagsUnmeasurable) != 0) {
 				// Even an `Unmeasurable` variance works out without a structural check if the source and target are _identical_.
 				// We can't simply assume invariance, because `Unmeasurable` marks nonlinear relations, for example, a relation tainted by
@@ -6977,7 +6977,7 @@ Ternary Relater::indexSignaturesRelatedTo(Type* source, Type* target,
 		});
 	Ternary result = Ternary::True;
 	for (IndexInfo* targetInfo : indexInfos) {
-		Ternary related;
+		Ternary related = Ternary::False;
 		if (relation != c->strictSubtypeRelation && !sourceIsPrimitive &&
 			targetHasStringIndex &&
 			(targetInfo->valueType->flags & TypeFlagsAny) != 0) {
@@ -7034,9 +7034,14 @@ Ternary Relater::typeRelatedToIndexInfo(Type* source, IndexInfo* targetInfo,
 // relater.go:4656
 bool Checker::isObjectTypeWithInferableIndex(Type* t) {
 	if ((t->flags & TypeFlagsIntersection) != 0) {
-		return everyType(t, [this](Type* u) {
-			return isObjectTypeWithInferableIndex(u);
-		});
+		// Go: core.Every(t.Types(), ...) — iterates members (everyType only
+		// unwraps unions).
+		for (Type* u : t->types()) {
+			if (!isObjectTypeWithInferableIndex(u)) {
+				return false;
+			}
+		}
+		return true;
 	}
 	return (t->symbol != nullptr &&
 			(t->symbol->flags &

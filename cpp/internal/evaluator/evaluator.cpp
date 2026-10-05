@@ -27,9 +27,15 @@ static EvalResult evaluateTemplateExpression(Node* expr, Node* location,
 
 Evaluator newEvaluator(const Evaluator& evaluateEntity,
 					   OuterExpressionKinds outerExpressionsToSkip) {
+	// Go: `evaluate` is a recursive closure — the closure variable lives on the
+	// heap, so self-copies resolve correctly. A C++ [&evaluate] capture of the
+	// local would dangle once this function returns, so the recursion target is
+	// a heap Evaluator*; `auto& evaluate = *self` keeps the body identical.
+	auto* self = new Evaluator();
 	Evaluator evaluate;
 	evaluate = [evaluateEntity, outerExpressionsToSkip,
-				&evaluate](Node* expr, Node* location) -> EvalResult {
+				self](Node* expr, Node* location) -> EvalResult {
+		Evaluator& evaluate = *self;
 		bool isSyntacticallyString = false;
 		bool resolvedOtherFiles = false;
 		bool hasExternalReferences = false;
@@ -170,6 +176,7 @@ Evaluator newEvaluator(const Evaluator& evaluateEntity,
 		return EvalResult{std::monostate{}, isSyntacticallyString, resolvedOtherFiles,
 						  hasExternalReferences};
 	};
+	*self = evaluate;
 	return evaluate;
 }
 

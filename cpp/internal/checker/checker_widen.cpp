@@ -181,7 +181,13 @@ bool Checker::isUnitLikeType(Type* t) {
 	t = getBaseConstraintOrType(t);
 	// Scan intersections such that tagged literal types are considered unit types.
 	if (t->flags & TypeFlagsIntersection) {
-		return someType(t, isUnitType);
+		// Go: core.Some(t.AsIntersectionType().types, isUnitType)
+		for (Type* u : t->types()) {
+			if (isUnitType(u)) {
+				return true;
+			}
+		}
+		return false;
 	}
 	return isUnitType(t);
 }
@@ -304,9 +310,14 @@ Type* Checker::getWidenedLiteralLikeTypeForContextualType(Type* t, Type* context
 bool Checker::isLiteralOfContextualType(Type* candidateType, Type* contextualType) {
 	if (contextualType != nullptr) {
 		if (contextualType->flags & TypeFlagsUnionOrIntersection) {
-			return someType(contextualType, [this, candidateType](Type* t) {
-				return isLiteralOfContextualType(candidateType, t);
-			});
+			// Go: core.Some(contextualType.Types(), ...) — iterates members for
+			// intersections too (someType() only unwraps unions).
+			for (Type* t : contextualType->types()) {
+				if (isLiteralOfContextualType(candidateType, t)) {
+					return true;
+				}
+			}
+			return false;
 		}
 		if (contextualType->flags & TypeFlagsInstantiableNonPrimitive) {
 			// If the contextual type is a type variable constrained to a primitive type, consider

@@ -5154,99 +5154,133 @@ bool Node::forEachChild(F&& v) const {
 
 // deepClone dispatch (generated).
 
-inline Node* deepCloneNode(NodeFactory& f, const Node* node);
+inline Node* deepCloneNode(NodeFactory& f, const Node* node,
+                           bool syntheticLocation = true);
 inline NodeList* deepCloneNodeList(NodeFactory& f,
-                                   const NodeList* l);
+                                   const NodeList* l,
+                                   bool syntheticLocation = true);
 inline ModifierList* deepCloneModifierList(NodeFactory& f,
-                                           const ModifierList* m);
+                                           const ModifierList* m,
+                                           bool syntheticLocation = true);
 
 inline NodeList* deepCloneNodeList(NodeFactory& f,
-                                   const NodeList* l) {
+                                   const NodeList* l,
+                                   bool syntheticLocation) {
 	if (l == nullptr) return nullptr;
 	auto* c = f.arena().alloc<NodeList>(*l);
-	for (auto& n : c->nodes) n = deepCloneNode(f, n);
+	for (auto& n : c->nodes) n = deepCloneNode(f, n, syntheticLocation);
+	if (syntheticLocation) {
+		c->loc = TextRange{-1, -1};
+		if (c->hasTrailingComma()) {
+			c->nodes.back()->loc = TextRange{-2, -2};
+		}
+	}
 	return c;
 }
 
 inline ModifierList* deepCloneModifierList(NodeFactory& f,
-                                           const ModifierList* m) {
+                                           const ModifierList* m,
+                                           bool syntheticLocation) {
 	if (m == nullptr) return nullptr;
 	auto* c = f.arena().alloc<ModifierList>(*m);
-	for (auto& n : c->nodes) n = deepCloneNode(f, n);
+	for (auto& n : c->nodes) n = deepCloneNode(f, n, syntheticLocation);
 	c->ModifierFlags = NodeFactory::modifiersToFlags(c->nodes);
+	if (syntheticLocation) {
+		c->loc = TextRange{-1, -1};
+		if (c->hasTrailingComma()) {
+			c->nodes.back()->loc = TextRange{-2, -2};
+		}
+	}
 	return c;
 }
 
-inline Node* deepCloneNode(NodeFactory& f, const Node* node) {
+inline Node* deepCloneNode(NodeFactory& f, const Node* node,
+                           bool syntheticLocation) {
 	if (node == nullptr) return nullptr;
 	switch (node->kind) {
 		case Kind::ArrayLiteralExpression:
 		{
 			auto* n = static_cast<const ArrayLiteralExpression*>(node);
 			auto* c = f.arena().alloc<ArrayLiteralExpression>(*n);
-			c->Elements = deepCloneNodeList(f, n->Elements);
+			c->Elements = deepCloneNodeList(f, n->Elements, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::ArrayType:
 		{
 			auto* n = static_cast<const ArrayTypeNode*>(node);
 			auto* c = f.arena().alloc<ArrayTypeNode>(*n);
-			c->ElementType = deepCloneNode(f, n->ElementType);
+			c->ElementType = deepCloneNode(f, n->ElementType, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::ArrowFunction:
 		{
 			auto* n = static_cast<const ArrowFunction*>(node);
 			auto* c = f.arena().alloc<ArrowFunction>(*n);
-			c->modifiers = deepCloneModifierList(f, n->modifiers);
-			c->TypeParameters = deepCloneNodeList(f, n->TypeParameters);
-			c->Parameters = deepCloneNodeList(f, n->Parameters);
-			c->Type = deepCloneNode(f, n->Type);
-			c->FullSignature = deepCloneNode(f, n->FullSignature);
-			c->EqualsGreaterThanToken = deepCloneNode(f, n->EqualsGreaterThanToken);
-			c->Body = deepCloneNode(f, n->Body);
+			c->modifiers = deepCloneModifierList(f, n->modifiers, syntheticLocation);
+			c->TypeParameters = deepCloneNodeList(f, n->TypeParameters, syntheticLocation);
+			c->Parameters = deepCloneNodeList(f, n->Parameters, syntheticLocation);
+			c->Type = deepCloneNode(f, n->Type, syntheticLocation);
+			c->FullSignature = deepCloneNode(f, n->FullSignature, syntheticLocation);
+			c->EqualsGreaterThanToken = deepCloneNode(f, n->EqualsGreaterThanToken, syntheticLocation);
+			c->Body = deepCloneNode(f, n->Body, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::AsExpression:
 		{
 			auto* n = static_cast<const AsExpression*>(node);
 			auto* c = f.arena().alloc<AsExpression>(*n);
-			c->Expression = deepCloneNode(f, n->Expression);
-			c->Type = deepCloneNode(f, n->Type);
+			c->Expression = deepCloneNode(f, n->Expression, syntheticLocation);
+			c->Type = deepCloneNode(f, n->Type, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::AwaitExpression:
 		{
 			auto* n = static_cast<const AwaitExpression*>(node);
 			auto* c = f.arena().alloc<AwaitExpression>(*n);
-			c->Expression = deepCloneNode(f, n->Expression);
+			c->Expression = deepCloneNode(f, n->Expression, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::BigIntLiteral:
 		{
 			auto* n = static_cast<const BigIntLiteral*>(node);
 			auto* c = f.arena().alloc<BigIntLiteral>(*n);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::BinaryExpression:
 		{
 			auto* n = static_cast<const BinaryExpression*>(node);
 			auto* c = f.arena().alloc<BinaryExpression>(*n);
-			c->modifiers = deepCloneModifierList(f, n->modifiers);
-			c->Left = deepCloneNode(f, n->Left);
-			c->Type = deepCloneNode(f, n->Type);
-			c->OperatorToken = deepCloneNode(f, n->OperatorToken);
-			c->Right = deepCloneNode(f, n->Right);
+			c->modifiers = deepCloneModifierList(f, n->modifiers, syntheticLocation);
+			c->Left = deepCloneNode(f, n->Left, syntheticLocation);
+			c->Type = deepCloneNode(f, n->Type, syntheticLocation);
+			c->OperatorToken = deepCloneNode(f, n->OperatorToken, syntheticLocation);
+			c->Right = deepCloneNode(f, n->Right, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::BindingElement:
 		{
 			auto* n = static_cast<const BindingElement*>(node);
 			auto* c = f.arena().alloc<BindingElement>(*n);
-			c->DotDotDotToken = deepCloneNode(f, n->DotDotDotToken);
-			c->PropertyName = deepCloneNode(f, n->PropertyName);
-			c->name = deepCloneNode(f, n->name);
-			c->Initializer = deepCloneNode(f, n->Initializer);
+			c->DotDotDotToken = deepCloneNode(f, n->DotDotDotToken, syntheticLocation);
+			c->PropertyName = deepCloneNode(f, n->PropertyName, syntheticLocation);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			c->Initializer = deepCloneNode(f, n->Initializer, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::ObjectBindingPattern:
@@ -5254,47 +5288,59 @@ inline Node* deepCloneNode(NodeFactory& f, const Node* node) {
 		{
 			auto* n = static_cast<const BindingPattern*>(node);
 			auto* c = f.arena().alloc<BindingPattern>(*n);
-			c->Elements = deepCloneNodeList(f, n->Elements);
+			c->Elements = deepCloneNodeList(f, n->Elements, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::Block:
 		{
 			auto* n = static_cast<const Block*>(node);
 			auto* c = f.arena().alloc<Block>(*n);
-			c->Statements = deepCloneNodeList(f, n->Statements);
+			c->Statements = deepCloneNodeList(f, n->Statements, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::BreakStatement:
 		{
 			auto* n = static_cast<const BreakStatement*>(node);
 			auto* c = f.arena().alloc<BreakStatement>(*n);
-			c->Label = deepCloneNode(f, n->Label);
+			c->Label = deepCloneNode(f, n->Label, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::CallExpression:
 		{
 			auto* n = static_cast<const CallExpression*>(node);
 			auto* c = f.arena().alloc<CallExpression>(*n);
-			c->Expression = deepCloneNode(f, n->Expression);
-			c->QuestionDotToken = deepCloneNode(f, n->QuestionDotToken);
-			c->TypeArguments = deepCloneNodeList(f, n->TypeArguments);
-			c->Arguments = deepCloneNodeList(f, n->Arguments);
+			c->Expression = deepCloneNode(f, n->Expression, syntheticLocation);
+			c->QuestionDotToken = deepCloneNode(f, n->QuestionDotToken, syntheticLocation);
+			c->TypeArguments = deepCloneNodeList(f, n->TypeArguments, syntheticLocation);
+			c->Arguments = deepCloneNodeList(f, n->Arguments, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::CallSignature:
 		{
 			auto* n = static_cast<const CallSignatureDeclaration*>(node);
 			auto* c = f.arena().alloc<CallSignatureDeclaration>(*n);
-			c->TypeParameters = deepCloneNodeList(f, n->TypeParameters);
-			c->Parameters = deepCloneNodeList(f, n->Parameters);
-			c->Type = deepCloneNode(f, n->Type);
+			c->TypeParameters = deepCloneNodeList(f, n->TypeParameters, syntheticLocation);
+			c->Parameters = deepCloneNodeList(f, n->Parameters, syntheticLocation);
+			c->Type = deepCloneNode(f, n->Type, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::CaseBlock:
 		{
 			auto* n = static_cast<const CaseBlock*>(node);
 			auto* c = f.arena().alloc<CaseBlock>(*n);
-			c->Clauses = deepCloneNodeList(f, n->Clauses);
+			c->Clauses = deepCloneNodeList(f, n->Clauses, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::CaseClause:
@@ -5302,221 +5348,273 @@ inline Node* deepCloneNode(NodeFactory& f, const Node* node) {
 		{
 			auto* n = static_cast<const CaseOrDefaultClause*>(node);
 			auto* c = f.arena().alloc<CaseOrDefaultClause>(*n);
-			c->Expression = deepCloneNode(f, n->Expression);
-			c->Statements = deepCloneNodeList(f, n->Statements);
+			c->Expression = deepCloneNode(f, n->Expression, syntheticLocation);
+			c->Statements = deepCloneNodeList(f, n->Statements, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::CatchClause:
 		{
 			auto* n = static_cast<const CatchClause*>(node);
 			auto* c = f.arena().alloc<CatchClause>(*n);
-			c->VariableDeclaration = deepCloneNode(f, n->VariableDeclaration);
-			c->Block = deepCloneNode(f, n->Block);
+			c->VariableDeclaration = deepCloneNode(f, n->VariableDeclaration, syntheticLocation);
+			c->Block = deepCloneNode(f, n->Block, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::ClassDeclaration:
 		{
 			auto* n = static_cast<const ClassDeclaration*>(node);
 			auto* c = f.arena().alloc<ClassDeclaration>(*n);
-			c->modifiers = deepCloneModifierList(f, n->modifiers);
-			c->name = deepCloneNode(f, n->name);
-			c->TypeParameters = deepCloneNodeList(f, n->TypeParameters);
-			c->HeritageClauses = deepCloneNodeList(f, n->HeritageClauses);
-			c->Members = deepCloneNodeList(f, n->Members);
+			c->modifiers = deepCloneModifierList(f, n->modifiers, syntheticLocation);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			c->TypeParameters = deepCloneNodeList(f, n->TypeParameters, syntheticLocation);
+			c->HeritageClauses = deepCloneNodeList(f, n->HeritageClauses, syntheticLocation);
+			c->Members = deepCloneNodeList(f, n->Members, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::ClassExpression:
 		{
 			auto* n = static_cast<const ClassExpression*>(node);
 			auto* c = f.arena().alloc<ClassExpression>(*n);
-			c->modifiers = deepCloneModifierList(f, n->modifiers);
-			c->name = deepCloneNode(f, n->name);
-			c->TypeParameters = deepCloneNodeList(f, n->TypeParameters);
-			c->HeritageClauses = deepCloneNodeList(f, n->HeritageClauses);
-			c->Members = deepCloneNodeList(f, n->Members);
+			c->modifiers = deepCloneModifierList(f, n->modifiers, syntheticLocation);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			c->TypeParameters = deepCloneNodeList(f, n->TypeParameters, syntheticLocation);
+			c->HeritageClauses = deepCloneNodeList(f, n->HeritageClauses, syntheticLocation);
+			c->Members = deepCloneNodeList(f, n->Members, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::ClassStaticBlockDeclaration:
 		{
 			auto* n = static_cast<const ClassStaticBlockDeclaration*>(node);
 			auto* c = f.arena().alloc<ClassStaticBlockDeclaration>(*n);
-			c->modifiers = deepCloneModifierList(f, n->modifiers);
-			c->Body = deepCloneNode(f, n->Body);
+			c->modifiers = deepCloneModifierList(f, n->modifiers, syntheticLocation);
+			c->Body = deepCloneNode(f, n->Body, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::ComputedPropertyName:
 		{
 			auto* n = static_cast<const ComputedPropertyName*>(node);
 			auto* c = f.arena().alloc<ComputedPropertyName>(*n);
-			c->Expression = deepCloneNode(f, n->Expression);
+			c->Expression = deepCloneNode(f, n->Expression, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::ConditionalExpression:
 		{
 			auto* n = static_cast<const ConditionalExpression*>(node);
 			auto* c = f.arena().alloc<ConditionalExpression>(*n);
-			c->Condition = deepCloneNode(f, n->Condition);
-			c->QuestionToken = deepCloneNode(f, n->QuestionToken);
-			c->WhenTrue = deepCloneNode(f, n->WhenTrue);
-			c->ColonToken = deepCloneNode(f, n->ColonToken);
-			c->WhenFalse = deepCloneNode(f, n->WhenFalse);
+			c->Condition = deepCloneNode(f, n->Condition, syntheticLocation);
+			c->QuestionToken = deepCloneNode(f, n->QuestionToken, syntheticLocation);
+			c->WhenTrue = deepCloneNode(f, n->WhenTrue, syntheticLocation);
+			c->ColonToken = deepCloneNode(f, n->ColonToken, syntheticLocation);
+			c->WhenFalse = deepCloneNode(f, n->WhenFalse, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::ConditionalType:
 		{
 			auto* n = static_cast<const ConditionalTypeNode*>(node);
 			auto* c = f.arena().alloc<ConditionalTypeNode>(*n);
-			c->CheckType = deepCloneNode(f, n->CheckType);
-			c->ExtendsType = deepCloneNode(f, n->ExtendsType);
-			c->TrueType = deepCloneNode(f, n->TrueType);
-			c->FalseType = deepCloneNode(f, n->FalseType);
+			c->CheckType = deepCloneNode(f, n->CheckType, syntheticLocation);
+			c->ExtendsType = deepCloneNode(f, n->ExtendsType, syntheticLocation);
+			c->TrueType = deepCloneNode(f, n->TrueType, syntheticLocation);
+			c->FalseType = deepCloneNode(f, n->FalseType, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::ConstructSignature:
 		{
 			auto* n = static_cast<const ConstructSignatureDeclaration*>(node);
 			auto* c = f.arena().alloc<ConstructSignatureDeclaration>(*n);
-			c->TypeParameters = deepCloneNodeList(f, n->TypeParameters);
-			c->Parameters = deepCloneNodeList(f, n->Parameters);
-			c->Type = deepCloneNode(f, n->Type);
+			c->TypeParameters = deepCloneNodeList(f, n->TypeParameters, syntheticLocation);
+			c->Parameters = deepCloneNodeList(f, n->Parameters, syntheticLocation);
+			c->Type = deepCloneNode(f, n->Type, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::Constructor:
 		{
 			auto* n = static_cast<const ConstructorDeclaration*>(node);
 			auto* c = f.arena().alloc<ConstructorDeclaration>(*n);
-			c->modifiers = deepCloneModifierList(f, n->modifiers);
-			c->TypeParameters = deepCloneNodeList(f, n->TypeParameters);
-			c->Parameters = deepCloneNodeList(f, n->Parameters);
-			c->Type = deepCloneNode(f, n->Type);
-			c->FullSignature = deepCloneNode(f, n->FullSignature);
-			c->Body = deepCloneNode(f, n->Body);
+			c->modifiers = deepCloneModifierList(f, n->modifiers, syntheticLocation);
+			c->TypeParameters = deepCloneNodeList(f, n->TypeParameters, syntheticLocation);
+			c->Parameters = deepCloneNodeList(f, n->Parameters, syntheticLocation);
+			c->Type = deepCloneNode(f, n->Type, syntheticLocation);
+			c->FullSignature = deepCloneNode(f, n->FullSignature, syntheticLocation);
+			c->Body = deepCloneNode(f, n->Body, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::ConstructorType:
 		{
 			auto* n = static_cast<const ConstructorTypeNode*>(node);
 			auto* c = f.arena().alloc<ConstructorTypeNode>(*n);
-			c->modifiers = deepCloneModifierList(f, n->modifiers);
-			c->TypeParameters = deepCloneNodeList(f, n->TypeParameters);
-			c->Parameters = deepCloneNodeList(f, n->Parameters);
-			c->Type = deepCloneNode(f, n->Type);
+			c->modifiers = deepCloneModifierList(f, n->modifiers, syntheticLocation);
+			c->TypeParameters = deepCloneNodeList(f, n->TypeParameters, syntheticLocation);
+			c->Parameters = deepCloneNodeList(f, n->Parameters, syntheticLocation);
+			c->Type = deepCloneNode(f, n->Type, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::ContinueStatement:
 		{
 			auto* n = static_cast<const ContinueStatement*>(node);
 			auto* c = f.arena().alloc<ContinueStatement>(*n);
-			c->Label = deepCloneNode(f, n->Label);
+			c->Label = deepCloneNode(f, n->Label, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::DebuggerStatement:
 		{
 			auto* n = static_cast<const DebuggerStatement*>(node);
 			auto* c = f.arena().alloc<DebuggerStatement>(*n);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::Decorator:
 		{
 			auto* n = static_cast<const Decorator*>(node);
 			auto* c = f.arena().alloc<Decorator>(*n);
-			c->Expression = deepCloneNode(f, n->Expression);
+			c->Expression = deepCloneNode(f, n->Expression, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::DeleteExpression:
 		{
 			auto* n = static_cast<const DeleteExpression*>(node);
 			auto* c = f.arena().alloc<DeleteExpression>(*n);
-			c->Expression = deepCloneNode(f, n->Expression);
+			c->Expression = deepCloneNode(f, n->Expression, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::DoStatement:
 		{
 			auto* n = static_cast<const DoStatement*>(node);
 			auto* c = f.arena().alloc<DoStatement>(*n);
-			c->Statement = deepCloneNode(f, n->Statement);
-			c->Expression = deepCloneNode(f, n->Expression);
+			c->Statement = deepCloneNode(f, n->Statement, syntheticLocation);
+			c->Expression = deepCloneNode(f, n->Expression, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::ElementAccessExpression:
 		{
 			auto* n = static_cast<const ElementAccessExpression*>(node);
 			auto* c = f.arena().alloc<ElementAccessExpression>(*n);
-			c->Expression = deepCloneNode(f, n->Expression);
-			c->QuestionDotToken = deepCloneNode(f, n->QuestionDotToken);
-			c->ArgumentExpression = deepCloneNode(f, n->ArgumentExpression);
+			c->Expression = deepCloneNode(f, n->Expression, syntheticLocation);
+			c->QuestionDotToken = deepCloneNode(f, n->QuestionDotToken, syntheticLocation);
+			c->ArgumentExpression = deepCloneNode(f, n->ArgumentExpression, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::EmptyStatement:
 		{
 			auto* n = static_cast<const EmptyStatement*>(node);
 			auto* c = f.arena().alloc<EmptyStatement>(*n);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::EnumDeclaration:
 		{
 			auto* n = static_cast<const EnumDeclaration*>(node);
 			auto* c = f.arena().alloc<EnumDeclaration>(*n);
-			c->modifiers = deepCloneModifierList(f, n->modifiers);
-			c->name = deepCloneNode(f, n->name);
-			c->Members = deepCloneNodeList(f, n->Members);
+			c->modifiers = deepCloneModifierList(f, n->modifiers, syntheticLocation);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			c->Members = deepCloneNodeList(f, n->Members, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::EnumMember:
 		{
 			auto* n = static_cast<const EnumMember*>(node);
 			auto* c = f.arena().alloc<EnumMember>(*n);
-			c->name = deepCloneNode(f, n->name);
-			c->Initializer = deepCloneNode(f, n->Initializer);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			c->Initializer = deepCloneNode(f, n->Initializer, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::ExportAssignment:
 		{
 			auto* n = static_cast<const ExportAssignment*>(node);
 			auto* c = f.arena().alloc<ExportAssignment>(*n);
-			c->modifiers = deepCloneModifierList(f, n->modifiers);
-			c->Type = deepCloneNode(f, n->Type);
-			c->Expression = deepCloneNode(f, n->Expression);
+			c->modifiers = deepCloneModifierList(f, n->modifiers, syntheticLocation);
+			c->Type = deepCloneNode(f, n->Type, syntheticLocation);
+			c->Expression = deepCloneNode(f, n->Expression, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::ExportDeclaration:
 		{
 			auto* n = static_cast<const ExportDeclaration*>(node);
 			auto* c = f.arena().alloc<ExportDeclaration>(*n);
-			c->modifiers = deepCloneModifierList(f, n->modifiers);
-			c->ExportClause = deepCloneNode(f, n->ExportClause);
-			c->ModuleSpecifier = deepCloneNode(f, n->ModuleSpecifier);
-			c->Attributes = deepCloneNode(f, n->Attributes);
+			c->modifiers = deepCloneModifierList(f, n->modifiers, syntheticLocation);
+			c->ExportClause = deepCloneNode(f, n->ExportClause, syntheticLocation);
+			c->ModuleSpecifier = deepCloneNode(f, n->ModuleSpecifier, syntheticLocation);
+			c->Attributes = deepCloneNode(f, n->Attributes, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::ExportSpecifier:
 		{
 			auto* n = static_cast<const ExportSpecifier*>(node);
 			auto* c = f.arena().alloc<ExportSpecifier>(*n);
-			c->PropertyName = deepCloneNode(f, n->PropertyName);
-			c->name = deepCloneNode(f, n->name);
+			c->PropertyName = deepCloneNode(f, n->PropertyName, syntheticLocation);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::ExpressionStatement:
 		{
 			auto* n = static_cast<const ExpressionStatement*>(node);
 			auto* c = f.arena().alloc<ExpressionStatement>(*n);
-			c->Expression = deepCloneNode(f, n->Expression);
+			c->Expression = deepCloneNode(f, n->Expression, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::ExpressionWithTypeArguments:
 		{
 			auto* n = static_cast<const ExpressionWithTypeArguments*>(node);
 			auto* c = f.arena().alloc<ExpressionWithTypeArguments>(*n);
-			c->Expression = deepCloneNode(f, n->Expression);
-			c->TypeArguments = deepCloneNodeList(f, n->TypeArguments);
+			c->Expression = deepCloneNode(f, n->Expression, syntheticLocation);
+			c->TypeArguments = deepCloneNodeList(f, n->TypeArguments, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::ExternalModuleReference:
 		{
 			auto* n = static_cast<const ExternalModuleReference*>(node);
 			auto* c = f.arena().alloc<ExternalModuleReference>(*n);
-			c->Expression = deepCloneNode(f, n->Expression);
+			c->Expression = deepCloneNode(f, n->Expression, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::ForOfStatement:
@@ -5524,115 +5622,139 @@ inline Node* deepCloneNode(NodeFactory& f, const Node* node) {
 		{
 			auto* n = static_cast<const ForInOrOfStatement*>(node);
 			auto* c = f.arena().alloc<ForInOrOfStatement>(*n);
-			c->AwaitModifier = deepCloneNode(f, n->AwaitModifier);
-			c->Initializer = deepCloneNode(f, n->Initializer);
-			c->Expression = deepCloneNode(f, n->Expression);
-			c->Statement = deepCloneNode(f, n->Statement);
+			c->AwaitModifier = deepCloneNode(f, n->AwaitModifier, syntheticLocation);
+			c->Initializer = deepCloneNode(f, n->Initializer, syntheticLocation);
+			c->Expression = deepCloneNode(f, n->Expression, syntheticLocation);
+			c->Statement = deepCloneNode(f, n->Statement, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::ForStatement:
 		{
 			auto* n = static_cast<const ForStatement*>(node);
 			auto* c = f.arena().alloc<ForStatement>(*n);
-			c->Initializer = deepCloneNode(f, n->Initializer);
-			c->Condition = deepCloneNode(f, n->Condition);
-			c->Incrementor = deepCloneNode(f, n->Incrementor);
-			c->Statement = deepCloneNode(f, n->Statement);
+			c->Initializer = deepCloneNode(f, n->Initializer, syntheticLocation);
+			c->Condition = deepCloneNode(f, n->Condition, syntheticLocation);
+			c->Incrementor = deepCloneNode(f, n->Incrementor, syntheticLocation);
+			c->Statement = deepCloneNode(f, n->Statement, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::FunctionDeclaration:
 		{
 			auto* n = static_cast<const FunctionDeclaration*>(node);
 			auto* c = f.arena().alloc<FunctionDeclaration>(*n);
-			c->modifiers = deepCloneModifierList(f, n->modifiers);
-			c->AsteriskToken = deepCloneNode(f, n->AsteriskToken);
-			c->name = deepCloneNode(f, n->name);
-			c->TypeParameters = deepCloneNodeList(f, n->TypeParameters);
-			c->Parameters = deepCloneNodeList(f, n->Parameters);
-			c->Type = deepCloneNode(f, n->Type);
-			c->FullSignature = deepCloneNode(f, n->FullSignature);
-			c->Body = deepCloneNode(f, n->Body);
+			c->modifiers = deepCloneModifierList(f, n->modifiers, syntheticLocation);
+			c->AsteriskToken = deepCloneNode(f, n->AsteriskToken, syntheticLocation);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			c->TypeParameters = deepCloneNodeList(f, n->TypeParameters, syntheticLocation);
+			c->Parameters = deepCloneNodeList(f, n->Parameters, syntheticLocation);
+			c->Type = deepCloneNode(f, n->Type, syntheticLocation);
+			c->FullSignature = deepCloneNode(f, n->FullSignature, syntheticLocation);
+			c->Body = deepCloneNode(f, n->Body, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::FunctionExpression:
 		{
 			auto* n = static_cast<const FunctionExpression*>(node);
 			auto* c = f.arena().alloc<FunctionExpression>(*n);
-			c->modifiers = deepCloneModifierList(f, n->modifiers);
-			c->AsteriskToken = deepCloneNode(f, n->AsteriskToken);
-			c->name = deepCloneNode(f, n->name);
-			c->TypeParameters = deepCloneNodeList(f, n->TypeParameters);
-			c->Parameters = deepCloneNodeList(f, n->Parameters);
-			c->Type = deepCloneNode(f, n->Type);
-			c->FullSignature = deepCloneNode(f, n->FullSignature);
-			c->Body = deepCloneNode(f, n->Body);
+			c->modifiers = deepCloneModifierList(f, n->modifiers, syntheticLocation);
+			c->AsteriskToken = deepCloneNode(f, n->AsteriskToken, syntheticLocation);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			c->TypeParameters = deepCloneNodeList(f, n->TypeParameters, syntheticLocation);
+			c->Parameters = deepCloneNodeList(f, n->Parameters, syntheticLocation);
+			c->Type = deepCloneNode(f, n->Type, syntheticLocation);
+			c->FullSignature = deepCloneNode(f, n->FullSignature, syntheticLocation);
+			c->Body = deepCloneNode(f, n->Body, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::FunctionType:
 		{
 			auto* n = static_cast<const FunctionTypeNode*>(node);
 			auto* c = f.arena().alloc<FunctionTypeNode>(*n);
-			c->TypeParameters = deepCloneNodeList(f, n->TypeParameters);
-			c->Parameters = deepCloneNodeList(f, n->Parameters);
-			c->Type = deepCloneNode(f, n->Type);
+			c->TypeParameters = deepCloneNodeList(f, n->TypeParameters, syntheticLocation);
+			c->Parameters = deepCloneNodeList(f, n->Parameters, syntheticLocation);
+			c->Type = deepCloneNode(f, n->Type, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::GetAccessor:
 		{
 			auto* n = static_cast<const GetAccessorDeclaration*>(node);
 			auto* c = f.arena().alloc<GetAccessorDeclaration>(*n);
-			c->modifiers = deepCloneModifierList(f, n->modifiers);
-			c->name = deepCloneNode(f, n->name);
-			c->TypeParameters = deepCloneNodeList(f, n->TypeParameters);
-			c->Parameters = deepCloneNodeList(f, n->Parameters);
-			c->Type = deepCloneNode(f, n->Type);
-			c->FullSignature = deepCloneNode(f, n->FullSignature);
-			c->Body = deepCloneNode(f, n->Body);
+			c->modifiers = deepCloneModifierList(f, n->modifiers, syntheticLocation);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			c->TypeParameters = deepCloneNodeList(f, n->TypeParameters, syntheticLocation);
+			c->Parameters = deepCloneNodeList(f, n->Parameters, syntheticLocation);
+			c->Type = deepCloneNode(f, n->Type, syntheticLocation);
+			c->FullSignature = deepCloneNode(f, n->FullSignature, syntheticLocation);
+			c->Body = deepCloneNode(f, n->Body, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::HeritageClause:
 		{
 			auto* n = static_cast<const HeritageClause*>(node);
 			auto* c = f.arena().alloc<HeritageClause>(*n);
-			c->Types = deepCloneNodeList(f, n->Types);
+			c->Types = deepCloneNodeList(f, n->Types, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::Identifier:
 		{
 			auto* n = static_cast<const Identifier*>(node);
 			auto* c = f.arena().alloc<Identifier>(*n);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::IfStatement:
 		{
 			auto* n = static_cast<const IfStatement*>(node);
 			auto* c = f.arena().alloc<IfStatement>(*n);
-			c->Expression = deepCloneNode(f, n->Expression);
-			c->ThenStatement = deepCloneNode(f, n->ThenStatement);
-			c->ElseStatement = deepCloneNode(f, n->ElseStatement);
+			c->Expression = deepCloneNode(f, n->Expression, syntheticLocation);
+			c->ThenStatement = deepCloneNode(f, n->ThenStatement, syntheticLocation);
+			c->ElseStatement = deepCloneNode(f, n->ElseStatement, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::ImportAttribute:
 		{
 			auto* n = static_cast<const ImportAttribute*>(node);
 			auto* c = f.arena().alloc<ImportAttribute>(*n);
-			c->name = deepCloneNode(f, n->name);
-			c->Value = deepCloneNode(f, n->Value);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			c->Value = deepCloneNode(f, n->Value, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::ImportAttributes:
 		{
 			auto* n = static_cast<const ImportAttributes*>(node);
 			auto* c = f.arena().alloc<ImportAttributes>(*n);
-			c->Attributes = deepCloneNodeList(f, n->Attributes);
+			c->Attributes = deepCloneNodeList(f, n->Attributes, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::ImportClause:
 		{
 			auto* n = static_cast<const ImportClause*>(node);
 			auto* c = f.arena().alloc<ImportClause>(*n);
-			c->name = deepCloneNode(f, n->name);
-			c->NamedBindings = deepCloneNode(f, n->NamedBindings);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			c->NamedBindings = deepCloneNode(f, n->NamedBindings, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::ImportDeclaration:
@@ -5640,206 +5762,256 @@ inline Node* deepCloneNode(NodeFactory& f, const Node* node) {
 		{
 			auto* n = static_cast<const ImportDeclaration*>(node);
 			auto* c = f.arena().alloc<ImportDeclaration>(*n);
-			c->modifiers = deepCloneModifierList(f, n->modifiers);
-			c->ImportClause = deepCloneNode(f, n->ImportClause);
-			c->ModuleSpecifier = deepCloneNode(f, n->ModuleSpecifier);
-			c->Attributes = deepCloneNode(f, n->Attributes);
+			c->modifiers = deepCloneModifierList(f, n->modifiers, syntheticLocation);
+			c->ImportClause = deepCloneNode(f, n->ImportClause, syntheticLocation);
+			c->ModuleSpecifier = deepCloneNode(f, n->ModuleSpecifier, syntheticLocation);
+			c->Attributes = deepCloneNode(f, n->Attributes, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::ImportEqualsDeclaration:
 		{
 			auto* n = static_cast<const ImportEqualsDeclaration*>(node);
 			auto* c = f.arena().alloc<ImportEqualsDeclaration>(*n);
-			c->modifiers = deepCloneModifierList(f, n->modifiers);
-			c->name = deepCloneNode(f, n->name);
-			c->ModuleReference = deepCloneNode(f, n->ModuleReference);
+			c->modifiers = deepCloneModifierList(f, n->modifiers, syntheticLocation);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			c->ModuleReference = deepCloneNode(f, n->ModuleReference, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::ImportSpecifier:
 		{
 			auto* n = static_cast<const ImportSpecifier*>(node);
 			auto* c = f.arena().alloc<ImportSpecifier>(*n);
-			c->PropertyName = deepCloneNode(f, n->PropertyName);
-			c->name = deepCloneNode(f, n->name);
+			c->PropertyName = deepCloneNode(f, n->PropertyName, syntheticLocation);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::ImportType:
 		{
 			auto* n = static_cast<const ImportTypeNode*>(node);
 			auto* c = f.arena().alloc<ImportTypeNode>(*n);
-			c->Argument = deepCloneNode(f, n->Argument);
-			c->Attributes = deepCloneNode(f, n->Attributes);
-			c->Qualifier = deepCloneNode(f, n->Qualifier);
-			c->TypeArguments = deepCloneNodeList(f, n->TypeArguments);
+			c->Argument = deepCloneNode(f, n->Argument, syntheticLocation);
+			c->Attributes = deepCloneNode(f, n->Attributes, syntheticLocation);
+			c->Qualifier = deepCloneNode(f, n->Qualifier, syntheticLocation);
+			c->TypeArguments = deepCloneNodeList(f, n->TypeArguments, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::IndexSignature:
 		{
 			auto* n = static_cast<const IndexSignatureDeclaration*>(node);
 			auto* c = f.arena().alloc<IndexSignatureDeclaration>(*n);
-			c->modifiers = deepCloneModifierList(f, n->modifiers);
-			c->Parameters = deepCloneNodeList(f, n->Parameters);
-			c->Type = deepCloneNode(f, n->Type);
+			c->modifiers = deepCloneModifierList(f, n->modifiers, syntheticLocation);
+			c->Parameters = deepCloneNodeList(f, n->Parameters, syntheticLocation);
+			c->Type = deepCloneNode(f, n->Type, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::IndexedAccessType:
 		{
 			auto* n = static_cast<const IndexedAccessTypeNode*>(node);
 			auto* c = f.arena().alloc<IndexedAccessTypeNode>(*n);
-			c->ObjectType = deepCloneNode(f, n->ObjectType);
-			c->IndexType = deepCloneNode(f, n->IndexType);
+			c->ObjectType = deepCloneNode(f, n->ObjectType, syntheticLocation);
+			c->IndexType = deepCloneNode(f, n->IndexType, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::InferType:
 		{
 			auto* n = static_cast<const InferTypeNode*>(node);
 			auto* c = f.arena().alloc<InferTypeNode>(*n);
-			c->TypeParameter = deepCloneNode(f, n->TypeParameter);
+			c->TypeParameter = deepCloneNode(f, n->TypeParameter, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::InterfaceDeclaration:
 		{
 			auto* n = static_cast<const InterfaceDeclaration*>(node);
 			auto* c = f.arena().alloc<InterfaceDeclaration>(*n);
-			c->modifiers = deepCloneModifierList(f, n->modifiers);
-			c->name = deepCloneNode(f, n->name);
-			c->TypeParameters = deepCloneNodeList(f, n->TypeParameters);
-			c->HeritageClauses = deepCloneNodeList(f, n->HeritageClauses);
-			c->Members = deepCloneNodeList(f, n->Members);
+			c->modifiers = deepCloneModifierList(f, n->modifiers, syntheticLocation);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			c->TypeParameters = deepCloneNodeList(f, n->TypeParameters, syntheticLocation);
+			c->HeritageClauses = deepCloneNodeList(f, n->HeritageClauses, syntheticLocation);
+			c->Members = deepCloneNodeList(f, n->Members, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::IntersectionType:
 		{
 			auto* n = static_cast<const IntersectionTypeNode*>(node);
 			auto* c = f.arena().alloc<IntersectionTypeNode>(*n);
-			c->Types = deepCloneNodeList(f, n->Types);
+			c->Types = deepCloneNodeList(f, n->Types, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JSDoc:
 		{
 			auto* n = static_cast<const JSDoc*>(node);
 			auto* c = f.arena().alloc<JSDoc>(*n);
-			c->Comment = deepCloneNodeList(f, n->Comment);
-			c->Tags = deepCloneNodeList(f, n->Tags);
+			c->Comment = deepCloneNodeList(f, n->Comment, syntheticLocation);
+			c->Tags = deepCloneNodeList(f, n->Tags, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JSDocAllType:
 		{
 			auto* n = static_cast<const JSDocAllType*>(node);
 			auto* c = f.arena().alloc<JSDocAllType>(*n);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JSDocAugmentsTag:
 		{
 			auto* n = static_cast<const JSDocAugmentsTag*>(node);
 			auto* c = f.arena().alloc<JSDocAugmentsTag>(*n);
-			c->TagName = deepCloneNode(f, n->TagName);
-			c->ClassName = deepCloneNode(f, n->ClassName);
-			c->Comment = deepCloneNodeList(f, n->Comment);
+			c->TagName = deepCloneNode(f, n->TagName, syntheticLocation);
+			c->ClassName = deepCloneNode(f, n->ClassName, syntheticLocation);
+			c->Comment = deepCloneNodeList(f, n->Comment, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JSDocCallbackTag:
 		{
 			auto* n = static_cast<const JSDocCallbackTag*>(node);
 			auto* c = f.arena().alloc<JSDocCallbackTag>(*n);
-			c->TagName = deepCloneNode(f, n->TagName);
-			c->TypeExpression = deepCloneNode(f, n->TypeExpression);
-			c->name = deepCloneNode(f, n->name);
-			c->Comment = deepCloneNodeList(f, n->Comment);
+			c->TagName = deepCloneNode(f, n->TagName, syntheticLocation);
+			c->TypeExpression = deepCloneNode(f, n->TypeExpression, syntheticLocation);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			c->Comment = deepCloneNodeList(f, n->Comment, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JSDocDeprecatedTag:
 		{
 			auto* n = static_cast<const JSDocDeprecatedTag*>(node);
 			auto* c = f.arena().alloc<JSDocDeprecatedTag>(*n);
-			c->TagName = deepCloneNode(f, n->TagName);
-			c->Comment = deepCloneNodeList(f, n->Comment);
+			c->TagName = deepCloneNode(f, n->TagName, syntheticLocation);
+			c->Comment = deepCloneNodeList(f, n->Comment, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JSDocImplementsTag:
 		{
 			auto* n = static_cast<const JSDocImplementsTag*>(node);
 			auto* c = f.arena().alloc<JSDocImplementsTag>(*n);
-			c->TagName = deepCloneNode(f, n->TagName);
-			c->ClassName = deepCloneNode(f, n->ClassName);
-			c->Comment = deepCloneNodeList(f, n->Comment);
+			c->TagName = deepCloneNode(f, n->TagName, syntheticLocation);
+			c->ClassName = deepCloneNode(f, n->ClassName, syntheticLocation);
+			c->Comment = deepCloneNodeList(f, n->Comment, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JSDocImportTag:
 		{
 			auto* n = static_cast<const JSDocImportTag*>(node);
 			auto* c = f.arena().alloc<JSDocImportTag>(*n);
-			c->TagName = deepCloneNode(f, n->TagName);
-			c->ImportClause = deepCloneNode(f, n->ImportClause);
-			c->ModuleSpecifier = deepCloneNode(f, n->ModuleSpecifier);
-			c->Attributes = deepCloneNode(f, n->Attributes);
-			c->Comment = deepCloneNodeList(f, n->Comment);
+			c->TagName = deepCloneNode(f, n->TagName, syntheticLocation);
+			c->ImportClause = deepCloneNode(f, n->ImportClause, syntheticLocation);
+			c->ModuleSpecifier = deepCloneNode(f, n->ModuleSpecifier, syntheticLocation);
+			c->Attributes = deepCloneNode(f, n->Attributes, syntheticLocation);
+			c->Comment = deepCloneNodeList(f, n->Comment, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JSDocLink:
 		{
 			auto* n = static_cast<const JSDocLink*>(node);
 			auto* c = f.arena().alloc<JSDocLink>(*n);
-			c->name = deepCloneNode(f, n->name);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JSDocLinkCode:
 		{
 			auto* n = static_cast<const JSDocLinkCode*>(node);
 			auto* c = f.arena().alloc<JSDocLinkCode>(*n);
-			c->name = deepCloneNode(f, n->name);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JSDocLinkPlain:
 		{
 			auto* n = static_cast<const JSDocLinkPlain*>(node);
 			auto* c = f.arena().alloc<JSDocLinkPlain>(*n);
-			c->name = deepCloneNode(f, n->name);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JSDocNameReference:
 		{
 			auto* n = static_cast<const JSDocNameReference*>(node);
 			auto* c = f.arena().alloc<JSDocNameReference>(*n);
-			c->name = deepCloneNode(f, n->name);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JSDocNonNullableType:
 		{
 			auto* n = static_cast<const JSDocNonNullableType*>(node);
 			auto* c = f.arena().alloc<JSDocNonNullableType>(*n);
-			c->Type = deepCloneNode(f, n->Type);
+			c->Type = deepCloneNode(f, n->Type, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JSDocNullableType:
 		{
 			auto* n = static_cast<const JSDocNullableType*>(node);
 			auto* c = f.arena().alloc<JSDocNullableType>(*n);
-			c->Type = deepCloneNode(f, n->Type);
+			c->Type = deepCloneNode(f, n->Type, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JSDocOptionalType:
 		{
 			auto* n = static_cast<const JSDocOptionalType*>(node);
 			auto* c = f.arena().alloc<JSDocOptionalType>(*n);
-			c->Type = deepCloneNode(f, n->Type);
+			c->Type = deepCloneNode(f, n->Type, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JSDocOverloadTag:
 		{
 			auto* n = static_cast<const JSDocOverloadTag*>(node);
 			auto* c = f.arena().alloc<JSDocOverloadTag>(*n);
-			c->TagName = deepCloneNode(f, n->TagName);
-			c->TypeExpression = deepCloneNode(f, n->TypeExpression);
-			c->Comment = deepCloneNodeList(f, n->Comment);
+			c->TagName = deepCloneNode(f, n->TagName, syntheticLocation);
+			c->TypeExpression = deepCloneNode(f, n->TypeExpression, syntheticLocation);
+			c->Comment = deepCloneNodeList(f, n->Comment, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JSDocOverrideTag:
 		{
 			auto* n = static_cast<const JSDocOverrideTag*>(node);
 			auto* c = f.arena().alloc<JSDocOverrideTag>(*n);
-			c->TagName = deepCloneNode(f, n->TagName);
-			c->Comment = deepCloneNodeList(f, n->Comment);
+			c->TagName = deepCloneNode(f, n->TagName, syntheticLocation);
+			c->Comment = deepCloneNodeList(f, n->Comment, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JSDocParameterTag:
@@ -5847,254 +6019,318 @@ inline Node* deepCloneNode(NodeFactory& f, const Node* node) {
 		{
 			auto* n = static_cast<const JSDocParameterOrPropertyTag*>(node);
 			auto* c = f.arena().alloc<JSDocParameterOrPropertyTag>(*n);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JSDocPrivateTag:
 		{
 			auto* n = static_cast<const JSDocPrivateTag*>(node);
 			auto* c = f.arena().alloc<JSDocPrivateTag>(*n);
-			c->TagName = deepCloneNode(f, n->TagName);
-			c->Comment = deepCloneNodeList(f, n->Comment);
+			c->TagName = deepCloneNode(f, n->TagName, syntheticLocation);
+			c->Comment = deepCloneNodeList(f, n->Comment, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JSDocProtectedTag:
 		{
 			auto* n = static_cast<const JSDocProtectedTag*>(node);
 			auto* c = f.arena().alloc<JSDocProtectedTag>(*n);
-			c->TagName = deepCloneNode(f, n->TagName);
-			c->Comment = deepCloneNodeList(f, n->Comment);
+			c->TagName = deepCloneNode(f, n->TagName, syntheticLocation);
+			c->Comment = deepCloneNodeList(f, n->Comment, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JSDocPublicTag:
 		{
 			auto* n = static_cast<const JSDocPublicTag*>(node);
 			auto* c = f.arena().alloc<JSDocPublicTag>(*n);
-			c->TagName = deepCloneNode(f, n->TagName);
-			c->Comment = deepCloneNodeList(f, n->Comment);
+			c->TagName = deepCloneNode(f, n->TagName, syntheticLocation);
+			c->Comment = deepCloneNodeList(f, n->Comment, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JSDocReadonlyTag:
 		{
 			auto* n = static_cast<const JSDocReadonlyTag*>(node);
 			auto* c = f.arena().alloc<JSDocReadonlyTag>(*n);
-			c->TagName = deepCloneNode(f, n->TagName);
-			c->Comment = deepCloneNodeList(f, n->Comment);
+			c->TagName = deepCloneNode(f, n->TagName, syntheticLocation);
+			c->Comment = deepCloneNodeList(f, n->Comment, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JSDocReturnTag:
 		{
 			auto* n = static_cast<const JSDocReturnTag*>(node);
 			auto* c = f.arena().alloc<JSDocReturnTag>(*n);
-			c->TagName = deepCloneNode(f, n->TagName);
-			c->TypeExpression = deepCloneNode(f, n->TypeExpression);
-			c->Comment = deepCloneNodeList(f, n->Comment);
+			c->TagName = deepCloneNode(f, n->TagName, syntheticLocation);
+			c->TypeExpression = deepCloneNode(f, n->TypeExpression, syntheticLocation);
+			c->Comment = deepCloneNodeList(f, n->Comment, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JSDocSatisfiesTag:
 		{
 			auto* n = static_cast<const JSDocSatisfiesTag*>(node);
 			auto* c = f.arena().alloc<JSDocSatisfiesTag>(*n);
-			c->TagName = deepCloneNode(f, n->TagName);
-			c->TypeExpression = deepCloneNode(f, n->TypeExpression);
-			c->Comment = deepCloneNodeList(f, n->Comment);
+			c->TagName = deepCloneNode(f, n->TagName, syntheticLocation);
+			c->TypeExpression = deepCloneNode(f, n->TypeExpression, syntheticLocation);
+			c->Comment = deepCloneNodeList(f, n->Comment, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JSDocSeeTag:
 		{
 			auto* n = static_cast<const JSDocSeeTag*>(node);
 			auto* c = f.arena().alloc<JSDocSeeTag>(*n);
-			c->TagName = deepCloneNode(f, n->TagName);
-			c->NameExpression = deepCloneNode(f, n->NameExpression);
-			c->Comment = deepCloneNodeList(f, n->Comment);
+			c->TagName = deepCloneNode(f, n->TagName, syntheticLocation);
+			c->NameExpression = deepCloneNode(f, n->NameExpression, syntheticLocation);
+			c->Comment = deepCloneNodeList(f, n->Comment, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JSDocSignature:
 		{
 			auto* n = static_cast<const JSDocSignature*>(node);
 			auto* c = f.arena().alloc<JSDocSignature>(*n);
-			c->TypeParameters = deepCloneNodeList(f, n->TypeParameters);
-			c->Parameters = deepCloneNodeList(f, n->Parameters);
-			c->Type = deepCloneNode(f, n->Type);
+			c->TypeParameters = deepCloneNodeList(f, n->TypeParameters, syntheticLocation);
+			c->Parameters = deepCloneNodeList(f, n->Parameters, syntheticLocation);
+			c->Type = deepCloneNode(f, n->Type, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JSDocTemplateTag:
 		{
 			auto* n = static_cast<const JSDocTemplateTag*>(node);
 			auto* c = f.arena().alloc<JSDocTemplateTag>(*n);
-			c->TagName = deepCloneNode(f, n->TagName);
-			c->Constraint = deepCloneNode(f, n->Constraint);
-			c->TypeParameters = deepCloneNodeList(f, n->TypeParameters);
-			c->Comment = deepCloneNodeList(f, n->Comment);
+			c->TagName = deepCloneNode(f, n->TagName, syntheticLocation);
+			c->Constraint = deepCloneNode(f, n->Constraint, syntheticLocation);
+			c->TypeParameters = deepCloneNodeList(f, n->TypeParameters, syntheticLocation);
+			c->Comment = deepCloneNodeList(f, n->Comment, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JSDocText:
 		{
 			auto* n = static_cast<const JSDocText*>(node);
 			auto* c = f.arena().alloc<JSDocText>(*n);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JSDocThisTag:
 		{
 			auto* n = static_cast<const JSDocThisTag*>(node);
 			auto* c = f.arena().alloc<JSDocThisTag>(*n);
-			c->TagName = deepCloneNode(f, n->TagName);
-			c->TypeExpression = deepCloneNode(f, n->TypeExpression);
-			c->Comment = deepCloneNodeList(f, n->Comment);
+			c->TagName = deepCloneNode(f, n->TagName, syntheticLocation);
+			c->TypeExpression = deepCloneNode(f, n->TypeExpression, syntheticLocation);
+			c->Comment = deepCloneNodeList(f, n->Comment, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JSDocThrowsTag:
 		{
 			auto* n = static_cast<const JSDocThrowsTag*>(node);
 			auto* c = f.arena().alloc<JSDocThrowsTag>(*n);
-			c->TagName = deepCloneNode(f, n->TagName);
-			c->TypeExpression = deepCloneNode(f, n->TypeExpression);
-			c->Comment = deepCloneNodeList(f, n->Comment);
+			c->TagName = deepCloneNode(f, n->TagName, syntheticLocation);
+			c->TypeExpression = deepCloneNode(f, n->TypeExpression, syntheticLocation);
+			c->Comment = deepCloneNodeList(f, n->Comment, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JSDocTypeExpression:
 		{
 			auto* n = static_cast<const JSDocTypeExpression*>(node);
 			auto* c = f.arena().alloc<JSDocTypeExpression>(*n);
-			c->Type = deepCloneNode(f, n->Type);
+			c->Type = deepCloneNode(f, n->Type, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JSDocTypeLiteral:
 		{
 			auto* n = static_cast<const JSDocTypeLiteral*>(node);
 			auto* c = f.arena().alloc<JSDocTypeLiteral>(*n);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JSDocTypeTag:
 		{
 			auto* n = static_cast<const JSDocTypeTag*>(node);
 			auto* c = f.arena().alloc<JSDocTypeTag>(*n);
-			c->TagName = deepCloneNode(f, n->TagName);
-			c->TypeExpression = deepCloneNode(f, n->TypeExpression);
-			c->Comment = deepCloneNodeList(f, n->Comment);
+			c->TagName = deepCloneNode(f, n->TagName, syntheticLocation);
+			c->TypeExpression = deepCloneNode(f, n->TypeExpression, syntheticLocation);
+			c->Comment = deepCloneNodeList(f, n->Comment, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JSDocTypedefTag:
 		{
 			auto* n = static_cast<const JSDocTypedefTag*>(node);
 			auto* c = f.arena().alloc<JSDocTypedefTag>(*n);
-			c->TagName = deepCloneNode(f, n->TagName);
-			c->TypeExpression = deepCloneNode(f, n->TypeExpression);
-			c->name = deepCloneNode(f, n->name);
-			c->Comment = deepCloneNodeList(f, n->Comment);
+			c->TagName = deepCloneNode(f, n->TagName, syntheticLocation);
+			c->TypeExpression = deepCloneNode(f, n->TypeExpression, syntheticLocation);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			c->Comment = deepCloneNodeList(f, n->Comment, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JSDocUnknownTag:
 		{
 			auto* n = static_cast<const JSDocUnknownTag*>(node);
 			auto* c = f.arena().alloc<JSDocUnknownTag>(*n);
-			c->TagName = deepCloneNode(f, n->TagName);
-			c->Comment = deepCloneNodeList(f, n->Comment);
+			c->TagName = deepCloneNode(f, n->TagName, syntheticLocation);
+			c->Comment = deepCloneNodeList(f, n->Comment, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JSDocVariadicType:
 		{
 			auto* n = static_cast<const JSDocVariadicType*>(node);
 			auto* c = f.arena().alloc<JSDocVariadicType>(*n);
-			c->Type = deepCloneNode(f, n->Type);
+			c->Type = deepCloneNode(f, n->Type, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JsxAttribute:
 		{
 			auto* n = static_cast<const JsxAttribute*>(node);
 			auto* c = f.arena().alloc<JsxAttribute>(*n);
-			c->name = deepCloneNode(f, n->name);
-			c->Initializer = deepCloneNode(f, n->Initializer);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			c->Initializer = deepCloneNode(f, n->Initializer, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JsxAttributes:
 		{
 			auto* n = static_cast<const JsxAttributes*>(node);
 			auto* c = f.arena().alloc<JsxAttributes>(*n);
-			c->Properties = deepCloneNodeList(f, n->Properties);
+			c->Properties = deepCloneNodeList(f, n->Properties, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JsxClosingElement:
 		{
 			auto* n = static_cast<const JsxClosingElement*>(node);
 			auto* c = f.arena().alloc<JsxClosingElement>(*n);
-			c->TagName = deepCloneNode(f, n->TagName);
+			c->TagName = deepCloneNode(f, n->TagName, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JsxClosingFragment:
 		{
 			auto* n = static_cast<const JsxClosingFragment*>(node);
 			auto* c = f.arena().alloc<JsxClosingFragment>(*n);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JsxElement:
 		{
 			auto* n = static_cast<const JsxElement*>(node);
 			auto* c = f.arena().alloc<JsxElement>(*n);
-			c->OpeningElement = deepCloneNode(f, n->OpeningElement);
-			c->Children = deepCloneNodeList(f, n->Children);
-			c->ClosingElement = deepCloneNode(f, n->ClosingElement);
+			c->OpeningElement = deepCloneNode(f, n->OpeningElement, syntheticLocation);
+			c->Children = deepCloneNodeList(f, n->Children, syntheticLocation);
+			c->ClosingElement = deepCloneNode(f, n->ClosingElement, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JsxExpression:
 		{
 			auto* n = static_cast<const JsxExpression*>(node);
 			auto* c = f.arena().alloc<JsxExpression>(*n);
-			c->DotDotDotToken = deepCloneNode(f, n->DotDotDotToken);
-			c->Expression = deepCloneNode(f, n->Expression);
+			c->DotDotDotToken = deepCloneNode(f, n->DotDotDotToken, syntheticLocation);
+			c->Expression = deepCloneNode(f, n->Expression, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JsxFragment:
 		{
 			auto* n = static_cast<const JsxFragment*>(node);
 			auto* c = f.arena().alloc<JsxFragment>(*n);
-			c->OpeningFragment = deepCloneNode(f, n->OpeningFragment);
-			c->Children = deepCloneNodeList(f, n->Children);
-			c->ClosingFragment = deepCloneNode(f, n->ClosingFragment);
+			c->OpeningFragment = deepCloneNode(f, n->OpeningFragment, syntheticLocation);
+			c->Children = deepCloneNodeList(f, n->Children, syntheticLocation);
+			c->ClosingFragment = deepCloneNode(f, n->ClosingFragment, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JsxNamespacedName:
 		{
 			auto* n = static_cast<const JsxNamespacedName*>(node);
 			auto* c = f.arena().alloc<JsxNamespacedName>(*n);
-			c->Namespace = deepCloneNode(f, n->Namespace);
-			c->name = deepCloneNode(f, n->name);
+			c->Namespace = deepCloneNode(f, n->Namespace, syntheticLocation);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JsxOpeningElement:
 		{
 			auto* n = static_cast<const JsxOpeningElement*>(node);
 			auto* c = f.arena().alloc<JsxOpeningElement>(*n);
-			c->TagName = deepCloneNode(f, n->TagName);
-			c->TypeArguments = deepCloneNodeList(f, n->TypeArguments);
-			c->Attributes = deepCloneNode(f, n->Attributes);
+			c->TagName = deepCloneNode(f, n->TagName, syntheticLocation);
+			c->TypeArguments = deepCloneNodeList(f, n->TypeArguments, syntheticLocation);
+			c->Attributes = deepCloneNode(f, n->Attributes, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JsxOpeningFragment:
 		{
 			auto* n = static_cast<const JsxOpeningFragment*>(node);
 			auto* c = f.arena().alloc<JsxOpeningFragment>(*n);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JsxSelfClosingElement:
 		{
 			auto* n = static_cast<const JsxSelfClosingElement*>(node);
 			auto* c = f.arena().alloc<JsxSelfClosingElement>(*n);
-			c->TagName = deepCloneNode(f, n->TagName);
-			c->TypeArguments = deepCloneNodeList(f, n->TypeArguments);
-			c->Attributes = deepCloneNode(f, n->Attributes);
+			c->TagName = deepCloneNode(f, n->TagName, syntheticLocation);
+			c->TypeArguments = deepCloneNodeList(f, n->TypeArguments, syntheticLocation);
+			c->Attributes = deepCloneNode(f, n->Attributes, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JsxSpreadAttribute:
 		{
 			auto* n = static_cast<const JsxSpreadAttribute*>(node);
 			auto* c = f.arena().alloc<JsxSpreadAttribute>(*n);
-			c->Expression = deepCloneNode(f, n->Expression);
+			c->Expression = deepCloneNode(f, n->Expression, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::JsxText:
 		{
 			auto* n = static_cast<const JsxText*>(node);
 			auto* c = f.arena().alloc<JsxText>(*n);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::ThisKeyword:
@@ -6105,6 +6341,8 @@ inline Node* deepCloneNode(NodeFactory& f, const Node* node) {
 		{
 			auto* n = static_cast<const KeywordExpression*>(node);
 			auto* c = f.arena().alloc<KeywordExpression>(*n);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::AnyKeyword:
@@ -6121,359 +6359,447 @@ inline Node* deepCloneNode(NodeFactory& f, const Node* node) {
 		{
 			auto* n = static_cast<const KeywordTypeNode*>(node);
 			auto* c = f.arena().alloc<KeywordTypeNode>(*n);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::LabeledStatement:
 		{
 			auto* n = static_cast<const LabeledStatement*>(node);
 			auto* c = f.arena().alloc<LabeledStatement>(*n);
-			c->Label = deepCloneNode(f, n->Label);
-			c->Statement = deepCloneNode(f, n->Statement);
+			c->Label = deepCloneNode(f, n->Label, syntheticLocation);
+			c->Statement = deepCloneNode(f, n->Statement, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::LiteralType:
 		{
 			auto* n = static_cast<const LiteralTypeNode*>(node);
 			auto* c = f.arena().alloc<LiteralTypeNode>(*n);
-			c->Literal = deepCloneNode(f, n->Literal);
+			c->Literal = deepCloneNode(f, n->Literal, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::MappedType:
 		{
 			auto* n = static_cast<const MappedTypeNode*>(node);
 			auto* c = f.arena().alloc<MappedTypeNode>(*n);
-			c->ReadonlyToken = deepCloneNode(f, n->ReadonlyToken);
-			c->TypeParameter = deepCloneNode(f, n->TypeParameter);
-			c->NameType = deepCloneNode(f, n->NameType);
-			c->QuestionToken = deepCloneNode(f, n->QuestionToken);
-			c->Type = deepCloneNode(f, n->Type);
-			c->Members = deepCloneNodeList(f, n->Members);
+			c->ReadonlyToken = deepCloneNode(f, n->ReadonlyToken, syntheticLocation);
+			c->TypeParameter = deepCloneNode(f, n->TypeParameter, syntheticLocation);
+			c->NameType = deepCloneNode(f, n->NameType, syntheticLocation);
+			c->QuestionToken = deepCloneNode(f, n->QuestionToken, syntheticLocation);
+			c->Type = deepCloneNode(f, n->Type, syntheticLocation);
+			c->Members = deepCloneNodeList(f, n->Members, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::MetaProperty:
 		{
 			auto* n = static_cast<const MetaProperty*>(node);
 			auto* c = f.arena().alloc<MetaProperty>(*n);
-			c->name = deepCloneNode(f, n->name);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::MethodDeclaration:
 		{
 			auto* n = static_cast<const MethodDeclaration*>(node);
 			auto* c = f.arena().alloc<MethodDeclaration>(*n);
-			c->modifiers = deepCloneModifierList(f, n->modifiers);
-			c->AsteriskToken = deepCloneNode(f, n->AsteriskToken);
-			c->name = deepCloneNode(f, n->name);
-			c->PostfixToken = deepCloneNode(f, n->PostfixToken);
-			c->TypeParameters = deepCloneNodeList(f, n->TypeParameters);
-			c->Parameters = deepCloneNodeList(f, n->Parameters);
-			c->Type = deepCloneNode(f, n->Type);
-			c->FullSignature = deepCloneNode(f, n->FullSignature);
-			c->Body = deepCloneNode(f, n->Body);
+			c->modifiers = deepCloneModifierList(f, n->modifiers, syntheticLocation);
+			c->AsteriskToken = deepCloneNode(f, n->AsteriskToken, syntheticLocation);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			c->PostfixToken = deepCloneNode(f, n->PostfixToken, syntheticLocation);
+			c->TypeParameters = deepCloneNodeList(f, n->TypeParameters, syntheticLocation);
+			c->Parameters = deepCloneNodeList(f, n->Parameters, syntheticLocation);
+			c->Type = deepCloneNode(f, n->Type, syntheticLocation);
+			c->FullSignature = deepCloneNode(f, n->FullSignature, syntheticLocation);
+			c->Body = deepCloneNode(f, n->Body, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::MethodSignature:
 		{
 			auto* n = static_cast<const MethodSignatureDeclaration*>(node);
 			auto* c = f.arena().alloc<MethodSignatureDeclaration>(*n);
-			c->modifiers = deepCloneModifierList(f, n->modifiers);
-			c->name = deepCloneNode(f, n->name);
-			c->PostfixToken = deepCloneNode(f, n->PostfixToken);
-			c->TypeParameters = deepCloneNodeList(f, n->TypeParameters);
-			c->Parameters = deepCloneNodeList(f, n->Parameters);
-			c->Type = deepCloneNode(f, n->Type);
+			c->modifiers = deepCloneModifierList(f, n->modifiers, syntheticLocation);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			c->PostfixToken = deepCloneNode(f, n->PostfixToken, syntheticLocation);
+			c->TypeParameters = deepCloneNodeList(f, n->TypeParameters, syntheticLocation);
+			c->Parameters = deepCloneNodeList(f, n->Parameters, syntheticLocation);
+			c->Type = deepCloneNode(f, n->Type, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::MissingDeclaration:
 		{
 			auto* n = static_cast<const MissingDeclaration*>(node);
 			auto* c = f.arena().alloc<MissingDeclaration>(*n);
-			c->modifiers = deepCloneModifierList(f, n->modifiers);
+			c->modifiers = deepCloneModifierList(f, n->modifiers, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::ModuleBlock:
 		{
 			auto* n = static_cast<const ModuleBlock*>(node);
 			auto* c = f.arena().alloc<ModuleBlock>(*n);
-			c->Statements = deepCloneNodeList(f, n->Statements);
+			c->Statements = deepCloneNodeList(f, n->Statements, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::ModuleDeclaration:
 		{
 			auto* n = static_cast<const ModuleDeclaration*>(node);
 			auto* c = f.arena().alloc<ModuleDeclaration>(*n);
-			c->modifiers = deepCloneModifierList(f, n->modifiers);
-			c->name = deepCloneNode(f, n->name);
-			c->Attributes = deepCloneNode(f, n->Attributes);
-			c->Body = deepCloneNode(f, n->Body);
+			c->modifiers = deepCloneModifierList(f, n->modifiers, syntheticLocation);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			c->Attributes = deepCloneNode(f, n->Attributes, syntheticLocation);
+			c->Body = deepCloneNode(f, n->Body, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::NamedExports:
 		{
 			auto* n = static_cast<const NamedExports*>(node);
 			auto* c = f.arena().alloc<NamedExports>(*n);
-			c->Elements = deepCloneNodeList(f, n->Elements);
+			c->Elements = deepCloneNodeList(f, n->Elements, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::NamedImports:
 		{
 			auto* n = static_cast<const NamedImports*>(node);
 			auto* c = f.arena().alloc<NamedImports>(*n);
-			c->Elements = deepCloneNodeList(f, n->Elements);
+			c->Elements = deepCloneNodeList(f, n->Elements, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::NamedTupleMember:
 		{
 			auto* n = static_cast<const NamedTupleMember*>(node);
 			auto* c = f.arena().alloc<NamedTupleMember>(*n);
-			c->DotDotDotToken = deepCloneNode(f, n->DotDotDotToken);
-			c->name = deepCloneNode(f, n->name);
-			c->QuestionToken = deepCloneNode(f, n->QuestionToken);
-			c->Type = deepCloneNode(f, n->Type);
+			c->DotDotDotToken = deepCloneNode(f, n->DotDotDotToken, syntheticLocation);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			c->QuestionToken = deepCloneNode(f, n->QuestionToken, syntheticLocation);
+			c->Type = deepCloneNode(f, n->Type, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::NamespaceExport:
 		{
 			auto* n = static_cast<const NamespaceExport*>(node);
 			auto* c = f.arena().alloc<NamespaceExport>(*n);
-			c->name = deepCloneNode(f, n->name);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::NamespaceExportDeclaration:
 		{
 			auto* n = static_cast<const NamespaceExportDeclaration*>(node);
 			auto* c = f.arena().alloc<NamespaceExportDeclaration>(*n);
-			c->modifiers = deepCloneModifierList(f, n->modifiers);
-			c->name = deepCloneNode(f, n->name);
+			c->modifiers = deepCloneModifierList(f, n->modifiers, syntheticLocation);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::NamespaceImport:
 		{
 			auto* n = static_cast<const NamespaceImport*>(node);
 			auto* c = f.arena().alloc<NamespaceImport>(*n);
-			c->name = deepCloneNode(f, n->name);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::NewExpression:
 		{
 			auto* n = static_cast<const NewExpression*>(node);
 			auto* c = f.arena().alloc<NewExpression>(*n);
-			c->Expression = deepCloneNode(f, n->Expression);
-			c->TypeArguments = deepCloneNodeList(f, n->TypeArguments);
-			c->Arguments = deepCloneNodeList(f, n->Arguments);
+			c->Expression = deepCloneNode(f, n->Expression, syntheticLocation);
+			c->TypeArguments = deepCloneNodeList(f, n->TypeArguments, syntheticLocation);
+			c->Arguments = deepCloneNodeList(f, n->Arguments, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::NoSubstitutionTemplateLiteral:
 		{
 			auto* n = static_cast<const NoSubstitutionTemplateLiteral*>(node);
 			auto* c = f.arena().alloc<NoSubstitutionTemplateLiteral>(*n);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::NonNullExpression:
 		{
 			auto* n = static_cast<const NonNullExpression*>(node);
 			auto* c = f.arena().alloc<NonNullExpression>(*n);
-			c->Expression = deepCloneNode(f, n->Expression);
+			c->Expression = deepCloneNode(f, n->Expression, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::NotEmittedStatement:
 		{
 			auto* n = static_cast<const NotEmittedStatement*>(node);
 			auto* c = f.arena().alloc<NotEmittedStatement>(*n);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::NotEmittedTypeElement:
 		{
 			auto* n = static_cast<const NotEmittedTypeElement*>(node);
 			auto* c = f.arena().alloc<NotEmittedTypeElement>(*n);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::NumericLiteral:
 		{
 			auto* n = static_cast<const NumericLiteral*>(node);
 			auto* c = f.arena().alloc<NumericLiteral>(*n);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::ObjectLiteralExpression:
 		{
 			auto* n = static_cast<const ObjectLiteralExpression*>(node);
 			auto* c = f.arena().alloc<ObjectLiteralExpression>(*n);
-			c->Properties = deepCloneNodeList(f, n->Properties);
+			c->Properties = deepCloneNodeList(f, n->Properties, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::OmittedExpression:
 		{
 			auto* n = static_cast<const OmittedExpression*>(node);
 			auto* c = f.arena().alloc<OmittedExpression>(*n);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::OptionalType:
 		{
 			auto* n = static_cast<const OptionalTypeNode*>(node);
 			auto* c = f.arena().alloc<OptionalTypeNode>(*n);
-			c->Type = deepCloneNode(f, n->Type);
+			c->Type = deepCloneNode(f, n->Type, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::Parameter:
 		{
 			auto* n = static_cast<const ParameterDeclaration*>(node);
 			auto* c = f.arena().alloc<ParameterDeclaration>(*n);
-			c->modifiers = deepCloneModifierList(f, n->modifiers);
-			c->DotDotDotToken = deepCloneNode(f, n->DotDotDotToken);
-			c->name = deepCloneNode(f, n->name);
-			c->QuestionToken = deepCloneNode(f, n->QuestionToken);
-			c->Type = deepCloneNode(f, n->Type);
-			c->Initializer = deepCloneNode(f, n->Initializer);
+			c->modifiers = deepCloneModifierList(f, n->modifiers, syntheticLocation);
+			c->DotDotDotToken = deepCloneNode(f, n->DotDotDotToken, syntheticLocation);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			c->QuestionToken = deepCloneNode(f, n->QuestionToken, syntheticLocation);
+			c->Type = deepCloneNode(f, n->Type, syntheticLocation);
+			c->Initializer = deepCloneNode(f, n->Initializer, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::ParenthesizedExpression:
 		{
 			auto* n = static_cast<const ParenthesizedExpression*>(node);
 			auto* c = f.arena().alloc<ParenthesizedExpression>(*n);
-			c->Expression = deepCloneNode(f, n->Expression);
+			c->Expression = deepCloneNode(f, n->Expression, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::ParenthesizedType:
 		{
 			auto* n = static_cast<const ParenthesizedTypeNode*>(node);
 			auto* c = f.arena().alloc<ParenthesizedTypeNode>(*n);
-			c->Type = deepCloneNode(f, n->Type);
+			c->Type = deepCloneNode(f, n->Type, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::PartiallyEmittedExpression:
 		{
 			auto* n = static_cast<const PartiallyEmittedExpression*>(node);
 			auto* c = f.arena().alloc<PartiallyEmittedExpression>(*n);
-			c->Expression = deepCloneNode(f, n->Expression);
+			c->Expression = deepCloneNode(f, n->Expression, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::PostfixUnaryExpression:
 		{
 			auto* n = static_cast<const PostfixUnaryExpression*>(node);
 			auto* c = f.arena().alloc<PostfixUnaryExpression>(*n);
-			c->Operand = deepCloneNode(f, n->Operand);
+			c->Operand = deepCloneNode(f, n->Operand, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::PrefixUnaryExpression:
 		{
 			auto* n = static_cast<const PrefixUnaryExpression*>(node);
 			auto* c = f.arena().alloc<PrefixUnaryExpression>(*n);
-			c->Operand = deepCloneNode(f, n->Operand);
+			c->Operand = deepCloneNode(f, n->Operand, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::PrivateIdentifier:
 		{
 			auto* n = static_cast<const PrivateIdentifier*>(node);
 			auto* c = f.arena().alloc<PrivateIdentifier>(*n);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::PropertyAccessExpression:
 		{
 			auto* n = static_cast<const PropertyAccessExpression*>(node);
 			auto* c = f.arena().alloc<PropertyAccessExpression>(*n);
-			c->Expression = deepCloneNode(f, n->Expression);
-			c->QuestionDotToken = deepCloneNode(f, n->QuestionDotToken);
-			c->name = deepCloneNode(f, n->name);
+			c->Expression = deepCloneNode(f, n->Expression, syntheticLocation);
+			c->QuestionDotToken = deepCloneNode(f, n->QuestionDotToken, syntheticLocation);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::PropertyAssignment:
 		{
 			auto* n = static_cast<const PropertyAssignment*>(node);
 			auto* c = f.arena().alloc<PropertyAssignment>(*n);
-			c->modifiers = deepCloneModifierList(f, n->modifiers);
-			c->name = deepCloneNode(f, n->name);
-			c->PostfixToken = deepCloneNode(f, n->PostfixToken);
-			c->Type = deepCloneNode(f, n->Type);
-			c->Initializer = deepCloneNode(f, n->Initializer);
+			c->modifiers = deepCloneModifierList(f, n->modifiers, syntheticLocation);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			c->PostfixToken = deepCloneNode(f, n->PostfixToken, syntheticLocation);
+			c->Type = deepCloneNode(f, n->Type, syntheticLocation);
+			c->Initializer = deepCloneNode(f, n->Initializer, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::PropertyDeclaration:
 		{
 			auto* n = static_cast<const PropertyDeclaration*>(node);
 			auto* c = f.arena().alloc<PropertyDeclaration>(*n);
-			c->modifiers = deepCloneModifierList(f, n->modifiers);
-			c->name = deepCloneNode(f, n->name);
-			c->PostfixToken = deepCloneNode(f, n->PostfixToken);
-			c->Type = deepCloneNode(f, n->Type);
-			c->Initializer = deepCloneNode(f, n->Initializer);
+			c->modifiers = deepCloneModifierList(f, n->modifiers, syntheticLocation);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			c->PostfixToken = deepCloneNode(f, n->PostfixToken, syntheticLocation);
+			c->Type = deepCloneNode(f, n->Type, syntheticLocation);
+			c->Initializer = deepCloneNode(f, n->Initializer, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::PropertySignature:
 		{
 			auto* n = static_cast<const PropertySignatureDeclaration*>(node);
 			auto* c = f.arena().alloc<PropertySignatureDeclaration>(*n);
-			c->modifiers = deepCloneModifierList(f, n->modifiers);
-			c->name = deepCloneNode(f, n->name);
-			c->PostfixToken = deepCloneNode(f, n->PostfixToken);
-			c->Type = deepCloneNode(f, n->Type);
-			c->Initializer = deepCloneNode(f, n->Initializer);
+			c->modifiers = deepCloneModifierList(f, n->modifiers, syntheticLocation);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			c->PostfixToken = deepCloneNode(f, n->PostfixToken, syntheticLocation);
+			c->Type = deepCloneNode(f, n->Type, syntheticLocation);
+			c->Initializer = deepCloneNode(f, n->Initializer, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::QualifiedName:
 		{
 			auto* n = static_cast<const QualifiedName*>(node);
 			auto* c = f.arena().alloc<QualifiedName>(*n);
-			c->Left = deepCloneNode(f, n->Left);
-			c->Right = deepCloneNode(f, n->Right);
+			c->Left = deepCloneNode(f, n->Left, syntheticLocation);
+			c->Right = deepCloneNode(f, n->Right, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::RegularExpressionLiteral:
 		{
 			auto* n = static_cast<const RegularExpressionLiteral*>(node);
 			auto* c = f.arena().alloc<RegularExpressionLiteral>(*n);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::RestType:
 		{
 			auto* n = static_cast<const RestTypeNode*>(node);
 			auto* c = f.arena().alloc<RestTypeNode>(*n);
-			c->Type = deepCloneNode(f, n->Type);
+			c->Type = deepCloneNode(f, n->Type, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::ReturnStatement:
 		{
 			auto* n = static_cast<const ReturnStatement*>(node);
 			auto* c = f.arena().alloc<ReturnStatement>(*n);
-			c->Expression = deepCloneNode(f, n->Expression);
+			c->Expression = deepCloneNode(f, n->Expression, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::SatisfiesExpression:
 		{
 			auto* n = static_cast<const SatisfiesExpression*>(node);
 			auto* c = f.arena().alloc<SatisfiesExpression>(*n);
-			c->Expression = deepCloneNode(f, n->Expression);
-			c->Type = deepCloneNode(f, n->Type);
+			c->Expression = deepCloneNode(f, n->Expression, syntheticLocation);
+			c->Type = deepCloneNode(f, n->Type, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::SemicolonClassElement:
 		{
 			auto* n = static_cast<const SemicolonClassElement*>(node);
 			auto* c = f.arena().alloc<SemicolonClassElement>(*n);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::SetAccessor:
 		{
 			auto* n = static_cast<const SetAccessorDeclaration*>(node);
 			auto* c = f.arena().alloc<SetAccessorDeclaration>(*n);
-			c->modifiers = deepCloneModifierList(f, n->modifiers);
-			c->name = deepCloneNode(f, n->name);
-			c->TypeParameters = deepCloneNodeList(f, n->TypeParameters);
-			c->Parameters = deepCloneNodeList(f, n->Parameters);
-			c->Type = deepCloneNode(f, n->Type);
-			c->FullSignature = deepCloneNode(f, n->FullSignature);
-			c->Body = deepCloneNode(f, n->Body);
+			c->modifiers = deepCloneModifierList(f, n->modifiers, syntheticLocation);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			c->TypeParameters = deepCloneNodeList(f, n->TypeParameters, syntheticLocation);
+			c->Parameters = deepCloneNodeList(f, n->Parameters, syntheticLocation);
+			c->Type = deepCloneNode(f, n->Type, syntheticLocation);
+			c->FullSignature = deepCloneNode(f, n->FullSignature, syntheticLocation);
+			c->Body = deepCloneNode(f, n->Body, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::ShorthandPropertyAssignment:
 		{
 			auto* n = static_cast<const ShorthandPropertyAssignment*>(node);
 			auto* c = f.arena().alloc<ShorthandPropertyAssignment>(*n);
-			c->modifiers = deepCloneModifierList(f, n->modifiers);
-			c->name = deepCloneNode(f, n->name);
-			c->PostfixToken = deepCloneNode(f, n->PostfixToken);
-			c->Type = deepCloneNode(f, n->Type);
-			c->EqualsToken = deepCloneNode(f, n->EqualsToken);
-			c->ObjectAssignmentInitializer = deepCloneNode(f, n->ObjectAssignmentInitializer);
+			c->modifiers = deepCloneModifierList(f, n->modifiers, syntheticLocation);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			c->PostfixToken = deepCloneNode(f, n->PostfixToken, syntheticLocation);
+			c->Type = deepCloneNode(f, n->Type, syntheticLocation);
+			c->EqualsToken = deepCloneNode(f, n->EqualsToken, syntheticLocation);
+			c->ObjectAssignmentInitializer = deepCloneNode(f, n->ObjectAssignmentInitializer, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::SourceFile:
@@ -6484,122 +6810,156 @@ inline Node* deepCloneNode(NodeFactory& f, const Node* node) {
 		{
 			auto* n = static_cast<const SpreadAssignment*>(node);
 			auto* c = f.arena().alloc<SpreadAssignment>(*n);
-			c->Expression = deepCloneNode(f, n->Expression);
+			c->Expression = deepCloneNode(f, n->Expression, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::SpreadElement:
 		{
 			auto* n = static_cast<const SpreadElement*>(node);
 			auto* c = f.arena().alloc<SpreadElement>(*n);
-			c->Expression = deepCloneNode(f, n->Expression);
+			c->Expression = deepCloneNode(f, n->Expression, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::StringLiteral:
 		{
 			auto* n = static_cast<const StringLiteral*>(node);
 			auto* c = f.arena().alloc<StringLiteral>(*n);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::SwitchStatement:
 		{
 			auto* n = static_cast<const SwitchStatement*>(node);
 			auto* c = f.arena().alloc<SwitchStatement>(*n);
-			c->Expression = deepCloneNode(f, n->Expression);
-			c->CaseBlock = deepCloneNode(f, n->CaseBlock);
+			c->Expression = deepCloneNode(f, n->Expression, syntheticLocation);
+			c->CaseBlock = deepCloneNode(f, n->CaseBlock, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::SyntaxList:
 		{
 			auto* n = static_cast<const SyntaxList*>(node);
 			auto* c = f.arena().alloc<SyntaxList>(*n);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::SyntheticExpression:
 		{
 			auto* n = static_cast<const SyntheticExpression*>(node);
 			auto* c = f.arena().alloc<SyntheticExpression>(*n);
-			c->TupleNameSource = deepCloneNode(f, n->TupleNameSource);
+			c->TupleNameSource = deepCloneNode(f, n->TupleNameSource, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::SyntheticReferenceExpression:
 		{
 			auto* n = static_cast<const SyntheticReferenceExpression*>(node);
 			auto* c = f.arena().alloc<SyntheticReferenceExpression>(*n);
-			c->Expression = deepCloneNode(f, n->Expression);
-			c->ThisArg = deepCloneNode(f, n->ThisArg);
+			c->Expression = deepCloneNode(f, n->Expression, syntheticLocation);
+			c->ThisArg = deepCloneNode(f, n->ThisArg, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::TaggedTemplateExpression:
 		{
 			auto* n = static_cast<const TaggedTemplateExpression*>(node);
 			auto* c = f.arena().alloc<TaggedTemplateExpression>(*n);
-			c->Tag = deepCloneNode(f, n->Tag);
-			c->QuestionDotToken = deepCloneNode(f, n->QuestionDotToken);
-			c->TypeArguments = deepCloneNodeList(f, n->TypeArguments);
-			c->Template = deepCloneNode(f, n->Template);
+			c->Tag = deepCloneNode(f, n->Tag, syntheticLocation);
+			c->QuestionDotToken = deepCloneNode(f, n->QuestionDotToken, syntheticLocation);
+			c->TypeArguments = deepCloneNodeList(f, n->TypeArguments, syntheticLocation);
+			c->Template = deepCloneNode(f, n->Template, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::TemplateExpression:
 		{
 			auto* n = static_cast<const TemplateExpression*>(node);
 			auto* c = f.arena().alloc<TemplateExpression>(*n);
-			c->Head = deepCloneNode(f, n->Head);
-			c->TemplateSpans = deepCloneNodeList(f, n->TemplateSpans);
+			c->Head = deepCloneNode(f, n->Head, syntheticLocation);
+			c->TemplateSpans = deepCloneNodeList(f, n->TemplateSpans, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::TemplateHead:
 		{
 			auto* n = static_cast<const TemplateHead*>(node);
 			auto* c = f.arena().alloc<TemplateHead>(*n);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::TemplateLiteralType:
 		{
 			auto* n = static_cast<const TemplateLiteralTypeNode*>(node);
 			auto* c = f.arena().alloc<TemplateLiteralTypeNode>(*n);
-			c->Head = deepCloneNode(f, n->Head);
-			c->TemplateSpans = deepCloneNodeList(f, n->TemplateSpans);
+			c->Head = deepCloneNode(f, n->Head, syntheticLocation);
+			c->TemplateSpans = deepCloneNodeList(f, n->TemplateSpans, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::TemplateLiteralTypeSpan:
 		{
 			auto* n = static_cast<const TemplateLiteralTypeSpan*>(node);
 			auto* c = f.arena().alloc<TemplateLiteralTypeSpan>(*n);
-			c->Type = deepCloneNode(f, n->Type);
-			c->Literal = deepCloneNode(f, n->Literal);
+			c->Type = deepCloneNode(f, n->Type, syntheticLocation);
+			c->Literal = deepCloneNode(f, n->Literal, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::TemplateMiddle:
 		{
 			auto* n = static_cast<const TemplateMiddle*>(node);
 			auto* c = f.arena().alloc<TemplateMiddle>(*n);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::TemplateSpan:
 		{
 			auto* n = static_cast<const TemplateSpan*>(node);
 			auto* c = f.arena().alloc<TemplateSpan>(*n);
-			c->Expression = deepCloneNode(f, n->Expression);
-			c->Literal = deepCloneNode(f, n->Literal);
+			c->Expression = deepCloneNode(f, n->Expression, syntheticLocation);
+			c->Literal = deepCloneNode(f, n->Literal, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::TemplateTail:
 		{
 			auto* n = static_cast<const TemplateTail*>(node);
 			auto* c = f.arena().alloc<TemplateTail>(*n);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::ThisType:
 		{
 			auto* n = static_cast<const ThisTypeNode*>(node);
 			auto* c = f.arena().alloc<ThisTypeNode>(*n);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::ThrowStatement:
 		{
 			auto* n = static_cast<const ThrowStatement*>(node);
 			auto* c = f.arena().alloc<ThrowStatement>(*n);
-			c->Expression = deepCloneNode(f, n->Expression);
+			c->Expression = deepCloneNode(f, n->Expression, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::ExportKeyword:
@@ -6626,22 +6986,28 @@ inline Node* deepCloneNode(NodeFactory& f, const Node* node) {
 		{
 			auto* n = static_cast<const Token*>(node);
 			auto* c = f.arena().alloc<Token>(*n);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::TryStatement:
 		{
 			auto* n = static_cast<const TryStatement*>(node);
 			auto* c = f.arena().alloc<TryStatement>(*n);
-			c->TryBlock = deepCloneNode(f, n->TryBlock);
-			c->CatchClause = deepCloneNode(f, n->CatchClause);
-			c->FinallyBlock = deepCloneNode(f, n->FinallyBlock);
+			c->TryBlock = deepCloneNode(f, n->TryBlock, syntheticLocation);
+			c->CatchClause = deepCloneNode(f, n->CatchClause, syntheticLocation);
+			c->FinallyBlock = deepCloneNode(f, n->FinallyBlock, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::TupleType:
 		{
 			auto* n = static_cast<const TupleTypeNode*>(node);
 			auto* c = f.arena().alloc<TupleTypeNode>(*n);
-			c->Elements = deepCloneNodeList(f, n->Elements);
+			c->Elements = deepCloneNodeList(f, n->Elements, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::TypeAliasDeclaration:
@@ -6649,138 +7015,172 @@ inline Node* deepCloneNode(NodeFactory& f, const Node* node) {
 		{
 			auto* n = static_cast<const TypeAliasDeclaration*>(node);
 			auto* c = f.arena().alloc<TypeAliasDeclaration>(*n);
-			c->modifiers = deepCloneModifierList(f, n->modifiers);
-			c->name = deepCloneNode(f, n->name);
-			c->TypeParameters = deepCloneNodeList(f, n->TypeParameters);
-			c->Type = deepCloneNode(f, n->Type);
+			c->modifiers = deepCloneModifierList(f, n->modifiers, syntheticLocation);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			c->TypeParameters = deepCloneNodeList(f, n->TypeParameters, syntheticLocation);
+			c->Type = deepCloneNode(f, n->Type, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::TypeAssertionExpression:
 		{
 			auto* n = static_cast<const TypeAssertion*>(node);
 			auto* c = f.arena().alloc<TypeAssertion>(*n);
-			c->Type = deepCloneNode(f, n->Type);
-			c->Expression = deepCloneNode(f, n->Expression);
+			c->Type = deepCloneNode(f, n->Type, syntheticLocation);
+			c->Expression = deepCloneNode(f, n->Expression, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::TypeLiteral:
 		{
 			auto* n = static_cast<const TypeLiteralNode*>(node);
 			auto* c = f.arena().alloc<TypeLiteralNode>(*n);
-			c->Members = deepCloneNodeList(f, n->Members);
+			c->Members = deepCloneNodeList(f, n->Members, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::TypeOfExpression:
 		{
 			auto* n = static_cast<const TypeOfExpression*>(node);
 			auto* c = f.arena().alloc<TypeOfExpression>(*n);
-			c->Expression = deepCloneNode(f, n->Expression);
+			c->Expression = deepCloneNode(f, n->Expression, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::TypeOperator:
 		{
 			auto* n = static_cast<const TypeOperatorNode*>(node);
 			auto* c = f.arena().alloc<TypeOperatorNode>(*n);
-			c->Type = deepCloneNode(f, n->Type);
+			c->Type = deepCloneNode(f, n->Type, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::TypeParameter:
 		{
 			auto* n = static_cast<const TypeParameterDeclaration*>(node);
 			auto* c = f.arena().alloc<TypeParameterDeclaration>(*n);
-			c->modifiers = deepCloneModifierList(f, n->modifiers);
-			c->name = deepCloneNode(f, n->name);
-			c->Constraint = deepCloneNode(f, n->Constraint);
-			c->Expression = deepCloneNode(f, n->Expression);
-			c->DefaultType = deepCloneNode(f, n->DefaultType);
+			c->modifiers = deepCloneModifierList(f, n->modifiers, syntheticLocation);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			c->Constraint = deepCloneNode(f, n->Constraint, syntheticLocation);
+			c->Expression = deepCloneNode(f, n->Expression, syntheticLocation);
+			c->DefaultType = deepCloneNode(f, n->DefaultType, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::TypePredicate:
 		{
 			auto* n = static_cast<const TypePredicateNode*>(node);
 			auto* c = f.arena().alloc<TypePredicateNode>(*n);
-			c->AssertsModifier = deepCloneNode(f, n->AssertsModifier);
-			c->ParameterName = deepCloneNode(f, n->ParameterName);
-			c->Type = deepCloneNode(f, n->Type);
+			c->AssertsModifier = deepCloneNode(f, n->AssertsModifier, syntheticLocation);
+			c->ParameterName = deepCloneNode(f, n->ParameterName, syntheticLocation);
+			c->Type = deepCloneNode(f, n->Type, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::TypeQuery:
 		{
 			auto* n = static_cast<const TypeQueryNode*>(node);
 			auto* c = f.arena().alloc<TypeQueryNode>(*n);
-			c->ExprName = deepCloneNode(f, n->ExprName);
-			c->TypeArguments = deepCloneNodeList(f, n->TypeArguments);
+			c->ExprName = deepCloneNode(f, n->ExprName, syntheticLocation);
+			c->TypeArguments = deepCloneNodeList(f, n->TypeArguments, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::TypeReference:
 		{
 			auto* n = static_cast<const TypeReferenceNode*>(node);
 			auto* c = f.arena().alloc<TypeReferenceNode>(*n);
-			c->TypeName = deepCloneNode(f, n->TypeName);
-			c->TypeArguments = deepCloneNodeList(f, n->TypeArguments);
+			c->TypeName = deepCloneNode(f, n->TypeName, syntheticLocation);
+			c->TypeArguments = deepCloneNodeList(f, n->TypeArguments, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::UnionType:
 		{
 			auto* n = static_cast<const UnionTypeNode*>(node);
 			auto* c = f.arena().alloc<UnionTypeNode>(*n);
-			c->Types = deepCloneNodeList(f, n->Types);
+			c->Types = deepCloneNodeList(f, n->Types, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::VariableDeclaration:
 		{
 			auto* n = static_cast<const VariableDeclaration*>(node);
 			auto* c = f.arena().alloc<VariableDeclaration>(*n);
-			c->name = deepCloneNode(f, n->name);
-			c->ExclamationToken = deepCloneNode(f, n->ExclamationToken);
-			c->Type = deepCloneNode(f, n->Type);
-			c->Initializer = deepCloneNode(f, n->Initializer);
+			c->name = deepCloneNode(f, n->name, syntheticLocation);
+			c->ExclamationToken = deepCloneNode(f, n->ExclamationToken, syntheticLocation);
+			c->Type = deepCloneNode(f, n->Type, syntheticLocation);
+			c->Initializer = deepCloneNode(f, n->Initializer, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::VariableDeclarationList:
 		{
 			auto* n = static_cast<const VariableDeclarationList*>(node);
 			auto* c = f.arena().alloc<VariableDeclarationList>(*n);
-			c->Declarations = deepCloneNodeList(f, n->Declarations);
+			c->Declarations = deepCloneNodeList(f, n->Declarations, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::VariableStatement:
 		{
 			auto* n = static_cast<const VariableStatement*>(node);
 			auto* c = f.arena().alloc<VariableStatement>(*n);
-			c->modifiers = deepCloneModifierList(f, n->modifiers);
-			c->DeclarationList = deepCloneNode(f, n->DeclarationList);
+			c->modifiers = deepCloneModifierList(f, n->modifiers, syntheticLocation);
+			c->DeclarationList = deepCloneNode(f, n->DeclarationList, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::VoidExpression:
 		{
 			auto* n = static_cast<const VoidExpression*>(node);
 			auto* c = f.arena().alloc<VoidExpression>(*n);
-			c->Expression = deepCloneNode(f, n->Expression);
+			c->Expression = deepCloneNode(f, n->Expression, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::WhileStatement:
 		{
 			auto* n = static_cast<const WhileStatement*>(node);
 			auto* c = f.arena().alloc<WhileStatement>(*n);
-			c->Expression = deepCloneNode(f, n->Expression);
-			c->Statement = deepCloneNode(f, n->Statement);
+			c->Expression = deepCloneNode(f, n->Expression, syntheticLocation);
+			c->Statement = deepCloneNode(f, n->Statement, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::WithStatement:
 		{
 			auto* n = static_cast<const WithStatement*>(node);
 			auto* c = f.arena().alloc<WithStatement>(*n);
-			c->Expression = deepCloneNode(f, n->Expression);
-			c->Statement = deepCloneNode(f, n->Statement);
+			c->Expression = deepCloneNode(f, n->Expression, syntheticLocation);
+			c->Statement = deepCloneNode(f, n->Statement, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		case Kind::YieldExpression:
 		{
 			auto* n = static_cast<const YieldExpression*>(node);
 			auto* c = f.arena().alloc<YieldExpression>(*n);
-			c->AsteriskToken = deepCloneNode(f, n->AsteriskToken);
-			c->Expression = deepCloneNode(f, n->Expression);
+			c->AsteriskToken = deepCloneNode(f, n->AsteriskToken, syntheticLocation);
+			c->Expression = deepCloneNode(f, n->Expression, syntheticLocation);
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
 		}
 		default:
@@ -6788,7 +7188,10 @@ inline Node* deepCloneNode(NodeFactory& f, const Node* node) {
 			// no children and carry no extra fields).
 			if (node->kind <= KindLastToken) {
 				auto* n = static_cast<const Token*>(node);
-				return f.arena().alloc<Token>(*n);
+				auto* c = f.arena().alloc<Token>(*n);
+				if (syntheticLocation) c->loc = TextRange{-1, -1};
+				if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
+				return c;
 			}
 			return nullptr;
 	}
@@ -7693,13 +8096,6 @@ inline SubtreeFacts Node::propagateSubtreeFacts() const {
 
 // is* predicates (generated).
 
-inline bool isWriteOnlyAccess(const Node*) { return false; /* TODO: IsWriteOnlyAccess */ }
-inline bool isWriteAccess(const Node*) { return false; /* TODO: IsWriteAccess */ }
-inline bool isWriteAccessForReference(const Node*) { return false; /* TODO: IsWriteAccessForReference */ }
-inline bool isArrayLiteralOrObjectLiteralDestructuringPattern(const Node*) { return false; /* TODO: IsArrayLiteralOrObjectLiteralDestructuringPattern */ }
-// ast.go:1515 — IsDeclarationNode: node->declarationData().symbol != nullptr
-inline bool isDeclarationNode(Node* n) { return n->declarationData().symbol != nullptr; }
-inline bool isLocalsContainer(const Node*) { return false; /* TODO: IsLocalsContainer */ }
 inline bool isTypeOrJSTypeAliasDeclaration(const Node* n) { return n->kind == Kind::TypeAliasDeclaration || n->kind == Kind::JSTypeAliasDeclaration; }
 inline bool isImportDeclarationOrJSImportDeclaration(const Node* n) { return n->kind == Kind::ImportDeclaration || n->kind == Kind::JSImportDeclaration; }
 inline bool isAnyExportAssignment(const Node* n) { return n->kind == Kind::ExportAssignment; }
@@ -9270,6 +9666,326 @@ inline SubtreeFacts Node::subtreeFacts() const {
 		default:
 			return computeSubtreeFacts();
 	}
+}
+
+
+// ---------------------------------------------------------------------------
+// Hand-maintained ports of the non-trivial ast.go helpers (accessKind, the
+// write-access family, GetDeclarationFromName, and the data-presence
+// predicates). The generator only auto-ports pure kind-check predicates; these
+// are emitted verbatim by gencpp.py. Keep in sync with
+// tsc/internal/ast/ast.go.
+// ---------------------------------------------------------------------------
+
+// isAssignmentOperator is defined later in ast.h, after this header's
+// inclusion point; forward-declared so accessKind can call it.
+bool isAssignmentOperator(Kind kind);
+
+// AccessKind — ast.go:1494
+enum class AccessKind : int32_t {
+	AccessKindRead,      // Only reads from a variable
+	AccessKindWrite,     // Only writes to a variable without ever reading it
+	AccessKindReadWrite, // Reads from and writes to a variable
+};
+
+// reverseAccessKind — ast.go:1484
+inline AccessKind reverseAccessKind(AccessKind a) {
+	switch (a) {
+	case AccessKind::AccessKindRead:
+		return AccessKind::AccessKindWrite;
+	case AccessKind::AccessKindWrite:
+		return AccessKind::AccessKindRead;
+	case AccessKind::AccessKindReadWrite:
+		return AccessKind::AccessKindReadWrite;
+	}
+	TSC_UNREACHABLE("Unhandled case in reverseAccessKind");
+}
+
+// accessKind — ast.go:1424
+inline AccessKind accessKind(Node* node) {
+	Node* parent = node->parent;
+	if (parent == nullptr) {
+		return AccessKind::AccessKindRead;
+	}
+	switch (parent->kind) {
+	case Kind::ParenthesizedExpression:
+		return accessKind(parent);
+	case Kind::PrefixUnaryExpression: {
+		Kind op = parent->as<PrefixUnaryExpression>()->Operator;
+		if (op == Kind::PlusPlusToken || op == Kind::MinusMinusToken) {
+			return AccessKind::AccessKindReadWrite;
+		}
+		return AccessKind::AccessKindRead;
+	}
+	case Kind::PostfixUnaryExpression: {
+		Kind op = parent->as<PostfixUnaryExpression>()->Operator;
+		if (op == Kind::PlusPlusToken || op == Kind::MinusMinusToken) {
+			return AccessKind::AccessKindReadWrite;
+		}
+		return AccessKind::AccessKindRead;
+	}
+	case Kind::BinaryExpression:
+		if (parent->as<BinaryExpression>()->Left == node) {
+			Node* opTok = parent->as<BinaryExpression>()->OperatorToken;
+			if (isAssignmentOperator(opTok->kind)) {
+				if (opTok->kind == Kind::EqualsToken) {
+					return AccessKind::AccessKindWrite;
+				}
+				return AccessKind::AccessKindReadWrite;
+			}
+		}
+		return AccessKind::AccessKindRead;
+	case Kind::PropertyAccessExpression:
+		if (parent->name() != node) {
+			return AccessKind::AccessKindRead;
+		}
+		return accessKind(parent);
+	case Kind::PropertyAssignment: {
+		AccessKind parentAccess = accessKind(parent->parent);
+		// In `({ x: varname }) = { x: 1 }`, the left `x` is a read, the right
+		// `x` is a write.
+		if (node == parent->as<PropertyAssignment>()->name) {
+			return reverseAccessKind(parentAccess);
+		}
+		return parentAccess;
+	}
+	case Kind::ShorthandPropertyAssignment:
+		// Assume it's the local variable being accessed, since we don't check
+		// public properties for --noUnusedLocals.
+		if (node ==
+		    parent->as<ShorthandPropertyAssignment>()
+		        ->ObjectAssignmentInitializer) {
+			return AccessKind::AccessKindRead;
+		}
+		return accessKind(parent->parent);
+	case Kind::ArrayLiteralExpression:
+		return accessKind(parent);
+	case Kind::ForInStatement:
+	case Kind::ForOfStatement:
+		if (node == parent->as<ForInOrOfStatement>()->Initializer) {
+			return AccessKind::AccessKindWrite;
+		}
+		return AccessKind::AccessKindRead;
+	default:
+		return AccessKind::AccessKindRead;
+	}
+}
+
+// IsWriteOnlyAccess — ast.go:1268
+inline bool isWriteOnlyAccess(Node* node) {
+	return accessKind(node) == AccessKind::AccessKindWrite;
+}
+inline bool isWriteOnlyAccess(const Node* node) {
+	return isWriteOnlyAccess(const_cast<Node*>(node));
+}
+
+// IsWriteAccess — ast.go:1272
+inline bool isWriteAccess(Node* node) {
+	return accessKind(node) != AccessKind::AccessKindRead;
+}
+inline bool isWriteAccess(const Node* node) {
+	return isWriteAccess(const_cast<Node*>(node));
+}
+
+// IsArrayLiteralOrObjectLiteralDestructuringPattern — ast.go:1406
+inline bool isArrayLiteralOrObjectLiteralDestructuringPattern(Node* node) {
+	if (!(isArrayLiteralExpression(node) || isObjectLiteralExpression(node))) {
+		return false;
+	}
+	Node* parent = node->parent;
+	// [a,b,c] from:
+	// [a, b, c] = someExpression;
+	if (isBinaryExpression(parent) &&
+	    parent->as<BinaryExpression>()->Left == node &&
+	    parent->as<BinaryExpression>()->OperatorToken->kind ==
+	        Kind::EqualsToken) {
+		return true;
+	}
+	// [a, b, c] from:
+	// for([a, b, c] of expression)
+	if (isForOfStatement(parent) && parent->initializer() == node) {
+		return true;
+	}
+	// {x, a: {a, b, c} } = someExpression
+	if (isPropertyAssignment(parent)) {
+		return isArrayLiteralOrObjectLiteralDestructuringPattern(parent->parent);
+	}
+	// [a, b, c] of
+	// [x, [a, b, c] ] = someExpression
+	return isArrayLiteralOrObjectLiteralDestructuringPattern(parent);
+}
+inline bool isArrayLiteralOrObjectLiteralDestructuringPattern(
+    const Node* node) {
+	return isArrayLiteralOrObjectLiteralDestructuringPattern(
+	    const_cast<Node*>(node));
+}
+
+// GetDeclarationFromName — ast.go:1281
+inline Node* getDeclarationFromName(Node* name) {
+	if (name == nullptr || name->parent == nullptr) {
+		return nullptr;
+	}
+	Node* parent = name->parent;
+	switch (name->kind) {
+	case Kind::StringLiteral:
+	case Kind::NoSubstitutionTemplateLiteral:
+	case Kind::NumericLiteral:
+		if (isComputedPropertyName(parent)) {
+			return parent->parent;
+		}
+		[[fallthrough]];
+	case Kind::Identifier:
+		if (isDeclaration(parent)) {
+			if (parent->name() == name) {
+				return parent;
+			}
+			return nullptr;
+		}
+		if (isQualifiedName(parent)) {
+			Node* tag = parent->parent;
+			if (isJSDocParameterTag(tag) && tag->name() == parent) {
+				return tag;
+			}
+			return nullptr;
+		}
+		{
+			Node* binExp = parent->parent;
+			if (isBinaryExpression(binExp) &&
+			    getAssignmentDeclarationKind(binExp) != JSDeclarationKind::None) {
+				// (binExp.left as BindableStaticNameExpression).symbol ||
+				// binExp.symbol
+				bool leftHasSymbol =
+				    binExp->as<BinaryExpression>()->Left != nullptr &&
+				    binExp->as<BinaryExpression>()->Left->symbol() != nullptr;
+				if (leftHasSymbol || binExp->symbol() != nullptr) {
+					if (getNameOfDeclaration(binExp) == name) {
+						return binExp;
+					}
+				}
+			}
+		}
+		break;
+	case Kind::PrivateIdentifier:
+		if (isDeclaration(parent) && parent->name() == name) {
+			return parent;
+		}
+		break;
+	}
+	return nullptr;
+}
+
+// declarationIsWriteAccess — ast.go:1327
+inline bool declarationIsWriteAccess(Node* decl) {
+	if (decl == nullptr) {
+		return false;
+	}
+	// Consider anything in an ambient declaration to be a write access since it
+	// may be coming from JS.
+	if ((decl->flags & NodeFlagsAmbient) != 0) {
+		return true;
+	}
+
+	switch (decl->kind) {
+	case Kind::BinaryExpression:
+	case Kind::BindingElement:
+	case Kind::ClassDeclaration:
+	case Kind::ClassExpression:
+	case Kind::DefaultKeyword:
+	case Kind::EnumDeclaration:
+	case Kind::EnumMember:
+	case Kind::ExportSpecifier:
+	case Kind::ImportClause: // default import
+	case Kind::ImportEqualsDeclaration:
+	case Kind::ImportSpecifier:
+	case Kind::InterfaceDeclaration:
+	case Kind::JSDocCallbackTag:
+	case Kind::JSDocTypedefTag:
+	case Kind::JsxAttribute:
+	case Kind::ModuleDeclaration:
+	case Kind::NamespaceExportDeclaration:
+	case Kind::NamespaceImport:
+	case Kind::NamespaceExport:
+	case Kind::Parameter:
+	case Kind::ShorthandPropertyAssignment:
+	case Kind::TypeAliasDeclaration:
+	case Kind::JSTypeAliasDeclaration:
+	case Kind::TypeParameter:
+		return true;
+
+	case Kind::PropertyAssignment:
+		// In `({ x: y } = 0);`, `x` is not a write access.
+		return !isArrayLiteralOrObjectLiteralDestructuringPattern(decl->parent);
+
+	case Kind::FunctionDeclaration:
+	case Kind::FunctionExpression:
+	case Kind::Constructor:
+	case Kind::MethodDeclaration:
+	case Kind::GetAccessor:
+	case Kind::SetAccessor:
+		// functions considered write if they provide a value (have a body)
+		switch (decl->kind) {
+		case Kind::FunctionDeclaration:
+			return decl->as<FunctionDeclaration>()->Body != nullptr;
+		case Kind::FunctionExpression:
+			return decl->as<FunctionExpression>()->Body != nullptr;
+		case Kind::Constructor:
+			return decl->as<ConstructorDeclaration>()->Body != nullptr;
+		case Kind::MethodDeclaration:
+			return decl->as<MethodDeclaration>()->Body != nullptr;
+		case Kind::GetAccessor:
+			return decl->as<GetAccessorDeclaration>()->Body != nullptr;
+		case Kind::SetAccessor:
+			return decl->as<SetAccessorDeclaration>()->Body != nullptr;
+		}
+		return false;
+
+	case Kind::VariableDeclaration:
+	case Kind::PropertyDeclaration: {
+		// variable/property write if initializer present or is in catch clause
+		bool hasInit;
+		if (decl->kind == Kind::VariableDeclaration) {
+			hasInit = decl->as<VariableDeclaration>()->Initializer != nullptr;
+		} else {
+			hasInit = decl->as<PropertyDeclaration>()->Initializer != nullptr;
+		}
+		return hasInit || isCatchClause(decl->parent);
+	}
+
+	case Kind::MethodSignature:
+	case Kind::PropertySignature:
+	case Kind::JSDocPropertyTag:
+	case Kind::JSDocParameterTag:
+		return false;
+
+	default:
+		TSC_UNREACHABLE("Unhandled case in declarationIsWriteAccess");
+	}
+}
+
+// IsWriteAccessForReference — ast.go:1276
+inline bool isWriteAccessForReference(Node* node) {
+	Node* decl = getDeclarationFromName(node);
+	return (decl != nullptr && declarationIsWriteAccess(decl)) ||
+	       node->kind == Kind::DefaultKeyword || isWriteAccess(node);
+}
+inline bool isWriteAccessForReference(const Node* node) {
+	return isWriteAccessForReference(const_cast<Node*>(node));
+}
+
+// IsDeclarationNode — ast.go:1505 (node.DeclarationData() != nil)
+inline bool isDeclarationNode(const Node* node) {
+	return const_cast<Node*>(node)->declarationData().symbol != nullptr;
+}
+inline bool isDeclarationNode(Node* node) {
+	return node->declarationData().symbol != nullptr;
+}
+
+// IsLocalsContainer — ast.go:1532 (node.LocalsContainerData() != nil)
+inline bool isLocalsContainer(const Node* node) {
+	return const_cast<Node*>(node)->localsContainerData().locals != nullptr;
+}
+inline bool isLocalsContainer(Node* node) {
+	return node->localsContainerData().locals != nullptr;
 }
 
 

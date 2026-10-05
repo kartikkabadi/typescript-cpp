@@ -1800,7 +1800,9 @@ Type* Checker::checkPropertyAccessExpressionOrQualifiedName(
 			}
 			if (!right->text().empty() &&
 			    !checkAndReportErrorForExtendingInterface(node)) {
-				addDeferredDiagnostic([&, this]() {
+				// Go captures the locals by value; [&] would dangle once
+				// this frame returns before the deferred diagnostic runs.
+				addDeferredDiagnostic([right, leftType, apparentType, isUncheckedJS, this]() {
 					// must be deferred because reporting this error can cause us to materialize the containing type completely (to print it), leading to erroneous circularity errors
 					reportNonexistentProperty(
 					    right,

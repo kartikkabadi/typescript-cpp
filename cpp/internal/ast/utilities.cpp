@@ -967,6 +967,35 @@ bool isImplicitlyExportedJSDocDeclaration(Node* node) {
 	       (node->flags & NodeFlagsReparsed) != 0;
 }
 
+// utilities.go:2158 — EntityNameToString
+std::string EntityNameToString(
+	Node* name, const std::function<std::string(const Node*)>& getTextOfNode) {
+	switch (name->kind) {
+	case Kind::ThisKeyword:
+		return "this";
+	case Kind::Identifier:
+	case Kind::PrivateIdentifier:
+		if (nodeIsSynthesized(name) || getTextOfNode == nullptr) {
+			return name->text();
+		}
+		return getTextOfNode(name);
+	case Kind::QualifiedName:
+		return EntityNameToString(name->as<QualifiedName>()->Left, getTextOfNode) +
+			"." +
+			EntityNameToString(name->as<QualifiedName>()->Right, getTextOfNode);
+	case Kind::PropertyAccessExpression:
+		return EntityNameToString(name->expression(), getTextOfNode) + "." +
+			EntityNameToString(name->as<PropertyAccessExpression>()->name,
+							   getTextOfNode);
+	case Kind::JsxNamespacedName:
+		return EntityNameToString(name->as<JsxNamespacedName>()->Namespace,
+								  getTextOfNode) +
+			":" +
+			EntityNameToString(name->as<JsxNamespacedName>()->name, getTextOfNode);
+	}
+	TSC_UNREACHABLE("Unhandled case in EntityNameToString");
+}
+
 } // namespace tsc
 
 namespace tsc {

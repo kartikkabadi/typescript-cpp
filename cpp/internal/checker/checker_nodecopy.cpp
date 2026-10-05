@@ -542,37 +542,56 @@ Node* NodeBuilderImpl::getEnclosingDeclarationIgnoringFakeScope() {
 // inlining hasn't been reliable
 NodeVisitor* getExistingNodeTreeVisitor(NodeBuilderImpl* b,
                                       recoveryBoundary* bound) {
-	NodeVisitor* visitor = nullptr;
+		// Go closures keep their captured variables alive on the heap; [&]
+	// lambdas stored in the returned visitor would dangle once this function
+	// returns. Heap-allocate the shared capture environment instead.
+	struct ExistingEnv {
+		NodeBuilderImpl* b;
+		recoveryBoundary* bound;
+		NodeVisitor* visitor = nullptr;
+		bool nonLocalNode = true;
+		std::function<Node*(Node*, Node*, Symbol*)>
+		    attachSymbolToLeftmostIdentifier;
+		std::function<std::tuple<bool, Node*, Symbol*>(Node*, Node*)>
+		    trackExistingEntityName;
+		std::function<Node*(Node*)> tryVisitSimpleTypeNode;
+		std::function<Node*(Node*)> tryVisitIndexedAccess;
+		std::function<Node*(Node*)> tryVisitKeyOf;
+		std::function<Node*(Node*)> tryVisitTypeQuery;
+		std::function<Node*(Node*)> tryVisitTypeReference;
+		std::function<Node*(Node*)> visitExistingNodeTreeSymbolsWorker;
+	};
+	auto* env = new ExistingEnv{b, bound};
 	// note: also handles renaming type parameters renamed within the current context
-	auto attachSymbolToLeftmostIdentifier =
-		[&](Node* leftmost, Node* node, Symbol* sym) -> Node* {
+	env->attachSymbolToLeftmostIdentifier =
+		[env](Node* leftmost, Node* node, Symbol* sym) -> Node* {
 		NodeVisitor* vis = nullptr;
-		std::function<Node*(Node*)> visitorFunc = [&](Node* node) -> Node* {
+		std::function<Node*(Node*)> visitorFunc = [&, env](Node* node) -> Node* {
 			if (node == leftmost) {
 				Type* type_ = nullptr;
 				Node* name = nullptr;
 				if (sym != nullptr) {
-					type_ = b->ch->getDeclaredTypeOfSymbol(sym);
+					type_ = env->b->ch->getDeclaredTypeOfSymbol(sym);
 					if (sym->flags & SymbolFlagsTypeParameter) {
-						name = b->typeParameterToName(type_)->asNode();
+						name = env->b->typeParameterToName(type_)->asNode();
 					}
 				}
 				if (name == nullptr) {
-					name = b->newIdentifier(node->text(), sym);
+					name = env->b->newIdentifier(node->text(), sym);
 				}
-				name = b->setTextRange(name, node);
-				b->e->addEmitFlags(name, printer::EFNoAsciiEscaping);
+				name = env->b->setTextRange(name, node);
+				env->b->e->addEmitFlags(name, printer::EFNoAsciiEscaping);
 				return name;
 			}
-			return b->setTextRange(node->visitEachChild(*vis), node);
+			return env->b->setTextRange(node->visitEachChild(*vis), node);
 		};
-		vis = newNodeVisitor(visitorFunc, b->f, NodeVisitorHooks{});
+		vis = newNodeVisitor(visitorFunc, env->b->f, NodeVisitorHooks{});
 		return visitorFunc(node);
 	};
-	auto trackExistingEntityName =
-		[&](Node* node, Node* overrideEnclosing)
+	env->trackExistingEntityName =
+		[env](Node* node, Node* overrideEnclosing)
 		-> std::tuple<bool, Node*, Symbol*> {
-		Node* enclosingDeclaration = b->ctx->enclosingDeclaration;
+		Node* enclosingDeclaration = env->b->ctx->enclosingDeclaration;
 		if (overrideEnclosing != nullptr) {
 			enclosingDeclaration = overrideEnclosing;
 		}
@@ -587,52 +606,52 @@ NodeVisitor* getExistingNodeTreeVisitor(NodeBuilderImpl* b,
 				  leftmost->parent->as<QualifiedName>()->Right)))) {
 			introducesError = true;
 			return {introducesError,
-			        b->setTextRange(deepCloneNode(*b->f, node), node), nullptr};
+			        env->b->setTextRange(deepCloneNode(*env->b->f, node), node), nullptr};
 		}
 		SymbolFlags meaning = getMeaningOfEntityNameReference(node);
 		Symbol* sym = nullptr;
 		if (isThisIdentifier(leftmost)) {
 			// `this` isn't a bindable identifier - skip resolution, find a relevant `this` symbol directly and avoid exhaustive scope traversal
-			sym = b->ch->getSymbolOfDeclaration(
-				b->ch->getThisContainer(leftmost, false, false));
-			if (b->ch->IsSymbolAccessible(sym, leftmost, meaning, false)
+			sym = env->b->ch->getSymbolOfDeclaration(
+				env->b->ch->getThisContainer(leftmost, false, false));
+			if (env->b->ch->IsSymbolAccessible(sym, leftmost, meaning, false)
 					.Accessibility != printer::SymbolAccessibility::Accessible) {
 				introducesError = true;
-				b->ctx->tracker->ReportInaccessibleThisError();
+				env->b->ctx->tracker->ReportInaccessibleThisError();
 			}
 			return {introducesError,
-			        attachSymbolToLeftmostIdentifier(leftmost, node, sym),
+			        env->attachSymbolToLeftmostIdentifier(leftmost, node, sym),
 			        nullptr};
 		}
-		sym = b->ch->resolveEntityName(leftmost, meaning, true, true, nullptr);
-		if (b->ctx->enclosingDeclaration != nullptr &&
+		sym = env->b->ch->resolveEntityName(leftmost, meaning, true, true, nullptr);
+		if (env->b->ctx->enclosingDeclaration != nullptr &&
 			!(sym != nullptr && (sym->flags & SymbolFlagsTypeParameter) != 0)) {
-			sym = b->ch->getExportSymbolOfValueSymbolIfExported(sym);
+			sym = env->b->ch->getExportSymbolOfValueSymbolIfExported(sym);
 			// Some declarations may be transplanted to a new location.
 			// When this happens we need to make sure that the name has the same meaning at both locations
 			// We also check for the unknownSymbol because when we create a fake scope some parameters may actually not be usable
 			// either because they are the expanded rest parameter,
 			// or because they are the newly added parameters from the tuple, which might have different meanings in the original context
-			Symbol* symAtLocation = b->ch->resolveEntityName(
-				leftmost, meaning, true, true, b->ctx->enclosingDeclaration);
+			Symbol* symAtLocation = env->b->ch->resolveEntityName(
+				leftmost, meaning, true, true, env->b->ctx->enclosingDeclaration);
 			if (
 				// Check for unusable parameters symbols
-				symAtLocation == b->ch->unknownSymbol ||
+				symAtLocation == env->b->ch->unknownSymbol ||
 				// If the symbol is not found, but was not found in the original scope either we probably have an error, don't reuse the node
 				(symAtLocation == nullptr && sym != nullptr) ||
 				// If the symbol is found both in declaration scope and in current scope then it should point to the same reference
 				(symAtLocation != nullptr && sym != nullptr &&
-				 b->ch->getSymbolIfSameReference(
-					 b->ch->getExportSymbolOfValueSymbolIfExported(
+				 env->b->ch->getSymbolIfSameReference(
+					 env->b->ch->getExportSymbolOfValueSymbolIfExported(
 						 symAtLocation),
 					 sym) == nullptr)) {
 				// In isolated declaration we will not do rest parameter expansion so there is no need to report on these.
-				if (symAtLocation != b->ch->unknownSymbol) {
-					b->ctx->tracker->ReportInferenceFallback(node);
+				if (symAtLocation != env->b->ch->unknownSymbol) {
+					env->b->ctx->tracker->ReportInferenceFallback(node);
 				}
 				introducesError = true;
 				return {introducesError,
-				        b->setTextRange(deepCloneNode(*b->f, node), node), sym};
+				        env->b->setTextRange(deepCloneNode(*env->b->f, node), node), sym};
 			} else {
 				sym = symAtLocation;
 			}
@@ -645,7 +664,7 @@ NodeVisitor* getExistingNodeTreeVisitor(NodeBuilderImpl* b,
 				if (isPartOfParameterDeclaration(sym->valueDeclaration) ||
 					isJSDocParameterTag(sym->valueDeclaration)) {
 					return {introducesError,
-					        attachSymbolToLeftmostIdentifier(leftmost, node,
+					        env->attachSymbolToLeftmostIdentifier(leftmost, node,
 					                                         sym),
 					        nullptr};
 				}
@@ -653,133 +672,132 @@ NodeVisitor* getExistingNodeTreeVisitor(NodeBuilderImpl* b,
 			if ((sym->flags & SymbolFlagsTypeParameter) ==
 					0 /* Type parameters are visible in the current context if they are are resolvable */ &&
 				!isDeclarationName(node) &&
-				b->ch->IsSymbolAccessible(sym, enclosingDeclaration, meaning,
+				env->b->ch->IsSymbolAccessible(sym, enclosingDeclaration, meaning,
 				                          false)
 						.Accessibility !=
 					printer::SymbolAccessibility::Accessible) {
-				b->ctx->tracker->ReportInferenceFallback(node);
+				env->b->ctx->tracker->ReportInferenceFallback(node);
 				introducesError = true;
 			} else {
-				b->ctx->tracker->TrackSymbol(sym, enclosingDeclaration,
+				env->b->ctx->tracker->TrackSymbol(sym, enclosingDeclaration,
 				                             meaning);
 			}
 			return {introducesError,
-			        attachSymbolToLeftmostIdentifier(leftmost, node, sym),
+			        env->attachSymbolToLeftmostIdentifier(leftmost, node, sym),
 			        nullptr};
 		}
 		return {introducesError,
-		        b->setTextRange(deepCloneNode(*b->f, node), node), nullptr};
+		        env->b->setTextRange(deepCloneNode(*env->b->f, node), node), nullptr};
 	};
-	std::function<Node*(Node*)> tryVisitSimpleTypeNode;
-	auto tryVisitIndexedAccess = [&](Node* node) -> Node* {
-		Node* resultObjectType = tryVisitSimpleTypeNode(
+	env->tryVisitIndexedAccess = [env](Node* node) -> Node* {
+		Node* resultObjectType = env->tryVisitSimpleTypeNode(
 			node->as<IndexedAccessTypeNode>()->ObjectType);
 		if (resultObjectType == nullptr) {
 			return nullptr;
 		}
-		return b->setTextRange(
-			b->f->updateIndexedAccessTypeNode(
+		return env->b->setTextRange(
+			env->b->f->updateIndexedAccessTypeNode(
 				node->as<IndexedAccessTypeNode>(), resultObjectType,
-				visitor->visitNode(
+				env->visitor->visitNode(
 					node->as<IndexedAccessTypeNode>()->IndexType)),
 			node);
 	};
-	auto tryVisitKeyOf = [&](Node* node) -> Node* {
+	env->tryVisitKeyOf = [env](Node* node) -> Node* {
 		TypeOperatorNode* to = node->as<TypeOperatorNode>();
-		Node* t = tryVisitSimpleTypeNode(to->Type);
+		Node* t = env->tryVisitSimpleTypeNode(to->Type);
 		if (t == nullptr) {
 			return nullptr;
 		}
-		return b->setTextRange(
-			b->f->updateTypeOperatorNode(to, to->Operator, t), node);
+		return env->b->setTextRange(
+			env->b->f->updateTypeOperatorNode(to, to->Operator, t), node);
 	};
-	auto tryVisitTypeQuery = [&](Node* node) -> Node* {
+	env->tryVisitTypeQuery = [env](Node* node) -> Node* {
 		auto [introducesError, exprName, _1] =
-			trackExistingEntityName(node->as<TypeQueryNode>()->ExprName,
+			env->trackExistingEntityName(node->as<TypeQueryNode>()->ExprName,
 			                        nullptr);
 		if (!introducesError) {
-			return b->setTextRange(
-				b->f->updateTypeQueryNode(
+			return env->b->setTextRange(
+				env->b->f->updateTypeQueryNode(
 					node->as<TypeQueryNode>(), exprName,
-					visitor->visitNodes(
+					env->visitor->visitNodes(
 						node->as<TypeQueryNode>()->TypeArguments)),
 				node);
 		}
 
-		Node* serializedName = b->serializeTypeName(
+		Node* serializedName = env->b->serializeTypeName(
 			node->as<TypeQueryNode>()->ExprName, true,
-			visitor->visitNodes(node->as<TypeQueryNode>()->TypeArguments));
+			env->visitor->visitNodes(node->as<TypeQueryNode>()->TypeArguments));
 		if (serializedName != nullptr) {
-			return b->setTextRange(serializedName,
+			return env->b->setTextRange(serializedName,
 			                       node->as<TypeQueryNode>()->ExprName);
 		}
 		return nullptr;
 	};
-	auto tryVisitTypeReference = [&](Node* node) -> Node* {
+	env->tryVisitTypeReference = [env](Node* node) -> Node* {
 		if (isConstTypeReference(node)) {
 			return nullptr;
 		}
-		Symbol* s = b->tryGetResolvedSymbolFromTypeNode(node);
+		Symbol* s = env->b->tryGetResolvedSymbolFromTypeNode(node);
 		if (s == nullptr) {
 			return nullptr; // ???
 		}
 		if ((s->flags & SymbolFlagsTypeParameter) != 0) {
-			Type* declaredType = b->ch->getDeclaredTypeOfSymbol(s);
-			if (b->ctx->mapper != nullptr &&
-				getMappedType(declaredType, b->ctx->mapper) != declaredType) {
+			Type* declaredType = env->b->ch->getDeclaredTypeOfSymbol(s);
+			if (env->b->ctx->mapper != nullptr &&
+				getMappedType(declaredType, env->b->ctx->mapper) != declaredType) {
 				return nullptr; // refers to type parameter remapped by context (TODO improvement: just return the remapped param name?)
 			}
 		}
-		if (!b->canReuseExistingJSTypeNode(
-				node, b->getTypeFromTypeNode(node, false))) {
+		if (!env->b->canReuseExistingJSTypeNode(
+				node, env->b->getTypeFromTypeNode(node, false))) {
 			// fallback to serialization for jsdoc types that have insufficient or incomplete type args, or are remapped by the checker in only jsdoc contexts
 			// TODO: remappings like `promise` -> `Promise<any>` are static, we *could* statically remap the nodes, too. But that only matters for `isolatedDeclarations`
 			// in JS, should we enable that.
 			return nullptr;
 		}
-		auto [introducesError, newName, _2] = trackExistingEntityName(
+		auto [introducesError, newName, _2] = env->trackExistingEntityName(
 			node->as<TypeReferenceNode>()->TypeName, nullptr);
 		if (!introducesError) {
-			NodeList* typeArguments = visitor->visitNodes(
+			NodeList* typeArguments = env->visitor->visitNodes(
 				node->as<TypeReferenceNode>()->TypeArguments);
-			return b->setTextRange(
-				b->f->updateTypeReferenceNode(node->as<TypeReferenceNode>(),
+			return env->b->setTextRange(
+				env->b->f->updateTypeReferenceNode(node->as<TypeReferenceNode>(),
 			                                  newName, typeArguments),
 				node);
 		} else {
-			Node* serializedName = b->serializeTypeName(
+			Node* serializedName = env->b->serializeTypeName(
 				node->as<TypeReferenceNode>()->TypeName, false,
-				visitor->visitNodes(
+				env->visitor->visitNodes(
 					node->as<TypeReferenceNode>()->TypeArguments));
 			if (serializedName != nullptr) {
-				return b->setTextRange(
+				return env->b->setTextRange(
 					serializedName, node->as<TypeReferenceNode>()->TypeName);
 			}
 			return nullptr;
 		}
 	};
-	tryVisitSimpleTypeNode = [&](Node* node) -> Node* {
+	env->tryVisitSimpleTypeNode = [env](Node* node) -> Node* {
 		Node* innerNode = skipParentheses(node);
 		switch (innerNode->kind) {
 		case Kind::TypeReference:
-			return tryVisitTypeReference(innerNode);
+			return env->tryVisitTypeReference(innerNode);
 		case Kind::TypeQuery:
-			return tryVisitTypeQuery(innerNode);
+			return env->tryVisitTypeQuery(innerNode);
 		case Kind::IndexedAccessType:
-			return tryVisitIndexedAccess(innerNode);
+			return env->tryVisitIndexedAccess(innerNode);
 		case Kind::TypeOperator:
 			if (innerNode->as<TypeOperatorNode>()->Operator ==
 				Kind::KeyOfKeyword) {
-				return tryVisitKeyOf(innerNode);
+				return env->tryVisitKeyOf(innerNode);
 			}
 			break;
 		default:
 			break;
 		}
-		return visitor->visitNode(node);
+		return env->visitor->visitNode(node);
 	};
-	auto visitExistingNodeTreeSymbolsWorker = [&](Node* node) -> Node* {
-		NodeFactory* factory = b->f;
+	env->visitExistingNodeTreeSymbolsWorker = [env](Node* node) -> Node* {
+		NodeFactory* factory = env->b->f;
 		// !!! TODO: the reparser *should* make all the jsdoc remapping logic here redundant,
 		// assuming we only ever try to preserve reparsed nodes and never walk back to the jsdoc "originals"
 		// accidentally.
@@ -787,7 +805,7 @@ NodeVisitor* getExistingNodeTreeVisitor(NodeBuilderImpl* b,
 		// Begin JSDoc handling
 		if (node->kind == Kind::JSDocTypeExpression) {
 			// Unwrap JSDocTypeExpressions
-			return visitor->visitNode(node->as<JSDocTypeExpression>()->Type);
+			return env->visitor->visitNode(node->as<JSDocTypeExpression>()->Type);
 		}
 		// !!! TODO: We don't _actually_ support jsdoc namepath types, emit `any` instead; verify we handle as gracefully as strada
 		if (node->kind == Kind::JSDocAllType /* || node.Kind == ast.JSDocNamepathType */) {
@@ -799,7 +817,7 @@ NodeVisitor* getExistingNodeTreeVisitor(NodeBuilderImpl* b,
 		// }
 		if (node->kind == Kind::JSDocNullableType) {
 			std::vector<Node*> unionMembers{
-				visitor->visitNode(node->as<JSDocNullableType>()->Type),
+				env->visitor->visitNode(node->as<JSDocNullableType>()->Type),
 				factory->newLiteralTypeNode(
 					factory->newKeywordExpression(Kind::NullKeyword)),
 			};
@@ -808,7 +826,7 @@ NodeVisitor* getExistingNodeTreeVisitor(NodeBuilderImpl* b,
 		}
 		if (node->kind == Kind::JSDocOptionalType) {
 			std::vector<Node*> unionMembers{
-				visitor->visitNode(node->as<JSDocOptionalType>()->Type),
+				env->visitor->visitNode(node->as<JSDocOptionalType>()->Type),
 				factory->newKeywordTypeNode(Kind::UndefinedKeyword),
 			};
 			return factory->newUnionTypeNode(
@@ -816,12 +834,12 @@ NodeVisitor* getExistingNodeTreeVisitor(NodeBuilderImpl* b,
 		}
 		if (node->kind == Kind::JSDocNonNullableType) {
 			// Unwrap
-			return visitor->visitNode(node->as<JSDocNonNullableType>()->Type);
+			return env->visitor->visitNode(node->as<JSDocNonNullableType>()->Type);
 		}
 		if (node->kind ==
 			Kind::JSDocVariadicType) { // !!! TODO: verify this matches how jsdoc variadics are actually handled now?
 			return factory->newArrayTypeNode(
-				visitor->visitNode(node->as<JSDocVariadicType>()->Type));
+				env->visitor->visitNode(node->as<JSDocVariadicType>()->Type));
 		}
 		if (node->kind == Kind::JSDocTypeLiteral) {
 			std::vector<Node*> members;
@@ -838,7 +856,7 @@ NodeVisitor* getExistingNodeTreeVisitor(NodeBuilderImpl* b,
 					targetName = n->as<QualifiedName>()
 									 ->Right; // !!! TODO: without typesystem backup, doing this cast unguarded seems really suspect, even though it is what strada does
 				}
-				Node* name = visitor->visitNode(targetName);
+				Node* name = env->visitor->visitNode(targetName);
 				bool shouldBeOptional =
 					t->as<JSDocParameterOrPropertyTag>()->IsBracketed ||
 					(t->typeExpression() != nullptr &&
@@ -847,7 +865,7 @@ NodeVisitor* getExistingNodeTreeVisitor(NodeBuilderImpl* b,
 				if (shouldBeOptional) {
 					question = factory->newToken(Kind::QuestionToken);
 				}
-				Node* ty = visitor->visitNode(
+				Node* ty = env->visitor->visitNode(
 					t->typeExpression()); // !!! TODO: alternate lookup locations for the type? serialize on demand if it doesn't serialze? strada does something funky here.
 
 				members.push_back(factory->newPropertySignatureDeclaration(
@@ -874,7 +892,7 @@ NodeVisitor* getExistingNodeTreeVisitor(NodeBuilderImpl* b,
 			node->as<TypeReferenceNode>()->TypeName->as<Identifier>()->Text ==
 				"") {
 			Node* replacement = factory->newKeywordTypeNode(Kind::AnyKeyword);
-			b->e->setOriginal(replacement, node);
+			env->b->e->setOriginal(replacement, node);
 			return replacement;
 		}
 		if (isThisTypeNode(node)) {
@@ -887,36 +905,36 @@ NodeVisitor* getExistingNodeTreeVisitor(NodeBuilderImpl* b,
 		}
 		if (isTypeParameterDeclaration(node)) {
 			auto [_3, newName, _4] =
-				trackExistingEntityName(node->name(), nullptr);
+				env->trackExistingEntityName(node->name(), nullptr);
 			return factory->updateTypeParameterDeclaration(
 				node->as<TypeParameterDeclaration>(),
-				visitor->visitModifiers(node->modifiers()), newName,
-				visitor->visitNode(node->as<TypeParameterDeclaration>()->Constraint),
-				visitor->visitNode(node->as<TypeParameterDeclaration>()->Expression),
-				visitor->visitNode(node->as<TypeParameterDeclaration>()->DefaultType));
+				env->visitor->visitModifiers(node->modifiers()), newName,
+				env->visitor->visitNode(node->as<TypeParameterDeclaration>()->Constraint),
+				env->visitor->visitNode(node->as<TypeParameterDeclaration>()->Expression),
+				env->visitor->visitNode(node->as<TypeParameterDeclaration>()->DefaultType));
 		}
 		if (isIndexedAccessTypeNode(node)) {
-			Node* result = tryVisitIndexedAccess(node);
+			Node* result = env->tryVisitIndexedAccess(node);
 			if (result != nullptr) {
 				return result;
 			}
-			bound->markError(nullptr);
+			env->bound->markError(nullptr);
 			return node;
 		}
 		if (isTypeReferenceNode(node)) {
-			Node* result = tryVisitTypeReference(node);
+			Node* result = env->tryVisitTypeReference(node);
 			if (result != nullptr) {
 				return result;
 			}
-			bound->markError(nullptr);
+			env->bound->markError(nullptr);
 			return node;
 		}
 		if (isTypeQueryNode(node)) {
-			Node* result = tryVisitTypeQuery(node);
+			Node* result = env->tryVisitTypeQuery(node);
 			if (result != nullptr) {
 				return result;
 			}
-			bound->markError(nullptr);
+			env->bound->markError(nullptr);
 			return node;
 		}
 		if (isTypeOperatorNode(node)) {
@@ -924,21 +942,21 @@ NodeVisitor* getExistingNodeTreeVisitor(NodeBuilderImpl* b,
 				node->as<TypeOperatorNode>()->Type->kind ==
 					Kind::SymbolKeyword) {
 				Node* nonFakeEnclosing =
-					b->getEnclosingDeclarationIgnoringFakeScope();
+					env->b->getEnclosingDeclarationIgnoringFakeScope();
 				Node* sameScope = findAncestor(node, [&](Node* a) -> bool {
 					return a == nonFakeEnclosing;
 				});
 				if (sameScope == nullptr) {
-					bound->markError(nullptr);
+					env->bound->markError(nullptr);
 					return node;
 				}
 			} else if (node->as<TypeOperatorNode>()->Operator ==
 					   Kind::KeyOfKeyword) {
-				Node* result = tryVisitKeyOf(node);
+				Node* result = env->tryVisitKeyOf(node);
 				if (result != nullptr) {
 					return result;
 				}
-				bound->markError(nullptr);
+				env->bound->markError(nullptr);
 				return node;
 			}
 		}
@@ -949,12 +967,12 @@ NodeVisitor* getExistingNodeTreeVisitor(NodeBuilderImpl* b,
 				node->as<ImportTypeNode>()
 						->Attributes->as<ImportAttributes>()
 						->Token == Kind::AssertKeyword) {
-				bound->markError(nullptr);
+				env->bound->markError(nullptr);
 				return node;
 			}
-			Type* t = b->getTypeFromTypeNode(node, true);
+			Type* t = env->b->getTypeFromTypeNode(node, true);
 			if (t == nullptr) {
-				bound->markError(nullptr);
+				env->bound->markError(nullptr);
 				return node;
 			}
 			if (isInJSFile(node)) {
@@ -964,9 +982,9 @@ NodeVisitor* getExistingNodeTreeVisitor(NodeBuilderImpl* b,
 			Node* originalSpec =
 				node->as<ImportTypeNode>()->Argument->as<LiteralTypeNode>()
 					->Literal;
-			Node* specifier = b->rewriteModuleSpecifier(node, originalSpec);
+			Node* specifier = env->b->rewriteModuleSpecifier(node, originalSpec);
 			if (originalSpec == specifier) {
-				specifier = visitor->visitNode(
+				specifier = env->visitor->visitNode(
 					specifier); // visit node if not replaced
 			}
 			Node* arg = node->as<ImportTypeNode>()->Argument;
@@ -976,25 +994,25 @@ NodeVisitor* getExistingNodeTreeVisitor(NodeBuilderImpl* b,
 			return factory->updateImportTypeNode(
 				node->as<ImportTypeNode>(),
 				node->as<ImportTypeNode>()->IsTypeOf, arg,
-				visitor->visitNode(node->as<ImportTypeNode>()->Attributes),
-				visitor->visitNode(node->as<ImportTypeNode>()->Qualifier),
-				visitor->visitNodes(node->as<ImportTypeNode>()->TypeArguments));
+				env->visitor->visitNode(node->as<ImportTypeNode>()->Attributes),
+				env->visitor->visitNode(node->as<ImportTypeNode>()->Qualifier),
+				env->visitor->visitNodes(node->as<ImportTypeNode>()->TypeArguments));
 		}
 		if (node->name() != nullptr &&
 			node->name()->kind == Kind::ComputedPropertyName &&
-			!b->ch->hasLateBindableName(node)) {
+			!env->b->ch->hasLateBindableName(node)) {
 			if (!hasDynamicName(node)) {
 				// !!! TODO: This matches strada, but rather than recursing, this should probably fall down to later cases.
 				// Take a `["field"]` property declaration - it still needs a `: any` appended to it
-				return visitor->visitEachChild(node);
+				return env->visitor->visitEachChild(node);
 			}
 			// !!! TODO: this condition matches strada, but it just seems wrong? Or at the very least extraordinarily approximate, and doesn't flag a builder error...
 			bool shouldRemoveDeclaration = !((
-				(b->ctx->internalFlags &
+				(env->b->ctx->internalFlags &
 				 nodebuilder::InternalFlagsAllowUnresolvedNames) != 0 &&
 				isEntityNameExpression(
 					node->name()->as<ComputedPropertyName>()->Expression) &&
-				(b->ch->checkComputedPropertyName(node->name())->flags &
+				(env->b->ch->checkComputedPropertyName(node->name())->flags &
 				 TypeFlagsAny) != 0));
 			if (shouldRemoveDeclaration) {
 				return nullptr;
@@ -1007,9 +1025,9 @@ NodeVisitor* getExistingNodeTreeVisitor(NodeBuilderImpl* b,
 			 node->initializer() == nullptr) ||
 			(isParameterDeclaration(node) && node->type() == nullptr &&
 			 node->initializer() == nullptr)) {
-			Node* visited = visitor->visitEachChild(node);
+			Node* visited = env->visitor->visitEachChild(node);
 			if (visited == node) {
-				visited = b->setTextRange(node->clone(*factory), node);
+				visited = env->b->setTextRange(node->clone(*factory), node);
 			}
 			node = visited;
 			Node* newType = factory->newKeywordTypeNode(Kind::AnyKeyword);
@@ -1075,7 +1093,7 @@ NodeVisitor* getExistingNodeTreeVisitor(NodeBuilderImpl* b,
 		if (isComputedPropertyName(node) &&
 			isEntityNameExpression(
 				node->as<ComputedPropertyName>()->Expression)) {
-			auto [introducesError, result, _5] = trackExistingEntityName(
+			auto [introducesError, result, _5] = env->trackExistingEntityName(
 				node->as<ComputedPropertyName>()->Expression, nullptr);
 			if (!introducesError) {
 				return factory->updateComputedPropertyName(
@@ -1083,20 +1101,20 @@ NodeVisitor* getExistingNodeTreeVisitor(NodeBuilderImpl* b,
 			} else {
 				// !!! TODO: rewriting computed names based on evaluator/typecheck results?
 				// strada's behavior seems hard to justify vs marking an error and moving on
-				bound->markError(nullptr);
-				return visitor->visitEachChild(node);
+				env->bound->markError(nullptr);
+				return env->visitor->visitEachChild(node);
 			}
 		}
 		if (isTypePredicateNode(node)) {
 			Node* parameterName = nullptr;
 			if (isIdentifier(node->as<TypePredicateNode>()->ParameterName)) {
-				auto [introducesError, result, _6] = trackExistingEntityName(
+				auto [introducesError, result, _6] = env->trackExistingEntityName(
 					node->as<TypePredicateNode>()->ParameterName, nullptr);
 				// Should not usually happen the only case is when a type predicate comes from a JSDoc type annotation with it's own parameter symbol definition.
 				// /** @type {(v: unknown) => v is undefined} */
 				// const isUndef = v => v === undefined;
 				if (introducesError) {
-					bound->markError(nullptr);
+					env->bound->markError(nullptr);
 				}
 				parameterName = result;
 			} else {
@@ -1106,24 +1124,24 @@ NodeVisitor* getExistingNodeTreeVisitor(NodeBuilderImpl* b,
 			}
 			return factory->updateTypePredicateNode(
 				node->as<TypePredicateNode>(),
-				visitor->visitNode(
+				env->visitor->visitNode(
 					node->as<TypePredicateNode>()->AssertsModifier),
 				parameterName,
-				visitor->visitNode(node->as<TypePredicateNode>()->Type));
+				env->visitor->visitNode(node->as<TypePredicateNode>()->Type));
 		}
 		if (isConditionalTypeNode(node)) {
-			Node* checkType = visitor->visitNode(
+			Node* checkType = env->visitor->visitNode(
 				node->as<ConditionalTypeNode>()->CheckType);
 			std::function<void()> dispose =
-				b->enterNewScope(node, {}, b->ch->getInferTypeParameters(node),
+				env->b->enterNewScope(node, {}, env->b->ch->getInferTypeParameters(node),
 				                 {}, nullptr);
-			Node* extendsType = visitor->visitNode(
+			Node* extendsType = env->visitor->visitNode(
 				node->as<ConditionalTypeNode>()->ExtendsType);
 			Node* trueType =
-				visitor->visitNode(node->as<ConditionalTypeNode>()->TrueType);
+				env->visitor->visitNode(node->as<ConditionalTypeNode>()->TrueType);
 			dispose();
 			Node* falseType =
-				visitor->visitNode(node->as<ConditionalTypeNode>()->FalseType);
+				env->visitor->visitNode(node->as<ConditionalTypeNode>()->FalseType);
 			return factory->updateConditionalTypeNode(
 				node->as<ConditionalTypeNode>(), checkType, extendsType,
 				trueType, falseType);
@@ -1131,16 +1149,16 @@ NodeVisitor* getExistingNodeTreeVisitor(NodeBuilderImpl* b,
 
 		// style applications
 		if (isTupleTypeNode(node) ||
-			((b->ctx->flags & nodebuilder::FlagsMultilineObjectLiterals) == 0 &&
+			((env->b->ctx->flags & nodebuilder::FlagsMultilineObjectLiterals) == 0 &&
 			 isTypeLiteralNode(node)) ||
 			isMappedTypeNode(node)) {
 			// make tuples/types/mappedtypes single line
-			Node* res = visitor->visitEachChild(node);
+			Node* res = env->visitor->visitEachChild(node);
 			if (res == node) {
 				res = res->clone(*factory);
-				res = b->setTextRange(res, node);
+				res = env->b->setTextRange(res, node);
 			}
-			b->e->addEmitFlags(res, printer::EFSingleLine);
+			env->b->e->addEmitFlags(res, printer::EFSingleLine);
 			return res;
 		}
 
@@ -1148,52 +1166,51 @@ NodeVisitor* getExistingNodeTreeVisitor(NodeBuilderImpl* b,
 			// Preserve the original characters of the literal (e.g. emojis) in declaration emit
 			// rather than escaping them as ASCII Unicode escapes. Mirrors TypeScript's behavior
 			// for synthesized string literal types in the node builder (checker.ts:6853).
-			Node* c = node->clone(*b->f);
+			Node* c = node->clone(*env->b->f);
 			if (isStringLiteral(node) &&
-				(b->ctx->flags &
+				(env->b->ctx->flags &
 				 nodebuilder::FlagsUseSingleQuotesForStringLiteralType) != 0 &&
 				!(node->as<StringLiteral>()->TokenFlags &
 				  TokenFlagsSingleQuote)) {
 				// set single quote on string literals
 				c->as<StringLiteral>()->TokenFlags ^= TokenFlagsSingleQuote;
 			}
-			b->e->addEmitFlags(c, printer::EFNoAsciiEscaping);
+			env->b->e->addEmitFlags(c, printer::EFNoAsciiEscaping);
 			return c;
 		}
 
-		return visitor->visitEachChild(node);
+		return env->visitor->visitEachChild(node);
 	};
-	bool nonLocalNode = true;
 	NodeVisitorHooks hooks;
-	hooks.visitNodes = [&](NodeList* nodes, NodeVisitor* v) -> NodeList* {
+	hooks.visitNodes = [env](NodeList* nodes, NodeVisitor* v) -> NodeList* {
 		NodeList* res = v->visitNodes(nodes);
-		if (nonLocalNode && res != nullptr) {
+		if (env->nonLocalNode && res != nullptr) {
 			// Remove position data from node lists originating in other files
 			if (res == nodes) {
-				res = nodes->clone(*b->f);
+				res = nodes->clone(*env->b->f);
 			}
 			res->loc = TextRange{-1, -1};
 		}
 		return res;
 	};
-	hooks.visitNode = [&](Node* node, NodeVisitor* v) -> Node* {
+	hooks.visitNode = [env](Node* node, NodeVisitor* v) -> Node* {
 		// Capture if the current node is in the current file so node lists knoww if they can keep positions or not
-		bool oldNonLocalNode = nonLocalNode;
-		nonLocalNode =
-			b->ctx->enclosingFile == nullptr ||
-			b->ctx->enclosingFile !=
-				getSourceFileOfNode(b->e->mostOriginal(node));
+		bool oldNonLocalNode = env->nonLocalNode;
+		env->nonLocalNode =
+			env->b->ctx->enclosingFile == nullptr ||
+			env->b->ctx->enclosingFile !=
+				getSourceFileOfNode(env->b->e->mostOriginal(node));
 		Node* res = v->visitNode(node);
-		nonLocalNode = oldNonLocalNode;
+		env->nonLocalNode = oldNonLocalNode;
 		return res;
 	};
-	visitor = newNodeVisitor(
-		[&](Node* node) -> Node* {
+	env->visitor = newNodeVisitor(
+		[env](Node* node) -> Node* {
 			// If there was an error in a sibling node bail early, the result will be discarded anyway
-			if (bound->hadError) {
+			if (env->bound->hadError) {
 				return node;
 			}
-			originalRecoveryScopeState recover_ = bound->startRecoveryScope();
+			originalRecoveryScopeState recover_ = env->bound->startRecoveryScope();
 			bool introducesNewScope =
 				isFunctionLike(node) || isMappedTypeNode(node);
 			std::function<void()> exit;
@@ -1201,25 +1218,25 @@ NodeVisitor* getExistingNodeTreeVisitor(NodeBuilderImpl* b,
 				std::vector<Symbol*> params;
 				std::vector<Type*> typeParams;
 				if (isFunctionLike(node)) {
-					Signature* sig = b->ch->getSignatureFromDeclaration(node);
+					Signature* sig = env->b->ch->getSignatureFromDeclaration(node);
 					params = sig->parameters;
 					typeParams = sig->typeParameters;
 				} else if (isConditionalTypeNode(node)) { // !!! TODO: impossible in combination with the scope start check???
-					typeParams = b->ch->getInferTypeParameters(node);
+					typeParams = env->b->ch->getInferTypeParameters(node);
 				} else if (isMappedTypeNode(node)) {
-					typeParams = {b->ch->getDeclaredTypeOfTypeParameter(
-						b->ch->getSymbolOfDeclaration(
+					typeParams = {env->b->ch->getDeclaredTypeOfTypeParameter(
+						env->b->ch->getSymbolOfDeclaration(
 							node->as<MappedTypeNode>()->TypeParameter))};
 				}
-				exit = b->enterNewScope(node, params, typeParams, {}, nullptr);
+				exit = env->b->enterNewScope(node, params, typeParams, {}, nullptr);
 			}
-			Node* result = visitExistingNodeTreeSymbolsWorker(node);
+			Node* result = env->visitExistingNodeTreeSymbolsWorker(node);
 			if (exit) {
 				exit();
 			}
 
 			if (result == node && !nodeIsSynthesized(node)) {
-				result = deepCloneNode(*b->f, node); // always clone a new node
+				result = deepCloneNode(*env->b->f, node); // always clone a new node
 			}
 
 			// We want to clone the subtree, so when we mark it up with __pos and __end in quickfixes,
@@ -1228,23 +1245,23 @@ NodeVisitor* getExistingNodeTreeVisitor(NodeBuilderImpl* b,
 			//  is set to build for (even though we are reusing the node structure, the position information
 			//  would make the printer print invalid spans for literals and identifiers, and the formatter would
 			//  choke on the mismatched positonal spans between a parent and an injected child from another file).
-			result = b->setTextRange(result, node);
+			result = env->b->setTextRange(result, node);
 
-			if (bound->hadError) {
+			if (env->bound->hadError) {
 				if (isTypeNode(node) && !isTypePredicateNode(node)) {
-					bound->endRecoveryScope(recover_);
+					env->bound->endRecoveryScope(recover_);
 					// TODO: this fallback matches strada behavior, but it lacks any verification that the type from `node` actually matches
 					// the type we'd expect at this traversal position within the parent type.
-					Type* t = b->getTypeFromTypeNode(node, false);
-					return b->typeToTypeNode(t);
+					Type* t = env->b->getTypeFromTypeNode(node, false);
+					return env->b->typeToTypeNode(t);
 				}
-				return b->setTextRange(node->clone(*b->f), node);
+				return env->b->setTextRange(node->clone(*env->b->f), node);
 			}
 
 			return result;
 		},
-		b->f, hooks);
-	return visitor;
+		env->b->f, hooks);
+	return env->visitor;
 }
 
 }  // namespace tsc::checker

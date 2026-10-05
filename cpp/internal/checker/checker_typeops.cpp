@@ -1364,8 +1364,8 @@ bool Checker::isStringIndexSignatureOnlyTypeWorker(Type* t) {
 	return ((t->flags & TypeFlagsObject) && !isGenericMappedType(t) &&
 			getPropertiesOfType(t).empty() && getIndexInfosOfType(t).size() == 1 &&
 			getIndexInfoOfType(t, stringType) != nullptr) ||
-		((t->flags & TypeFlagsUnionOrIntersection) &&
-		 everyType(t, isStringIndexSignatureOnlyType));
+		((t->flags & TypeFlagsUnionOrIntersection) != 0 &&
+		 everyContainedType(t, isStringIndexSignatureOnlyType));
 }
 
 // checker.go:27836
