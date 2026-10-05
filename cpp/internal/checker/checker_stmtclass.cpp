@@ -1833,6 +1833,7 @@ bool Checker::checkTypeComparableTo(Type* source, Type* target, Node* errorNode,
 // owner: services tail (checker.go:32070-32660)
 // (deduped: getSymbolAtLocation defined in the owning slice file)
 // (deduped: getApplicableIndexInfos defined in the owning slice file)
+// (deduped: getSymbolAtLocation / getApplicableIndexInfos real defs in checker_services.cpp)
 
 // (deduped: checkExportsOnMergedDeclarations defined in cpp/internal/checker/checker_declchecks2.cpp)
 

@@ -949,6 +949,12 @@ public:
 	virtual Node* GetImportHelpersImportSpecifier(const std::string& /*path*/) {
 		return nullptr;
 	}
+	// program.go GetJSXRuntimeImportSpecifier — (moduleReference, specifier)
+	// the program synthesized for this file's implicit jsx runtime import.
+	virtual std::pair<std::string, Node*> GetJSXRuntimeImportSpecifier(
+	    const std::string& /*path*/) {
+		return {"", nullptr};
+	}
 };
 
 // nodeLinkStore / symbolArenaLinkStore (links.go)
@@ -2816,10 +2822,7 @@ public:
 	bool isMethodAccessForCall(Node* node);
 	Symbol* getPrivateIdentifierPropertyOfType(Type* leftType,
 		Symbol* lexicallyScopedIdentifier);
-	// owner: jsx slice (jsx.go)
-	Symbol* getJsxNamespaceContainerForImplicitImport(Node* location);
-	std::string getJsxNamespace(Node* location);
-	Node* getJsxFactoryEntity(Node* location);
+	// (jsx-owned decls moved to the === slice: jsx === block below)
 	// owner: relater slice (relater.go)
 	// owner: signatures slice (checker.go:20143-20986)
 	// owner: declchecks slice (checker.go:5081-5929)
@@ -2918,7 +2921,7 @@ public:
 	Type* checkExpressionForMutableLocation(Node* node, CheckMode checkMode);
 	Type* checkIteratedTypeOrElementType(IterationUse use, Type* inputType,
 		Type* sentType, Node* errorNode);
-	Type* checkJsxAttribute(Node* node, CheckMode checkMode);
+	// (checkJsxAttribute moved to the === slice: jsx === block below)
 	Type* checkObjectLiteralMethod(Node* node, CheckMode checkMode);
 	Type* checkPropertyAssignment(Node* node, CheckMode checkMode);
 	Type* getFlowTypeInConstructor(Symbol* symbol, Node* constructor);
@@ -3103,16 +3106,7 @@ public:
 	Type* discriminateTypeByDiscriminableItems(Type* target,
 											   Discriminator& discriminator);
 	bool isConstTypeVariable(Type* t, int depth);
-	Type* discriminateContextualTypeByJSXAttributes(Node* node,
-													Type* contextualType);
-	Type* getContextualJsxElementAttributesType(Node* node,
-												ContextFlags contextFlags);
-	Type* getContextualTypeForJsxAttribute(Node* attribute,
-										   ContextFlags contextFlags);
-	Type* getContextualTypeForJsxExpression(Node* node,
-											ContextFlags contextFlags);
-	Type* getEffectiveFirstArgumentForJsxSignature(Signature* signature,
-												   Node* node);
+	// (jsx-owned dep decls moved to the === slice: jsx === block below)
 	// === end slice: contextual ===
 	// === slice: typeops === (checker_typeops.cpp — checker.go:26223-28654:
 	// index/indexed-access machinery, base constraints, literal/enum helpers,
@@ -3219,7 +3213,7 @@ public:
 	Type* checkNewTargetMetaProperty(Node* node);
 	Type* checkMetaPropertyKeyword(Node* node);
 	Type* getSymbolHasInstanceMethodOfObjectType(Type* t);
-	Symbol* getIntrinsicTagSymbol(Node* node);
+	// (getIntrinsicTagSymbol moved to the === slice: jsx === block below)
 	Type* checkImportAttributesExpression(Node* node);
 	// === end slice: services ===
 	// === slice: flow === (checker_flow.cpp)
@@ -3842,15 +3836,104 @@ public:
 		std::vector<Diagnostic*>* diagnosticOutput);                                 // relater.go:428 — relater slice
 	Type* getNonArrayRestType(Signature* signature);                                 // relater.go:1891 — relater slice
 	std::string signatureToString(Signature* signature);                             // printer.go:179 — printer slice
-	Signature* resolveJsxOpeningLikeElement(
-		Node* node, std::vector<Signature*>* candidatesOutArray,
-		CheckMode checkMode);                                                        // jsx.go:545 — jsx slice
+
+	// === slice: jsx === (checker_jsx.cpp — jsx.go: JSX element/attribute checking,
+	// JSX namespace resolution, classic & automatic-runtime factories)
+	// Entry-point checkers are declared with the walk/dispatch decls above:
+	// checkJsxExpression, checkJsxElement, checkJsxSelfClosingElement,
+	// checkJsxFragment, checkJsxAttributes, checkJsxSelfClosingElementDeferred,
+	// checkJsxElementDeferred.
+	void checkJsxOpeningLikeElementOrOpeningFragment(Node* node);
+	void checkJsxPreconditions(Node* errorNode);
+	void checkJsxReturnAssignableToAppropriateBound(JsxReferenceKind refKind,
+		Type* elemInstanceType, Node* openingLikeElement);
 	std::vector<Type*> inferJsxTypeArguments(Node* node, Signature* signature,
-	                                       CheckMode checkMode,
-	                                       InferenceContext* context);               // jsx.go:198 — jsx slice
+		CheckMode checkMode, InferenceContext* context);
+	Type* getContextualTypeForChildJsxExpression(Node* node, Node* child,
+		ContextFlags contextFlags);
+	Type* discriminateContextualTypeByJSXAttributes(Node* node,
+		Type* contextualType);                                       // was contextual dep stub
+	bool elaborateJsxComponents(Node* node, Type* source, Type* target,
+		Relation* relation, std::vector<Diagnostic*>* diagnosticOutput);
+	JsxElaborationSeq generateJsxChildren(
+		Node* node, const GetInvalidTextDiagnostic& getInvalidTextDiagnostic);
+	JsxElaborationElement getElaborationElementForJsxChild(
+		Node* child, Type* nameType,
+		const GetInvalidTextDiagnostic& getInvalidTextDiagnostic);
+	bool elaborateIterableOrArrayLikeTargetElementwise(
+		JsxElaborationSeq iterator, Type* source, Type* target, Relation* relation,
+		std::vector<Diagnostic*>* diagnosticOutput);
+	Symbol* getSuggestedSymbolForNonexistentJSXAttribute(const std::string& name,
+		Type* containingType);
+	Type* getJSXFragmentType(Node* node);
+	Signature* resolveJsxOpeningLikeElement(Node* node,
+		std::vector<Signature*>* candidatesOutArray, CheckMode checkMode);
 	bool checkApplicableSignatureForJsxCallLikeElement(
 		Node* node, Signature* signature, Relation* relation, CheckMode checkMode,
-		bool reportErrors, std::vector<Diagnostic*>* diagnosticOutput);              // jsx.go:591 — jsx slice
+		bool reportErrors, std::vector<Diagnostic*>* diagnosticOutput);
+	Type* createJsxAttributesTypeFromAttributesProperty(Node* openingLikeElement,
+		CheckMode checkMode);
+	Type* checkJsxAttribute(Node* node, CheckMode checkMode);      // was decltypes dep stub
+	std::vector<Type*> checkJsxChildren(Node* node, CheckMode checkMode);
+	std::vector<Signature*> getUninstantiatedJsxSignaturesOfType(Type* elementType,
+		Node* caller);
+	Type* getEffectiveFirstArgumentForJsxSignature(Signature* signature,
+		Node* node);                                                 // was contextual dep stub
+	Type* getJsxPropsTypeFromCallSignature(Signature* sig, Node* context);
+	Type* getJsxPropsTypeFromClassType(Signature* sig, Node* context);
+	Type* getJsxPropsTypeForSignatureFromMember(Signature* sig,
+		const std::string& forcedLookupLocation);
+	Type* getJsxManagedAttributesFromLocatedAttributes(Node* context, Symbol* ns,
+		Type* attributesType);
+	Type* instantiateAliasOrInterfaceWithDefaults(Symbol* managedSym,
+		const std::vector<Type*>& typeArguments, bool inJavaScript);
+	Symbol* getJsxLibraryManagedAttributes(Symbol* jsxNamespace);
+	Symbol* getJsxElementTypeSymbol(Symbol* jsxNamespace);
+	std::string getJsxElementPropertiesName(Symbol* jsxNamespace);
+	std::string getJsxElementChildrenPropertyName(Symbol* jsxNamespace);
+	std::string getNameFromJsxElementAttributesContainer(
+		const std::string& nameOfAttribPropContainer, Symbol* jsxNamespace);
+	Type* getStaticTypeOfReferencedJsxConstructor(Node* context);
+	Type* getIntrinsicAttributesTypeFromStringLiteralType(Type* t, Node* location);
+	JsxReferenceKind getJsxReferenceKind(Node* node);
+	Signature* createSignatureForJSXIntrinsic(Node* node, Type* result);
+	Type* getIntrinsicAttributesTypeFromJsxOpeningLikeElement(Node* node);
+	Symbol* getIntrinsicTagSymbol(Node* node);                     // was services dep stub
+	Type* getJsxStatelessElementTypeAt(Node* location);
+	Type* getJsxElementClassTypeAt(Node* location);
+	Type* getJsxElementTypeAt(Node* location);
+	Type* getJsxElementTypeTypeAt(Node* location);
+	Type* getJsxType(const std::string& name, Node* location);
+	Symbol* getJsxNamespaceAt(Node* location);
+	std::string getJsxNamespace(Node* location);                   // was markrefs dep stub
+	std::string getLocalJsxNamespace(SourceFile* file);
+	Node* getJsxFactoryEntity(Node* location);                     // was markrefs dep stub
+	Node* getJsxFragmentFactoryEntity(Node* location);
+	Node* parseIsolatedEntityName(const std::string& name);
+	Symbol* getJsxNamespaceContainerForImplicitImport(Node* location);  // was markrefs dep stub
+	std::pair<std::string, Node*> getJSXRuntimeImportSpecifier(SourceFile* file);
+	// contextual helpers (decls moved from the contextual slice's dep block)
+	Type* getContextualTypeForJsxExpression(Node* node, ContextFlags contextFlags);
+	Type* getContextualTypeForJsxAttribute(Node* attribute,
+		ContextFlags contextFlags);
+	Type* getContextualJsxElementAttributesType(Node* node,
+		ContextFlags contextFlags);
+	// dep stubs owned by other slices — bodies at bottom of checker_jsx.cpp
+	bool checkTypeRelatedTo(Type* source, Type* target, Relation* relation,
+		Node* errorNode);                                            // relater slice
+	bool elaborateError(Node* node, Type* source, Type* target,
+		Relation* relation, const DiagnosticMessage* headMessage,
+		std::vector<Diagnostic*>* diagnosticOutput);                 // relater slice
+	bool elaborateElement(Type* source, Type* target, Relation* relation,
+		Node* prop, Node* next, Type* nameType,
+		const DiagnosticMessage* errorMessage,
+		std::function<Diagnostic*(Node*)> diagnosticFactory,
+		std::vector<Diagnostic*>* diagnosticOutput);                 // relater slice
+	Type* getBestMatchIndexedAccessTypeOrUndefined(Type* source, Type* target,
+		Type* nameType);                                             // relater slice
+	Type* checkExpressionForMutableLocationWithContextualType(Node* next,
+		Type* sourcePropType);                                       // relater slice
+	// === end slice: jsx ===
 };  // class Checker
 
 // moduletarget-slice file-local callees hoisted for the dep graph (defs in

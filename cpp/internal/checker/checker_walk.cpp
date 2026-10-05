@@ -1175,22 +1175,31 @@ Type* Checker::checkSuperExpression(Node* node) { TSC_UNREACHABLE("checkSuperExp
 // (deduped: checkSyntheticExpression defined in the owning slice file)
 
 // (deduped: checkAssertion defined in the owning slice file)
-// (deduped: checkBinaryExpression defined in the owning slice file)
-Type* Checker::checkJsxExpression(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkJsxExpression — jsx slice"); }
-Type* Checker::checkJsxElement(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkJsxElement — jsx slice"); }
-Type* Checker::checkJsxSelfClosingElement(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkJsxSelfClosingElement — jsx slice"); }
-Type* Checker::checkJsxFragment(Node* node) { TSC_UNREACHABLE("checkJsxFragment — jsx slice"); }
-Type* Checker::checkJsxAttributes(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkJsxAttributes — jsx slice"); }
-// (deduped: isSymbolOrSymbolForCall defined in owning slice file)
+// (deduped: checkBinaryExpression defined in the owning slice file)// (deduped: checkJsxExpression defined in checker_jsx.cpp)// (deduped: checkJsxElement defined in checker_jsx.cpp)
+// (deduped: checkJsxFragment defined in checker_jsx.cpp)
+// (deduped: isSymbolOrSymbolForCall defined in owning slice file)// (deduped: checkTemplateExpression defined in checker_expressions_a.cpp)// (deduped: checkRegularExpressionLiteral defined in checker_expressions_a.cpp)
+// (deduped: checkObjectLiteral defined in checker_expressions_c.cpp)
+// (deduped: checkQualifiedName defined in checker_expressions_a.cpp)
+// (deduped: checkCallExpression defined in checker_expressions_a.cpp)
+// (deduped: checkTaggedTemplateExpression defined in checker_expressions_a.cpp)
+// (deduped: checkClassExpression defined in checker_expressions_a.cpp)
+// (deduped: checkAssertion defined in checker_expressions_c.cpp)
+// (deduped: checkNonNullAssertion defined in checker_expressions_b.cpp)
+// (deduped: checkMetaProperty defined in checker_expressions_b.cpp)
+// (deduped: checkVoidExpression defined in checker_expressions_b.cpp)
+// (deduped: checkPrefixUnaryExpression defined in checker_expressions_b.cpp)
+// (deduped: checkBinaryExpression defined in checker_expressions_c.cpp)
+// (deduped: checkSpreadExpression defined in checker_expressions_b.cpp)
+// (jsx-owned checkers moved to checker_jsx.cpp — real defs there)
+// (deduped: checkNonNullExpression ported in checker_utilities.cpp)// (deduped: isSymbolOrSymbolForCall defined in checker_expressions_a.cpp)
 
 // owner: deferred-check callees (wave-3)
 // (deduped: resolveUntypedCall defined in checker_expressions_a.cpp)
 // (deduped: checkFunctionExpressionOrObjectLiteralMethodDeferred defined in checker_expressions_a.cpp)
-// (deduped: checkClassExpressionDeferred defined in checker_expressions_a.cpp)
-void Checker::checkJsxSelfClosingElementDeferred(Node* node) { TSC_UNREACHABLE("checkJsxSelfClosingElementDeferred — jsx slice"); }
-void Checker::checkJsxElementDeferred(Node* node) { TSC_UNREACHABLE("checkJsxElementDeferred — jsx slice"); }
+// (deduped: checkClassExpressionDeferred defined in checker_expressions_a.cpp)// (deduped: checkJsxSelfClosingElementDeferred defined in checker_jsx.cpp)// (deduped: checkJsxElementDeferred defined in checker_jsx.cpp)
 // (deduped: checkAssertionDeferred defined in cpp/internal/checker/checker_expressions_c.cpp)
-// (deduped: checkContextualDeprecations defined in cpp/internal/checker/checker_expressions_c.cpp)
+// (deduped: checkContextualDeprecations defined in cpp/internal/checker/checker_expressions_c.cpp)// (deduped: resolveUntypedCall defined in checker_expressions_a.cpp)// (deduped: checkFunctionExpressionOrObjectLiteralMethodDeferred defined in checker_expressions_a.cpp)
+// (jsx-owned deferred checkers moved to checker_jsx.cpp — real defs there)// (deduped: checkAssertionDeferred defined in checker_expressions_c.cpp)// (deduped: checkContextualDeprecations defined in checker_expressions_c.cpp)
 
 // owner: walker per-node checks (wave-3)
 // (deduped: checkVariableStatement defined in cpp/internal/checker/checker_declchecks2.cpp)
@@ -1222,7 +1231,7 @@ void Checker::checkExpressionStatement(Node* node) { TSC_UNREACHABLE("checkExpre
 // (deduped: getEffectiveCheckNode defined in owning slice file)
 // (deduped: getImportAttributesTypeForModuleSpecifier defined in owning slice file)
 Symbol* Checker::getSymbolOfPartOfRightHandSideOfImportEquals(Node* entityName) { TSC_UNREACHABLE("getSymbolOfPartOfRightHandSideOfImportEquals — symboltype slice"); }
-Symbol* Checker::getIntrinsicTagSymbol(Node* node) { TSC_UNREACHABLE("getIntrinsicTagSymbol — jsx slice"); }
+// (deduped: getIntrinsicTagSymbol defined in checker_jsx.cpp)
 
 } // namespace tsc::checker
 

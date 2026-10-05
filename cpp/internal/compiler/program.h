@@ -454,6 +454,16 @@ public:
 	    SourceFile* file) override;
 	std::string GetCurrentDirectory() override;
 	bool UseCaseSensitiveFileNames() override;
+	// program.go GetJSXRuntimeImportSpecifier — consult
+	// jsxRuntimeImportSpecifiers (jsx slice).
+	std::pair<std::string, Node*> GetJSXRuntimeImportSpecifier(
+	    const std::string& path) override {
+		auto it = jsxRuntimeImportSpecifiers.find(path);
+		if (it == jsxRuntimeImportSpecifiers.end()) {
+			return {"", nullptr};
+		}
+		return {it->second.moduleReference, it->second.specifier};
+	}
 	// GetRedirectForResolution / GetProjectReferenceFromSource: base-class
 	// nullptr defaults — Go-equivalent (no project references).
 

@@ -1186,4 +1186,40 @@ struct ObjectLiteralDiscriminator : Discriminator {
 
 // === end slice: contextual ===
 
+// === slice: jsx === (jsx.go:17-40, 369-374)
+
+using JsxFlags = uint32_t;
+inline constexpr JsxFlags JsxFlagsNone = 0;
+inline constexpr JsxFlags JsxFlagsIntrinsicNamedElement =
+	1 << 0; // An element from a named property of the JSX.IntrinsicElements interface
+inline constexpr JsxFlags JsxFlagsIntrinsicIndexedElement =
+	1 << 1; // An element inferred from the string index signature of the JSX.IntrinsicElements interface
+inline constexpr JsxFlags JsxFlagsIntrinsicElement =
+	JsxFlagsIntrinsicNamedElement | JsxFlagsIntrinsicIndexedElement;
+
+enum class JsxReferenceKind : int32_t {
+	Component,
+	Function,
+	Mixed,
+};
+
+struct JsxElaborationElement {
+	Node* errorNode{};
+	Node* innerExpression{};
+	Type* nameType{};
+	std::function<Diagnostic*(Node*)> createDiagnostic; // Optional: creates a custom diagnostic for this element
+};
+
+// getInvalidTextDiagnostic — lazily produces the 'text children' diagnostic
+// and its args (jsx.go:332). Diagnostic is tsc::Diagnostic.
+using GetInvalidTextDiagnostic =
+	std::function<std::pair<const DiagnosticMessage*, std::vector<std::string>>()>;
+
+// iter.Seq[JsxElaborationElement] (jsx.go:376) — a generator invoked with a
+// yield callback; returning false from yield stops the iteration.
+using JsxElaborationSeq =
+	std::function<void(const std::function<bool(JsxElaborationElement)>&)>;
+
+// === end slice: jsx ===
+
 } // namespace tsc::checker

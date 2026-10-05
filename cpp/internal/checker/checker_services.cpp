@@ -561,8 +561,148 @@ Type* Checker::getRegularTypeOfExpression(Node* expr) {
 	return getRegularTypeOfLiteralType(getTypeOfExpression(expr));
 }
 
-// checker.go:32611 — containsArgumentsReference
-// (deduped: containsArgumentsReference defined in the owning slice file)
+// checker.go:32419 — getTypeOfNode (services tail owner)
+Type* Checker::getTypeOfNode(Node* node) {
+	if (isSourceFile(node) && !isExternalOrCommonJSModule(node->as<SourceFile>())) {
+		return errorType;
+	}
+	if ((node->flags & NodeFlagsInWithStatement) != 0) {
+		return errorType;
+	}
+	bool isImplements = false;
+	Node* classDecl = tryGetClassImplementingOrExtendingHeritageClauseElement(node, &isImplements);
+	Type* classType = nullptr;
+	if (classDecl != nullptr) {
+		classType = getDeclaredTypeOfClassOrInterface(getSymbolOfDeclaration(classDecl));
+	}
+	if (isPartOfTypeNode(node)) {
+		Type* typeFromTypeNode = getTypeFromTypeNode(node);
+		if (classType != nullptr) {
+			return getTypeWithThisArgument(typeFromTypeNode,
+										   classType->AsInterfaceType()->thisType,
+										   false /*needApparentType*/);
+		}
+		return typeFromTypeNode;
+	}
+	if (isExpressionNode(node)) {
+		return getRegularTypeOfExpression(node);
+	}
+	if (classType != nullptr && !isImplements) {
+		// An ExpressionWithTypeArguments is a type node except in a class's
+		// extends clause; handled here (checker.go:32456).
+		Type* baseType = getBaseTypes(classType).empty() ? nullptr
+													 : getBaseTypes(classType)[0];
+		if (baseType != nullptr) {
+			return getTypeWithThisArgument(baseType,
+										   classType->AsInterfaceType()->thisType,
+										   false /*needApparentType*/);
+		}
+		return errorType;
+	}
+	if (isTypeDeclaration(node)) {
+		Symbol* symbol = getSymbolOfDeclaration(node);
+		return getDeclaredTypeOfSymbol(symbol);
+	}
+	if (isTypeDeclarationName(node)) {
+		Symbol* symbol = getSymbolAtLocation(node, false /*ignoreErrors*/);
+		if (symbol != nullptr) {
+			return getDeclaredTypeOfSymbol(symbol);
+		}
+		return errorType;
+	}
+	if (isBindingElement(node)) {
+		Type* t = getTypeForVariableLikeDeclaration(node, true /*includeOptionality*/,
+													CheckModeNormal);
+		if (t != nullptr) {
+			return t;
+		}
+		return errorType;
+	}
+	if (isDeclaration(node)) {
+		Symbol* symbol = getSymbolOfDeclaration(node);
+		if (symbol != nullptr) {
+			return getTypeOfSymbol(symbol);
+		}
+		return errorType;
+	}
+	if (isDeclarationNameOrImportPropertyName(node)) {
+		Symbol* symbol = getSymbolAtLocation(node, false /*ignoreErrors*/);
+		if (symbol != nullptr) {
+			return getTypeOfSymbol(symbol);
+		}
+		return errorType;
+	}
+	if (isBindingPattern(node)) {
+		Type* t = getTypeForVariableLikeDeclaration(node->parent,
+													true /*includeOptionality*/,
+													CheckModeNormal);
+		if (t != nullptr) {
+			return t;
+		}
+		return errorType;
+	}
+	if (isInRightSideOfImportOrExportAssignment(node)) {
+		Symbol* symbol = getSymbolAtLocation(node, false /*ignoreErrors*/);
+		if (symbol != nullptr) {
+			Type* declaredType = getDeclaredTypeOfSymbol(symbol);
+			if (!isErrorType(declaredType)) {
+				return declaredType;
+			}
+			return getTypeOfSymbol(symbol);
+		}
+	}
+	if (node->parent != nullptr && isMetaProperty(node->parent) &&
+		node->parent->as<MetaProperty>()->KeywordToken == node->kind) {
+		return checkMetaPropertyKeyword(node->parent);
+	}
+	if (isImportAttributes(node)) {
+		return checkImportAttributesExpression(node);
+	}
+	return errorType;
+}
+
+// checker.go:32611 — containsArgumentsReference (services tail owner)
+bool Checker::containsArgumentsReference(Node* node) {
+	if (node->body() == nullptr) {
+		return false;
+	}
+	auto cached = cachedArgumentsReferenced.find(node);
+	if (cached != cachedArgumentsReferenced.end()) {
+		return cached->second;
+	}
+	std::function<bool(Node*)> visit = [&](Node* node) -> bool {
+		if (node == nullptr) {
+			return false;
+		}
+		switch (node->kind) {
+		case Kind::Identifier:
+			return node->text() == argumentsSymbol->name &&
+				IsArgumentsSymbol(getResolvedSymbol(node));
+		case Kind::PropertyDeclaration:
+		case Kind::MethodDeclaration:
+		case Kind::GetAccessor:
+		case Kind::SetAccessor:
+			if (isComputedPropertyName(node->name())) {
+				return visit(node->name());
+			}
+			break;
+		case Kind::PropertyAccessExpression:
+		case Kind::ElementAccessExpression:
+			return visit(node->expression());
+		case Kind::PropertyAssignment:
+			return visit(node->initializer());
+		default:
+			break;
+		}
+		if (nodeStartsNewLexicalEnvironment(node) || isPartOfTypeNode(node)) {
+			return false;
+		}
+		return node->forEachChild(visit);
+	};
+	bool containsArguments = visit(node->body());
+	cachedArgumentsReferenced[node] = containsArguments;
+	return containsArguments;
+}
 
 // checker.go:32648 — GetTypeAtLocation
 Type* Checker::GetTypeAtLocation(Node* node) {
@@ -574,6 +714,12 @@ EmitResolver* Checker::GetEmitResolver() {
 	std::call_once(emitResolverOnce, [&] { emitResolver = newEmitResolver(this); });
 	return emitResolver;
 }
+
+// === dep stubs — removed when owner slice lands ===
+// Declared in the services decl block (checker.h ~3176) and called from this
+// TU, but never defined by any landed slice; stubbed here so the TU links.
+
+// (deduped: getImportAttributesTypeForModuleSpecifier + checkImportAttributesExpression defined in checker_declchecks2.cpp; checkMetaPropertyKeyword in checker_expressions_b.cpp)
 
 }  // namespace checker
 }  // namespace tsc

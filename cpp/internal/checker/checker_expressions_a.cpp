@@ -3500,23 +3500,9 @@ std::string Checker::signatureToString(Signature* signature) {
 }
 
 // owner: jsx slice (jsx.go:198,545,591)
-Signature* Checker::resolveJsxOpeningLikeElement(
-	Node* node, std::vector<Signature*>* candidatesOutArray,
-	CheckMode checkMode) {
-	TSC_UNREACHABLE("resolveJsxOpeningLikeElement — jsx slice dep");
-}
-std::vector<Type*> Checker::inferJsxTypeArguments(Node* node,
-												  Signature* signature,
-												  CheckMode checkMode,
-												  InferenceContext* context) {
-	TSC_UNREACHABLE("inferJsxTypeArguments — jsx slice dep");
-}
-bool Checker::checkApplicableSignatureForJsxCallLikeElement(
-	Node* node, Signature* signature, Relation* relation, CheckMode checkMode,
-	bool reportErrors, std::vector<Diagnostic*>* diagnosticOutput) {
-	TSC_UNREACHABLE(
-		"checkApplicableSignatureForJsxCallLikeElement — jsx slice dep");
-}
+// (deduped: resolveJsxOpeningLikeElement defined in checker_jsx.cpp)
+// (deduped: inferJsxTypeArguments defined in checker_jsx.cpp)
+// (deduped: checkApplicableSignatureForJsxCallLikeElement defined in checker_jsx.cpp)
 
 // (deduped: cloneInferredPartOfContext defined in owning slice file)
 // (deduped: getMapperFromContext defined in owning slice file)

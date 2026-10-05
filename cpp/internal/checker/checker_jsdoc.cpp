@@ -179,50 +179,7 @@ bool Checker::isArrayType(Type* t) {
 }
 
 // checker.go:32611
-bool Checker::containsArgumentsReference(Node* node) {
-	if (node->body() == nullptr) {
-		return false;
-	}
-
-	if (auto it = cachedArgumentsReferenced.find(node);
-		it != cachedArgumentsReferenced.end()) {
-		return it->second;
-	}
-
-	std::function<bool(Node*)> visit = [&](Node* node) -> bool {
-		if (node == nullptr) {
-			return false;
-		}
-		switch (node->kind) {
-			case Kind::Identifier:
-				return node->text() == argumentsSymbol->name &&
-					IsArgumentsSymbol(getResolvedSymbol(node));
-			case Kind::PropertyDeclaration:
-			case Kind::MethodDeclaration:
-			case Kind::GetAccessor:
-			case Kind::SetAccessor:
-				if (isComputedPropertyName(node->name())) {
-					return visit(node->name());
-				}
-				break;
-			case Kind::PropertyAccessExpression:
-			case Kind::ElementAccessExpression:
-				return visit(node->expression());
-			case Kind::PropertyAssignment:
-				return visit(node->initializer());
-			default:
-				break;
-		}
-		if (nodeStartsNewLexicalEnvironment(node) || isPartOfTypeNode(node)) {
-			return false;
-		}
-		return node->forEachChild(visit);
-	};
-
-	bool containsArguments = visit(node->body());
-	cachedArgumentsReferenced[node] = containsArguments;
-	return containsArguments;
-}
+// (deduped: containsArgumentsReference real def in checker_services.cpp)
 
 // services.go:240 — originally from services.ts
 bool Checker::IsArgumentsSymbol(Symbol* symbol) {
