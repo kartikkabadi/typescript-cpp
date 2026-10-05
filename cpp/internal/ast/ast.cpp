@@ -968,6 +968,13 @@ Node* tryGetPropertyNameOfBindingOrAssignmentElement(
 // IsLiteralExpression — utilities.go:319
 bool isLiteralExpression(Node* node) { return isLiteralKind(node->kind); }
 
+// IsSuperProperty — utilities.go:4589
+bool isSuperProperty(Node* node) {
+	return (isPropertyAccessExpression(node) ||
+	        isElementAccessExpression(node)) &&
+	       node->expression()->kind == Kind::SuperKeyword;
+}
+
 // IsSuperCall — utilities.go:2138
 bool isSuperCall(Node* node) {
 	return isCallExpression(node) &&

@@ -154,11 +154,7 @@ bool isInitializedProperty(Node* member) {
 	return member->kind == Kind::PropertyDeclaration && member->initializer() != nullptr;
 }
 
-// utilities.go:4589 — IsSuperProperty
-bool isSuperProperty(Node* node) {
-	return (isPropertyAccessExpression(node) || isElementAccessExpression(node)) &&
-		node->expression()->kind == Kind::SuperKeyword;
-}
+// isSuperProperty (utilities.go:4589) — canonical in ast.cpp
 
 // utilities.go:3009 — IsJsxCallLike
 bool isJsxCallLike(Node* node) {

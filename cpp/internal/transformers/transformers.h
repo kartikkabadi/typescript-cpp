@@ -17,7 +17,9 @@
 
 namespace tsc {
 
+namespace checker {
 struct EmitResolver;
+}
 
 namespace transformers {
 
@@ -57,7 +59,7 @@ struct TransformOptions {
 	printer::EmitContext* Context = nullptr;
 	const CompilerOptions* CompilerOptions = nullptr;
 	binder::ReferenceResolver* Resolver = nullptr;
-	EmitResolver* emitResolver = nullptr;
+	checker::EmitResolver* EmitResolver = nullptr;
 	std::function<ModuleKind(SourceFile*)> GetEmitModuleFormatOfFile;
 };
 

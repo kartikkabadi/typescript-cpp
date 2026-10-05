@@ -652,6 +652,7 @@ Node* getAssignedName(Node* node);
 // utilities.go:3866,3879,3891,4046
 std::vector<Node*> getElementsOfBindingOrAssignmentPattern(Node* pattern);
 bool isLiteralExpression(Node* node);
+bool isSuperProperty(Node* node);
 bool isSuperCall(Node* node);
 bool isEmptyObjectLiteral(Node* expression);
 bool isEmptyArrayLiteral(Node* expression);

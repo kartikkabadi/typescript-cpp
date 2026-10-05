@@ -5,6 +5,10 @@
 #pragma once
 
 #include <string>
+#include <string_view>
+
+#include "internal/core/types.h"
+#include "internal/tspath/tspath.h"
 
 namespace tsc {
 struct CompilerOptions;
@@ -26,5 +30,25 @@ std::string GetOutputJSFileNameWorker(const std::string& inputFileName,
 std::string GetOutputDeclarationFileNameWorker(
     const std::string& inputFileName, const CompilerOptions* options,
     checker::Program* host);
+
+// GetOutputExtension — outputpaths.go:116
+inline std::string_view GetOutputExtension(std::string_view fileName,
+                                           JsxEmit jsx) {
+	using namespace tspath;
+	if (fileExtensionIs(fileName, extensionJson)) {
+		return extensionJson;
+	}
+	if (jsx == JsxEmit::Preserve &&
+	    fileExtensionIsOneOf(fileName, {extensionJsx, extensionTsx})) {
+		return extensionJsx;
+	}
+	if (fileExtensionIsOneOf(fileName, {extensionMts, extensionMjs})) {
+		return extensionMjs;
+	}
+	if (fileExtensionIsOneOf(fileName, {extensionCts, extensionCjs})) {
+		return extensionCjs;
+	}
+	return extensionJs;
+}
 
 } // namespace tsc::outputpaths

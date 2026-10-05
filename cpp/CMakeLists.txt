@@ -85,6 +85,10 @@ add_library(tsc STATIC
 	internal/transformers/transformer.cpp
 	internal/transformers/utilities.cpp
 	internal/transformers/destructuring.cpp
+	internal/transformers/estransforms/utilities.cpp
+	internal/transformers/tstransforms/utilities.cpp
+	internal/transformers/moduletransforms/utilities.cpp
+	internal/transformers/inliners/constenum.cpp
 	# === slice: module ===
 	internal/core/compileroptions.cpp
 	internal/module/util.cpp
