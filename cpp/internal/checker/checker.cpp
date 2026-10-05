@@ -4388,12 +4388,6 @@ bool Checker::checkTypeAssignableTo(Type* source, Type* target, Node* errorNode,
 	TSC_UNREACHABLE("checkTypeAssignableTo — ported with relater.go");
 }
 
-Type* Checker::getFlowTypeOfReferenceEx(Node* reference, Type* declaredType,
-										Type* initialType, Node* flowContainer,
-										FlowNode* flowNode) {
-	TSC_UNREACHABLE("getFlowTypeOfReferenceEx — ported with flow.go");
-}
-
 Type* Checker::getOptionalType(Type* t, bool isProperty) {
 	TSC_UNREACHABLE("getOptionalType — ported with checker.cpp:18980 slice");
 }
@@ -6604,11 +6598,6 @@ Type* Checker::getRestrictiveTypeParameter(Type* t) {
 bool Checker::isStringIndexSignatureOnlyTypeWorker(Type* t) {
 	TSC_UNREACHABLE(
 		"isStringIndexSignatureOnlyTypeWorker — ported with checker.go:27831 slice");
-}
-
-bool Checker::markNodeAssignmentsWorker(Node* node) {
-	TSC_UNREACHABLE(
-		"markNodeAssignmentsWorker — ported with flow.go:2700 slice");
 }
 
 Ternary Checker::compareTypesAssignableWorker(Type* source, Type* target,

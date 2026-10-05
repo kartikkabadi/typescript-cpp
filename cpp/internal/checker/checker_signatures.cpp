@@ -11,6 +11,9 @@
 namespace tsc {
 namespace checker {
 
+// getFlowNodeOfNode — defined in checker_flow.cpp (flow.go:69).
+FlowNode* getFlowNodeOfNode(Node* node);
+
 namespace {
 
 // --- core.* / file-local helpers (PORTING.md: anonymous-namespace copies per TU) ---
@@ -148,15 +151,6 @@ bool forEachYieldExpression(Node* body, const std::function<bool(Node*)>& visito
 		return false;
 	};
 	return traverse(body);
-}
-
-// getFlowNodeOfNode — flow.go:69
-FlowNode* getFlowNodeOfNode(Node* node) {
-	FlowNode** flowNodeData = node->flowNodeData().flowNode;
-	if (flowNodeData != nullptr) {
-		return *flowNodeData;
-	}
-	return nullptr;
 }
 
 // getEffectiveSetAccessorTypeAnnotationNode — checker.go:20459
@@ -1051,9 +1045,7 @@ Type* Checker::getAwaitedTypeNoAlias(Type* /*t*/) { TSC_UNREACHABLE("getAwaitedT
 Type* Checker::unwrapAwaitedType(Type* /*t*/) { TSC_UNREACHABLE("unwrapAwaitedType — owned by async/awaited"); }
 IterationTypes Checker::getIterationTypesOfIterable(Type* /*t*/, IterationUse /*use*/, Node* /*errorNode*/) { TSC_UNREACHABLE("getIterationTypesOfIterable — owned by iteration"); }
 Type* Checker::getIterationTypeOfGeneratorFunctionReturnType(IterationTypeKind /*typeKind*/, Type* /*returnType*/, bool /*isAsyncGenerator*/) { TSC_UNREACHABLE("getIterationTypeOfGeneratorFunctionReturnType — owned by iteration"); }
-bool Checker::isConstantReference(Node* /*node*/) { TSC_UNREACHABLE("isConstantReference — owned by flow"); }
-bool Checker::isReachableFlowNode(FlowNode* /*flow*/) { TSC_UNREACHABLE("isReachableFlowNode — owned by flow"); }
-bool Checker::isSymbolAssigned(Symbol* /*symbol*/) { TSC_UNREACHABLE("isSymbolAssigned — owned by flow"); }
+// isConstantReference / isReachableFlowNode / isSymbolAssigned — defined in checker_flow.cpp
 
 } // namespace checker
 } // namespace tsc

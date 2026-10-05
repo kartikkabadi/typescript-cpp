@@ -1361,10 +1361,7 @@ std::pair<std::string, bool> Checker::getEffectivePropertyNameForPropertyNameNod
 	return {"", false};
 }
 
-// checker.go: tryGetNameFromType — reads literal/unique-symbol type members.
-std::pair<std::string, bool> Checker::tryGetNameFromType(Type* t) {
-	TSC_UNREACHABLE("tryGetNameFromType — ported with the expression-checking slice");
-}
+// checker.go: tryGetNameFromType — defined in checker_flow.cpp (flow slice).
 
 // checker.go: getTypeOfExpression — full expression checking.
 // (getTypeOfExpression dep-stub removed — walk slice defines it in checker_walk.cpp.)

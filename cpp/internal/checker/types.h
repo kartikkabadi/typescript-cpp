@@ -267,6 +267,7 @@ struct SwitchStatementLinks {
 	ExhaustiveState exhaustiveState{}; // Switch statement exhaustiveness
 	bool switchTypesComputed{};
 	bool witnessesComputed{};
+	bool witnessesAreNil{}; // Go: links.witnesses == nil (case exprs not all string literals)
 	std::vector<Type*> switchTypes;
 	std::vector<std::string> witnesses;
 };

@@ -726,11 +726,16 @@ struct Relation;
 
 // SharedFlow / FlowState (flow.go)
 
-struct FlowType;
+struct FlowType {
+	Type* t{};
+	bool incomplete{};
+
+	bool isNil() const { return t == nullptr; }
+};
 
 struct SharedFlow {
 	FlowNode* flow{};
-	FlowType* flowType{};
+	FlowType flowType{};
 };
 
 struct FlowState {
@@ -2639,6 +2644,175 @@ public:
 	Type* inferTypeForHomomorphicMappedType(Type* source, Type* target,
 											Type* constraint);
 	// === end slice: instantiate ===
+
+	// === slice: flow === (checker_flow.cpp)
+	// flow.go — control-flow type narrowing. All functions in Go file order;
+	// free functions are file-local in checker_flow.cpp.
+	FlowType newFlowType(Type* t, bool incomplete);
+	FlowState* getFlowState();
+	void putFlowState(FlowState* f);
+	Type* getFlowTypeOfReference(Node* reference, Type* declaredType);
+	FlowType getTypeAtFlowNode(FlowState* f, FlowNode* flow);
+	FlowType getTypeAtFlowAssignment(FlowState* f, FlowNode* flow);
+	Type* getInitialOrAssignedType(FlowState* f, FlowNode* flow);
+	bool isEmptyArrayAssignment(Node* node);
+	FlowType getTypeAtFlowCall(FlowState* f, FlowNode* flow);
+	Type* narrowTypeByTypePredicate(FlowState* f, Type* t, TypePredicate* predicate,
+									Node* callExpression, bool assumeTrue);
+	Type* narrowTypeByAssertion(FlowState* f, Type* t, Node* expr);
+	FlowType getTypeAtFlowCondition(FlowState* f, FlowNode* flow);
+	Type* narrowType(FlowState* f, Type* t, Node* expr, bool assumeTrue);
+	Type* narrowTypeByOptionality(FlowState* f, Type* t, Node* expr, bool assumePresent);
+	Type* narrowTypeByTruthiness(FlowState* f, Type* t, Node* expr, bool assumeTrue);
+	Type* narrowTypeByCallExpression(FlowState* f, Type* t, Node* callExpression,
+									 bool assumeTrue);
+	Type* narrowTypeByBinaryExpression(FlowState* f, Type* t, BinaryExpression* expr,
+									   bool assumeTrue);
+	Type* narrowTypeByEquality(Type* t, Kind operatorKind, Node* value, bool assumeTrue);
+	Type* narrowTypeByTypeof(FlowState* f, Type* t, TypeOfExpression* typeOfExpr,
+							 Kind operatorKind, Node* literal, bool assumeTrue);
+	Type* narrowTypeByLiteralExpression(Type* t, Node* literal, bool assumeTrue);
+	Type* narrowTypeByTypeName(Type* t, const std::string& typeName);
+	Type* narrowTypeByTypeFacts(Type* t, Type* impliedType, TypeFacts facts);
+	Type* narrowTypeByDiscriminantProperty(Type* t, Node* access, Kind operatorKind,
+										   Node* value, bool assumeTrue);
+	Type* narrowTypeByDiscriminant(Type* t, Node* access,
+								   const std::function<Type*(Type*)>& narrowType);
+	bool isMatchingConstructorReference(FlowState* f, Node* expr);
+	Type* narrowTypeByConstructor(Type* t, Kind operatorKind, Node* identifier,
+								  bool assumeTrue);
+	bool isConstructedBy(Type* source, Type* target);
+	Type* narrowTypeByBooleanComparison(FlowState* f, Type* t, Node* expr,
+										Node* boolValue, Kind operatorKind, bool assumeTrue);
+	Type* narrowTypeByInstanceof(FlowState* f, Type* t, BinaryExpression* expr,
+								 bool assumeTrue);
+	Type* getNarrowedType(Type* t, Type* candidate, bool assumeTrue, bool checkDerived);
+	Type* getNarrowedTypeWorker(Type* t, Type* candidate, bool assumeTrue,
+								bool checkDerived);
+	Type* getInstanceType(Type* constructorType);
+	Type* narrowTypeByPrivateIdentifierInInExpression(FlowState* f, Type* t,
+													  BinaryExpression* expr, bool assumeTrue);
+	Type* narrowTypeByInKeyword(FlowState* f, Type* t, Type* nameType, bool assumeTrue);
+	bool isTypePresencePossible(Type* t, const std::string& propName, bool assumeTrue);
+	Type* narrowTypeByOptionalChainContainment(FlowState* f, Type* t, Kind operatorKind,
+											   Node* value, bool assumeTrue);
+	FlowType getTypeAtSwitchClause(FlowState* f, FlowNode* flow);
+	Type* narrowTypeBySwitchOnDiscriminant(Type* t, FlowSwitchClauseData* data);
+	Type* narrowTypeBySwitchOnTypeOf(Type* t, FlowSwitchClauseData* data);
+	Type* narrowTypeBySwitchOnTrue(FlowState* f, Type* t, FlowSwitchClauseData* data);
+	Type* narrowTypeBySwitchOptionalChainContainment(
+		Type* t, FlowSwitchClauseData* data,
+		const std::function<bool(Type*)>& clauseCheck);
+	Type* narrowTypeBySwitchOnDiscriminantProperty(Type* t, Node* access,
+												   FlowSwitchClauseData* data);
+	FlowType getTypeAtFlowBranchLabel(FlowState* f, FlowNode* flow, FlowList* antecedents);
+	Type* getUnionOrEvolvingArrayType(FlowState* f, const std::vector<Type*>& types,
+									  UnionReduction subtypeReduction);
+	FlowType getTypeAtFlowLoopLabel(FlowState* f, FlowNode* flow);
+	FlowType getTypeAtFlowArrayMutation(FlowState* f, FlowNode* flow);
+	Node* getDiscriminantPropertyAccess(FlowState* f, Node* expr, Type* computedType);
+	Node* getCandidateDiscriminantPropertyAccess(FlowState* f, Node* expr);
+	Type* getEvolvingArrayType(Type* elementType);
+	Type* getElementTypeOfEvolvingArrayType(Type* t);
+	bool isEvolvingArrayOperationTarget(Node* node);
+	Type* addEvolvingArrayElementType(Type* evolvingArrayType, Node* node);
+	Type* finalizeEvolvingArrayType(Type* t);
+	Type* getFinalArrayType(EvolvingArrayType* t);
+	Type* createFinalArrayType(Type* elementType);
+	void reportFlowControlError(Node* node);
+	bool isMatchingReference(Node* source, Node* target);
+	CacheKey getFlowReferenceKey(FlowState* f);
+	std::pair<std::string, bool> getAccessedPropertyName(Node* access);
+	std::pair<std::string, bool> tryGetElementAccessExpressionName(
+		ElementAccessExpression* node);
+	std::pair<std::string, bool> tryGetNameFromEntityNameExpression(Node* node);
+	std::pair<std::string, bool> getDestructuringPropertyName(Node* node);
+	std::pair<std::string, bool> getLiteralPropertyNameText(Node* name);
+	bool containsMatchingReference(Node* source, Node* target);
+	bool optionalChainContainsReference(Node* source, Node* target);
+	Node* getReferenceCandidate(Node* node);
+	Node* getReferenceRoot(Node* node);
+	bool hasMatchingArgument(Node* expression, Node* reference);
+	bool isOrContainsMatchingReference(Node* source, Node* target);
+	Type* replacePrimitivesWithLiterals(Type* typeWithPrimitives,
+										Type* typeWithLiterals);
+	bool isExhaustiveSwitchStatement(Node* node);
+	bool computeExhaustiveSwitchStatement(Node* node);
+	bool eachTypeContainedIn(Type* source, const std::vector<Type*>& types);
+	std::optional<std::vector<std::string>> getSwitchClauseTypeOfWitnesses(Node* node);
+	TypeFacts getNotEqualFactsFromTypeofSwitch(int start, int end,
+											 const std::vector<std::string>& witnesses);
+	std::vector<Type*> getSwitchClauseTypes(Node* node);
+	Type* getTypeOfSwitchClause(Node* clause);
+	Signature* getEffectsSignature(Node* node);
+	Type* getSymbolHasInstanceMethodOfObjectType(Type* t);
+	std::string getPropertyNameForKnownSymbolName(const std::string& symbolName);
+	Type* getTypeOfDottedName(Node* node, Diagnostic* diagnostic);
+	Type* getExplicitTypeOfSymbol(Symbol* symbol, Diagnostic* diagnostic);
+	bool isDeclarationWithExplicitTypeAnnotation(Node* node);
+	bool isExpandoPropertyFunctionWithReturnTypeAnnotation(Node* node);
+	bool hasTypePredicateOrNeverReturnType(Signature* sig);
+	Type* getExplicitThisType(Node* node);
+	Type* getInitialType(Node* node);
+	Type* getInitialTypeOfVariableDeclaration(Node* node);
+	Type* getTypeOfInitializer(Node* node);
+	Type* getInitialTypeOfBindingElement(Node* node);
+	Type* getAssignedType(Node* node);
+	Type* getAssignedTypeOfBinaryExpression(Node* node);
+	Type* getAssignedTypeOfArrayLiteralElement(Node* node, Node* element);
+	Type* getTypeOfDestructuredArrayElement(Type* t, int index);
+	Type* includeUndefinedInIndexSignature(Type* t);
+	Type* getAssignedTypeOfSpreadExpression(Node* node);
+	Type* getTypeOfDestructuredSpreadExpression(Type* t);
+	Type* getAssignedTypeOfPropertyAssignment(Node* node);
+	Type* getTypeOfDestructuredProperty(Type* t, Node* name);
+	Type* getAssignedTypeOfShorthandPropertyAssignment(Node* node);
+	bool isDestructuringAssignmentTarget(Node* parent);
+	Type* getTypeWithDefault(Type* t, Node* defaultExpression);
+	Type* getAssignmentReducedType(Type* declaredType, Type* assignedType);
+	Type* getAssignmentReducedTypeWorker(Type* declaredType, Type* assignedType);
+	bool typeMaybeAssignableTo(Type* source, Type* target);
+	Node* getTypePredicateArgument(TypePredicate* predicate, Node* callExpression);
+	Type* getFlowTypeInConstructor(Symbol* symbol, Node* constructor);
+	Type* getFlowTypeInStaticBlocks(Symbol* symbol, const std::vector<Node*>& staticBlocks);
+	bool isReachableFlowNodeWorker(FlowState* f, FlowNode* flow, bool noCacheCheck);
+	bool isFalseExpression(Node* expr);
+	bool isPostSuperFlowNode(FlowNode* flow, bool noCacheCheck);
+	bool isPostSuperFlowNodeWorker(FlowState* f, FlowNode* flow, bool noCacheCheck);
+	bool isSymbolAssignedDefinitely(Symbol* symbol);
+	bool isPastLastAssignment(Symbol* symbol, Node* location);
+	void ensureAssignmentsMarked(Symbol* symbol);
+	bool hasParentWithAssignmentsMarked(Node* node);
+	int32_t extendAssignmentPosition(Node* node, Node* declaration);
+
+	// flow.go dep stubs — defined TSC_UNREACHABLE at the bottom of checker_flow.cpp.
+	bool IsNullableType(Type* t);
+	bool allTypesAssignableToKind(Type* source, TypeFlags kind);
+	bool areTypesComparable(Type* type1, Type* type2);
+	Type* checkIteratedTypeOrElementType(IterationUse use, Type* inputType,
+										 Type* sentType, Node* errorNode);
+	Type* checkNonNullType(Type* t, Node* node);
+	Type* convertAutoToAny(Type* t);
+	Type* extractTypesOfKind(Type* t, TypeFlags kind);
+	Type* getConstituentTypeForKeyType(Type* t, Type* keyType);
+	Type* getFlowTypeOfProperty(Node* reference, Symbol* prop);
+	std::string getKeyPropertyName(Type* t);
+	Type* getNarrowableTypeForReference(Type* t, Node* reference, CheckMode checkMode);
+	Type* getNonUndefinedType(Type* t);
+	Type* getRegularTypeOfObjectLiteral(Type* t);
+	Signature* getResolvedSignature(Node* node, std::vector<Signature*>* candidatesOutArray,
+									CheckMode checkMode);
+	TypeFacts getTypeFacts(Type* t, TypeFacts mask);
+	Type* getTypeOfPropertyOrIndexSignatureOfType(Type* t, const std::string& name);
+	Type* getTypeWithFacts(Type* t, TypeFacts include);
+	Type* getAdjustedTypeWithFacts(Type* t, TypeFacts facts);
+	bool isConstructorType(Type* t);
+	bool isDiscriminantProperty(Type* t, const std::string& name);
+	bool isFunctionType(Type* t);
+	bool isSomeSymbolAssigned(Node* rootDeclaration);
+	bool isTypeSubsetOf(Type* source, Type* target);
+	bool isUniformUnionType(Type* t);
+	Type* recombineUnknownType(Type* t);
 };
 
 // Free helpers used across checker translation units.

@@ -1136,8 +1136,7 @@ void Checker::skippedGenericFunction(Node* node, CheckMode checkMode) {
 
 // (grammar dep-stubs removed — grammarchecks slice landed the real definitions.)
 
-// owner: flow slice (flow.go)
-bool Checker::isReachableFlowNode(FlowNode* flow) { TSC_UNREACHABLE("isReachableFlowNode — flow slice"); }
+// owner: flow slice (flow.go) — isReachableFlowNode defined in checker_flow.cpp
 
 // owner: contextual slice
 Type* Checker::getAwaitedType(Type* t) { TSC_UNREACHABLE("getAwaitedType — contextual slice"); }
