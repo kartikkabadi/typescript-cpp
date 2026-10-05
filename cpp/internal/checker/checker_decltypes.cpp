@@ -2991,7 +2991,6 @@ Type* Checker::checkJsxAttribute(Node* node, CheckMode checkMode) { decltypesDep
 
 // (deduped: getConditionalTypeInstantiation defined in cpp/internal/checker/checker_instantiate.cpp)
 
-Type* Checker::getContextualThisParameterType(Node* fn) { decltypesDepUnreachable("getContextualThisParameterType — decltypes dep"); }
 // (deduped: getContextuallyTypedParameterType defined in cpp/internal/checker/checker_contextual.cpp)
 
 // (deduped: getDestructuringPropertyName defined in checker_flow.cpp)
@@ -3036,9 +3035,11 @@ Type* Checker::getContextualThisParameterType(Node* fn) { decltypesDepUnreachabl
 // (deduped: getTypeOfInitializer defined in checker_flow.cpp)
 // (deduped: getTypeOfMappedSymbol defined in cpp/internal/checker/checker_members.cpp)
 
-Type* Checker::getTypeOfPropertyInBaseClass(Symbol* symbol) { decltypesDepUnreachable("getTypeOfPropertyInBaseClass — decltypes dep"); }
+// (deduped: getTypeOfPropertyInBaseClass defined in the owning slice file)
 // (deduped: getTypeOfReverseMappedSymbol — inference slice, defined in
 // cpp/internal/checker/checker_inference.cpp)
+
+// (deduped: getTypeOfReverseMappedSymbol defined in the owning slice file)
 // (deduped: getTypeReferenceArity defined in cpp/internal/checker/checker_typenodes.cpp)
 
 // (deduped: getTypeWithFacts defined in cpp/internal/checker/checker_contextual.cpp)

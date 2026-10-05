@@ -265,6 +265,16 @@ struct InstantiationExpressionKey {
 	bool operator==(const InstantiationExpressionKey&) const = default;
 };
 
+// NonExistentPropertyKey — checker.go:244 (collections.Set key for
+// deduplicating "property does not exist" diagnostics)
+
+struct NonExistentPropertyKey {
+	Node* propNode{};
+	Type* containingType{};
+	bool isUncheckedJS{};
+	bool operator==(const NonExistentPropertyKey&) const = default;
+};
+
 // SubstitutionTypeKey
 
 struct SubstitutionTypeKey {
@@ -3162,8 +3172,6 @@ public:
 	// checker_typeops.cpp under "dep stubs".
 	std::string getTupleElementLabel(const TupleElementInfo& elementInfo,
 	                               Symbol* restSymbol, int index);          // relater slice
-	Node* getControlFlowContainer(Node* node);                              // expressions slice
-	bool isUncalledFunctionReference(Node* node, Symbol* prop);             // expressions slice
 	bool isJSLiteralType(Type* t);                                          // decltypes slice
 	bool isDeprecatedSymbol(Symbol* symbol);                                // decltypes slice
 	// === slice: utilities ===
@@ -3190,7 +3198,7 @@ public:
 	Type* getImportAttributesTypeForModuleSpecifier(Node* moduleSpecifier);
 	Symbol* getSymbolOfPartOfRightHandSideOfImportEquals(Node* entityName);
 	// expr/jsx/emitresolver-owned deps (stubs until those slices land)
-	Symbol* checkNewTargetMetaProperty(Node* node);
+	Type* checkNewTargetMetaProperty(Node* node);
 	Type* checkMetaPropertyKeyword(Node* node);
 	Type* getSymbolHasInstanceMethodOfObjectType(Type* t);
 	Symbol* getIntrinsicTagSymbol(Node* node);
@@ -3513,11 +3521,109 @@ public:
 
 	// expr_c dep stubs — owned by other slices; bodies stubbed in
 	// checker_expressions_c.cpp under "dep stubs".
-	void reportNonexistentProperty(Node* propNode, Type* containingType, bool isUncheckedJS); // expressions slice
-	bool checkPropertyAccessibility(Node* node, bool isSuper, bool writing, Type* t, Symbol* prop); // expressions slice
 	bool isTypeComparableTo(Type* source, Type* target);                    // relater slice
 	bool areTypesComparable(Type* type1, Type* type2);                      // relater slice
 	std::pair<std::string, std::string> getTypeNamesForErrorDisplay(Type* left, Type* right); // relater slice
+
+	// === slice: expr_b === (checker_expressions_b.cpp — checker.go:10492-12389)
+	Node* getControlFlowContainer(Node* node);
+	bool isUncalledFunctionReference(Node* node, Symbol* prop);
+	Signature* getIntersectedSignatures(const std::vector<Signature*>& signatures);
+	bool isAritySmaller(Signature* signature, Node* target);
+	void assignContextualParameterTypes(Signature* sig, Signature* context);
+	void assignNonContextualParameterTypes(Signature* signature);
+	void assignParameterType(Symbol* parameter, Type* contextualType);
+	void assignBindingElementTypes(Node* pattern, Type* parentType);
+	void checkCollisionWithRequireExportsInGeneratedCode(Node* node, Node* name);
+	void checkCollisionWithGlobalObjectInGeneratedCode(Node* node, Node* name);
+	bool needCollisionCheckForIdentifier(Node* node, Node* identifier,
+	                                     const std::string& name);
+	void recordPotentialCollisionWithWeakMapSetInGeneratedCode(Node* node,
+	                                                           Node* name);
+	void checkWeakMapSetCollision(Node* node);
+	void checkCollisionWithGlobalPromiseInGeneratedCode(Node* node, Node* name);
+	void recordPotentialCollisionWithReflectInGeneratedCode(Node* node,
+	                                                        Node* name);
+	void checkReflectCollision(Node* node);
+	void checkClassNameCollisionWithObject(Node* name);
+	Type* checkNonNullChain(Node* node);
+	Type* checkImportMetaProperty(Node* node);
+	void checkDeleteExpressionMustBeOptional(Node* expr, Symbol* symbol);
+	Type* getUnaryResultType(Type* operandType);
+	bool isSameScopedBindingElement(Node* node, Node* declaration);
+	Type* removeOptionalityFromDeclaredType(Type* declaredType,
+	                                        Node* declaration);
+	bool parameterInitializerContainsUndefined(Node* declaration);
+	Type* checkPropertyAccessChain(Node* node, CheckMode checkMode);
+	Type* checkPropertyAccessExpressionOrQualifiedName(Node* node, Node* left,
+	                                                   Type* leftType,
+	                                                   Node* right,
+	                                                   CheckMode checkMode,
+	                                                   bool writeOnly);
+	Type* getFlowTypeOfAccessExpression(Node* node, Symbol* prop, Type* propType,
+	                                    Node* errorNode, CheckMode checkMode);
+	bool checkPrivateIdentifierPropertyAccess(Type* leftType, Node* right,
+	                                          Symbol* lexicallyScopedIdentifier);
+	void reportNonexistentProperty(Node* propNode, Type* containingType,
+	                               bool isUncheckedJS);
+	Symbol* getSuggestedSymbolForNonexistentProperty(Node* name,
+	                                                 Type* containingType);
+	bool isValidPropertyAccessForCompletions(Node* node, Type* t,
+	                                         Symbol* property);
+	bool isPropertyAccessible(Node* node, bool isSuper, bool isWrite,
+	                          Type* containingType, Symbol* property);
+	bool containerSeemsToBeEmptyDomElement(Type* containingType);
+	void checkPropertyNotUsedBeforeDeclaration(Symbol* prop, Node* node,
+	                                           Node* right);
+	bool isOptionalPropertyDeclaration(Node* node);
+	bool isPropertyDeclaredInAncestorClass(Symbol* prop);
+	bool checkPropertyAccessibility(Node* node, bool isSuper, bool writing,
+	                                Type* t, Symbol* prop);
+	bool checkPropertyAccessibilityEx(Node* node, bool isSuper, bool writing,
+	                                  Type* t, Symbol* prop, bool reportError);
+	bool checkPropertyAccessibilityAtLocation(Node* location, bool isSuper,
+	                                          bool writing, Type* containingType,
+	                                          Symbol* prop, Node* errorNode);
+	bool symbolHasNonMethodDeclaration(Symbol* symbol);
+	bool forEachProperty(Symbol* prop,
+	                     const std::function<bool(Symbol*)>& callback);
+	Type* getDeclaringClass(Symbol* prop);
+	bool isValidOverrideOf(Symbol* sourceProp, Symbol* targetProp);
+	bool isPropertyInClassDerivedFrom(Symbol* prop, Type* baseClass);
+	bool isNodeUsedDuringClassInitialization(Node* node);
+	bool isNodeWithinClass(Node* node, Node* classDeclaration);
+	bool forEachEnclosingClass(Node* node,
+	                           const std::function<bool(Node*)>& callback);
+	bool isClassDerivedFromDeclaringClasses(Type* checkClass, Symbol* prop,
+	                                        bool writing);
+	Type* getEnclosingClassFromThisParameter(Node* node);
+	Type* tryGetThisTypeAt(Node* node);
+	Type* TryGetThisTypeAtEx(Node* node, bool includeGlobalThis,
+	                         Node* container);
+	Type* tryGetThisTypeAtEx(Node* node, bool includeGlobalThis,
+	                         Node* container);
+	// nonExistentProperties — checker.go:903 (collections.Set[NonExistentPropertyKey])
+	struct NonExistentPropertyKeyHash {
+		size_t operator()(const NonExistentPropertyKey& k) const noexcept {
+			return reinterpret_cast<size_t>(k.propNode) ^
+			       (reinterpret_cast<size_t>(k.containingType) << 1) ^
+			       (static_cast<size_t>(k.isUncheckedJS) << 63);
+		}
+	};
+	std::unordered_set<NonExistentPropertyKey, NonExistentPropertyKeyHash>
+		nonExistentProperties;
+	// expr_b dep decls — owned by other slices; bodies stubbed in
+	// checker_expressions_b.cpp under "dep stubs".
+	std::vector<Type*> checkTypeArguments(
+		Signature* signature, const std::vector<Node*>& typeArgumentNodes,
+		bool reportErrors,
+		const DiagnosticMessage* headMessage);                                // checker.go:9414 slice
+	Type* getIterationTypeOfIterable(IterationUse use, IterationTypeKind typeKind,
+	                                 Type* inputType, Node* errorNode);       // checker.go:6408 slice
+	bool hasCorrectTypeArgumentArity(Signature* signature,
+	                                 const std::vector<Node*>& typeArguments); // checker.go:9406 slice
+	std::string SymbolToString(Symbol* s);                                    // printer slice
+	// === end slice: expr_b ===
 };  // class Checker
 
 // moduletarget-slice file-local callees hoisted for the dep graph (defs in

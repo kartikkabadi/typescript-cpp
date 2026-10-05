@@ -984,9 +984,10 @@ IndexInfo* Checker::instantiateIndexInfo(IndexInfo* info, TypeMapper* m) {
 Type* Checker::getRestTypeAtPosition(Signature* /*source*/, int /*pos*/, bool /*readonly*/) { TSC_UNREACHABLE("getRestTypeAtPosition — owned by typeops/relater"); }
 TypePredicate* Checker::newTypePredicate(TypePredicateKind /*kind*/, const std::string& /*parameterName*/, int32_t /*parameterIndex*/, Type* /*t*/) { TSC_UNREACHABLE("newTypePredicate — owned by typeops/relater"); }
 bool Checker::isResolvingReturnTypeOfSignature(Signature* /*signature*/) { TSC_UNREACHABLE("isResolvingReturnTypeOfSignature — owned by typeops/relater"); }
-Type* Checker::getYieldedTypeOfYieldExpression(Node* /*node*/, Type* /*expressionType*/, Type* /*sentType*/, bool /*isAsync*/) { TSC_UNREACHABLE("getYieldedTypeOfYieldExpression — signatures dep"); }
+// (deduped: getYieldedTypeOfYieldExpression defined in the owning slice file)
 // (deduped: isConstContext defined in cpp/internal/checker/checker_expressions_c.cpp)
 
+// (deduped: isConstContext defined in the owning slice file)
 
 
 

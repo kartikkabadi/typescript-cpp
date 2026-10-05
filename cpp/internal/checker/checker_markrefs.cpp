@@ -970,10 +970,10 @@ void Checker::markTypeNodeAsReferenced(Node* node /*TypeNode*/) {
 
 // owner: expressions slice (checker.go:8090-14185)
 // (deduped: getResolvedSymbol defined in cpp/internal/checker/checker_expressions_c.cpp)
-bool Checker::isMethodAccessForCall(Node* node) { TSC_UNREACHABLE("isMethodAccessForCall — expressions slice"); }
-Symbol* Checker::getPrivateIdentifierPropertyOfType(Type* leftType, Symbol* lexicallyScopedIdentifier) {
-	TSC_UNREACHABLE("getPrivateIdentifierPropertyOfType — expressions slice");
-}
+// (deduped: isMethodAccessForCall defined in the owning slice file)
+// (deduped: getPrivateIdentifierPropertyOfType defined in the owning slice file)
+
+// (deduped: getResolvedSymbol defined in the owning slice file)
 // owner: jsx slice (jsx.go)
 Symbol* Checker::getJsxNamespaceContainerForImplicitImport(Node* location) {
 	TSC_UNREACHABLE("getJsxNamespaceContainerForImplicitImport — jsx slice");

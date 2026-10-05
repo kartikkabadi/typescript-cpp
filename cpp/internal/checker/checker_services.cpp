@@ -73,7 +73,7 @@ Symbol* Checker::getSymbolAtLocation(Node* node, bool ignoreErrors) {
 			if (metaProp->KeywordToken == Kind::NewKeyword &&
 			    node->text() == "target") {
 				// `target` in `new.target`
-				return checkNewTargetMetaProperty(parent);
+				return checkNewTargetMetaProperty(parent)->symbol;
 			}
 			// The `meta` in `import.meta` could be given
 			// `getTypeOfNode(parent)->symbol` (the `ImportMeta` interface
@@ -461,128 +461,7 @@ bool Checker::isThisPropertyAndThisTyped(Node* node) {
 }
 
 // checker.go:32419 — getTypeOfNode
-Type* Checker::getTypeOfNode(Node* node) {
-	if (isSourceFile(node) &&
-	    !isExternalOrCommonJSModule(static_cast<SourceFile*>(node))) {
-		return errorType;
-	}
-
-	if ((node->flags & NodeFlagsInWithStatement) != 0) {
-		// We cannot answer semantic questions within a with block, do not
-		// proceed any further
-		return errorType;
-	}
-
-	bool isImplements = false;
-	Node* classDecl =
-	    tryGetClassImplementingOrExtendingHeritageClauseElement(node,
-	                                                          &isImplements);
-	Type* classType = nullptr;
-	if (classDecl != nullptr) {
-		classType = getDeclaredTypeOfClassOrInterface(
-		    getSymbolOfDeclaration(classDecl));
-	}
-
-	if (isPartOfTypeNode(node)) {
-		Type* typeFromTypeNode = getTypeFromTypeNode(node);
-		if (classType != nullptr) {
-			return getTypeWithThisArgument(
-			    typeFromTypeNode,
-			    classType->AsInterfaceType()->thisType,
-			    false /*needApparentType*/);
-		}
-
-		return typeFromTypeNode;
-	}
-
-	if (isExpressionNode(node)) {
-		return getRegularTypeOfExpression(node);
-	}
-
-	if (classType != nullptr && !isImplements) {
-		// A SyntaxKind.ExpressionWithTypeArguments is considered a type node,
-		// except when it occurs in the extends clause of a class. We handle
-		// that case here.
-		auto baseTypes = getBaseTypes(classType);
-		Type* baseType = baseTypes.empty() ? nullptr : baseTypes.front();
-		if (baseType != nullptr) {
-			return getTypeWithThisArgument(
-			    baseType, classType->AsInterfaceType()->thisType,
-			    false /*needApparentType*/);
-		}
-		return errorType;
-	}
-
-	if (isTypeDeclaration(node)) {
-		// In this case, we call getSymbolOfDeclaration instead of
-		// getSymbolAtLocation because it is a declaration
-		Symbol* symbol = getSymbolOfDeclaration(node);
-		return getDeclaredTypeOfSymbol(symbol);
-	}
-
-	if (isTypeDeclarationName(node)) {
-		Symbol* symbol = getSymbolAtLocation(node, false /*ignoreErrors*/);
-		if (symbol != nullptr) {
-			return getDeclaredTypeOfSymbol(symbol);
-		}
-		return errorType;
-	}
-
-	if (isBindingElement(node)) {
-		Type* t = getTypeForVariableLikeDeclaration(
-		    node, true /*includeOptionality*/, CheckModeNormal);
-		if (t != nullptr) {
-			return t;
-		}
-		return errorType;
-	}
-
-	if (isDeclaration(node)) {
-		// In this case, we call getSymbolOfDeclaration instead of
-		// getSymbolAtLocation because it is a declaration
-		Symbol* symbol = getSymbolOfDeclaration(node);
-		return getTypeOfSymbol(symbol);
-	}
-
-	if (isDeclarationNameOrImportPropertyName(node)) {
-		Symbol* symbol = getSymbolAtLocation(node, false /*ignoreErrors*/);
-		if (symbol != nullptr) {
-			return getTypeOfSymbol(symbol);
-		}
-		return errorType;
-	}
-
-	if (isBindingPattern(node)) {
-		Type* t = getTypeForVariableLikeDeclaration(
-		    node->parent, true /*includeOptionality*/, CheckModeNormal);
-		if (t != nullptr) {
-			return t;
-		}
-		return errorType;
-	}
-
-	if (isInRightSideOfImportOrExportAssignment(node)) {
-		Symbol* symbol = getSymbolAtLocation(node, false /*ignoreErrors*/);
-		if (symbol != nullptr) {
-			Type* declaredType = getDeclaredTypeOfSymbol(symbol);
-			if (!isErrorType(declaredType)) {
-				return declaredType;
-			}
-			return getTypeOfSymbol(symbol);
-		}
-	}
-
-	if (isMetaProperty(node->parent) &&
-	    node->parent->as<MetaProperty>()->KeywordToken == node->kind) {
-		return checkMetaPropertyKeyword(node->parent);
-	}
-
-	if (isImportAttributes(node)) {
-		return checkImportAttributesExpression(node);
-	}
-
-	return errorType;
-}
+// (deduped: getTypeOfNode defined in the owning slice file)
 
 // checker.go:32531 — getThisTypeOfObjectLiteralFromContextualType
 Type* Checker::getThisTypeOfObjectLiteralFromContextualType(
@@ -683,50 +562,7 @@ Type* Checker::getRegularTypeOfExpression(Node* expr) {
 }
 
 // checker.go:32611 — containsArgumentsReference
-bool Checker::containsArgumentsReference(Node* node) {
-	if (node->body() == nullptr) {
-		return false;
-	}
-
-	if (auto it = cachedArgumentsReferenced.find(node);
-	    it != cachedArgumentsReferenced.end()) {
-		return it->second;
-	}
-
-	std::function<bool(Node*)> visit = [&](Node* node) -> bool {
-		if (node == nullptr) {
-			return false;
-		}
-		switch (node->kind) {
-		case Kind::Identifier:
-			return node->text() == argumentsSymbol->name &&
-			       IsArgumentsSymbol(getResolvedSymbol(node));
-		case Kind::PropertyDeclaration:
-		case Kind::MethodDeclaration:
-		case Kind::GetAccessor:
-		case Kind::SetAccessor:
-			if (isComputedPropertyName(node->name())) {
-				return visit(node->name());
-			}
-			break;
-		case Kind::PropertyAccessExpression:
-		case Kind::ElementAccessExpression:
-			return visit(node->expression());
-		case Kind::PropertyAssignment:
-			return visit(node->initializer());
-		default:
-			break;
-		}
-		if (nodeStartsNewLexicalEnvironment(node) || isPartOfTypeNode(node)) {
-			return false;
-		}
-		return node->forEachChild(visit);
-	};
-
-	bool containsArguments = visit(node->body());
-	cachedArgumentsReferenced[node] = containsArguments;
-	return containsArguments;
-}
+// (deduped: containsArgumentsReference defined in the owning slice file)
 
 // checker.go:32648 — GetTypeAtLocation
 Type* Checker::GetTypeAtLocation(Node* node) {

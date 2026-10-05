@@ -2663,9 +2663,6 @@ std::string Checker::TypeToStringEx(Type* t, Node* enclosingDeclaration,
 // (deduped: getSubstitutionType defined in cpp/internal/checker/checker_instantiate.cpp)
 
 
-Type* Checker::getInstantiationExpressionType(Type* exprType, Node* node) {
-	TSC_UNREACHABLE("getInstantiationExpressionType — typenodes dep");
-}
 
 }  // namespace checker
 }  // namespace tsc

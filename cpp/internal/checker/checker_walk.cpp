@@ -1159,14 +1159,14 @@ void Checker::skippedGenericFunction(Node* node, CheckMode checkMode) {
 // checker_contextual.cpp; `newInferenceInfo` lives in checker_inference.cpp.
 
 // owner: expression-check slices (wave-3)
-Type* Checker::checkIdentifier(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkIdentifier — expressions slice"); }
-Type* Checker::checkThisExpression(Node* node) { TSC_UNREACHABLE("checkThisExpression — expressions slice"); }
 Type* Checker::checkSuperExpression(Node* node) { TSC_UNREACHABLE("checkSuperExpression — expressions slice"); }
 Type* Checker::checkTemplateExpression(Node* node) { TSC_UNREACHABLE("checkTemplateExpression — expressions slice"); }
 Type* Checker::checkRegularExpressionLiteral(Node* node) { TSC_UNREACHABLE("checkRegularExpressionLiteral — expressions slice"); }
 Type* Checker::checkArrayLiteral(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkArrayLiteral — expressions slice"); }
 // (deduped: checkObjectLiteral defined in cpp/internal/checker/checker_expressions_c.cpp)
-Type* Checker::checkPropertyAccessExpression(Node* node, CheckMode checkMode, bool writeOnly) { TSC_UNREACHABLE("checkPropertyAccessExpression — expressions slice"); }
+// (deduped: checkPropertyAccessExpression defined in the owning slice file)
+
+// (deduped: checkObjectLiteral defined in the owning slice file)
 Type* Checker::checkQualifiedName(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkQualifiedName — expressions slice"); }
 Type* Checker::checkIndexedAccess(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkIndexedAccess — expressions slice"); }
 Type* Checker::checkCallExpression(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkCallExpression — expressions slice"); }
@@ -1176,20 +1176,23 @@ Type* Checker::checkParenthesizedExpression(Node* node, CheckMode checkMode) { T
 Type* Checker::checkClassExpression(Node* node) { TSC_UNREACHABLE("checkClassExpression — expressions slice"); }
 Type* Checker::checkFunctionExpressionOrObjectLiteralMethod(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkFunctionExpressionOrObjectLiteralMethod — expressions slice"); }
 // (deduped: checkAssertion defined in cpp/internal/checker/checker_expressions_c.cpp)
-Type* Checker::checkTypeOfExpression(Node* node) { TSC_UNREACHABLE("checkTypeOfExpression — expressions slice"); }
-Type* Checker::checkNonNullAssertion(Node* node) { TSC_UNREACHABLE("checkNonNullAssertion — expressions slice"); }
-Type* Checker::checkSatisfiesExpression(Node* node) { TSC_UNREACHABLE("checkSatisfiesExpression — expressions slice"); }
-Type* Checker::checkMetaProperty(Node* node) { TSC_UNREACHABLE("checkMetaProperty — expressions slice"); }
-Type* Checker::checkDeleteExpression(Node* node) { TSC_UNREACHABLE("checkDeleteExpression — expressions slice"); }
-Type* Checker::checkVoidExpression(Node* node) { TSC_UNREACHABLE("checkVoidExpression — expressions slice"); }
-Type* Checker::checkAwaitExpression(Node* node) { TSC_UNREACHABLE("checkAwaitExpression — expressions slice"); }
-Type* Checker::checkPrefixUnaryExpression(Node* node) { TSC_UNREACHABLE("checkPrefixUnaryExpression — expressions slice"); }
-Type* Checker::checkPostfixUnaryExpression(Node* node) { TSC_UNREACHABLE("checkPostfixUnaryExpression — expressions slice"); }
+// (deduped: checkTypeOfExpression defined in the owning slice file)
+// (deduped: checkNonNullAssertion defined in the owning slice file)
+// (deduped: checkSatisfiesExpression defined in the owning slice file)
+// (deduped: checkMetaProperty defined in the owning slice file)
+// (deduped: checkDeleteExpression defined in the owning slice file)
+// (deduped: checkVoidExpression defined in the owning slice file)
+// (deduped: checkAwaitExpression defined in the owning slice file)
+// (deduped: checkPrefixUnaryExpression defined in the owning slice file)
+// (deduped: checkPostfixUnaryExpression defined in the owning slice file)
 // (deduped: checkBinaryExpression defined in cpp/internal/checker/checker_expressions_c.cpp)
-Type* Checker::checkConditionalExpression(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkConditionalExpression — expressions slice"); }
-Type* Checker::checkSpreadExpression(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkSpreadExpression — expressions slice"); }
-Type* Checker::checkYieldExpression(Node* node) { TSC_UNREACHABLE("checkYieldExpression — expressions slice"); }
-Type* Checker::checkSyntheticExpression(Node* node) { TSC_UNREACHABLE("checkSyntheticExpression — expressions slice"); }
+// (deduped: checkConditionalExpression defined in the owning slice file)
+// (deduped: checkSpreadExpression defined in the owning slice file)
+// (deduped: checkYieldExpression defined in the owning slice file)
+// (deduped: checkSyntheticExpression defined in the owning slice file)
+
+// (deduped: checkAssertion defined in the owning slice file)
+// (deduped: checkBinaryExpression defined in the owning slice file)
 Type* Checker::checkJsxExpression(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkJsxExpression — jsx slice"); }
 Type* Checker::checkJsxElement(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkJsxElement — jsx slice"); }
 Type* Checker::checkJsxSelfClosingElement(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkJsxSelfClosingElement — jsx slice"); }
@@ -1233,4 +1236,12 @@ void Checker::registerForUnusedIdentifiersCheck(Node* node) { TSC_UNREACHABLE("r
 // owner: module/resolved-symbol helpers
 std::string Checker::getIsolatedModulesLikeFlagName() { TSC_UNREACHABLE("getIsolatedModulesLikeFlagName — modulechecks slice"); }
 
+
+// dep stubs — owned by slices not yet merged
+Node* Checker::getEffectiveCheckNode(Node* argument) { TSC_UNREACHABLE("getEffectiveCheckNode — expr-a slice"); }
+Type* Checker::getImportAttributesTypeForModuleSpecifier(Node* moduleSpecifier) { TSC_UNREACHABLE("getImportAttributesTypeForModuleSpecifier — declchecks2 slice"); }
+Symbol* Checker::getSymbolOfPartOfRightHandSideOfImportEquals(Node* entityName) { TSC_UNREACHABLE("getSymbolOfPartOfRightHandSideOfImportEquals — symboltype slice"); }
+Symbol* Checker::getIntrinsicTagSymbol(Node* node) { TSC_UNREACHABLE("getIntrinsicTagSymbol — jsx slice"); }
+
 } // namespace tsc::checker
+

@@ -2400,13 +2400,6 @@ std::string Checker::getTupleElementLabel(const TupleElementInfo& elementInfo,
 
 // owner: contextual slice
 
-// owner: expressions slice
-Node* Checker::getControlFlowContainer(Node* node) {
-	TSC_UNREACHABLE("getControlFlowContainer — expressions slice");
-}
-bool Checker::isUncalledFunctionReference(Node* node, Symbol* prop) {
-	TSC_UNREACHABLE("isUncalledFunctionReference — expressions slice");
-}
 
 // owner: decltypes slice
 

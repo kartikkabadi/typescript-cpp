@@ -2302,14 +2302,10 @@ Symbol* Checker::getReferencedValueOrAliasSymbol(Node* reference) {
 // (deduped: checkNonNullType defined in checker_utilities.cpp)
 
 // checker.go:11730 — expressions slice
-void Checker::reportNonexistentProperty(Node* propNode, Type* containingType, bool isUncheckedJS) {
-	TSC_UNREACHABLE("reportNonexistentProperty — owned by expressions slice");
-}
+// (deduped: reportNonexistentProperty defined in checker_expressions_b.cpp)
 
 // checker.go:11954 — expressions slice
-bool Checker::checkPropertyAccessibility(Node* node, bool isSuper, bool writing, Type* t, Symbol* prop) {
-	TSC_UNREACHABLE("checkPropertyAccessibility — owned by expressions slice");
-}
+// (deduped: checkPropertyAccessibility defined in checker_expressions_b.cpp)
 
 // flow.go:2604 — flow slice
 // (deduped: isPostSuperFlowNode defined in checker_flow.cpp)

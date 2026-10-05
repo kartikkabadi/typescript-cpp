@@ -1791,15 +1791,11 @@ bool Checker::isPropertyWithoutInitializer(Node* node) {
 // ---------------------------------------------------------------------------
 
 // owner: expressions slice (checker.go:8090-14185)
-Type* Checker::checkTruthinessExpression(Node* node, CheckMode checkMode) {
-	TSC_UNREACHABLE("checkTruthinessExpression — expressions slice");
-}
+// (deduped: checkTruthinessExpression defined in the owning slice file)
 // (deduped: checkReferenceExpression defined in cpp/internal/checker/checker_expressions_c.cpp)
 // (deduped: checkDestructuringAssignment defined in cpp/internal/checker/checker_expressions_c.cpp)
 // (deduped: isTypeEqualityComparableTo defined in cpp/internal/checker/checker_expressions_c.cpp)
-Node* Checker::getEffectiveCheckNode(Node* node) {
-	TSC_UNREACHABLE("getEffectiveCheckNode — expressions slice");
-}
+
 std::string Checker::getTypeNameForErrorDisplay(Type* t) {
 	TSC_UNREACHABLE("getTypeNameForErrorDisplay — expressions slice");
 }
@@ -1843,13 +1839,8 @@ ConstructorAccessibilityError* Checker::getConstructorAccessibilityError(
 // owner: typeops slice (checker.go:26020-28654)
 
 // owner: services tail (checker.go:32070-32660)
-Symbol* Checker::getSymbolAtLocation(Node* node, bool ignoreErrors) {
-	TSC_UNREACHABLE("getSymbolAtLocation — services tail");
-}
-std::vector<IndexInfo*> Checker::getApplicableIndexInfos(Type* t,
-                                                         Type* keyType) {
-	TSC_UNREACHABLE("getApplicableIndexInfos — services tail");
-}
+// (deduped: getSymbolAtLocation defined in the owning slice file)
+// (deduped: getApplicableIndexInfos defined in the owning slice file)
 
 // owner: modulechecks slice (checker.go:5082-5928 region; fn at 7082 is
 // in aliasunused range)
