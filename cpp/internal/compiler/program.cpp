@@ -1,0 +1,1821 @@
+// --- program.go + outputpaths/commonsourcedirectory.go + emitter.go
+// (sourceFileMayBeEmitted) — program slice ---
+//
+// Port notes:
+//  - Go runs file parsing/binding/checking through workgroups; this port is
+//    single-threaded and produces identical observable state.
+//  - Project references, content mappers, incremental (.tsbuildinfo), and
+//    emit are out of scope — Go-equivalent no-ops or TSC_UNREACHABLE where a
+//    branch can't be reached from `tsc --noEmit <files>`.
+//  - The checker's per-file check walker isn't ported yet, so checker
+//    diagnostics are empty (faithful for this slice's output).
+
+#include "internal/compiler/program.h"
+#include "internal/binder/binder.h"
+#include "internal/diagnostics/messages_generated.h"
+#include "internal/scanner/scanner.h"
+
+#include <algorithm>
+#include <cstring>
+#include <deque>
+#include <functional>
+
+namespace tsc::compiler {
+
+namespace {
+
+// ===========================================================================
+// core stringers — modulekind_stringer_generated.go /
+// scripttarget_stringer_generated.go / compileroptions.go JsxEmit.String
+// ===========================================================================
+
+std::string moduleKindString(ModuleKind i) {
+	static const char* name0 =
+	    "NoneCommonJSAMDUMDSystemES2015ES2020ES2022";
+	static const uint8_t index0[] = {0, 4, 12, 15, 18, 24, 30, 36, 42};
+	static const char* name1 = "ESNextNode16Node18Node20";
+	static const uint8_t index1[] = {0, 6, 12, 18, 24};
+	static const char* name2 = "NodeNextPreserve";
+	static const uint8_t index2[] = {0, 8, 16};
+	int v = static_cast<int>(i);
+	if (0 <= v && v <= 7)
+		return std::string(name0 + index0[v],
+		                   static_cast<size_t>(index0[v + 1] - index0[v]));
+	if (99 <= v && v <= 102) {
+		v -= 99;
+		return std::string(name1 + index1[v],
+		                   static_cast<size_t>(index1[v + 1] - index1[v]));
+	}
+	if (199 <= v && v <= 200) {
+		v -= 199;
+		return std::string(name2 + index2[v],
+		                   static_cast<size_t>(index2[v + 1] - index2[v]));
+	}
+	return "ModuleKind(" + std::to_string(v) + ")";
+}
+
+std::string scriptTargetStringForOptions(ScriptTarget i) {
+	static const char* name0 =
+	    "NoneES5ES2015ES2016ES2017ES2018ES2019ES2020ES2021ES2022ES2023ES2024"
+	    "ES2025ES2026";
+	static const uint8_t index0[] = {0, 4, 7, 13, 19, 25, 31, 37, 43,
+	                                 49, 55, 61, 67, 73, 79};
+	static const char* name1 = "ESNextJSON";
+	static const uint8_t index1[] = {0, 6, 10};
+	int v = static_cast<int>(i);
+	if (0 <= v && v <= 13)
+		return std::string(name0 + index0[v],
+		                   static_cast<size_t>(index0[v + 1] - index0[v]));
+	if (99 <= v && v <= 100) {
+		v -= 99;
+		return std::string(name1 + index1[v],
+		                   static_cast<size_t>(index1[v + 1] - index1[v]));
+	}
+	return "ScriptTarget(" + std::to_string(v) + ")";
+}
+
+std::string moduleResolutionKindString(ModuleResolutionKind m) {
+	switch (m) {
+		case ModuleResolutionKind::Unknown:
+			TSC_UNREACHABLE(
+			    "ModuleResolutionKind.Unknown — ported with the program slice");
+		case ModuleResolutionKind::Classic: return "Classic";
+		case ModuleResolutionKind::Node10: return "Node10";
+		case ModuleResolutionKind::Node16: return "Node16";
+		case ModuleResolutionKind::NodeNext: return "NodeNext";
+		case ModuleResolutionKind::Bundler: return "Bundler";
+	}
+	TSC_UNREACHABLE(
+	    "unhandled case in moduleResolutionKindString — ported with the "
+	    "program slice");
+}
+
+std::string jsxEmitString(JsxEmit j) {
+	switch (j) {
+		case JsxEmit::None:
+			TSC_UNREACHABLE(
+			    "JsxEmit.None — ported with the program slice");
+		case JsxEmit::Preserve: return "preserve";
+		case JsxEmit::ReactNative: return "react-native";
+		case JsxEmit::React: return "react";
+		case JsxEmit::ReactJSX: return "react-jsx";
+		case JsxEmit::ReactJSXDev: return "react-jsxdev";
+	}
+	TSC_UNREACHABLE(
+	    "unhandled case in jsxEmitString — ported with the program slice");
+}
+
+// program.go: hasZeroOrOneAsteriskCharacter
+bool hasZeroOrOneAsteriskCharacter(std::string_view str) {
+	bool seenAsterisk = false;
+	for (char ch : str) {
+		if (ch == '*') {
+			if (!seenAsterisk) {
+				seenAsterisk = true;
+			} else {
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
+// program.go
+bool moduleResolutionSupportsPackageJsonExportsAndImports(
+    ModuleResolutionKind moduleResolution) {
+	return (moduleResolution >= ModuleResolutionKind::Node16 &&
+	        moduleResolution <= ModuleResolutionKind::NodeNext) ||
+	       moduleResolution == ModuleResolutionKind::Bundler;
+}
+
+bool emitModuleKindIsNonNodeESM(ModuleKind moduleKind) {
+	return moduleKind >= ModuleKind::ES2015 &&
+	       moduleKind <= ModuleKind::ESNext;
+}
+
+// program.go: isCommentOrBlankLine
+bool isCommentOrBlankLine(std::string_view text, size_t pos) {
+	while (pos < text.size() && (text[pos] == ' ' || text[pos] == '\t')) {
+		pos++;
+	}
+	return pos == text.size() ||
+	       (pos < text.size() &&
+	        (text[pos] == '\r' || text[pos] == '\n')) ||
+	       (pos + 1 < text.size() && text[pos] == '/' &&
+	        text[pos + 1] == '/');
+}
+
+// Arena for diagnostic clones produced by compactAndMergeRelatedInfos —
+// diagnostics are never freed within a run, mirroring Go's GC.
+Diagnostic* cloneDiagnostic(Diagnostic* d) {
+	static std::deque<Diagnostic> arena;
+	return &arena.emplace_back(*d);
+}
+
+// program.go:2373 plainJSErrors — diagnostics still reported for plain JS
+// (binder grammar errors + a few others; JS type errors are filtered out).
+bool isPlainJSError(int32_t code) {
+	static const std::unordered_set<int32_t> s = {
+	    Cannot_redeclare_block_scoped_variable_0->code,
+	    A_module_cannot_have_multiple_default_exports->code,
+	    Another_export_default_is_here->code,
+	    The_first_export_default_is_here->code,
+	    Identifier_expected_0_is_a_reserved_word_at_the_top_level_of_a_module
+	        ->code,
+	    Identifier_expected_0_is_a_reserved_word_in_strict_mode_Modules_are_automatically_in_strict_mode
+	        ->code,
+	    Identifier_expected_0_is_a_reserved_word_that_cannot_be_used_here
+	        ->code,
+	    X_constructor_is_a_reserved_word->code,
+	    X_delete_cannot_be_called_on_an_identifier_in_strict_mode->code,
+	    Code_contained_in_a_class_is_evaluated_in_JavaScript_s_strict_mode_which_does_not_allow_this_use_of_0_For_more_information_see_https_Colon_Slash_Slashdeveloper_mozilla_org_Slashen_US_Slashdocs_SlashWeb_SlashJavaScript_SlashReference_SlashStrict_mode
+	        ->code,
+	    Invalid_use_of_0_Modules_are_automatically_in_strict_mode->code,
+	    Invalid_use_of_0_in_strict_mode->code,
+	    A_label_is_not_allowed_here->code,
+	    X_with_statements_are_not_allowed_in_strict_mode->code,
+	    A_break_statement_can_only_be_used_within_an_enclosing_iteration_or_switch_statement
+	        ->code,
+	    A_break_statement_can_only_jump_to_a_label_of_an_enclosing_statement
+	        ->code,
+	    A_class_declaration_without_the_default_modifier_must_have_a_name
+	        ->code,
+	    A_class_member_cannot_have_the_0_keyword->code,
+	    A_comma_expression_is_not_allowed_in_a_computed_property_name->code,
+	    A_continue_statement_can_only_be_used_within_an_enclosing_iteration_statement
+	        ->code,
+	    A_continue_statement_can_only_jump_to_a_label_of_an_enclosing_iteration_statement
+	        ->code,
+	    A_default_clause_cannot_appear_more_than_once_in_a_switch_statement
+	        ->code,
+	    A_default_export_must_be_at_the_top_level_of_a_file_or_module_declaration
+	        ->code,
+	    A_definite_assignment_assertion_is_not_permitted_in_this_context->code,
+	    A_destructuring_declaration_must_have_an_initializer->code,
+	    A_get_accessor_cannot_have_parameters->code,
+	    A_rest_element_cannot_contain_a_binding_pattern->code,
+	    A_rest_element_cannot_have_a_property_name->code,
+	    A_rest_element_cannot_have_an_initializer->code,
+	    A_rest_element_must_be_last_in_a_destructuring_pattern->code,
+	    A_rest_parameter_cannot_have_an_initializer->code,
+	    A_rest_parameter_must_be_last_in_a_parameter_list->code,
+	    A_rest_parameter_or_binding_pattern_may_not_have_a_trailing_comma
+	        ->code,
+	    A_return_statement_cannot_be_used_inside_a_class_static_block->code,
+	    A_set_accessor_cannot_have_rest_parameter->code,
+	    A_set_accessor_must_have_exactly_one_parameter->code,
+	    An_export_declaration_can_only_be_used_at_the_top_level_of_a_module
+	        ->code,
+	    An_export_declaration_cannot_have_modifiers->code,
+	    An_import_declaration_can_only_be_used_at_the_top_level_of_a_module
+	        ->code,
+	    An_import_declaration_cannot_have_modifiers->code,
+	    An_object_member_cannot_be_declared_optional->code,
+	    Argument_of_dynamic_import_cannot_be_spread_element->code,
+	    Cannot_assign_to_private_method_0_Private_methods_are_not_writable
+	        ->code,
+	    Cannot_redeclare_identifier_0_in_catch_clause->code,
+	    Catch_clause_variable_cannot_have_an_initializer->code,
+	    Class_decorators_can_t_be_used_with_static_private_identifier_Consider_removing_the_experimental_decorator
+	        ->code,
+	    Classes_can_only_extend_a_single_class->code,
+	    Classes_may_not_have_a_field_named_constructor->code,
+	    Did_you_mean_to_use_a_Colon_An_can_only_follow_a_property_name_when_the_containing_object_literal_is_part_of_a_destructuring_pattern
+	        ->code,
+	    Duplicate_label_0->code,
+	    Dynamic_imports_can_only_accept_a_module_specifier_and_an_optional_set_of_attributes_as_arguments
+	        ->code,
+	    X_for_await_loops_cannot_be_used_inside_a_class_static_block->code,
+	    JSX_attributes_must_only_be_assigned_a_non_empty_expression->code,
+	    JSX_elements_cannot_have_multiple_attributes_with_the_same_name->code,
+	    JSX_expressions_may_not_use_the_comma_operator_Did_you_mean_to_write_an_array
+	        ->code,
+	    JSX_property_access_expressions_cannot_include_JSX_namespace_names
+	        ->code,
+	    Jump_target_cannot_cross_function_boundary->code,
+	    Line_terminator_not_permitted_before_arrow->code,
+	    Modifiers_cannot_appear_here->code,
+	    Only_a_single_variable_declaration_is_allowed_in_a_for_in_statement
+	        ->code,
+	    Only_a_single_variable_declaration_is_allowed_in_a_for_of_statement
+	        ->code,
+	    Private_identifiers_are_not_allowed_outside_class_bodies->code,
+	    Private_identifiers_are_only_allowed_in_class_bodies_and_may_only_be_used_as_part_of_a_class_member_declaration_property_access_or_on_the_left_hand_side_of_an_in_expression
+	        ->code,
+	    Property_0_is_not_accessible_outside_class_1_because_it_has_a_private_identifier
+	        ->code,
+	    Tagged_template_expressions_are_not_permitted_in_an_optional_chain
+	        ->code,
+	    The_left_hand_side_of_a_for_of_statement_may_not_be_async->code,
+	    The_variable_declaration_of_a_for_in_statement_cannot_have_an_initializer
+	        ->code,
+	    The_variable_declaration_of_a_for_of_statement_cannot_have_an_initializer
+	        ->code,
+	    Trailing_comma_not_allowed->code,
+	    Variable_declaration_list_cannot_be_empty->code,
+	    X_0_and_1_operations_cannot_be_mixed_without_parentheses->code,
+	    X_0_expected->code,
+	    X_0_is_not_a_valid_meta_property_for_keyword_1_Did_you_mean_2->code,
+	    X_0_list_cannot_be_empty->code,
+	    X_0_modifier_already_seen->code,
+	    X_0_modifier_cannot_appear_on_a_constructor_declaration->code,
+	    X_0_modifier_cannot_appear_on_a_module_or_namespace_element->code,
+	    X_0_modifier_cannot_appear_on_a_parameter->code,
+	    X_0_modifier_cannot_appear_on_class_elements_of_this_kind->code,
+	    X_0_modifier_cannot_be_used_here->code,
+	    X_0_modifier_must_precede_1_modifier->code,
+	    X_0_declarations_can_only_be_declared_inside_a_block->code,
+	    X_0_declarations_must_be_initialized->code,
+	    X_extends_clause_already_seen->code,
+	    X_let_is_not_allowed_to_be_used_as_a_name_in_let_or_const_declarations
+	        ->code,
+	    Class_constructor_may_not_be_a_generator->code,
+	    Class_constructor_may_not_be_an_accessor->code,
+	    X_await_expressions_are_only_allowed_within_async_functions_and_at_the_top_levels_of_modules
+	        ->code,
+	    X_await_using_statements_are_only_allowed_within_async_functions_and_at_the_top_levels_of_modules
+	        ->code,
+	    Private_field_0_must_be_declared_in_an_enclosing_class->code,
+	    // Type errors
+	    This_condition_will_always_return_0_since_JavaScript_compares_objects_by_reference_not_value
+	        ->code,
+	};
+	return s.count(code) != 0;
+}
+
+}  // namespace
+
+// ===========================================================================
+// SimpleProgram — program.go
+// ===========================================================================
+
+// program.go:285 NewProgram — processAllProgramFiles + checker pool (lazy
+// single checker here) + verifyCompilerOptions.
+SimpleProgram::SimpleProgram(CompilerHost* host_,
+                             const CompilerOptions& opts,
+                             std::vector<std::string> rootFileNames,
+                             bool skipModuleResolution_)
+	: options(opts), skipModuleResolution(skipModuleResolution_) {
+	host = host_;
+	host->compilerOptions = &options;
+
+	// fileLoader{} setup (processAllProgramFiles body, fileloader.go:152)
+	filesLoader loader;
+	filesParser parser;
+	includeProcessor_.processingDiagArena.clear();
+	loader.host = host;
+	loader.compilerOptions = &options;
+	loader.parser = &parser;
+	loader.program = this;
+	loader.ip = &includeProcessor_;
+	loader.skipModuleResolution = skipModuleResolution;
+	loader.defaultLibraryPath = tspath::getNormalizedAbsolutePath(
+	    host->DefaultLibraryPath(), host->GetCurrentDirectory());
+	loader.useCaseSensitiveFileNames = true; // POSIX FS — vfs UseCaseSensitiveFileNames
+	loader.supportedExtensions =
+	    tsoptions::getSupportedExtensions(&options, {});
+	loader.supportedExtensionsWithJsonIfResolveJsonModule =
+	    tsoptions::getSupportedExtensionsWithJsonIfResolveJsonModule(
+	        &options, loader.supportedExtensions);
+	int maxNodeModuleJsDepth = 0;
+	if (options.MaxNodeModuleJsDepth != nullptr) {
+		maxNodeModuleJsDepth = *options.MaxNodeModuleJsDepth;
+	}
+	parser.loader = &loader;
+	parser.maxDepth = maxNodeModuleJsDepth;
+
+	// module.NewResolver(ResolverOptions{...}) — no project reference
+	// redirects, no typingsLocation/ProjectName for the CLI path.
+	module::ResolverOptions resolverOptions;
+	resolverOptions.host = host;
+	resolverOptions.compilerOptions = &options;
+	resolverOptions.typingsLocation = "";
+	resolverOptions.projectName = "";
+	resolverOptions.extraExtensions = {};
+	resolver_ = module::newResolver(resolverOptions);
+	loader.resolver = resolver_.get();
+
+	loader.processAllProgramFiles(rootFileNames);
+
+	// Move collected state into the program (processedFiles).
+	files = std::move(parser.files);
+	filesByPath = std::move(parser.filesByPath);
+	resolvedModules = std::move(parser.resolvedModules);
+	typeResolutionsInFile = std::move(parser.typeResolutionsInFile);
+	sourceFileMetaDatas = std::move(parser.sourceFileMetaDatas);
+	jsxRuntimeImportSpecifiers =
+	    std::move(parser.jsxRuntimeImportSpecifiers);
+	importHelpersImportSpecifiers =
+	    std::move(parser.importHelpersImportSpecifiers);
+	sourceFilesFoundSearchingNodeModules =
+	    std::move(parser.sourceFilesFoundSearchingNodeModules);
+	libFiles = std::move(parser.libFiles);
+	missingFiles = std::move(parser.missingFiles);
+	redirectTargetsMap = std::move(parser.redirectTargetsMap);
+	redirectFilesByPath = std::move(parser.redirectFilesByPath);
+	fileNameList = std::move(rootFileNames);
+
+	// initCheckerPool — lazily: getChecker() materializes the single
+	// checker.
+	verifyCompilerOptions();
+	// collectContentMapperOptionDiagnostics — no content mappers.
+}
+
+// program.go:570 BindSourceFiles (single-threaded)
+void SimpleProgram::BindSourceFiles() {
+	for (auto* file : files) {
+		if (!file->isBound.load(std::memory_order_relaxed)) {
+			bindSourceFile(file);
+		}
+	}
+	bindDone_ = true;
+}
+
+// program.go: GetTypeChecker — lazy single checker.
+checker::Checker* SimpleProgram::getChecker() {
+	if (!checker_) {
+		checker_ = std::make_unique<checker::Checker>();
+		checker_->init(this);
+	}
+	return checker_.get();
+}
+
+// program.go:618 GetResolvedModule — lookup only (resolutions were recorded
+// by the file loader).
+module::ResolvedModule* SimpleProgram::getResolvedModuleByPath(
+    const tspath::Path& path, const std::string& moduleReference,
+    ResolutionMode mode) {
+	auto it = resolvedModules.find(path);
+	if (it != resolvedModules.end()) {
+		auto it2 = it->second.find(
+		    module::ModeAwareCacheKey{moduleReference, mode});
+		if (it2 != it->second.end()) {
+			return it2->second;
+		}
+	}
+	return nullptr;
+}
+
+// checker.Program::GetResolvedModule — adapts module::ResolvedModule to the
+// checker's minimal ResolvedModule value type.
+std::optional<checker::ResolvedModule> SimpleProgram::GetResolvedModule(
+    SourceFile* file, const std::string& moduleReference,
+    ResolutionMode mode) {
+	module::ResolvedModule* rm =
+	    getResolvedModuleByPath(file->Path(), moduleReference, mode);
+	if (rm == nullptr) {
+		return std::nullopt;
+	}
+	checker::ResolvedModule out;
+	out.resolved = rm->IsResolved();
+	out.resolvedFileName = rm->resolvedFileName;
+	out.resolvedUsingTsExtension = rm->resolvedUsingTsExtension;
+	out.isExternalLibraryImport = rm->isExternalLibraryImport;
+	out.extension = rm->extension;
+	out.alternateResult = rm->alternateResult;
+	out.packageId = checker::PackageId{rm->packageId.name};
+	out.resolvedUsingExtraExtensions = rm->resolvedUsingExtraExtensions;
+	return out;
+}
+
+module::ResolvedModule* SimpleProgram::GetResolvedModuleFromModuleSpecifier(
+    SourceFile* file, Node* moduleSpecifier) {
+	if (!isStringLiteralLike(moduleSpecifier)) {
+		TSC_UNREACHABLE(
+		    "moduleSpecifier must be a StringLiteralLike — program slice");
+	}
+	ResolutionMode mode = GetModeForUsageLocation(file, moduleSpecifier);
+	return getResolvedModuleByPath(file->Path(),
+	                               std::string(moduleSpecifier->text()),
+	                               mode);
+}
+
+module::ResolvedTypeReferenceDirective*
+SimpleProgram::GetResolvedTypeReferenceDirective(
+    SourceFile* file, const std::string& typeDirectiveName,
+    ResolutionMode mode) {
+	auto it = typeResolutionsInFile.find(file->Path());
+	if (it != typeResolutionsInFile.end()) {
+		auto it2 = it->second.find(
+		    module::ModeAwareCacheKey{typeDirectiveName, mode});
+		if (it2 != it->second.end()) {
+			return it2->second;
+		}
+	}
+	return nullptr;
+}
+
+// program.go:648 collectDiagnostics — single file or all files.
+std::vector<Diagnostic*> SimpleProgram::collectDiagnostics(
+    SourceFile* sourceFile,
+    const std::function<std::vector<Diagnostic*>(SourceFile*)>& collect) {
+	std::vector<Diagnostic*> result;
+	if (sourceFile != nullptr) {
+		result = collect(sourceFile);
+	} else {
+		for (auto* file : files) {
+			auto d = collect(file);
+			result.insert(result.end(), d.begin(), d.end());
+		}
+	}
+	return filterAndSortDiagnostics(result);
+}
+
+// program.go:697 collectCheckerDiagnostics — same shape with SkipTypeChecking.
+std::vector<Diagnostic*> SimpleProgram::collectCheckerDiagnostics(
+    SourceFile* sourceFile,
+    const std::function<std::vector<Diagnostic*>(SourceFile*)>& collect) {
+	if (sourceFile != nullptr) {
+		if (SkipTypeChecking(sourceFile, false)) {
+			return {};
+		}
+		return filterAndSortDiagnostics(collect(sourceFile));
+	}
+	std::vector<Diagnostic*> result;
+	for (auto* file : files) {
+		if (SkipTypeChecking(file, false)) {
+			continue;
+		}
+		auto d = collect(file);
+		result.insert(result.end(), d.begin(), d.end());
+	}
+	return filterAndSortDiagnostics(result);
+}
+
+// program.go:743 GetSyntacticDiagnostics
+std::vector<Diagnostic*> SimpleProgram::GetSyntacticDiagnostics(
+    SourceFile* sourceFile) {
+	return collectDiagnostics(
+	    sourceFile, [this](SourceFile* file) -> std::vector<Diagnostic*> {
+		    std::vector<Diagnostic*> diags = file->diagnostics;
+		    diags.insert(diags.end(), file->jsDiagnostics.begin(),
+		                 file->jsDiagnostics.end());
+		    if (isSourceFileJS(file) &&
+		        !isCheckJSEnabledForFile(file, &options)) {
+			    auto extra =
+			        getAdditionalJSSyntacticDiagnostics(file, &options);
+			    diags.insert(diags.end(), extra.begin(), extra.end());
+		    }
+		    return diags;
+	    });
+}
+
+// program.go:761 getAdditionalJSSyntacticDiagnostics — parameter decorators
+// in JS files that won't be checked.
+std::vector<Diagnostic*> getAdditionalJSSyntacticDiagnostics(
+    SourceFile* file, const CompilerOptions* options) {
+	if (options->ExperimentalDecorators == Tristate::True) {
+		return {};
+	}
+	std::vector<Diagnostic*> diags;
+	std::function<bool(Node*)> walk = [&](Node* node) -> bool {
+		if ((node->subtreeFacts() & SubtreeContainsDecorators) == 0) {
+			return false;
+		}
+		if (node->kind == Kind::Parameter && hasDecorators(node)) {
+			Node* decorator = nullptr;
+			for (Node* m : node->modifierNodes()) {
+				if (isDecorator(m)) {
+					decorator = m;
+					break;
+				}
+			}
+			if (decorator != nullptr) {
+				diags.push_back(newDiagnostic(
+				    file, decorator->loc,
+				    Decorators_are_not_valid_here));
+			}
+		}
+		node->forEachChild(
+		    [&](Node* child) -> bool { return walk(child); });
+		return false;
+	};
+	file->forEachChild([&](Node* child) -> bool { return walk(child); });
+	return diags;
+}
+
+// program.go:786 GetBindDiagnostics
+std::vector<Diagnostic*> SimpleProgram::GetBindDiagnostics(
+    SourceFile* sourceFile) {
+	if (sourceFile != nullptr) {
+		bindSourceFile(sourceFile);
+	} else {
+		BindSourceFiles();
+	}
+	return collectDiagnostics(
+	    sourceFile, [](SourceFile* file) -> std::vector<Diagnostic*> {
+		    return file->bindDiagnostics;
+	    });
+}
+
+// program.go:804 GetSemanticDiagnostics
+std::vector<Diagnostic*> SimpleProgram::GetSemanticDiagnostics(
+    SourceFile* sourceFile) {
+	return collectCheckerDiagnostics(
+	    sourceFile,
+	    [this](SourceFile* file) -> std::vector<Diagnostic*> {
+		    return getSemanticDiagnosticsWithChecker(file);
+	    });
+}
+
+// program.go:826 GetProgramDiagnostics
+std::vector<Diagnostic*> SimpleProgram::GetProgramDiagnostics() {
+	// programDiagnostics + contentMapperDiagnostics(none) +
+	// contentMapperOptionDiagnostics(none) + includeProcessor globals
+	std::vector<Diagnostic*> all = programDiagnostics;
+	auto ipGlobals =
+	    includeProcessor_.getDiagnostics(this)->GetGlobalDiagnostics();
+	all.insert(all.end(), ipGlobals.begin(), ipGlobals.end());
+	return sortAndDeduplicateDiagnostics(std::move(all));
+}
+
+// program.go:840 GetIncludeProcessorDiagnostics
+std::vector<Diagnostic*> SimpleProgram::GetIncludeProcessorDiagnostics(
+    SourceFile* sourceFile) {
+	if (SkipTypeChecking(sourceFile, false)) {
+		return {};
+	}
+	auto [filtered, _] = getDiagnosticsWithPrecedingDirectives(
+	    sourceFile, includeProcessor_.getDiagnostics(this)
+	                    ->GetDiagnosticsForFile(sourceFile));
+	return filtered;
+}
+
+// program.go:847 SkipTypeChecking
+bool SimpleProgram::SkipTypeChecking(SourceFile* sourceFile,
+                                     bool ignoreNoCheck) {
+	return (!ignoreNoCheck && options.NoCheck == Tristate::True) ||
+	       (options.SkipLibCheck == Tristate::True &&
+	        sourceFile->IsDeclarationFile) ||
+	       (options.SkipDefaultLibCheck == Tristate::True &&
+	        IsSourceFileDefaultLibrary(sourceFile->Path())) ||
+	       IsSourceFromProjectReference(sourceFile->Path()) ||
+	       !canIncludeBindAndCheckDiagnostics(sourceFile);
+}
+
+// program.go:856 canIncludeBindAndCheckDiagnostics
+bool SimpleProgram::canIncludeBindAndCheckDiagnostics(
+    SourceFile* sourceFile) {
+	if (sourceFile->CheckJsDirective != nullptr &&
+	    !sourceFile->CheckJsDirective->Enabled) {
+		return false;
+	}
+
+	if (sourceFile->ScriptKind == ScriptKind::TS ||
+	    sourceFile->ScriptKind == ScriptKind::TSX) {
+		return true;
+	}
+
+	bool isJS = sourceFile->ScriptKind == ScriptKind::JS ||
+	            sourceFile->ScriptKind == ScriptKind::JSX;
+	bool isCheckJS =
+	    isJS && isCheckJSEnabledForFile(sourceFile, &options);
+	bool isPlainJS = isPlainJSFile(sourceFile, options.CheckJs);
+
+	return isPlainJS || isCheckJS;
+}
+
+// program.go:1498 getSemanticDiagnosticsWithChecker
+std::vector<Diagnostic*> SimpleProgram::getSemanticDiagnosticsWithChecker(
+    SourceFile* sourceFile) {
+	auto first = filterNoEmitSemanticDiagnostics(
+	    getBindAndCheckDiagnosticsWithChecker(sourceFile), &options);
+	auto second = GetIncludeProcessorDiagnostics(sourceFile);
+	first.insert(first.end(), second.begin(), second.end());
+	return first;
+}
+
+// program.go:1505 FilterNoEmitSemanticDiagnostics
+std::vector<Diagnostic*> filterNoEmitSemanticDiagnostics(
+    std::vector<Diagnostic*> diags, const CompilerOptions* options) {
+	if (options->NoEmit != Tristate::True) {
+		return diags;
+	}
+	std::vector<Diagnostic*> out;
+	for (auto* d : diags) {
+		if (!d->SkippedOnNoEmit()) {
+			out.push_back(d);
+		}
+	}
+	return out;
+}
+
+// program.go:1512 getBindAndCheckDiagnosticsWithChecker
+// includeDeferredGlobals only exists for incremental — always false here.
+// Checker::GetDiagnostics (per-file check walker) is ported with the check
+// slice; until then the checker contributes zero diagnostics.
+std::vector<Diagnostic*>
+SimpleProgram::getBindAndCheckDiagnosticsWithChecker(
+    SourceFile* sourceFile) {
+	if (SkipTypeChecking(sourceFile, false)) {
+		return {};
+	}
+	getChecker(); // checker creation forces binding
+
+	std::vector<Diagnostic*> diags = sourceFile->bindDiagnostics;
+	// + fileChecker.GetDiagnostics(ctx, sourceFile) — check walker not
+	// ported; zero diagnostics (never fake).
+
+	bool isPlainJS = isPlainJSFile(sourceFile, options.CheckJs);
+	if (isPlainJS) {
+		std::vector<Diagnostic*> kept;
+		for (auto* d : diags) {
+			if (isPlainJSError(d->Code())) {
+				kept.push_back(d);
+			}
+		}
+		diags = std::move(kept);
+	} else {
+		bool isJS = sourceFile->ScriptKind == ScriptKind::JS ||
+		            sourceFile->ScriptKind == ScriptKind::JSX;
+		bool isCheckJS =
+		    isJS && isCheckJSEnabledForFile(sourceFile, &options);
+		if (isCheckJS) {
+			diags.insert(diags.end(), sourceFile->jsdocDiagnostics.begin(),
+			             sourceFile->jsdocDiagnostics.end());
+		}
+	}
+
+	auto [filtered, directivesByLine] =
+	    getDiagnosticsWithPrecedingDirectives(sourceFile, std::move(diags));
+	for (auto& [line, directive] : directivesByLine) {
+		if (directive.Kind == CommentDirectiveKind::ExpectError) {
+			filtered.push_back(newDiagnostic(
+			    sourceFile, directive.Loc,
+			    Unused_ts_expect_error_directive));
+		}
+	}
+	// applyContentMapperDiagnosticDirectives — content mappers not in scope;
+	// files have no DiagnosticDirectives in this mode.
+	return filtered;
+}
+
+// program.go:1597 getDiagnosticsWithPrecedingDirectives
+std::pair<std::vector<Diagnostic*>, std::unordered_map<int, CommentDirective>>
+SimpleProgram::getDiagnosticsWithPrecedingDirectives(
+    SourceFile* sourceFile, std::vector<Diagnostic*> diags) {
+	if (sourceFile->CommentDirectives.empty()) {
+		return {diags, {}};
+	}
+	std::unordered_map<int, CommentDirective> directivesByLine;
+	for (auto& directive : sourceFile->CommentDirectives) {
+		int line = getECMALineOfPosition(sourceFile,
+		                                          directive.Loc.pos());
+		directivesByLine[line] = directive;
+	}
+	auto lineStarts = getECMALineStarts(sourceFile);
+	std::vector<Diagnostic*> filtered;
+	filtered.reserve(diags.size());
+	for (auto* diagnostic : diags) {
+		bool ignoreDiagnostic = false;
+		if (diagnostic->File() != sourceFile) {
+			filtered.push_back(diagnostic);
+			continue;
+		}
+		for (int line = computeLineOfPosition(lineStarts,
+		                                               diagnostic->Pos()) -
+		                1;
+		     line >= 0; line--) {
+			if (auto it = directivesByLine.find(line);
+			    it != directivesByLine.end()) {
+				ignoreDiagnostic = true;
+				it->second.Kind = CommentDirectiveKind::Ignore;
+				break;
+			}
+			if (!isCommentOrBlankLine(sourceFile->text,
+			                          static_cast<size_t>(
+			                              lineStarts[line]))) {
+				break;
+			}
+		}
+		if (!ignoreDiagnostic) {
+			filtered.push_back(diagnostic);
+		}
+	}
+	return {filtered, directivesByLine};
+}
+
+static std::vector<Diagnostic*> compactAndMergeRelatedInfosImpl(
+    std::vector<Diagnostic*> diagnostics);
+
+// program.go:1651 SortAndDeduplicateDiagnostics
+std::vector<Diagnostic*> sortAndDeduplicateDiagnostics(
+    std::vector<Diagnostic*> diagnostics) {
+	std::sort(diagnostics.begin(), diagnostics.end(),
+	          [](Diagnostic* a, Diagnostic* b) {
+		          return CompareDiagnostics(a, b) < 0;
+	          });
+	return compactAndMergeRelatedInfosImpl(std::move(diagnostics));
+}
+
+// program.go:1659 compactAndMergeRelatedInfos
+static std::vector<Diagnostic*> compactAndMergeRelatedInfosImpl(
+    std::vector<Diagnostic*> diagnostics) {
+	if (diagnostics.size() < 2) {
+		return diagnostics;
+	}
+	size_t i = 0, j = 0;
+	while (i < diagnostics.size()) {
+		Diagnostic* d = diagnostics[i];
+		size_t n = 1;
+		while (i + n < diagnostics.size() &&
+		       EqualDiagnosticsNoRelatedInfo(d, diagnostics[i + n])) {
+			n++;
+		}
+		if (n > 1) {
+			std::vector<Diagnostic*> relatedInfos;
+			for (size_t k = 0; k < n; k++) {
+				auto& ri = diagnostics[i + k]->RelatedInformation();
+				relatedInfos.insert(relatedInfos.end(), ri.begin(),
+				                    ri.end());
+			}
+			if (!relatedInfos.empty()) {
+				std::sort(relatedInfos.begin(), relatedInfos.end(),
+				          [](Diagnostic* a, Diagnostic* b) {
+					          return CompareDiagnostics(a, b) < 0;
+				          });
+				std::vector<Diagnostic*> uniq;
+				for (auto* ri : relatedInfos) {
+					if (uniq.empty() ||
+					    !EqualDiagnostics(uniq.back(), ri)) {
+						uniq.push_back(ri);
+					}
+				}
+				d = cloneDiagnostic(d)->SetRelatedInfo(std::move(uniq));
+			}
+		}
+		diagnostics[j] = d;
+		i += n;
+		j++;
+	}
+	diagnostics.resize(j);
+	return diagnostics;
+}
+
+// program.go:694 filterAndSortDiagnostics — SpanMap is always null here (no
+// content mappers), so the filter keeps everything.
+std::vector<Diagnostic*> filterAndSortDiagnostics(
+    std::vector<Diagnostic*> diags) {
+	return sortAndDeduplicateDiagnostics(std::move(diags));
+}
+
+// program.go:1435 GetGlobalDiagnostics
+std::vector<Diagnostic*> SimpleProgram::GetGlobalDiagnostics() {
+	if (files.empty()) {
+		return {};
+	}
+	// compilerCheckerPool.GetGlobalDiagnostics — our single checker's
+	// collection (empty until the check walker lands).
+	if (checker_ == nullptr) {
+		return {};
+	}
+	return checker_->diagnostics.GetGlobalDiagnostics();
+}
+
+// program.go:1454 GetDeclarationDiagnostics — only when NoEmit &&
+// GetEmitDeclarations; requires emit's getDeclarationDiagnostics — emit is
+// out of scope, unreachable for `tsc --noEmit` without --declaration.
+std::vector<Diagnostic*> SimpleProgram::GetDeclarationDiagnostics(
+    SourceFile* sourceFile) {
+	if (sourceFile->IsDeclarationFile) {
+		return {};
+	}
+	TSC_UNREACHABLE(
+	    "getDeclarationDiagnosticsForFile — ported with the emit slice");
+}
+
+// --- program.go: file/path accessors ---
+
+tspath::Path SimpleProgram::toPath(const std::string& fileName) const {
+	return tspath::toPath(fileName, host->GetCurrentDirectory(),
+	                      host->useCaseSensitiveFileNames());
+}
+
+tspath::ComparePathsOptions SimpleProgram::comparePathsOptions() const {
+	return {host->useCaseSensitiveFileNames(), host->GetCurrentDirectory()};
+}
+
+SourceFile* SimpleProgram::GetSourceFile(const std::string& fileName) {
+	return GetSourceFileByPath(toPath(fileName));
+}
+
+SourceFile* SimpleProgram::GetSourceFileForResolvedModule(
+    const std::string& fileName) {
+	SourceFile* file = GetSourceFile(fileName);
+	// GetParseFileRedirect — project references not in scope → none.
+	return file;
+}
+
+bool SimpleProgram::FileExists(const std::string& fileName) {
+	return host->fileExists(fileName);
+}
+
+std::string SimpleProgram::GetCurrentDirectory() {
+	return host->GetCurrentDirectory();
+}
+
+bool SimpleProgram::UseCaseSensitiveFileNames() {
+	return true; // POSIX FS
+}
+
+const std::vector<const FileIncludeReason*>* SimpleProgram::GetIncludeReasons(
+    const tspath::Path& path) const {
+	auto it = includeProcessor_.fileIncludeReasons.find(path);
+	if (it == includeProcessor_.fileIncludeReasons.end()) {
+		return nullptr;
+	}
+	return &it->second;
+}
+
+// program.go: GetLibFileFromReference
+SourceFile* SimpleProgram::GetLibFileFromReference(const FileReference* ref) {
+	auto [path, ok] = tsoptions::getLibFileName(ref->FileName);
+	if (!ok) {
+		return nullptr;
+	}
+	return GetSourceFileByPath(tspath::Path(path));
+}
+
+// program.go: IsSourceFileDefaultLibrary / IsLibFile
+bool SimpleProgram::IsSourceFileDefaultLibrary(
+    const tspath::Path& path) const {
+	return libFiles.find(path) != libFiles.end();
+}
+
+bool SimpleProgram::IsLibFile(SourceFile* file) const {
+	auto it = libFiles.find(file->Path());
+	return it != libFiles.end() &&
+	       it->second->name == file->fileName.substr(
+	           file->fileName.rfind('/') + 1);
+}
+
+// program.go: IsSourceFileFromExternalLibrary
+bool SimpleProgram::IsSourceFileFromExternalLibrary(SourceFile* file) const {
+	return sourceFilesFoundSearchingNodeModules.count(file->Path()) != 0;
+}
+
+// program.go: IsSourceFromProjectReference — none (no project references).
+bool SimpleProgram::IsSourceFromProjectReference(
+    const tspath::Path& path) const {
+	return false;
+}
+
+const SourceFileMetaData& SimpleProgram::GetSourceFileMetaData(
+    const tspath::Path& path) const {
+	static const SourceFileMetaData empty{};
+	auto it = sourceFileMetaDatas.find(path);
+	return it != sourceFileMetaDatas.end() ? it->second : empty;
+}
+
+// --- emit-format helpers (program.go:1750+) ---
+
+ModuleKind SimpleProgram::GetEmitModuleFormatOfFile(SourceFile* sourceFile) {
+	return getEmitModuleFormatOfFileWorker(sourceFile->FileName(), &options,
+	                                     GetSourceFileMetaData(
+	                                         sourceFile->Path()));
+}
+
+ResolutionMode SimpleProgram::GetEmitSyntaxForUsageLocation(
+    SourceFile* sourceFile, Node* usageLocation) {
+	return getEmitSyntaxForUsageLocationWorker(
+	    sourceFile->FileName(),
+	    sourceFileMetaDatas[sourceFile->Path()], usageLocation, &options);
+}
+
+ModuleKind SimpleProgram::GetImpliedNodeFormatForEmit(
+    SourceFile* sourceFile) {
+	return getImpliedNodeFormatForEmitWorker(
+	    sourceFile->FileName(), options.GetEmitModuleKind(),
+	    GetSourceFileMetaData(sourceFile->Path()));
+}
+
+ResolutionMode SimpleProgram::GetModeForUsageLocation(SourceFile* file,
+                                                    Node* location) {
+	return getModeForUsageLocation(
+	    file->FileName(), sourceFileMetaDatas[file->Path()], location,
+	    &options);
+}
+
+// program.go:1759 GetModeForResolutionAtIndex
+ResolutionMode SimpleProgram::GetModeForResolutionAtIndex(
+    SourceFile* sourceFile, int index) {
+	const auto& imports = sourceFile->imports;
+	if (index < static_cast<int>(imports.size())) {
+		return GetModeForUsageLocation(sourceFile, imports[index]);
+	}
+	index -= static_cast<int>(imports.size());
+	for (auto* augmentation : sourceFile->ModuleAugmentations) {
+		if (augmentation->kind == Kind::StringLiteral) {
+			if (index == 0) {
+				return GetModeForUsageLocation(sourceFile, augmentation);
+			}
+			index--;
+		}
+	}
+	TSC_UNREACHABLE(
+	    "resolution index out of range — ported with the program slice");
+}
+
+ResolutionMode SimpleProgram::GetDefaultResolutionModeForFile(
+    SourceFile* file) {
+	return getDefaultResolutionModeForFile(
+	    file->FileName(), sourceFileMetaDatas[file->Path()], &options);
+}
+
+// --- commonsourcedirectory.go ---
+
+// computeCommonSourceDirectoryOfFilenames
+static std::string computeCommonSourceDirectoryOfFilenames(
+    const std::vector<std::string>& fileNames,
+    const std::string& currentDirectory, bool useCaseSensitiveFileNames) {
+	std::vector<std::string> commonPathComponents;
+	bool first = true;
+	for (auto& sourceFile : fileNames) {
+		auto sourcePathComponents =
+		    tspath::getNormalizedPathComponents(sourceFile,
+		                                      currentDirectory);
+		// The base file name is not part of the common directory path
+		if (!sourcePathComponents.empty())
+			sourcePathComponents.pop_back();
+
+		if (first) {
+			commonPathComponents = std::move(sourcePathComponents);
+			first = false;
+			continue;
+		}
+
+		size_t n = std::min(commonPathComponents.size(),
+		                    sourcePathComponents.size());
+		for (size_t i = 0; i < n; i++) {
+			if (tspath::getCanonicalFileName(commonPathComponents[i],
+			                                 useCaseSensitiveFileNames) !=
+			    tspath::getCanonicalFileName(sourcePathComponents[i],
+			                                 useCaseSensitiveFileNames)) {
+				if (i == 0) {
+					return "";
+				}
+				commonPathComponents.resize(i);
+				break;
+			}
+		}
+		if (sourcePathComponents.size() < commonPathComponents.size()) {
+			commonPathComponents.resize(sourcePathComponents.size());
+		}
+	}
+
+	if (commonPathComponents.empty()) {
+		return currentDirectory;
+	}
+	std::vector<std::string_view> componentViews;
+	componentViews.reserve(commonPathComponents.size());
+	for (auto& c : commonPathComponents)
+		componentViews.emplace_back(c);
+	return tspath::getPathFromPathComponents(componentViews);
+}
+
+// program.go:1791 checkSourceFilesBelongToPath
+bool SimpleProgram::checkSourceFilesBelongToPath(
+    const std::vector<std::string>& sourceFiles,
+    const std::string& rootDirectory) {
+	bool allFilesBelongToPath = true;
+	for (auto& file : sourceFiles) {
+		std::string absoluteSourceFilePath = tspath::getCanonicalFileName(
+		    tspath::getNormalizedAbsolutePath(file, GetCurrentDirectory()),
+		    UseCaseSensitiveFileNames());
+		if (!tspath::containsPath(rootDirectory, file,
+		                          comparePathsOptions())) {
+			includeProcessor_.addProcessingDiagnostic(
+			    includeProcessor_.newProcessingDiagnostic(
+			        processingDiagnosticKind::ExplainingFileInclude,
+			        includeExplainingDiagnostic{
+			            tspath::Path(absoluteSourceFilePath), nullptr,
+			            
+			                File_0_is_not_under_rootDir_1_rootDir_is_expected_to_contain_all_source_files,
+			            {file, rootDirectory}}));
+			allFilesBelongToPath = false;
+		}
+	}
+	return allFilesBelongToPath;
+}
+
+// outputpaths.GetCommonSourceDirectory + program.go CommonSourceDirectory
+// (memoized).
+std::string SimpleProgram::CommonSourceDirectory() {
+	if (commonSourceDirectory_.has_value()) {
+		return *commonSourceDirectory_;
+	}
+	// files() closure: emitted file names
+	std::vector<std::string> emittedFiles;
+	for (auto* file : files) {
+		if (sourceFileMayBeEmitted(file, this, false, false) &&
+		    !file->IsDeclarationFile) {
+			emittedFiles.push_back(file->FileName());
+		}
+	}
+	std::string commonSourceDirectory;
+	if (!options.RootDir.empty()) {
+		commonSourceDirectory = options.RootDir;
+		checkSourceFilesBelongToPath(emittedFiles, options.RootDir);
+	} else if (!options.ConfigFilePath.empty()) {
+		commonSourceDirectory =
+		    tspath::getDirectoryPath(options.ConfigFilePath);
+		checkSourceFilesBelongToPath(emittedFiles, commonSourceDirectory);
+	} else {
+		commonSourceDirectory = computeCommonSourceDirectoryOfFilenames(
+		    emittedFiles, GetCurrentDirectory(),
+		    UseCaseSensitiveFileNames());
+	}
+	if (!commonSourceDirectory.empty()) {
+		commonSourceDirectory =
+		    tspath::ensureTrailingDirectorySeparator(
+		        commonSourceDirectory);
+	}
+	commonSourceDirectory_ = commonSourceDirectory;
+	return commonSourceDirectory;
+}
+
+// --- emitter.go:493 sourceFileMayBeEmitted ---
+
+bool sourceFileMayBeEmitted(SourceFile* sourceFile, SimpleProgram* host,
+                            bool forceDtsEmit, bool forceJsEmit) {
+	const CompilerOptions* options = host->Options();
+	if (!forceJsEmit &&
+	    options->NoEmitForJsFiles == Tristate::True &&
+	    isSourceFileJS(sourceFile)) {
+		return false;
+	}
+	if (sourceFile->IsDeclarationFile) {
+		return false;
+	}
+	// ContentMapper() != "" — no content mappers in this slice.
+	if (host->IsSourceFileFromExternalLibrary(sourceFile)) {
+		return false;
+	}
+	if (forceDtsEmit || forceJsEmit) {
+		return true;
+	}
+	// GetProjectReferenceFromSource — none without project references.
+	if (!isJsonSourceFile(sourceFile)) {
+		return true;
+	}
+	if (options->OutDir.empty()) {
+		return false;
+	}
+	if (!options->RootDir.empty() || !options->ConfigFilePath.empty()) {
+		// Requires outputpaths.GetSourceFilePathInNewDirWorker — emit
+		// helpers not ported; unreachable for `tsc --noEmit` with neither
+		// RootDir nor config.
+		TSC_UNREACHABLE(
+		    "sourceFileMayBeEmitted json+RootDir — ported with the emit "
+		    "slice");
+	}
+	return true;
+}
+
+bool SimpleProgram::SourceFileMayBeEmitted(SourceFile* sourceFile,
+                                           bool forceDtsEmit) {
+	return sourceFileMayBeEmitted(sourceFile, this, forceDtsEmit, false);
+}
+
+// ==== verifyCompilerOptions ====  program.go:866+
+void SimpleProgram::verifyCompilerOptions() {
+	// Config-file syntax accessors: no config file in this mode, so
+	// sourceFile()/getCompilerOptionsPropertySyntax()/
+	// getCompilerOptionsObjectLiteralSyntax() are all nil — matching Go's
+	// ForEachTsConfigPropArray(nil)/ForEachPropertyAssignment(nil) no-ops.
+
+	auto createCompilerOptionsDiagnostic =
+	    [&](const DiagnosticMessage* message,
+	        std::vector<std::string> args = {}) -> Diagnostic* {
+		// compilerOptionsProperty is nil (no config file) →
+		// NewCompilerDiagnostic
+		auto* diag = tsoptions::newCompilerDiagnostic(message,
+		                                              std::move(args));
+		programDiagnostics.push_back(diag);
+		return diag;
+	};
+
+	// createOptionDiagnosticInObjectLiteralSyntax — objectLiteral is always
+	// nil here, so it always returns nil (Go: ForEachPropertyAssignment(nil)
+	// → nil).
+	auto createOptionDiagnosticInObjectLiteralSyntax =
+	    [&](void* objectLiteral, bool onKey, const std::string& key1,
+	        const std::string& key2, const DiagnosticMessage* message,
+	        std::vector<std::string> args = {}) -> Diagnostic* {
+		return nullptr; // no config file
+	};
+
+	auto createDiagnosticForOption =
+	    [&](bool onKey, const std::string& option1, const std::string& option2,
+	        const DiagnosticMessage* message,
+	        std::vector<std::string> args = {}) -> Diagnostic* {
+		Diagnostic* diag = createOptionDiagnosticInObjectLiteralSyntax(
+		    nullptr, onKey, option1, option2, message, args);
+		if (diag == nullptr) {
+			diag = createCompilerOptionsDiagnostic(message,
+			                                     std::move(args));
+		}
+		return diag;
+	};
+
+	auto createDiagnosticForOptionName =
+	    [&](const DiagnosticMessage* message, const std::string& option1,
+	        const std::string& option2,
+	        std::vector<std::string> args = {}) {
+		std::vector<std::string> newArgs;
+		newArgs.reserve(args.size() + 2);
+		newArgs.push_back(option1);
+		newArgs.push_back(option2);
+		for (auto& a : args)
+			newArgs.push_back(std::move(a));
+		createDiagnosticForOption(true, option1, option2, message,
+		                          std::move(newArgs));
+	};
+
+	auto createOptionValueDiagnostic =
+	    [&](const std::string& option1, const DiagnosticMessage* message,
+	        std::vector<std::string> args = {}) {
+		createDiagnosticForOption(false, option1, "", message,
+		                          std::move(args));
+	};
+
+	auto createRemovedOptionDiagnostic =
+	    [&](const std::string& name, const std::string& value,
+	        const std::string& useInstead) {
+		const DiagnosticMessage* message;
+		std::vector<std::string> args;
+		if (value.empty()) {
+			message = 
+			    Option_0_has_been_removed_Please_remove_it_from_your_configuration;
+			args = {name};
+		} else {
+			message = 
+			    Option_0_1_has_been_removed_Please_remove_it_from_your_configuration;
+			args = {name, value};
+		}
+		auto* diag = createDiagnosticForOption(value.empty(), name, "",
+		                                       message, args);
+		if (!useInstead.empty()) {
+			diag->AddMessageChain(tsoptions::newCompilerDiagnostic(
+			    Use_0_instead, {useInstead}));
+		}
+	};
+
+	// Removed in TS7
+
+	if (!options.BaseUrl.empty()) {
+		std::string useInstead;
+		// configFilePath() is "" without a config file → suggestion skipped.
+		createRemovedOptionDiagnostic("baseUrl", "", useInstead);
+	}
+
+	if (!options.OutFile.empty()) {
+		createRemovedOptionDiagnostic("outFile", "", "");
+	}
+
+	if (options.Target == ScriptTarget::ES5) {
+		createRemovedOptionDiagnostic("target", "ES5", "");
+	}
+
+	if (options.Module == ModuleKind::AMD) {
+		createRemovedOptionDiagnostic("module", "AMD", "");
+	}
+	if (options.Module == ModuleKind::System) {
+		createRemovedOptionDiagnostic("module", "System", "");
+	}
+	if (options.Module == ModuleKind::UMD) {
+		createRemovedOptionDiagnostic("module", "UMD", "");
+	}
+
+	if (options.ModuleResolution == ModuleResolutionKind::Classic) {
+		createRemovedOptionDiagnostic("moduleResolution", "Classic", "");
+	}
+
+	if (options.AlwaysStrict == Tristate::False) {
+		createRemovedOptionDiagnostic("alwaysStrict", "false", "");
+	}
+
+	if (options.ESModuleInterop == Tristate::False) {
+		createRemovedOptionDiagnostic("esModuleInterop", "false", "");
+	}
+
+	if (options.AllowSyntheticDefaultImports == Tristate::False) {
+		createRemovedOptionDiagnostic("allowSyntheticDefaultImports",
+		                              "false", "");
+	}
+
+	if (options.ModuleResolution == ModuleResolutionKind::Node10) {
+		createRemovedOptionDiagnostic("moduleResolution", "node10", "");
+	}
+
+	if (options.DownlevelIteration != Tristate::Unknown) {
+		createRemovedOptionDiagnostic("downlevelIteration", "", "");
+	}
+
+	if (options.StrictPropertyInitialization == Tristate::True &&
+	    !options.GetStrictOptionValue(options.StrictNullChecks)) {
+		createDiagnosticForOptionName(
+		    
+		        Option_0_cannot_be_specified_without_specifying_option_1,
+		    "strictPropertyInitialization", "strictNullChecks");
+	}
+	if (options.ExactOptionalPropertyTypes == Tristate::True &&
+	    !options.GetStrictOptionValue(options.StrictNullChecks)) {
+		createDiagnosticForOptionName(
+		    
+		        Option_0_cannot_be_specified_without_specifying_option_1,
+		    "exactOptionalPropertyTypes", "strictNullChecks");
+	}
+
+	if (options.IsolatedDeclarations == Tristate::True) {
+		if (options.GetAllowJS()) {
+			createDiagnosticForOptionName(
+			    Option_0_cannot_be_specified_with_option_1,
+			    "allowJs", "isolatedDeclarations");
+		}
+		if (!options.GetEmitDeclarations()) {
+			createDiagnosticForOptionName(
+			    
+			        Option_0_cannot_be_specified_without_specifying_option_1_or_option_2,
+			    "isolatedDeclarations", "declaration", {"composite"});
+		}
+	}
+
+	if (options.InlineSourceMap == Tristate::True) {
+		if (options.SourceMap == Tristate::True) {
+			createDiagnosticForOptionName(
+			    Option_0_cannot_be_specified_with_option_1,
+			    "sourceMap", "inlineSourceMap");
+		}
+		if (!options.MapRoot.empty()) {
+			createDiagnosticForOptionName(
+			    Option_0_cannot_be_specified_with_option_1,
+			    "mapRoot", "inlineSourceMap");
+		}
+	}
+
+	if (options.Composite == Tristate::True) {
+		if (options.Declaration == Tristate::False) {
+			createDiagnosticForOptionName(
+			    
+			        Composite_projects_may_not_disable_declaration_emit,
+			    "declaration", "");
+		}
+		if (options.Incremental == Tristate::False) {
+			createDiagnosticForOptionName(
+			    
+			        Composite_projects_may_not_disable_incremental_compilation,
+			    "declaration", "");
+		}
+	}
+
+	if (options.TsBuildInfoFile.empty() &&
+	    options.Incremental == Tristate::True &&
+	    options.ConfigFilePath.empty()) {
+		createCompilerOptionsDiagnostic(
+		    
+		        Option_incremental_is_only_valid_with_a_known_configuration_file_like_tsconfig_json_or_when_tsBuildInfoFile_is_explicitly_provided);
+	}
+
+	verifyProjectReferences();
+
+	if (options.Composite == Tristate::True) {
+		std::unordered_set<tspath::Path> rootPaths;
+		for (auto& fileName : fileNameList) {
+			rootPaths.insert(toPath(fileName));
+		}
+		for (auto* file : files) {
+			tspath::Path rootPath = file->Path();
+			// CanonicalSourceFile — no content mappers → file itself.
+			if (sourceFileMayBeEmitted(file, this, false, false) &&
+			    !rootPaths.count(rootPath)) {
+				includeProcessor_.addProcessingDiagnostic(
+				    includeProcessor_.newProcessingDiagnostic(
+				        processingDiagnosticKind::ExplainingFileInclude,
+				        includeExplainingDiagnostic{
+				            file->Path(), nullptr,
+				            
+				                File_0_is_not_listed_within_the_file_list_of_project_1_Projects_must_list_all_files_or_use_an_include_pattern,
+				            {file->FileName(), ""}}));
+			}
+		}
+	}
+
+	// forEachOptionPathsSyntax / createDiagnosticForOptionPaths /
+	// createDiagnosticForOptionPathKeyValue — getCompilerOptionsObjectLiteralSyntax
+	// is nil → ForEachPropertyAssignment(nil) → nil → falls through to
+	// createCompilerOptionsDiagnostic.
+	auto forEachOptionPathsSyntax =
+	    [&](const std::function<Diagnostic*(void*)>& callback)
+	    -> Diagnostic* { return nullptr; };
+
+	auto createDiagnosticForOptionPaths =
+	    [&](bool onKey, const std::string& key,
+	        const DiagnosticMessage* message,
+	        std::vector<std::string> args = {}) -> Diagnostic* {
+		Diagnostic* diag = forEachOptionPathsSyntax(
+		    [&](void* pathProp) -> Diagnostic* { return nullptr; });
+		if (diag == nullptr) {
+			diag = createCompilerOptionsDiagnostic(message,
+			                                     std::move(args));
+		}
+		return diag;
+	};
+
+	auto createDiagnosticForOptionPathKeyValue =
+	    [&](const std::string& key, int valueIndex,
+	        const DiagnosticMessage* message,
+	        std::vector<std::string> args = {}) -> Diagnostic* {
+		Diagnostic* diag = forEachOptionPathsSyntax(
+		    [&](void* pathProp) -> Diagnostic* { return nullptr; });
+		if (diag == nullptr) {
+			diag = createCompilerOptionsDiagnostic(message,
+			                                     std::move(args));
+		}
+		return diag;
+	};
+
+	for (auto& [key, value] : options.Paths) {
+		if (!hasZeroOrOneAsteriskCharacter(key)) {
+			createDiagnosticForOptionPaths(
+			    true, key,
+			    
+			        Pattern_0_can_have_at_most_one_Asterisk_character,
+			    {key});
+		}
+		if (value.empty()) {
+			// Go distinguishes nil ("should be an array") from empty
+			// ("shouldn't be an empty array"); both collapse to empty here,
+			// and tsconfig-driven paths can't occur without a config file.
+			createDiagnosticForOptionPaths(
+			    false, key,
+			    
+			        Substitutions_for_pattern_0_shouldn_t_be_an_empty_array,
+			    {key});
+		}
+		for (size_t i = 0; i < value.size(); i++) {
+			const std::string& subst = value[i];
+			if (!hasZeroOrOneAsteriskCharacter(subst)) {
+				createDiagnosticForOptionPathKeyValue(
+				    key, static_cast<int>(i),
+				    
+				        Substitution_0_in_pattern_1_can_have_at_most_one_Asterisk_character,
+				    {subst, key});
+			}
+			if (!tspath::pathIsRelative(subst) &&
+			    !tspath::pathIsAbsolute(subst)) {
+				createDiagnosticForOptionPathKeyValue(
+				    key, static_cast<int>(i),
+				    
+				        Non_relative_paths_are_not_allowed_Did_you_forget_a_leading_Slash,
+				    {});
+			}
+		}
+	}
+
+	if (options.SourceMap != Tristate::True &&
+	    options.InlineSourceMap != Tristate::True) {
+		if (options.InlineSources == Tristate::True) {
+			createDiagnosticForOptionName(
+			    
+			        Option_0_can_only_be_used_when_either_option_inlineSourceMap_or_option_sourceMap_is_provided,
+			    "inlineSources", "");
+		}
+		if (!options.SourceRoot.empty()) {
+			createDiagnosticForOptionName(
+			    
+			        Option_0_can_only_be_used_when_either_option_inlineSourceMap_or_option_sourceMap_is_provided,
+			    "sourceRoot", "");
+		}
+	}
+
+	if (!options.MapRoot.empty() &&
+	    !(options.SourceMap == Tristate::True ||
+	      options.DeclarationMap == Tristate::True)) {
+		createDiagnosticForOptionName(
+		    
+		        Option_0_cannot_be_specified_without_specifying_option_1_or_option_2,
+		    "mapRoot", "sourceMap", {"declarationMap"});
+	}
+
+	if (!options.DeclarationDir.empty()) {
+		if (!options.GetEmitDeclarations()) {
+			createDiagnosticForOptionName(
+			    
+			        Option_0_cannot_be_specified_without_specifying_option_1_or_option_2,
+			    "declarationDir", "declaration", {"composite"});
+		}
+	}
+
+	if (options.DeclarationMap == Tristate::True &&
+	    !options.GetEmitDeclarations()) {
+		createDiagnosticForOptionName(
+		    
+		        Option_0_cannot_be_specified_without_specifying_option_1_or_option_2,
+		    "declarationMap", "declaration", {"composite"});
+	}
+
+	if (!options.Lib.empty() && options.NoLib == Tristate::True) {
+		createDiagnosticForOptionName(
+		    Option_0_cannot_be_specified_with_option_1, "lib",
+		    "noLib");
+	}
+
+	if (options.IsolatedModules == Tristate::True ||
+	    options.VerbatimModuleSyntax == Tristate::True) {
+		if (options.PreserveConstEnums == Tristate::False) {
+			createDiagnosticForOptionName(
+			    
+			        Option_preserveConstEnums_cannot_be_disabled_when_0_is_enabled,
+			    options.VerbatimModuleSyntax == Tristate::True
+			        ? "verbatimModuleSyntax"
+			        : "isolatedModules",
+			    "preserveConstEnums");
+		}
+	}
+
+	if (!options.OutDir.empty() || !options.RootDir.empty() ||
+	    !options.SourceRoot.empty() || !options.MapRoot.empty() ||
+	    (options.GetEmitDeclarations() &&
+	     !options.DeclarationDir.empty())) {
+		std::string dir = CommonSourceDirectory();
+		bool anyRooted = false;
+		for (auto* f : files) {
+			if (tspath::getRootLength(f->FileName()) > 1) {
+				anyRooted = true;
+				break;
+			}
+		}
+		if (!options.OutDir.empty() && dir.empty() && anyRooted) {
+			createDiagnosticForOptionName(
+			    
+			        Cannot_find_the_common_subdirectory_path_for_the_input_files,
+			    "outDir", "");
+		}
+	}
+
+	// The common-source-dir-vs-rootDir check requires emit helpers
+	// (outputpaths.GetComputedCommonSourceDirectory over emitted files);
+	// unreachable when NoEmit is true, which it always is here.
+	if (options.NoEmit != Tristate::True &&
+	    options.Composite != Tristate::True && options.RootDir.empty() &&
+	    !options.ConfigFilePath.empty() &&
+	    (!options.OutDir.empty() ||
+	     (options.GetEmitDeclarations() &&
+	      !options.DeclarationDir.empty()) ||
+	     !options.OutFile.empty())) {
+		std::string dir = CommonSourceDirectory();
+		std::vector<std::string> emittedFiles;
+		for (auto* file : files) {
+			if (!file->IsDeclarationFile &&
+			    sourceFileMayBeEmitted(file, this, false, false)) {
+				emittedFiles.push_back(file->FileName());
+			}
+		}
+		std::string dir59 =
+		    tspath::ensureTrailingDirectorySeparator(
+		        computeCommonSourceDirectoryOfFilenames(
+		            emittedFiles, GetCurrentDirectory(),
+		            UseCaseSensitiveFileNames()));
+		if (!dir59.empty() &&
+		    tspath::getCanonicalFileName(dir,
+		                                 UseCaseSensitiveFileNames()) !=
+		        tspath::getCanonicalFileName(dir59,
+		                                     UseCaseSensitiveFileNames())) {
+			std::string option1;
+			if (!options.OutFile.empty()) {
+				option1 = "outFile";
+			} else if (!options.OutDir.empty()) {
+				option1 = "outDir";
+			} else {
+				option1 = "declarationDir";
+			}
+			std::string option2;
+			if (options.OutFile.empty() && !options.OutDir.empty()) {
+				option2 = "declarationDir";
+			}
+			Diagnostic* diag = createDiagnosticForOption(
+			    true, option1, option2,
+			    
+			        The_common_source_directory_of_0_is_1_The_rootDir_setting_must_be_explicitly_set_to_this_or_another_path_to_adjust_your_output_s_file_layout,
+			    {std::string(tspath::getBaseFileName(
+			         options.ConfigFilePath)),
+			     tspath::getRelativePathFromFile(
+			         options.ConfigFilePath, dir59,
+			         comparePathsOptions())});
+			diag->AddMessageChain(tsoptions::newCompilerDiagnostic(
+			    
+			        Visit_https_Colon_Slash_Slashaka_ms_Slashts6_for_migration_information));
+		}
+	}
+
+	if (options.CheckJs == Tristate::True && !options.GetAllowJS()) {
+		createDiagnosticForOptionName(
+		    Option_0_cannot_be_specified_with_option_1,
+		    "checkJs", "allowJs");
+	}
+
+	if (options.EmitDeclarationOnly == Tristate::True) {
+		if (!options.GetEmitDeclarations()) {
+			createDiagnosticForOptionName(
+			    
+			        Option_0_cannot_be_specified_without_specifying_option_1_or_option_2,
+			    "emitDeclarationOnly", "declaration", {"composite"});
+		}
+	}
+
+	if (options.EmitDecoratorMetadata == Tristate::True &&
+	    options.ExperimentalDecorators != Tristate::True) {
+		createDiagnosticForOptionName(
+		    Option_0_cannot_be_specified_with_option_1,
+		    "emitDecoratorMetadata", "experimentalDecorators");
+	}
+
+	if (!options.JsxFactory.empty()) {
+		if (!options.ReactNamespace.empty()) {
+			createDiagnosticForOptionName(
+			    Option_0_cannot_be_specified_with_option_1,
+			    "reactNamespace", "jsxFactory");
+		}
+		if (options.Jsx == JsxEmit::ReactJSX ||
+		    options.Jsx == JsxEmit::ReactJSXDev) {
+			createDiagnosticForOptionName(
+			    Option_0_cannot_be_specified_when_option_jsx_is_1,
+			    "jsxFactory", {jsxEmitString(options.Jsx)});
+		}
+		if (parseIsolatedEntityName(options.JsxFactory) ==
+		    nullptr) {
+			createOptionValueDiagnostic(
+			    "jsxFactory",
+			    
+			        Invalid_value_for_jsxFactory_0_is_not_a_valid_identifier_or_qualified_name,
+			    {options.JsxFactory});
+		}
+	} else if (!options.ReactNamespace.empty() &&
+	           !isIdentifierText(options.ReactNamespace, LanguageVariant::Standard)) {
+		createOptionValueDiagnostic(
+		    "reactNamespace",
+		    
+		        Invalid_value_for_reactNamespace_0_is_not_a_valid_identifier,
+		    {options.ReactNamespace});
+	}
+
+	if (!options.JsxFragmentFactory.empty()) {
+		if (options.JsxFactory.empty()) {
+			createDiagnosticForOptionName(
+			    
+			        Option_0_cannot_be_specified_without_specifying_option_1,
+			    "jsxFragmentFactory", "jsxFactory");
+		}
+		if (options.Jsx == JsxEmit::ReactJSX ||
+		    options.Jsx == JsxEmit::ReactJSXDev) {
+			createDiagnosticForOptionName(
+			    Option_0_cannot_be_specified_when_option_jsx_is_1,
+			    "jsxFragmentFactory", {jsxEmitString(options.Jsx)});
+		}
+		if (parseIsolatedEntityName(options.JsxFragmentFactory) ==
+		    nullptr) {
+			createOptionValueDiagnostic(
+			    "jsxFragmentFactory",
+			    
+			        Invalid_value_for_jsxFragmentFactory_0_is_not_a_valid_identifier_or_qualified_name,
+			    {options.JsxFragmentFactory});
+		}
+	}
+
+	if (!options.ReactNamespace.empty()) {
+		if (options.Jsx == JsxEmit::ReactJSX ||
+		    options.Jsx == JsxEmit::ReactJSXDev) {
+			createDiagnosticForOptionName(
+			    Option_0_cannot_be_specified_when_option_jsx_is_1,
+			    "reactNamespace", {jsxEmitString(options.Jsx)});
+		}
+	}
+
+	if (!options.JsxImportSource.empty()) {
+		if (options.Jsx == JsxEmit::React) {
+			createDiagnosticForOptionName(
+			    Option_0_cannot_be_specified_when_option_jsx_is_1,
+			    "jsxImportSource", {jsxEmitString(options.Jsx)});
+		}
+	}
+
+	ModuleKind moduleKind = options.GetEmitModuleKind();
+
+	if (options.AllowImportingTsExtensions == Tristate::True &&
+	    !(options.NoEmit == Tristate::True ||
+	      options.EmitDeclarationOnly == Tristate::True ||
+	      options.RewriteRelativeImportExtensions == Tristate::True)) {
+		createOptionValueDiagnostic(
+		    "allowImportingTsExtensions",
+		    
+		        Option_allowImportingTsExtensions_can_only_be_used_when_one_of_noEmit_emitDeclarationOnly_or_rewriteRelativeImportExtensions_is_set);
+	}
+
+	ModuleResolutionKind moduleResolution =
+	    options.GetModuleResolutionKind();
+	if (options.ResolvePackageJsonExports == Tristate::True &&
+	    !moduleResolutionSupportsPackageJsonExportsAndImports(
+	        moduleResolution)) {
+		createDiagnosticForOptionName(
+		    
+		        Option_0_can_only_be_used_when_moduleResolution_is_set_to_node16_nodenext_or_bundler,
+		    "resolvePackageJsonExports", "");
+	}
+	if (options.ResolvePackageJsonImports == Tristate::True &&
+	    !moduleResolutionSupportsPackageJsonExportsAndImports(
+	        moduleResolution)) {
+		createDiagnosticForOptionName(
+		    
+		        Option_0_can_only_be_used_when_moduleResolution_is_set_to_node16_nodenext_or_bundler,
+		    "resolvePackageJsonImports", "");
+	}
+	if (!options.CustomConditions.empty() &&
+	    !moduleResolutionSupportsPackageJsonExportsAndImports(
+	        moduleResolution)) {
+		createDiagnosticForOptionName(
+		    
+		        Option_0_can_only_be_used_when_moduleResolution_is_set_to_node16_nodenext_or_bundler,
+		    "customConditions", "");
+	}
+
+	if (moduleResolution == ModuleResolutionKind::Bundler &&
+	    !emitModuleKindIsNonNodeESM(moduleKind) &&
+	    moduleKind != ModuleKind::Preserve &&
+	    moduleKind != ModuleKind::CommonJS) {
+		createOptionValueDiagnostic(
+		    "moduleResolution",
+		    
+		        Option_0_can_only_be_used_when_module_is_set_to_preserve_commonjs_or_es2015_or_later,
+		    {"bundler"});
+	}
+
+	if (ModuleKind::Node16 <= moduleKind &&
+	    moduleKind <= ModuleKind::NodeNext &&
+	    !(ModuleResolutionKind::Node16 <= moduleResolution &&
+	      moduleResolution <= ModuleResolutionKind::NodeNext)) {
+		std::string moduleKindName = moduleKindString(moduleKind);
+		std::string moduleResolutionName;
+		// core.ModuleKindToModuleResolutionKind map
+		if (moduleKind == ModuleKind::Node16) {
+			moduleResolutionName =
+			    moduleResolutionKindString(ModuleResolutionKind::Node16);
+		} else if (moduleKind == ModuleKind::NodeNext) {
+			moduleResolutionName = moduleResolutionKindString(
+			    ModuleResolutionKind::NodeNext);
+		} else {
+			moduleResolutionName = "Node16";
+		}
+		createOptionValueDiagnostic(
+		    "moduleResolution",
+		    
+		        Option_moduleResolution_must_be_set_to_0_or_left_unspecified_when_option_module_is_set_to_1,
+		    {moduleResolutionName, moduleKindName});
+	} else if (ModuleResolutionKind::Node16 <= moduleResolution &&
+	           moduleResolution <= ModuleResolutionKind::NodeNext &&
+	           !(ModuleKind::Node16 <= moduleKind &&
+	             moduleKind <= ModuleKind::NodeNext)) {
+		std::string moduleResolutionName =
+		    moduleResolutionKindString(moduleResolution);
+		createOptionValueDiagnostic(
+		    "module",
+		    
+		        Option_module_must_be_set_to_0_when_option_moduleResolution_is_set_to_1,
+		    {moduleResolutionName, moduleResolutionName});
+	}
+
+	// If the emit is enabled make sure that every output file is unique and
+	// not overwriting any of the input files — emit is out of scope, and
+	// the block is unreachable with NoEmit.
+	if (options.NoEmit != Tristate::True &&
+	    options.SuppressOutputPathCheck != Tristate::True) {
+		TSC_UNREACHABLE(
+		    "verifyCompilerOptions emit-file uniqueness — ported with the "
+		    "emit slice");
+	}
+}
+
+// program.go:1398 verifyProjectReferences — RangeResolvedProjectReference
+// iterates over resolved project references; there are none in this mode,
+// so this is a faithful no-op.
+void SimpleProgram::verifyProjectReferences() {}
+
+// program.go:2010 GetDiagnosticsOfAnyProgram
+std::vector<Diagnostic*> getDiagnosticsOfAnyProgram(
+    SimpleProgram* program, const std::vector<SourceFile*>& files,
+    bool skipNoEmitCheckForDtsDiagnostics) {
+	std::vector<Diagnostic*> allDiagnostics =
+	    program->GetConfigFileParsingDiagnostics();
+	size_t configFileParsingDiagnosticsLength = allDiagnostics.size();
+
+	auto appendDiagnosticsForAllFiles =
+	    [&](std::vector<Diagnostic*> diagnostics,
+	        const std::function<std::vector<Diagnostic*>(SourceFile*)>&
+	            getDiagnostics) {
+		    if (files.empty()) {
+			    auto d = getDiagnostics(nullptr);
+			    diagnostics.insert(diagnostics.end(), d.begin(),
+			                       d.end());
+			    return diagnostics;
+		    }
+		    for (auto* file : files) {
+			    auto d = getDiagnostics(file);
+			    diagnostics.insert(diagnostics.end(), d.begin(),
+			                       d.end());
+		    }
+		    return diagnostics;
+	    };
+
+	auto syntacticDiagnostics = appendDiagnosticsForAllFiles(
+	    {}, [&](SourceFile* f) {
+		    return program->GetSyntacticDiagnostics(f);
+	    });
+	// (no contentMapperDiagnostics — no mappers)
+	allDiagnostics.insert(allDiagnostics.end(),
+	                      syntacticDiagnostics.begin(),
+	                      syntacticDiagnostics.end());
+
+	if (allDiagnostics.size() == configFileParsingDiagnosticsLength) {
+		auto progDiags = program->GetProgramDiagnostics();
+		allDiagnostics.insert(allDiagnostics.end(), progDiags.begin(),
+		                      progDiags.end());
+
+		// Do binding early so we can track the time.
+		appendDiagnosticsForAllFiles({}, [&](SourceFile* f) {
+			return program->GetBindDiagnostics(f);
+		});
+
+		if (program->options.ListFilesOnly != Tristate::True) {
+			auto globals = program->GetGlobalDiagnostics();
+			allDiagnostics.insert(allDiagnostics.end(), globals.begin(),
+			                      globals.end());
+
+			if (allDiagnostics.size() ==
+			    configFileParsingDiagnosticsLength) {
+				allDiagnostics = appendDiagnosticsForAllFiles(
+				    allDiagnostics, [&](SourceFile* f) {
+					    return program->GetSemanticDiagnostics(f);
+				    });
+				// Late sweep of global diagnostics (in case checking
+				// produced globals).
+				auto globals2 = program->GetGlobalDiagnostics();
+				allDiagnostics.insert(allDiagnostics.end(),
+				                      globals2.begin(), globals2.end());
+			}
+
+			if ((skipNoEmitCheckForDtsDiagnostics ||
+			     program->options.NoEmit == Tristate::True) &&
+			    program->options.GetEmitDeclarations() &&
+			    allDiagnostics.size() ==
+			        configFileParsingDiagnosticsLength) {
+				allDiagnostics = appendDiagnosticsForAllFiles(
+				    allDiagnostics, [&](SourceFile* f) {
+					    return program->GetDeclarationDiagnostics(f);
+				    });
+			}
+		}
+	}
+	return allDiagnostics;
+}
+
+}  // namespace tsc::compiler

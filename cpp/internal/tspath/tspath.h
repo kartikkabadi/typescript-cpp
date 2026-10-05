@@ -247,8 +247,68 @@ inline bool hasTSFileExtension(std::string_view path) {
 	return fileExtensionIsOneOf(path, supportedTSExtensionsFlat);
 }
 
+// extension.go — grouped extension tables + file-kind predicates (program slice)
+inline const std::vector<std::string_view> supportedDeclarationExtensions = {
+	extensionDts, extensionDcts, extensionDmts};
+inline const std::vector<std::string_view> supportedTSImplementationExtensions = {
+	extensionTs, extensionTsx, extensionMts, extensionCts};
+inline const std::vector<std::string_view> supportedJSExtensionsFlat = {
+	extensionJs, extensionJsx, extensionMjs, extensionCjs};
+inline const std::vector<std::vector<std::string_view>> allSupportedExtensions = {
+	{extensionTs, extensionTsx, extensionDts, extensionJs, extensionJsx},
+	{extensionCts, extensionDcts, extensionCjs},
+	{extensionMts, extensionDmts, extensionMjs}};
+inline const std::vector<std::vector<std::string_view>> supportedTSExtensions = {
+	{extensionTs, extensionTsx, extensionDts},
+	{extensionCts, extensionDcts},
+	{extensionMts, extensionDmts}};
+inline const std::vector<std::vector<std::string_view>> supportedJSExtensions = {
+	{extensionJs, extensionJsx}, {extensionMjs}, {extensionCjs}};
+inline const std::vector<std::vector<std::string_view>>
+	allSupportedExtensionsWithJson = [] {
+		auto v = allSupportedExtensions;
+		v.push_back({extensionJson});
+		return v;
+	}();
+inline const std::vector<std::vector<std::string_view>>
+	supportedTSExtensionsWithJson = [] {
+		auto v = supportedTSExtensions;
+		v.push_back({extensionJson});
+		return v;
+	}();
+inline const std::vector<std::string_view> supportedTSExtensionsWithJsonFlat =
+	[] {
+		auto v = supportedTSExtensionsFlat;
+		v.push_back(extensionJson);
+		return v;
+	}();
+inline const std::vector<std::string_view>
+	extensionsNotSupportingExtensionlessResolution = {
+		extensionMts, extensionDmts, extensionMjs, extensionCts,
+		extensionDcts, extensionCjs};
+
+inline bool hasImplementationTSFileExtension(std::string_view path) {
+	return fileExtensionIsOneOf(path, supportedTSImplementationExtensions) &&
+	       !isDeclarationFileName(path);
+}
+
+inline bool hasJSFileExtension(std::string_view path) {
+	return fileExtensionIsOneOf(path, supportedJSExtensionsFlat);
+}
+
 inline bool hasExtension(std::string_view fileName) {
 	return getBaseFileName(fileName).find('.') != std::string_view::npos;
+}
+
+// extension.go: RemoveFileExtension — remove any known extension even if it
+// has more than one dot.
+inline std::string_view removeFileExtension(std::string_view path) {
+	for (auto ext : extensionsToRemove) {
+		if (endsWith(path, ext)) {
+			return path.substr(0, path.size() - ext.size());
+		}
+	}
+	return path;
 }
 
 inline std::string_view removeExtension(std::string_view path,
@@ -413,6 +473,52 @@ inline std::vector<std::string_view> reducePathComponents(
 		reduced.push_back(component);
 	}
 	return reduced;
+}
+
+// path.go: getNormalizedPathComponentsFromCombined
+inline std::vector<std::string_view> getNormalizedPathComponentsFromCombined(
+    std::string_view path) {
+	size_t rootLength = getRootLength(path);
+	std::vector<std::string_view> components;
+	components.push_back(path.substr(0, rootLength));
+
+	size_t i = rootLength;
+	for (; i < path.size();) {
+		for (; i < path.size() && path[i] == '/';)
+			i++;
+		if (i >= path.size()) break;
+		size_t start = i;
+		for (; i < path.size() && path[i] != '/';)
+			i++;
+		std::string_view component = path.substr(start, i - start);
+
+		if (component.empty() || component == ".") continue;
+		if (component == "..") {
+			if (components.size() > 1) {
+				if (components.back() != "..") {
+					components.pop_back();
+					continue;
+				}
+			} else if (!components[0].empty()) {
+				continue;
+			}
+		}
+		components.push_back(component);
+	}
+	return components;
+}
+
+// path.go: GetNormalizedPathComponents — returns owned strings (Go returns
+// []string; the combined path would otherwise dangle behind string_views).
+inline std::vector<std::string> getNormalizedPathComponents(
+    std::string_view path, std::string_view currentDirectory) {
+	std::string combined = combinePaths(currentDirectory, {path});
+	auto views = getNormalizedPathComponentsFromCombined(combined);
+	std::vector<std::string> out;
+	out.reserve(views.size());
+	for (auto v : views)
+		out.emplace_back(v);
+	return out;
 }
 
 inline std::string getPathFromPathComponents(
@@ -724,6 +830,9 @@ struct ComparePathsOptions {
 	    const {
 		return getStringEqualityComparer(!useCaseSensitiveFileNames);
 	}
+
+	// GetComparer — declared here; defined below getStringComparer.
+	std::function<int(std::string_view, std::string_view)> comparer() const;
 };
 
 inline bool pathIsAbsolute(std::string_view path) {
@@ -798,6 +907,153 @@ inline std::string getRelativePathFromFile(std::string_view from,
                                            const ComparePathsOptions& options) {
 	return ensurePathIsNonModuleName(getRelativePathFromDirectory(
 	    getDirectoryPath(from), to, options));
+}
+
+// path.go — ported with the program slice.
+
+inline std::string getCanonicalFileName(std::string_view fileName,
+                                        bool useCaseSensitiveFileNames) {
+	if (useCaseSensitiveFileNames) {
+		return std::string(fileName);
+	}
+	return toFileNameLowerCase(fileName);
+}
+
+// path.go: GetNormalizedAbsolutePathWithoutRoot
+inline std::string getNormalizedAbsolutePathWithoutRoot(
+    std::string_view fileName, std::string_view currentDirectory) {
+	std::string absolutePath =
+	    getNormalizedAbsolutePath(fileName, currentDirectory);
+	int rootLength = getRootLength(absolutePath);
+	return absolutePath.substr(rootLength);
+}
+
+// path.go: GetLongestExtensionFromPath
+inline std::string_view getLongestExtensionFromPath(
+    std::string_view path, const std::vector<std::string_view>& extensions,
+    bool ignoreCase) {
+	path = removeTrailingDirectorySeparator(path);
+	auto comparer = getStringEqualityComparer(ignoreCase);
+	std::string_view longest;
+	for (auto extension : extensions) {
+		if (extension.size() > longest.size()) {
+			auto matched = tryGetExtensionFromPathWorker(path, extension, comparer);
+			if (!matched.empty()) {
+				longest = matched;
+			}
+		}
+	}
+	return longest;
+}
+
+// path.go: ComparePaths
+inline int compareStringsCaseInsensitive(std::string_view a, std::string_view b) {
+	size_t n = std::min(a.size(), b.size());
+	for (size_t i = 0; i < n; i++) {
+		char ca = a[i], cb = b[i];
+		if (ca >= 'A' && ca <= 'Z') ca += 'a' - 'A';
+		if (cb >= 'A' && cb <= 'Z') cb += 'a' - 'A';
+		if (ca != cb) return ca < cb ? -1 : 1;
+	}
+	return static_cast<int>(a.size()) - static_cast<int>(b.size());
+}
+
+inline std::function<int(std::string_view, std::string_view)>
+getStringComparer(bool ignoreCase) {
+	if (ignoreCase) {
+		return [](std::string_view a, std::string_view b) {
+			return compareStringsCaseInsensitive(a, b);
+		};
+	}
+	return [](std::string_view a, std::string_view b) {
+		return a.compare(b);
+	};
+}
+
+inline std::function<int(std::string_view, std::string_view)>
+ComparePathsOptions::comparer() const {
+	return getStringComparer(!useCaseSensitiveFileNames);
+}
+
+inline int comparePaths(std::string_view a, std::string_view b,
+                        const ComparePathsOptions& options) {
+	std::string as = combinePaths(options.currentDirectory, {a});
+	std::string bs = combinePaths(options.currentDirectory, {b});
+	if (as == bs) return 0;
+	if (as.empty()) return -1;
+	if (bs.empty()) return 1;
+
+	auto aRoot = std::string_view(as).substr(0, getRootLength(as));
+	auto bRoot = std::string_view(bs).substr(0, getRootLength(bs));
+	int result = compareStringsCaseInsensitive(aRoot, bRoot);
+	if (result != 0) return result;
+
+	auto aRest = std::string_view(as).substr(aRoot.size());
+	auto bRest = std::string_view(bs).substr(bRoot.size());
+	if (!hasRelativePathSegment(aRest) && !hasRelativePathSegment(bRest)) {
+		return options.comparer()(aRest, bRest);
+	}
+
+	auto aComponents =
+	    reducePathComponents(getPathComponents(as, ""));
+	auto bComponents =
+	    reducePathComponents(getPathComponents(bs, ""));
+	size_t sharedLength = std::min(aComponents.size(), bComponents.size());
+	for (size_t i = 1; i < sharedLength; i++) {
+		result = options.comparer()(aComponents[i], bComponents[i]);
+		if (result != 0) return result;
+	}
+	return static_cast<int>(aComponents.size()) -
+	       static_cast<int>(bComponents.size());
+}
+
+// path.go: ContainsPath
+inline bool containsPath(std::string_view parent, std::string_view child,
+                         const ComparePathsOptions& options) {
+	std::string parents = combinePaths(options.currentDirectory, {parent});
+	std::string childs = combinePaths(options.currentDirectory, {child});
+	if (parents.empty() || childs.empty()) return false;
+	if (parents == childs) return true;
+	auto parentComponents =
+	    reducePathComponents(getPathComponents(parents, ""));
+	auto childComponents =
+	    reducePathComponents(getPathComponents(childs, ""));
+	if (childComponents.size() < parentComponents.size()) return false;
+
+	auto componentComparer = options.equalityComparer();
+	for (size_t i = 0; i < parentComponents.size(); i++) {
+		bool eq;
+		if (i == 0) {
+			eq = equateStringCaseInsensitive(parentComponents[i],
+			                               childComponents[i]);
+		} else {
+			eq = componentComparer(parentComponents[i], childComponents[i]);
+		}
+		if (!eq) return false;
+	}
+	return true;
+}
+
+// path.go: ForEachAncestorDirectory — calls `callback` on `directory` and
+// every ancestor directory it has, returning the first defined result.
+template <class T>
+inline T forEachAncestorDirectory(
+    std::string directory,
+    const std::function<std::pair<T, bool>(const std::string&)>& callback,
+    bool* ok = nullptr) {
+	for (;;) {
+		auto [result, stop] = callback(directory);
+		if (stop) {
+			if (ok != nullptr) *ok = true;
+			return result;
+		}
+		std::string parentPath = getDirectoryPath(directory);
+		if (parentPath == directory) {
+			if (ok != nullptr) *ok = false;
+			return T{};
+		}
+		directory = parentPath;
+	}
 }
 
 }  // namespace tsc::tspath

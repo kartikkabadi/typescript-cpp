@@ -7797,5 +7797,358 @@ std::string Checker::getFullyQualifiedName(Symbol* symbol,
 	                        SymbolFormatFlagsDoNotIncludeSymbolChain |
 	                            SymbolFormatFlagsAllowAnyNodeKind);
 }
+
+// ---------------------------------------------------------------------------
+// === slice: program ===
+// Stubs for checker methods that are declared and referenced by already-ported
+// bodies but belong to slices not yet ported (type relations, checking walker,
+// declaration emit). Each throws via TSC_UNREACHABLE like Go's equivalents —
+// never fake results.
+// ---------------------------------------------------------------------------
+
+Type* Checker::checkComputedPropertyName(Node* node) {
+	TSC_UNREACHABLE(
+	    "checkComputedPropertyName — ported with the expression-checking slice");
+}
+
+Type* Checker::checkExpressionCached(Node* node) {
+	TSC_UNREACHABLE(
+	    "checkExpressionCached — ported with the expression-checking slice");
+}
+
+Diagnostic* Checker::createDiagnosticForNode(
+    Node* node, const DiagnosticMessage* message,
+    const std::vector<std::string>& args) {
+	TSC_UNREACHABLE(
+	    "createDiagnosticForNode — ported with the diagnostic slice");
+}
+
+Type* Checker::getBaseConstraintOfType(Type* t) {
+	TSC_UNREACHABLE(
+	    "getBaseConstraintOfType — ported with the constraint slice");
+}
+
+// utilities.go:1677 isReservedMemberName
+static bool isReservedMemberName(const std::string& name) {
+	return name.size() >= 2 && name[0] == '\xFE' && name[1] != '@' &&
+	       name[1] != '#';
+}
+
+// checker.go:22479 isNamedMember
+bool Checker::isNamedMember(Symbol* symbol, const std::string& id) {
+	return !isReservedMemberName(id) && symbolIsValue(symbol);
+}
+
+// checker.go:22468 isDeclarationContainedBy
+bool Checker::isDeclarationContainedBy(Symbol* symbol, Symbol* container) {
+	if (Node* declaration = symbol->valueDeclaration;
+	    declaration != nullptr) {
+		for (Node* d : container->declarations) {
+			// text.go:58 TextRange.ContainedBy
+			if (d->loc.pos() <= declaration->loc.pos() &&
+			    d->loc.end() >= declaration->loc.end()) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+// checker.go:22483 symbolIsValue
+bool Checker::symbolIsValue(Symbol* symbol) {
+	return symbolIsValueEx(symbol, false /*includeTypeOnlyMembers*/);
+}
+
+// checker.go:22487 symbolIsValueEx
+bool Checker::symbolIsValueEx(Symbol* symbol, bool includeTypeOnlyMembers) {
+	return (symbol->flags & SymbolFlagsValue) ||
+	       ((symbol->flags & SymbolFlagsAlias) &&
+	        (getSymbolFlagsEx(symbol, !includeTypeOnlyMembers,
+	                          false /*excludeLocalMeanings*/) &
+	         SymbolFlagsValue));
+}
+
+// checker.go:22441 getNamedMembers
+std::vector<Symbol*> Checker::getNamedMembers(const SymbolTable& members,
+                                              Symbol* typeSymbol) {
+	if (members.empty()) {
+		return {};
+	}
+	// For classes and interfaces, we store explicitly declared members ahead
+	// of inherited members. This ensures we process explicitly declared
+	// members first in type relations, which is beneficial because explicitly
+	// declared members are more likely to contain discriminating differences.
+	// See https://github.com/microsoft/TypeScript/tsc/issues/1968.
+	std::vector<Symbol*> result;
+	result.reserve(members.size());
+	size_t containedCount = 0;
+	if (typeSymbol != nullptr &&
+	    (typeSymbol->flags & (SymbolFlagsClass | SymbolFlagsInterface))) {
+		for (auto& [id, symbol] : members) {
+			if (isNamedMember(symbol, id) &&
+			    isDeclarationContainedBy(symbol, typeSymbol)) {
+				result.push_back(symbol);
+			}
+		}
+		containedCount = result.size();
+	}
+	for (auto& [id, symbol] : members) {
+		if (isNamedMember(symbol, id) &&
+		    (typeSymbol == nullptr ||
+		     !(typeSymbol->flags &
+		       (SymbolFlagsClass | SymbolFlagsInterface)) ||
+		     !isDeclarationContainedBy(symbol, typeSymbol))) {
+			result.push_back(symbol);
+		}
+	}
+	std::vector<Symbol*> first(result.begin(), result.begin() + containedCount);
+	std::vector<Symbol*> rest(result.begin() + containedCount, result.end());
+	sortSymbols(first);
+	sortSymbols(rest);
+	std::copy(first.begin(), first.end(), result.begin());
+	std::copy(rest.begin(), rest.end(), result.begin() + containedCount);
+	return result;
+}
+
+Type* Checker::getTypeFromImportAttributes(Node* node) {
+	TSC_UNREACHABLE(
+	    "getTypeFromImportAttributes — ported with the type-node slice");
+}
+
+Type* Checker::getTypeOfSymbol(Symbol* symbol) {
+	TSC_UNREACHABLE("getTypeOfSymbol — ported with the type-resolution slice");
+}
+
+// checker.go:25346 getGenericObjectFlags
+ObjectFlags Checker::getGenericObjectFlags(Type* t) {
+	ObjectFlags combinedFlags = 0;
+	if (t->flags & (TypeFlagsUnionOrIntersection | TypeFlagsSubstitution)) {
+		if (!(t->objectFlags & ObjectFlagsIsGenericTypeComputed)) {
+			if (t->flags & TypeFlagsUnionOrIntersection) {
+				for (Type* u : t->types()) {
+					combinedFlags |= getGenericObjectFlags(u);
+				}
+			} else {
+				combinedFlags =
+				    getGenericObjectFlags(t->AsSubstitutionType()->baseType) |
+				    getGenericObjectFlags(t->AsSubstitutionType()->constraint);
+			}
+			t->objectFlags |=
+			    ObjectFlagsIsGenericTypeComputed | combinedFlags;
+		}
+		return t->objectFlags & ObjectFlagsIsGenericType;
+	}
+	if ((t->flags & TypeFlagsInstantiableNonPrimitive) ||
+	    isGenericMappedType(t) || isGenericTupleType(t)) {
+		combinedFlags |= ObjectFlagsIsGenericObjectType;
+	}
+	if ((t->flags & (TypeFlagsInstantiableNonPrimitive | TypeFlagsIndex)) ||
+	    isGenericStringLikeType(t)) {
+		combinedFlags |= ObjectFlagsIsGenericIndexType;
+	}
+	return combinedFlags;
+}
+
+// checker.go:23946 isTupleType (free function)
+static bool isTupleType(Type* t) {
+	return (t->objectFlags & ObjectFlagsReference) &&
+	       (t->AsTypeReference()->target->objectFlags & ObjectFlagsTuple);
+}
+
+// checker.go:25370 isGenericTupleType
+bool Checker::isGenericTupleType(Type* t) {
+	return isTupleType(t) &&
+	       (t->AsTypeReference()->target->AsTupleType()->combinedFlags &
+	        ElementFlagsVariadic);
+}
+
+// checker.go:25342 isGenericIndexType
+bool Checker::isGenericIndexType(Type* t) {
+	return (getGenericObjectFlags(t) & ObjectFlagsIsGenericIndexType) != 0;
+}
+
+// checker.go:23091 getTypeParameterFromMappedType
+Type* Checker::getTypeParameterFromMappedType(Type* t) {
+	TSC_UNREACHABLE(
+	    "getTypeParameterFromMappedType — ported with the mapped-type slice");
+}
+
+// checker.go:23099 getConstraintTypeFromMappedType
+Type* Checker::getConstraintTypeFromMappedType(Type* t) {
+	TSC_UNREACHABLE(
+	    "getConstraintTypeFromMappedType — ported with the mapped-type slice");
+}
+
+// checker.go:23107 getNameTypeFromMappedType
+Type* Checker::getNameTypeFromMappedType(Type* t) {
+	TSC_UNREACHABLE(
+	    "getNameTypeFromMappedType — ported with the mapped-type slice");
+}
+
+// checker.go:25374 isGenericMappedType
+bool Checker::isGenericMappedType(Type* t) {
+	if (t->objectFlags & ObjectFlagsMapped) {
+		Type* constraint = getConstraintTypeFromMappedType(t);
+		if (isGenericIndexType(constraint)) {
+			return true;
+		}
+		// A mapped type is generic if the 'as' clause references generic types
+		// other than the iteration type. To determine this, we substitute the
+		// constraint type (that we now know isn't generic) for the iteration
+		// type and check whether the resulting type is generic.
+		Type* nameType = getNameTypeFromMappedType(t);
+		if (nameType != nullptr &&
+		    isGenericIndexType(instantiateType(
+		        nameType,
+		        newSimpleTypeMapper(getTypeParameterFromMappedType(t),
+		                            constraint)))) {
+			return true;
+		}
+	}
+	return false;
+}
+
+bool Checker::isMemberOfStringMapping(Type* source, Type* target) {
+	TSC_UNREACHABLE(
+	    "isMemberOfStringMapping — ported with the type-predicate slice");
+}
+
+bool Checker::isTypeAssignableTo(Type* source, Type* target) {
+	TSC_UNREACHABLE("isTypeAssignableTo — ported with relater.go");
+}
+
+bool Checker::isTypeIdenticalTo(Type* source, Type* target) {
+	TSC_UNREACHABLE("isTypeIdenticalTo — ported with relater.go");
+}
+
+bool Checker::isTypeMatchedByTemplateLiteralType(
+    Type* t, TemplateLiteralType* templateType,
+    TypeComparer compareTypesAssignable) {
+	TSC_UNREACHABLE(
+	    "isTypeMatchedByTemplateLiteralType — ported with the type-predicate slice");
+}
+
+bool Checker::isTypeStrictSubtypeOf(Type* source, Type* target) {
+	TSC_UNREACHABLE("isTypeStrictSubtypeOf — ported with relater.go");
+}
+
+// checker.go:14304 newSymbol
+Symbol* Checker::newSymbol(SymbolFlags flags, const std::string& name) {
+	SymbolCount++;
+	Symbol* result = symbolArena.alloc<Symbol>();
+	result->flags = flags | SymbolFlagsTransient;
+	result->name = name;
+	return result;
+}
+
+// checker.go:14312 newSymbolEx
+Symbol* Checker::newSymbolEx(SymbolFlags flags, const std::string& name,
+                             CheckFlags checkFlags) {
+	Symbol* result = newSymbol(flags, name);
+	result->checkFlags = checkFlags;
+	return result;
+}
+
+Symbol* Checker::resolveExternalModuleSymbol(Symbol* moduleSymbol,
+                                             bool dontResolveAlias) {
+	TSC_UNREACHABLE(
+	    "resolveExternalModuleSymbol — ported with the import-resolution slice");
+}
+
+StructuredType* Checker::resolveStructuredTypeMembers(Type* t) {
+	TSC_UNREACHABLE(
+	    "resolveStructuredTypeMembers — ported with the member-resolution slice");
+}
+}  // namespace checker
+}  // namespace tsc
+
+// === slice: program — additional stubs/hashes needed by program-link ===
+
+namespace tsc {
+namespace checker {
+// Hash operators for checker.h key structs (infra for maps; Go hashes these
+// natively). Any equal-keys→equal-hash function is faithful.
+inline static uint64_t checkerHashStep(uint64_t h, uint64_t x) {
+	h ^= x;
+	h *= 1099511628211ull;
+	h ^= h >> 33;
+	return h;
+}
+
+size_t Checker::EnumLiteralKeyHash::operator()(const EnumLiteralKey& k) const noexcept {
+	uint64_t h = 1469598103934665603ull;
+	h = checkerHashStep(h, reinterpret_cast<uintptr_t>(k.enumSymbol));
+	std::visit(
+	    [&h](auto&& v) {
+		    using T = std::decay_t<decltype(v)>;
+		    if constexpr (std::is_same_v<T, std::string>) {
+			    for (char c : v)
+				    h = checkerHashStep(h, static_cast<uint64_t>(c));
+		    } else if constexpr (std::is_same_v<T, Number>) {
+			    uint64_t bits;
+			    double d = v.v;
+			    std::memcpy(&bits, &d, 8);
+			    h = checkerHashStep(h, bits);
+		    } else if constexpr (std::is_same_v<T, PseudoBigInt>) {
+			    h = checkerHashStep(h, static_cast<uint64_t>(v.base10Value.size()) |
+				                   (v.negative ? 0x8000000000000000ull : 0));
+			    for (char c : v.base10Value)
+				    h = checkerHashStep(h, static_cast<uint64_t>(c));
+		    }
+	    },
+	    k.value);
+	return static_cast<size_t>(h);
+}
+
+size_t Checker::CachedTypeKeyHash::operator()(const CachedTypeKey& k) const noexcept {
+	uint64_t h = 1469598103934665603ull;
+	h = checkerHashStep(h, static_cast<uint64_t>(k.kind));
+	h = checkerHashStep(h, static_cast<uint64_t>(k.typeId));
+	return static_cast<size_t>(h);
+}
+
+size_t Checker::UnionOfUnionKeyHash::operator()(const UnionOfUnionKey& k) const noexcept {
+	uint64_t h = 1469598103934665603ull;
+	h = checkerHashStep(h, static_cast<uint64_t>(k.id1));
+	h = checkerHashStep(h, static_cast<uint64_t>(k.id2));
+	h = checkerHashStep(h, static_cast<uint64_t>(k.r));
+	h = checkerHashStep(h, CacheKeyHash{}(k.a));
+	return static_cast<size_t>(h);
+}
+
+Type* Checker::getBaseConstraintOrType(Type* t) {
+	TSC_UNREACHABLE("getBaseConstraintOrType — ported with the <slice> slice");
+}
+std::vector<Symbol*> Checker::getPropertiesOfType(Type* t) {
+	TSC_UNREACHABLE("getPropertiesOfType — ported with the <slice> slice");
+}
+Type* Checker::getStringMappingTypeForGenericType(Symbol* symbol, Type* t) {
+	TSC_UNREACHABLE("getStringMappingTypeForGenericType — ported with the <slice> slice");
+}
+Type* Checker::getTargetType(Type* t) {
+	TSC_UNREACHABLE("getTargetType — ported with the <slice> slice");
+}
+Type* Checker::instantiateType(Type* t, TypeMapper* mapper) {
+	TSC_UNREACHABLE("instantiateType — ported with the <slice> slice");
+}
+std::vector<Type*> Checker::instantiateTypes(const std::vector<Type*>& types, TypeMapper* mapper) {
+	TSC_UNREACHABLE("instantiateTypes — ported with the <slice> slice");
+}
+bool Checker::isTypeDerivedFrom(Type* source, Type* target) {
+	TSC_UNREACHABLE("isTypeDerivedFrom — ported with the <slice> slice");
+}
+bool Checker::isTypeRelatedTo(Type* source, Type* target, Relation* relation) {
+	TSC_UNREACHABLE("isTypeRelatedTo — ported with the <slice> slice");
+}
+bool Checker::isTypeSubtypeOf(Type* source, Type* target) {
+	TSC_UNREACHABLE("isTypeSubtypeOf — ported with the <slice> slice");
+}
+
+void Checker::inferFromIntraExpressionSites(InferenceContext* context) {
+	TSC_UNREACHABLE("inferFromIntraExpressionSites — ported with the inference slice");
+}
+Type* Checker::getInferredType(InferenceContext* context, size_t index) {
+	TSC_UNREACHABLE("getInferredType — ported with the inference slice");
+}
 }  // namespace checker
 }  // namespace tsc

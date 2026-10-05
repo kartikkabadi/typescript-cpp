@@ -1032,26 +1032,26 @@ struct LanguageFeatureMinimumTargetMap {
 
 using StringLiteralType = Type;
 
-IntrinsicType* Type::AsIntrinsicType() { return static_cast<IntrinsicType*>(data); }
-LiteralType* Type::AsLiteralType() { return static_cast<LiteralType*>(data); }
-UniqueESSymbolType* Type::AsUniqueESSymbolType() { return static_cast<UniqueESSymbolType*>(data); }
-TupleType* Type::AsTupleType() { return static_cast<TupleType*>(data); }
-InstantiationExpressionType* Type::AsInstantiationExpressionType() {
+inline IntrinsicType* Type::AsIntrinsicType() { return static_cast<IntrinsicType*>(data); }
+inline LiteralType* Type::AsLiteralType() { return static_cast<LiteralType*>(data); }
+inline UniqueESSymbolType* Type::AsUniqueESSymbolType() { return static_cast<UniqueESSymbolType*>(data); }
+inline TupleType* Type::AsTupleType() { return static_cast<TupleType*>(data); }
+inline InstantiationExpressionType* Type::AsInstantiationExpressionType() {
 		return static_cast<InstantiationExpressionType*>(data);
 	}
-MappedType* Type::AsMappedType() { return static_cast<MappedType*>(data); }
-ReverseMappedType* Type::AsReverseMappedType() { return static_cast<ReverseMappedType*>(data); }
-EvolvingArrayType* Type::AsEvolvingArrayType() { return static_cast<EvolvingArrayType*>(data); }
-TypeParameter* Type::AsTypeParameter() { return static_cast<TypeParameter*>(data); }
-UnionType* Type::AsUnionType() { return static_cast<UnionType*>(data); }
-IntersectionType* Type::AsIntersectionType() { return static_cast<IntersectionType*>(data); }
-IndexType* Type::AsIndexType() { return static_cast<IndexType*>(data); }
-IndexedAccessType* Type::AsIndexedAccessType() { return static_cast<IndexedAccessType*>(data); }
-TemplateLiteralType* Type::AsTemplateLiteralType() { return static_cast<TemplateLiteralType*>(data); }
-StringMappingType* Type::AsStringMappingType() { return static_cast<StringMappingType*>(data); }
-SubstitutionType* Type::AsSubstitutionType() { return static_cast<SubstitutionType*>(data); }
-ConditionalType* Type::AsConditionalType() { return static_cast<ConditionalType*>(data); }
-ConstrainedType* Type::AsConstrainedType() {
+inline MappedType* Type::AsMappedType() { return static_cast<MappedType*>(data); }
+inline ReverseMappedType* Type::AsReverseMappedType() { return static_cast<ReverseMappedType*>(data); }
+inline EvolvingArrayType* Type::AsEvolvingArrayType() { return static_cast<EvolvingArrayType*>(data); }
+inline TypeParameter* Type::AsTypeParameter() { return static_cast<TypeParameter*>(data); }
+inline UnionType* Type::AsUnionType() { return static_cast<UnionType*>(data); }
+inline IntersectionType* Type::AsIntersectionType() { return static_cast<IntersectionType*>(data); }
+inline IndexType* Type::AsIndexType() { return static_cast<IndexType*>(data); }
+inline IndexedAccessType* Type::AsIndexedAccessType() { return static_cast<IndexedAccessType*>(data); }
+inline TemplateLiteralType* Type::AsTemplateLiteralType() { return static_cast<TemplateLiteralType*>(data); }
+inline StringMappingType* Type::AsStringMappingType() { return static_cast<StringMappingType*>(data); }
+inline SubstitutionType* Type::AsSubstitutionType() { return static_cast<SubstitutionType*>(data); }
+inline ConditionalType* Type::AsConditionalType() { return static_cast<ConditionalType*>(data); }
+inline ConstrainedType* Type::AsConstrainedType() {
 		// IntrinsicType, LiteralType (incl. Enum/EnumLiteral) and UniqueESSymbolType
 		// do not embed ConstrainedType; every other kind does.
 		if (flags & (TypeFlagsIntrinsic | TypeFlagsLiteral | TypeFlagsUniqueESSymbol |
@@ -1060,42 +1060,42 @@ ConstrainedType* Type::AsConstrainedType() {
 		}
 		return static_cast<ConstrainedType*>(data);
 	}
-StructuredType* Type::AsStructuredType() {
+inline StructuredType* Type::AsStructuredType() {
 		if (!(flags & TypeFlagsStructuredType)) {
 			return nullptr;
 		}
 		return static_cast<StructuredType*>(data);
 	}
-ObjectType* Type::AsObjectType() {
+inline ObjectType* Type::AsObjectType() {
 		if (!(flags & TypeFlagsObject)) {
 			return nullptr;
 		}
 		return static_cast<ObjectType*>(data);
 	}
-TypeReference* Type::AsTypeReference() {
+inline TypeReference* Type::AsTypeReference() {
 		if (!(flags & TypeFlagsObject) ||
 			!(objectFlags & (ObjectFlagsReference | ObjectFlagsClassOrInterface | ObjectFlagsTuple))) {
 			return nullptr;
 		}
 		return static_cast<TypeReference*>(data);
 	}
-InterfaceType* Type::AsInterfaceType() {
+inline InterfaceType* Type::AsInterfaceType() {
 		if (!(flags & TypeFlagsObject) ||
 			!(objectFlags & (ObjectFlagsClassOrInterface | ObjectFlagsTuple))) {
 			return nullptr;
 		}
 		return static_cast<InterfaceType*>(data);
 	}
-UnionOrIntersectionType* Type::AsUnionOrIntersectionType() {
+inline UnionOrIntersectionType* Type::AsUnionOrIntersectionType() {
 		if (!(flags & TypeFlagsUnionOrIntersection)) {
 			return nullptr;
 		}
 		return static_cast<UnionOrIntersectionType*>(data);
 	}
-const std::vector<Type*>& Type::types() const {
+inline const std::vector<Type*>& Type::types() const {
 		return static_cast<const UnionOrIntersectionType*>(data)->types;
 	}
-std::vector<Type*>& Type::types() {
+inline std::vector<Type*>& Type::types() {
 		return static_cast<UnionOrIntersectionType*>(data)->types;
 	}
 

@@ -1350,6 +1350,17 @@ public:
 	bool isPatternLiteralPlaceholderType(Type* t);
 	bool isGenericStringLikeType(Type* t);
 	bool isGenericMappedType(Type* t);
+	// === slice: program ===
+	ObjectFlags getGenericObjectFlags(Type* t);
+	bool isGenericTupleType(Type* t);
+	Type* getTypeParameterFromMappedType(Type* t);
+	Type* getConstraintTypeFromMappedType(Type* t);
+	Type* getNameTypeFromMappedType(Type* t);
+	bool isNamedMember(Symbol* symbol, const std::string& id);
+	bool isDeclarationContainedBy(Symbol* symbol, Symbol* container);
+	bool symbolIsValue(Symbol* symbol);
+	bool symbolIsValueEx(Symbol* symbol, bool includeTypeOnlyMembers);
+	// === end slice: program ===
 	bool IsEmptyAnonymousObjectType(Type* t);
 	bool isEmptyResolvedType(StructuredType* t);
 	bool isEmptyObjectType(Type* t);

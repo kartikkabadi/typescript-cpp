@@ -11,6 +11,7 @@
 #include "internal/ast/symbol.h"
 #include "internal/ast/symbolflags.h"
 #include "internal/core/types.h"
+#include "internal/tspath/tspath.h"
 
 namespace tsc {
 
@@ -2105,6 +2106,200 @@ bool isPartOfTypeOnlyImportOrExportDeclaration(Node* node) {
 bool isVariableDeclarationInitializedToBareOrAccessedRequire(Node* node) {
 	return isVariableDeclarationInitializedWithRequireHelper(
 	    node, true /*allowAccessedRequire*/);
+}
+
+// ---------------------------------------------------------------------------
+// === slice: program === — utilities.go format/emit + pragma helpers
+// ---------------------------------------------------------------------------
+
+// utilities.go: IsSourceFileJS
+bool isSourceFileJS(SourceFile* file) {
+	return file->ScriptKind == ScriptKind::JS || file->ScriptKind == ScriptKind::JSX;
+}
+
+// utilities.go: IsCheckJSEnabledForFile
+bool isCheckJSEnabledForFile(SourceFile* sourceFile,
+                             const CompilerOptions* compilerOptions) {
+	if (sourceFile->CheckJsDirective != nullptr) {
+		return sourceFile->CheckJsDirective->Enabled;
+	}
+	return compilerOptions->CheckJs == Tristate::True;
+}
+
+// utilities.go: WalkUpParenthesizedExpressions
+Node* walkUpParenthesizedExpressions(Node* node) {
+	while (node->parent != nullptr &&
+	       node->parent->kind == Kind::ParenthesizedExpression) {
+		node = node->parent;
+	}
+	return node;
+}
+
+// utilities.go: ShouldTransformImportCall
+bool shouldTransformImportCall(std::string_view fileName,
+                               const CompilerOptions* options,
+                               ModuleKind impliedNodeFormatForEmit) {
+	ModuleKind moduleKind = options->GetEmitModuleKind();
+	if ((ModuleKind::Node16 <= moduleKind &&
+	     moduleKind <= ModuleKind::NodeNext) ||
+	    moduleKind == ModuleKind::Preserve) {
+		return false;
+	}
+	return impliedNodeFormatForEmit < ModuleKind::ES2015;
+}
+
+// utilities.go: GetImpliedNodeFormatForFile (ast.go equivalent)
+ModuleKind getImpliedNodeFormatForFile(std::string_view path,
+                                       std::string_view packageJsonType) {
+	ModuleKind impliedNodeFormat = ResolutionModeNone;
+	if (tspath::fileExtensionIsOneOf(path, {tspath::extensionDmts, tspath::extensionMts, tspath::extensionMjs})) {
+		impliedNodeFormat = ResolutionModeESM;
+	} else if (tspath::fileExtensionIsOneOf(path,
+	                                {tspath::extensionDcts, tspath::extensionCts, tspath::extensionCjs})) {
+		impliedNodeFormat = ResolutionModeCommonJS;
+	} else if (tspath::fileExtensionIsOneOf(path, {tspath::extensionDts, tspath::extensionTs, tspath::extensionTsx,
+	                                       tspath::extensionJs, tspath::extensionJsx})) {
+		impliedNodeFormat = packageJsonType == "module" ? ResolutionModeESM
+		                                                : ResolutionModeCommonJS;
+	}
+	return impliedNodeFormat;
+}
+
+// utilities.go: GetImpliedNodeFormatForEmitWorker
+ResolutionMode getImpliedNodeFormatForEmitWorker(
+    std::string_view fileName, ModuleKind emitModuleKind,
+    const SourceFileMetaData& sourceFileMetaData) {
+	if (ModuleKind::Node16 <= emitModuleKind &&
+	    emitModuleKind <= ModuleKind::NodeNext) {
+		return sourceFileMetaData.ImpliedNodeFormat;
+	}
+	if (sourceFileMetaData.ImpliedNodeFormat == ModuleKind::CommonJS &&
+	    (sourceFileMetaData.PackageJsonType == "commonjs" ||
+	     tspath::fileExtensionIsOneOf(fileName, {tspath::extensionCjs, tspath::extensionCts}))) {
+		return ModuleKind::CommonJS;
+	}
+	if (sourceFileMetaData.ImpliedNodeFormat == ModuleKind::ESNext &&
+	    (sourceFileMetaData.PackageJsonType == "module" ||
+	     tspath::fileExtensionIsOneOf(fileName, {tspath::extensionMjs, tspath::extensionMts}))) {
+		return ModuleKind::ESNext;
+	}
+	return ModuleKind::None;
+}
+
+// utilities.go: GetEmitModuleFormatOfFileWorker
+ModuleKind getEmitModuleFormatOfFileWorker(
+    std::string_view fileName, const CompilerOptions* options,
+    const SourceFileMetaData& sourceFileMetaData) {
+	ModuleKind result = getImpliedNodeFormatForEmitWorker(
+	    fileName, options->GetEmitModuleKind(), sourceFileMetaData);
+	if (result != ModuleKind::None) {
+		return result;
+	}
+	return options->GetEmitModuleKind();
+}
+
+// parseoptions.go: isFileForcedToBeModuleByFormat
+static bool isFileForcedToBeModuleByFormat(
+    std::string_view fileName, const CompilerOptions* options,
+    const SourceFileMetaData& metadata) {
+	if (getImpliedNodeFormatForEmitWorker(
+	        fileName, options->GetEmitModuleKind(), metadata) ==
+	        ModuleKind::ESNext ||
+	    tspath::fileExtensionIsOneOf(
+	        fileName, {tspath::extensionCjs, tspath::extensionCts, tspath::extensionMjs, tspath::extensionMts})) {
+		return true;
+	}
+	return false;
+}
+
+// parseoptions.go: GetExternalModuleIndicatorOptions
+ExternalModuleIndicatorOptions getExternalModuleIndicatorOptions(
+    std::string_view fileName, const CompilerOptions* options,
+    const SourceFileMetaData& metadata) {
+	if (tspath::isDeclarationFileName(fileName)) {
+		return ExternalModuleIndicatorOptions{};
+	}
+
+	switch (options->GetEmitModuleDetectionKind()) {
+	case ModuleDetectionKind::Force:
+		// All non-declaration files are modules, declaration files still do the
+		// usual isFileProbablyExternalModule
+		return ExternalModuleIndicatorOptions{.Force = true};
+	case ModuleDetectionKind::Legacy:
+		// Files are modules if they have imports, exports, or import.meta
+		return ExternalModuleIndicatorOptions{};
+	case ModuleDetectionKind::Auto:
+		// C++ stores the raw JsxEmit; getExternalModuleIndicator checks
+		// JSX == ReactJSX || ReactJSXDev itself.
+		return ExternalModuleIndicatorOptions{
+		    .JSX = options->Jsx,
+		    .Force = isFileForcedToBeModuleByFormat(fileName, options, metadata)};
+	default:
+		return ExternalModuleIndicatorOptions{};
+	}
+}
+
+// utilities.go: GetPragmaFromSourceFile — last matching pragma wins.
+const Pragma* getPragmaFromSourceFile(const SourceFile* file,
+                                      std::string_view name) {
+	const Pragma* result = nullptr;
+	if (file != nullptr) {
+		for (const auto& pragma : file->Pragmas) {
+			if (pragma.Name == name) {
+				result = &pragma;
+			}
+		}
+	}
+	return result;
+}
+
+// utilities.go: GetPragmaArgument
+std::string getPragmaArgument(const Pragma* pragma, std::string_view name) {
+	if (pragma != nullptr) {
+		auto it = pragma->Args.find(std::string(name));
+		if (it != pragma->Args.end()) {
+			return it->second.Value;
+		}
+	}
+	return "";
+}
+
+// utilities.go: GetJSXImplicitImportBase
+std::string getJSXImplicitImportBase(const CompilerOptions* compilerOptions,
+                                     SourceFile* file) {
+	const Pragma* jsxImportSourcePragma =
+	    getPragmaFromSourceFile(file, "jsximportsource");
+	const Pragma* jsxRuntimePragma =
+	    getPragmaFromSourceFile(file, "jsxruntime");
+	if (getPragmaArgument(jsxRuntimePragma, "factory") == "classic") {
+		return "";
+	}
+	if (compilerOptions->Jsx == JsxEmit::ReactJSX ||
+	    compilerOptions->Jsx == JsxEmit::ReactJSXDev ||
+	    compilerOptions->JsxImportSource != "" ||
+	    jsxImportSourcePragma != nullptr ||
+	    getPragmaArgument(jsxRuntimePragma, "factory") == "automatic") {
+		std::string result = getPragmaArgument(jsxImportSourcePragma, "factory");
+		if (result == "") {
+			result = compilerOptions->JsxImportSource;
+		}
+		if (result == "") {
+			result = "react";
+		}
+		return result;
+	}
+	return "";
+}
+
+// utilities.go: GetJSXRuntimeImport
+std::string getJSXRuntimeImport(std::string_view base,
+                                const CompilerOptions* options) {
+	if (base == "") {
+		return std::string(base);
+	}
+	return std::string(base) + "/" +
+	       (options->Jsx == JsxEmit::ReactJSXDev ? "jsx-dev-runtime"
+	                                             : "jsx-runtime");
 }
 
 } // namespace tsc
