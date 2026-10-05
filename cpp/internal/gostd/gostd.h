@@ -386,6 +386,16 @@ struct Closer {
 struct ReadWriter : Reader, Writer {};
 struct ReadWriteCloser : Reader, Writer, Closer {};
 
+// === slice: ipc ===
+// io.EOF / io.ErrUnexpectedEOF sentinels and the single-purpose closer
+// interfaces (used by the jsonrpc base-protocol reader and the ipc stdio
+// transport).
+inline const Error errEOF = newError("EOF");
+inline const Error errUnexpectedEOF = newError("unexpected EOF");
+struct ReadCloser : Reader, Closer {};
+struct WriteCloser : Writer, Closer {};
+// === end slice: ipc ===
+
 namespace detail {
 struct discardWriter : Writer {
 	std::pair<int, Error> write(std::string_view data) override {

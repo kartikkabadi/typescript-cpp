@@ -2164,19 +2164,3 @@ Diagnostic* newExternalDiagnostic(SourceFile* file, TextRange loc,
 }
 
 } // namespace tsc
-
-namespace tsc::ipc {
-
-// Dep-stubs — the ipc slice owns these (never reached without a real Spawner).
-
-std::shared_ptr<Protocol> NewJSONRPCProtocol(
-    std::shared_ptr<gostd::io::ReadWriteCloser>) {
-	TSC_UNREACHABLE("ipc::NewJSONRPCProtocol — ipc slice");
-}
-std::shared_ptr<Conn> NewAsyncConnWithProtocol(
-    std::shared_ptr<gostd::io::ReadWriteCloser>,
-    std::shared_ptr<Protocol>, std::shared_ptr<Handler>) {
-	TSC_UNREACHABLE("ipc::NewAsyncConnWithProtocol — ipc slice");
-}
-
-} // namespace tsc::ipc

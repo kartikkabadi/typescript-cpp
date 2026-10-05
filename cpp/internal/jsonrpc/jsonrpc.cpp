@@ -1,5 +1,9 @@
-// Port of tsc/internal/jsonrpc/jsonrpc.go.
+// Port of tsc/internal/jsonrpc/jsonrpc.go + baseproto.go.
 #include "internal/jsonrpc/jsonrpc.h"
+
+#include <algorithm>
+#include <charconv>
+#include <cstring>
 
 namespace tsc::jsonrpc {
 
@@ -139,6 +143,13 @@ std::pair<Message, gostd::Error> unmarshalMessage(const json::Value& data) {
 		                   "json: cannot unmarshal non-object into Message")};
 	}
 	Message m;
+	// JSONRPCVersion.UnmarshalJSON — jsonrpc.go:27: any present "jsonrpc"
+	// member other than exactly "2.0" is an error.
+	if (const json::Dom* v = json::objGet(d, "jsonrpc")) {
+		if (v->raw != "\"2.0\"") {
+			return {Message{}, ErrInvalidJSONRPCVersion};
+		}
+	}
 	if (const json::Dom* v = json::objGet(d, "id")) {
 		ID id;
 		if (auto e = id.unmarshalJSON(json::Value(v->raw))) {
@@ -188,5 +199,193 @@ std::pair<ResponseError, gostd::Error> unmarshalResponseError(
 	}
 	return {re, nullptr};
 }
+
+// === slice: ipc ===
+
+// --- baseproto.go ------------------------------------------------------------
+
+namespace {
+
+// trimSpace — bytes.TrimSpace (ASCII whitespace at both ends).
+std::string_view trimSpace(std::string_view s) {
+	auto isSpace = [](char c) {
+		return c == ' ' || c == '\t' || c == '\n' || c == '\v' ||
+		       c == '\f' || c == '\r';
+	};
+	while (!s.empty() && isSpace(s.front())) s.remove_prefix(1);
+	while (!s.empty() && isSpace(s.back())) s.remove_suffix(1);
+	return s;
+}
+
+// parseInt64 — strconv.ParseInt(s, 10, 64): optional sign + digits.
+std::pair<int64_t, gostd::Error> parseInt64(std::string_view s) {
+	std::string orig(s);
+	if (!s.empty() && s[0] == '+') {
+		s.remove_prefix(1); // strconv accepts a leading '+'
+	}
+	int64_t v = 0;
+	auto [ptr, ec] =
+	    std::from_chars(s.data(), s.data() + s.size(), v);
+	// strconv.NumError: "strconv.ParseInt: parsing " + Quote(num) + ": " + err
+	if (ec == std::errc::result_out_of_range) {
+		return {0, gostd::newError("strconv.ParseInt: parsing " +
+		                         gostd::detail::quoteGo(orig) +
+		                         ": value out of range")};
+	}
+	if (s.empty() || ec != std::errc() || ptr != s.data() + s.size()) {
+		return {0, gostd::newError("strconv.ParseInt: parsing " +
+		                         gostd::detail::quoteGo(orig) +
+		                         ": invalid syntax")};
+	}
+	return {v, nullptr};
+}
+
+// readUnderlying — bufio's fill loop: retry (0,nil) reads up to 100 times,
+// then io.ErrNoProgress.
+std::pair<int, gostd::Error> readUnderlying(gostd::io::Reader* r,
+                                            std::span<char> buf) {
+	for (int i = 100; i > 0; i--) {
+		auto [n, err] = r->read(buf);
+		if (n != 0 || err != nullptr) {
+			return {n, err};
+		}
+	}
+	return {0, gostd::newError("io: read made no progress")};
+}
+
+} // namespace
+
+// Reader::Read — baseproto.go:39.
+std::pair<std::string, gostd::Error> Reader::Read() {
+	int64_t contentLength = 0;
+
+	for (;;) {
+		auto [line, err] = readBytes('\n');
+		if (err != nullptr) {
+			if (gostd::errorIs(err, gostd::io::errEOF)) {
+				return {"", gostd::io::errEOF};
+			}
+			return {"", gostd::errorf("jsonrpc: read header: %w", {err})};
+		}
+
+		if (line == "\r\n") {
+			break;
+		}
+
+		size_t colon = line.find(':');
+		if (colon == std::string::npos) {
+			return {"", gostd::errorf("%w: %q", {ErrInvalidHeader, line})};
+		}
+		std::string_view key(line.data(), colon);
+		std::string_view value(line.data() + colon + 1,
+		                       line.size() - colon - 1);
+		if (key == "Content-Length") {
+			auto [n, perr] = parseInt64(trimSpace(value));
+			if (perr != nullptr) {
+				return {"", gostd::errorf("%w: parse error: %w",
+				                        {ErrInvalidContentLength, perr})};
+			}
+			if (n < 0) {
+				return {"", gostd::errorf("%w: negative value %d",
+				                        {ErrInvalidContentLength, n})};
+			}
+			contentLength = n;
+		}
+	}
+
+	if (contentLength <= 0) {
+		return {"", ErrNoContentLength};
+	}
+
+	std::string data(static_cast<size_t>(contentLength), '\0');
+	if (auto err = readFull(
+	        std::span<char>(data.data(), data.size()));
+	    err != nullptr) {
+		return {"", gostd::errorf("jsonrpc: read content: %w", {err})};
+	}
+	return {std::move(data), nullptr};
+}
+
+// Reader::readBytes — bufio.Reader.ReadBytes.
+std::pair<std::string, gostd::Error> Reader::readBytes(char delim) {
+	std::string line;
+	for (;;) {
+		size_t pos = buf_.find(delim);
+		if (pos != std::string::npos) {
+			line.append(buf_, 0, pos + 1);
+			buf_.erase(0, pos + 1);
+			return {std::move(line), nullptr};
+		}
+		line += buf_;
+		buf_.clear();
+		char tmp[4096];
+		auto [n, err] = readUnderlying(
+		    r_, std::span<char>(tmp, sizeof tmp));
+		buf_.assign(tmp, static_cast<size_t>(n));
+		if (err != nullptr) {
+			// bufio returns the fragment read so far along with the error.
+			line += buf_;
+			buf_.clear();
+			return {std::move(line), err};
+		}
+	}
+}
+
+// Reader::readFull — io.ReadFull over the buffered stream: drains buf_
+// first, then reads the rest directly.
+gostd::Error Reader::readFull(std::span<char> out) {
+	size_t got = 0;
+	while (got < out.size()) {
+		if (!buf_.empty()) {
+			size_t take = std::min(buf_.size(), out.size() - got);
+			std::memcpy(out.data() + got, buf_.data(), take);
+			buf_.erase(0, take);
+			got += take;
+			continue;
+		}
+		auto [n, err] = readUnderlying(r_, out.subspan(got));
+		got += static_cast<size_t>(n);
+		if (got >= out.size()) {
+			return nullptr; // io.ReadAtLeast: n >= min clears the error
+		}
+		if (err != nullptr) {
+			if (gostd::errorIs(err, gostd::io::errEOF)) {
+				return got == 0 ? gostd::io::errEOF
+				                : gostd::io::errUnexpectedEOF;
+			}
+			return err;
+		}
+	}
+	return nullptr;
+}
+
+// Writer::Write — baseproto.go:93. Header + payload + single Flush.
+gostd::Error Writer::Write(std::string_view data) {
+	// fmt.Fprintf(w.w, "Content-Length: %d\r\n\r\n", len(data))
+	buf_ += "Content-Length: ";
+	buf_ += std::to_string(data.size());
+	buf_ += "\r\n\r\n";
+	buf_ += data;
+	return flush();
+}
+
+// Writer::flush — bufio.Writer.Flush: ONE Write of the buffered bytes;
+// a short write is io.ErrShortWrite.
+gostd::Error Writer::flush() {
+	if (buf_.empty()) {
+		return nullptr;
+	}
+	size_t want = buf_.size();
+	auto [n, err] = w_->write(std::string_view(buf_));
+	if (n > 0) {
+		buf_.erase(0, static_cast<size_t>(n));
+	}
+	if (err == nullptr && static_cast<size_t>(n) < want) {
+		err = gostd::newError("short write");
+	}
+	return err;
+}
+
+// === end slice: ipc ===
 
 } // namespace tsc::jsonrpc
