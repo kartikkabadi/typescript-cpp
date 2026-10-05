@@ -6,6 +6,8 @@
 //   tscpp bench-parse <file> [n] parse the file n times, report throughput
 //   tscpp parse-all <dir|list> [workers]  parse many files in parallel,
 //        report aggregate throughput (source files only, no dumps)
+//   tscpp bind <file>          bind and dump symbols/flow/locals (oracle-comparable)
+//   tscpp check <file>         semantic-check and dump diagnostics (oracle-comparable)
 #include <atomic>
 #include <chrono>
 #include <cstdio>
@@ -302,6 +304,23 @@ static void bindFile(const char* path, const std::string& src) {
 	std::fwrite(out.data(), 1, out.size(), stdout);
 }
 
+// checkFile — `tsc --noEmit <file>` equivalent. Emits the canonical
+// diagnostic dump that checkdump (Go) produces:
+//   G <code>                file-less diagnostics
+//   F <fileName>            per file that has diagnostics
+//   T <code> <pos> <end>    diagnostics in that file
+// TODO(program slice): this currently parses+binds only the root file and
+// emits no diagnostics — the multi-file Program (lib closure, module
+// resolution) and the check walker land in their own slices.
+static void checkFile(const char* path, const std::string& src) {
+	SourceFileParseOptions opts;
+	opts.FileName = path;
+	opts.Path = path;
+	SourceFile* file = parseSourceFile(opts, src, scriptKindFromFileName(path));
+	bindSourceFile(file);
+	(void)file;
+}
+
 static void parseFile(const char* path, const std::string& src) {
 	SourceFileParseOptions opts;
 	opts.FileName = path;
@@ -421,13 +440,13 @@ int main(int argc, char** argv) {
 	if (argc < 3) {
 		std::fprintf(
 			stderr,
-			"usage: tscpp <lex|lex-json|bench|parse|bench-parse|parse-all|bind> <file|dir> [iters|workers]\n");
+			"usage: tscpp <lex|lex-json|bench|parse|bench-parse|parse-all|bind|check> <file|dir> [iters|workers]\n");
 		return 2;
 	}
 	std::string mode = argv[1];
 	if (mode != "lex" && mode != "lex-json" && mode != "bench" &&
 	    mode != "parse" && mode != "bench-parse" && mode != "parse-all" &&
-	    mode != "bind") {
+	    mode != "bind" && mode != "check") {
 		std::fprintf(stderr, "tscpp: unknown mode %s\n", mode.c_str());
 		return 2;
 	}
@@ -448,6 +467,8 @@ int main(int argc, char** argv) {
 		parseFile(argv[2], src);
 	} else if (mode == "bind") {
 		bindFile(argv[2], src);
+	} else if (mode == "check") {
+		checkFile(argv[2], src);
 	} else if (mode == "bench-parse") {
 		int iters = argc > 3 ? std::atoi(argv[3]) : 5;
 		benchParse(argv[2], src, iters);

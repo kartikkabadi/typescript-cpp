@@ -22,7 +22,7 @@ oracle.
 | JSDoc parser | `parser/jsdoc.go` | `cpp/internal/parser/jsdoc.cpp` | complete |
 | Reparser (JSDoc→declarations) | `parser/reparser.go` | `cpp/internal/parser/reparser.cpp` | complete |
 | Binder | `binder/` | `cpp/internal/binder` | complete |
-| Checker | `checker/` | — | not started |
+| Checker | `checker/` | `cpp/internal/checker` | in progress — bootstrap, symbol merge, entity/alias/external-module resolution, evaluator, mapper, link store (~281/~2,900 funcs; stubs `TSC_UNREACHABLE`) |
 | Emitter | `printer/`, `transformers/` | — | not started |
 
 ## Conformance
@@ -68,7 +68,7 @@ performs no per-node refcount/GC work.
 ```
 cpp/
   CMakeLists.txt          cmake+ninja build (Apple clang / GCC / MSVC)
-  cmd/tscpp/main.cpp      lex|lex-json|bench|parse|bench-parse|parse-all|bind driver
+  cmd/tscpp/main.cpp      lex|lex-json|bench|parse|bench-parse|parse-all|bind|check driver
   internal/
     ast/                  Node model; nodes_generated.h is generated
     core/                 arena allocator, text/span types
