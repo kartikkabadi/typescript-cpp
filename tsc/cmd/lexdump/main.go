@@ -3,9 +3,9 @@ package main
 
 import (
 	"encoding/json"
-	"strings"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/internal/ast"
 	"github.com/microsoft/TypeScript/tsc/internal/core"
