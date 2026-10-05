@@ -10,15 +10,8 @@ namespace tsc::printer {
 
 // NewNodeFactory (factory.go) — wires the emit-aware hooks (synthesized flag
 // on create, original-node tracking on update/clone).
-NodeFactory::NodeFactory(EmitContext* ctx) : emitContext(ctx) {
-	hooks.onCreate = [ctx](Node* node) { ctx->onCreate(node); };
-	hooks.onUpdate = [ctx](Node* updated, Node* original) {
-		ctx->onUpdate(updated, original);
-	};
-	hooks.onClone = [ctx](Node* updated, Node* original) {
-		ctx->onClone(updated, original);
-	};
-}
+// printer::NodeFactory ctor lives in factory.cpp (NewNodeFactory,
+// factory.go:18).
 
 void EmitContext::reset() {
 	// *c = EmitContext{Factory: c.Factory} — Factory is kept as-is.

@@ -27,27 +27,29 @@ struct Source {
 // implementation. Methods are declared so the printer compiles; they are
 // unreachable on the diagnostics path (SourceMap/InlineSourceMap are off).
 struct Generator {
-	// dep stub — owned by the sourcemap slice
+	// dep stub — owned by the sourcemap slice. Go returns `error`; the C++
+	// port mirrors it as int (0 = nil/ok) so call sites keep their `if err`
+	// shape.
 	SourceIndex AddSource(std::string_view fileName) {
 		TSC_UNREACHABLE("sourcemap::Generator::AddSource — sourcemap slice");
 	}
-	void SetSourceContent(SourceIndex sourceIndex, std::string_view content) {
+	int SetSourceContent(SourceIndex sourceIndex, std::string_view content) {
 		TSC_UNREACHABLE("sourcemap::Generator::SetSourceContent — sourcemap slice");
 	}
-	void AddGeneratedMapping(int line, TextPos character) {
+	int AddGeneratedMapping(int line, TextPos character) {
 		TSC_UNREACHABLE("sourcemap::Generator::AddGeneratedMapping — sourcemap slice");
 	}
-	void AddSourceMapping(int generatedLine, TextPos generatedCharacter,
-	                      SourceIndex sourceIndex, int sourceLine,
-	                      TextPos sourceCharacter) {
+	int AddSourceMapping(int generatedLine, TextPos generatedCharacter,
+	                     SourceIndex sourceIndex, int sourceLine,
+	                     TextPos sourceCharacter) {
 		TSC_UNREACHABLE("sourcemap::Generator::AddSourceMapping — sourcemap slice");
 	}
-	void AddName(std::string_view name) {
+	int AddName(std::string_view name) {
 		TSC_UNREACHABLE("sourcemap::Generator::AddName — sourcemap slice");
 	}
-	void AddNamedSourceMapping(int generatedLine, TextPos generatedCharacter,
-	                           SourceIndex sourceIndex, int sourceLine,
-	                           TextPos sourceCharacter, int nameIndex) {
+	int AddNamedSourceMapping(int generatedLine, TextPos generatedCharacter,
+	                          SourceIndex sourceIndex, int sourceLine,
+	                          TextPos sourceCharacter, int nameIndex) {
 		TSC_UNREACHABLE("sourcemap::Generator::AddNamedSourceMapping — sourcemap slice");
 	}
 };

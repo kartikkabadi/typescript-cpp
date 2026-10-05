@@ -7,6 +7,7 @@
 #include <functional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace tsc {
 
@@ -621,3 +622,74 @@ inline Comparison CompareStringsCaseInsensitiveThenSensitive(
 }
 
 }  // namespace tsc::stringutil
+
+// splitLines (stringutil/util.go:87).
+inline std::vector<std::string_view> splitLines(std::string_view text) {
+	std::vector<std::string_view> lines;
+	size_t start = 0;
+	size_t pos = 0;
+	while (pos < text.size()) {
+		char c = text[pos];
+		if (c == '\r') {
+			if (pos + 1 < text.size() && text[pos + 1] == '\n') {
+				lines.push_back(text.substr(start, pos - start));
+				pos += 2;
+				start = pos;
+				continue;
+			}
+		}
+		if (c == '\n' || c == '\r') {
+			lines.push_back(text.substr(start, pos - start));
+			pos++;
+			start = pos;
+			continue;
+		}
+		pos++;
+	}
+	if (start < text.size()) {
+		lines.push_back(text.substr(start));
+	}
+	return lines;
+}
+
+// guessIndentation (stringutil/util.go:115).
+inline int guessIndentation(const std::vector<std::string_view>& lines) {
+	constexpr int kMaxSmiX86 = 0x3fffffff;
+	int indentation = kMaxSmiX86;
+	for (auto line : lines) {
+		if (line.empty()) {
+			continue;
+		}
+		size_t i = 0;
+		while (i < line.size() && (int)i < indentation) {
+			int width = 0;
+			char32_t ch = tsc::decodeUtf8Rune(line.substr(i), &width);
+			if (!tsc::isWhiteSpaceLike(ch)) {
+				break;
+			}
+			i += width;
+		}
+		if ((int)i < indentation) {
+			indentation = (int)i;
+		}
+		if (indentation == 0) {
+			return 0;
+		}
+	}
+	return indentation == kMaxSmiX86 ? 0 : indentation;
+}
+
+// trimSpace — strings.TrimSpace equivalent for ASCII whitespace.
+inline std::string_view trimSpace(std::string_view s) {
+	while (!s.empty() && (s.front() == ' ' || s.front() == '\t' ||
+	                      s.front() == '\n' || s.front() == '\r' ||
+	                      s.front() == '\v' || s.front() == '\f')) {
+		s.remove_prefix(1);
+	}
+	while (!s.empty() && (s.back() == ' ' || s.back() == '\t' ||
+	                      s.back() == '\n' || s.back() == '\r' ||
+	                      s.back() == '\v' || s.back() == '\f')) {
+		s.remove_suffix(1);
+	}
+	return s;
+}

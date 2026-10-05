@@ -158,13 +158,28 @@ struct AssignedNameOptions {
 	bool IgnoreAssignedName = false;
 };
 
-// PrivateIdentifierKind (factory.go:677).
+// PrivateIdentifierKind (factory.go:677). Go carries these as string
+// constants; C++ keeps an enum and converts at the call site.
 enum class PrivateIdentifierKind : int {
 	Field,          // "f"
 	Method,         // "m"
 	Accessor,       // "a"
 	Untransformed,  // "untransformed"
 };
+
+inline std::string privateIdentifierKindString(PrivateIdentifierKind k) {
+	switch (k) {
+	case PrivateIdentifierKind::Field:
+		return "f";
+	case PrivateIdentifierKind::Method:
+		return "m";
+	case PrivateIdentifierKind::Accessor:
+		return "a";
+	case PrivateIdentifierKind::Untransformed:
+		return "untransformed";
+	}
+	return {};
+}
 
 using Priority = int32_t;
 

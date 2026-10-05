@@ -50,6 +50,18 @@ struct PrinterOptions {
 
 // Result of PrintHandlers::MapSourcePosition — Go returns
 // (mappedSource, mappedPos, ok).
+// Adapter: ast.SourceFile implements sourcemap.Source via this wrapper
+// (Go has SourceFile implement the interface directly; C++ can't cross the
+// package boundary, so we wrap).
+struct SourceFileSource final : sourcemap::Source {
+	SourceFile* sf = nullptr;
+	std::string_view FileName() override { return sf->FileName(); }
+	std::string_view Text() override { return sf->text; }
+	const std::vector<TextPos>& ECMALineMap() override {
+		return sf->ecmaLineMap();
+	}
+};
+
 struct MappedSourcePosition {
 	sourcemap::Source* source = nullptr;
 	TextPos pos = 0;
@@ -103,6 +115,8 @@ struct EmitTextWriter {
 	virtual bool IsAtStartOfLine() = 0;
 	virtual bool HasTrailingComment() = 0;
 	virtual bool HasTrailingWhitespace() = 0;
+	// Grow is an optional hint (Go: interface{ Grow(n int) }).
+	virtual void Grow(size_t n) {}
 };
 
 // NewTextWriter (textwriter.go:218).
@@ -112,6 +126,9 @@ int GetDefaultIndentSize();
 // GetSingleLineStringWriter (singlelinestringwriter.go:21) — pooled writer
 // plus its release func.
 std::pair<EmitTextWriter*, std::function<void()>> GetSingleLineStringWriter();
+
+// getTrailingSemicolonDeferringWriter (semicolon_writer.go:12).
+EmitTextWriter* getTrailingSemicolonDeferringWriter(EmitTextWriter* writer);
 
 // --- EmitHost / SourceFileMetaDataProvider (emithost.go /
 // sourcefilemetadataprovider.go) — interfaces for hosts driving emit. ---
@@ -286,11 +303,11 @@ class ChangeTrackerWriter; // dep — changetrackerwriter slice
 
 // PrintAndPositionNode (syntheticfile.go:15).
 std::pair<std::string, Node*> PrintAndPositionNode(
-	NodeFactory* factory, Node* node, SourceFile* sourceFile,
+	tsc::NodeFactory* factory, Node* node, SourceFile* sourceFile,
 	const std::string& newLine, int indentSize, EmitContext* emitContext);
 
 // CreateSyntheticSourceFile (syntheticfile.go:35).
-SourceFile* CreateSyntheticSourceFile(NodeFactory* factory, Node* node,
+SourceFile* CreateSyntheticSourceFile(tsc::NodeFactory* factory, Node* node,
                                       const std::string& text,
                                       SourceFileParseOptions parseOptions);
 
@@ -311,18 +328,16 @@ enum class WriteKind : int32_t {
 
 // tokenEmitFlags (printer.go:6201).
 using tokenEmitFlags = uint32_t;
+inline constexpr tokenEmitFlags tefNoComments = 1 << 0;
+inline constexpr tokenEmitFlags tefIndentLeadingComments = 1 << 1;
+inline constexpr tokenEmitFlags tefNoSourceMaps = 1 << 2;
 inline constexpr tokenEmitFlags tefNone = 0;
-inline constexpr tokenEmitFlags tefNoLeadingSourceMap = 1 << 0;
-inline constexpr tokenEmitFlags tefNoTrailingSourceMap = 1 << 1;
-inline constexpr tokenEmitFlags tefNoSourceMap =
-	tefNoLeadingSourceMap | tefNoTrailingSourceMap;
 
-// commentSeparator (printer.go:5757).
+// commentSeparator (printer.go:5757) — plain enum, not bit flags.
 using commentSeparator = uint32_t;
 inline constexpr commentSeparator commentSeparatorNone = 0;
-inline constexpr commentSeparator commentSeparatorLine = 1 << 0;
-inline constexpr commentSeparator commentSeparatorSpace = 1 << 1;
-inline constexpr commentSeparator commentSeparatorIndentation = 1 << 2;
+inline constexpr commentSeparator commentSeparatorBefore = 1;
+inline constexpr commentSeparator commentSeparatorAfter = 2;
 
 // ListFormat (printer.go:6223).
 using ListFormat = int32_t;
@@ -482,14 +497,21 @@ struct Printer {
 	EmitContext* emitContext = nullptr;
 	SourceFile* currentSourceFile = nullptr;
 	std::unordered_map<std::string, Node*> uniqueHelperNames;
+	// Go's `uniqueHelperNames != nil` — true once setSourceFile activates the
+	// map for EFExternalHelpers.
+	bool uniqueHelperNamesSet = false;
 	Node* externalHelpersModuleName = nullptr;
 	TextPos nextListElementPos = 0;
 	EmitTextWriter* writer = nullptr;
 	std::unique_ptr<EmitTextWriter> ownWriter;
+	// Owned trailingSemicolonDeferringWriter while OmitTrailingSemicolon is
+	// in effect inside Write (Go: wrapped interface value).
+	std::unique_ptr<EmitTextWriter> deferringWriter;
 	WriteKind writeKind = WriteKind::None;
 	bool sourceMapsDisabled = true;
 	sourcemap::Generator* sourceMapGenerator = nullptr;
 	sourcemap::Source* sourceMapSource = nullptr;
+	SourceFileSource sourceFileAdapter;
 	sourcemap::SourceIndex sourceMapSourceIndex = 0;
 	bool sourceMapSourceIsJson = false;
 	std::unique_ptr<lineCharacterCache> sourceMapLineCharCache;
@@ -936,5 +958,50 @@ Printer* NewPrinter(const PrinterOptions& options, const PrintHandlers& handlers
 
 std::string getOpeningBracket(ListFormat format);
 std::string getClosingBracket(ListFormat format);
+
+// greatestEnd (utilities.go:577-611) — max of end() over heterogeneous args
+// (Node*, NodeList*, ModifierList*, TextRange). Go iterates args backward;
+// since it is a pure max, order is irrelevant.
+namespace greatestEndDetail {
+inline bool tryGetEnd(Node* n, TextPos* out) {
+	if (n == nullptr) {
+		return false;
+	}
+	*out = n->end();
+	return true;
+}
+inline bool tryGetEnd(NodeList* n, TextPos* out) {
+	if (n == nullptr) {
+		return false;
+	}
+	*out = n->end();
+	return true;
+}
+inline bool tryGetEnd(TextRange r, TextPos* out) {
+	*out = r.end();
+	return true;
+}
+} // namespace greatestEndDetail
+
+template<typename... Args>
+inline TextPos greatestEnd(TextPos end, const Args&... args) {
+	TextPos e = end;
+	auto tryOne = [&e](const auto& v) {
+		TextPos t;
+		if (greatestEndDetail::tryGetEnd(v, &t) && e < t) {
+			e = t;
+		}
+	};
+	(tryOne(args), ...);
+	return e;
+}
+
+// firstOrNil/lastOrNil — core.FirstOrNil/LastOrNil for node slices.
+inline Node* firstOrNil(const std::vector<Node*>& nodes) {
+	return nodes.empty() ? nullptr : nodes.front();
+}
+inline Node* lastOrNil(const std::vector<Node*>& nodes) {
+	return nodes.empty() ? nullptr : nodes.back();
+}
 
 } // namespace tsc::printer

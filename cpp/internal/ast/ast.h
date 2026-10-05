@@ -643,6 +643,9 @@ bool isModuleIdentifier(Node* node);
 Node* getElementOrPropertyAccessName(Node* node);
 bool isModuleExportsAccessExpression(Node* node);
 Node* getNameOfDeclaration(Node* declaration);
+Node* getNonAssignedNameOfDeclaration(Node* declaration);
+Node* tryGetPropertyNameOfBindingOrAssignmentElement(
+	Node* bindingElement);
 Node* getAssignedName(Node* node);
 
 template <class T>
