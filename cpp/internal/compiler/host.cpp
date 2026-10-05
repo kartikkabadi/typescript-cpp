@@ -59,4 +59,36 @@ SourceFile* CompilerHost::GetSourceFile(const SourceFileParseOptions& opts,
 	return file;
 }
 
+// host.go:100 GetContentMappedSourceFiles.
+std::pair<contentmapper::SourceFiles, gostd::Error>
+CompilerHost::GetContentMappedSourceFiles(
+    const SourceFileParseOptions& parseOptions, contentmapper::Mapper* mapper) {
+	if (contentMapperProject == nullptr) {
+		return {contentmapper::SourceFiles{},
+		        contentmapper::ErrProjectUnavailable};
+	}
+	auto content = fs->ReadFile(parseOptions.FileName);
+	if (!content.second) {
+		return {contentmapper::SourceFiles{}, nullptr};
+	}
+	auto [files, err] = contentmapper::TransformAndParse(
+	    parseOptions, content.first, mapper, contentMapperProject);
+	if (err == nullptr) {
+		err = contentmapper::CheckSupplementalFileNameCollisions(
+		    files, [this](std::string_view f) {
+			    return fs->FileExists(std::string(f));
+		    });
+	}
+	return {files, err};
+}
+
+// host.go:119 GetResolvedProjectReference.
+tsoptions::ParsedCommandLine* CompilerHost::GetResolvedProjectReference(
+    const std::string& fileName, const tspath::Path& path) {
+	auto [commandLine, _] = tsoptions::GetParsedCommandLineOfConfigFilePath(
+	    fileName, path, nullptr, tsoptions::JsonObjectPtr{}, this,
+	    extendedConfigCache);
+	return commandLine;
+}
+
 }  // namespace tsc::compiler

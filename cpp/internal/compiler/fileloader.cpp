@@ -202,7 +202,407 @@ SourceFile* filesLoader::parseSourceFile(parseTask* t) {
 	        getExternalModuleIndicatorOptions(t->normalizedFilePath, options,
 	                                          t->metadata),
 	};
+	// tspath.FileExtensionIsOneOf(t.normalizedFilePath, mapperExtensions)
+	if (std::any_of(contentMapperExtensions.begin(),
+	                contentMapperExtensions.end(), [&](const std::string& ext) {
+		                return tspath::fileExtensionIs(t->normalizedFilePath, ext);
+	                })) {
+		return parseContentMappedFile(parseOptions);
+	}
 	return host->GetSourceFile(parseOptions, t->metadata);
+}
+
+// fileloader.go:32 maxContentMapperFailures — transform failures a single
+// content mapper may accumulate before it is disabled for the rest of the
+// program.
+static constexpr int maxContentMapperFailures = 5;
+
+// fileloader.go:467 contentMapperTransformDiagnosticChain.
+static Diagnostic* contentMapperTransformDiagnosticChain(
+    SourceFile* file, const std::string& label,
+    const DiagnosticMessage* message, std::vector<std::string> args = {});
+
+// fileloader.go:545 contentMapperTransformDiagnosticWithDetail.
+static Diagnostic* contentMapperTransformDiagnosticWithDetail(
+    SourceFile* file, const std::string& label, Diagnostic* detail) {
+	return newDiagnostic(
+	       file, TextRange{0, 0},
+	       The_content_mapper_0_failed_to_transform_this_file,
+	       {label})
+	    ->AddMessageChain(detail);
+}
+
+static Diagnostic* contentMapperTransformDiagnosticChain(
+    SourceFile* file, const std::string& label,
+    const DiagnosticMessage* message, std::vector<std::string> args) {
+	return contentMapperTransformDiagnosticWithDetail(
+	    file, label, tsoptions::newCompilerDiagnostic(message, args));
+}
+
+// fileloader.go:556 contentMapperMappingDiagnostic — diagnostic reported
+// against a mapper that produced an invalid span map, including the
+// offsets involved.
+static Diagnostic* contentMapperMappingDiagnostic(
+    SourceFile* file, const std::string& label,
+    const spanmap::MappingError* problem) {
+	TextRange loc{0, 0};
+	switch (problem->Kind) {
+	case spanmap::MappingErrorKindOverlap:
+		return newDiagnostic(
+		    file, loc,
+		    The_content_mapper_0_produced_overlapping_or_out_of_order_position_mappings_near_virtual_offset_1,
+		    {label, std::to_string(problem->VirtualPos)});
+	case spanmap::MappingErrorKindOutOfBounds:
+		return newDiagnostic(
+		    file, loc,
+		    The_content_mapper_0_produced_a_position_mapping_that_points_outside_the_original_content_original_offset_1,
+		    {label, std::to_string(problem->OriginalPos)});
+	case spanmap::MappingErrorKindVerbatimMismatch:
+		return newDiagnostic(
+		    file, loc,
+		    The_content_mapper_0_produced_a_verbatim_mapping_that_does_not_match_the_original_content_virtual_offset_1_original_offset_2,
+		    {label, std::to_string(problem->VirtualPos),
+		     std::to_string(problem->OriginalPos)});
+	case spanmap::MappingErrorKindKind:
+		return newDiagnostic(
+		    file, loc,
+		    The_content_mapper_0_produced_a_position_mapping_with_an_invalid_kind_near_virtual_offset_1,
+		    {label, std::to_string(problem->VirtualPos)});
+	case spanmap::MappingErrorKindFeature:
+		return newDiagnostic(
+		    file, loc,
+		    The_content_mapper_0_produced_invalid_mapping_features_near_original_offset_1,
+		    {label, std::to_string(problem->OriginalPos)});
+	default:
+		return newDiagnostic(
+		    file, loc,
+		    The_content_mapper_0_did_not_provide_the_required_position_mappings,
+		    {label});
+	}
+}
+
+// fileloader.go:522 ContentMapperProjectErrorDiagnostic — localized
+// diagnostic message for a project setup error.
+static const DiagnosticMessage* contentMapperProjectErrorDiagnostic(
+    const gostd::Error& err) {
+	if (auto* projectError =
+	        gostd::errorAs<contentmapper::ProjectError*>(err)) {
+		switch (projectError->Kind) {
+		case contentmapper::ProjectErrorKindMalformedResponse:
+			return The_content_mapper_returned_a_project_response_that_could_not_be_decoded;
+		case contentmapper::ProjectErrorKindMissingConfigIdentity:
+			return The_content_mapper_did_not_return_configIdentity_which_is_required_when_the_content_mapper_has_dynamicConfig_Colon_true_in_its_package_json;
+		case contentmapper::ProjectErrorKindNonAbsoluteWatchedFile:
+			return The_content_mapper_returned_a_non_absolute_path_in_watchedFiles;
+		case contentmapper::ProjectErrorKindUnexpectedConfigIdentity:
+			return The_content_mapper_returned_configIdentity_which_is_only_allowed_when_it_declares_dynamicConfig_Colon_true_in_its_package_json;
+		case contentmapper::ProjectErrorKindUnexpectedWatchedFiles:
+			return The_content_mapper_returned_watchedFiles_which_is_only_allowed_when_it_declares_dynamicConfig_Colon_true_in_its_package_json;
+		}
+	}
+	return The_content_mapper_process_failed_while_handling_the_project_request;
+}
+
+// fileloader.go:467 contentMapperTransformDiagnostic.
+static Diagnostic* contentMapperTransformDiagnostic(
+    SourceFile* file, const std::string& label, const gostd::Error& err) {
+	if (auto* collision =
+	        gostd::errorAs<contentmapper::SupplementalFileCollisionError*>(
+	            err)) {
+		return contentMapperTransformDiagnosticChain(
+		    file, label,
+		    Content_mapper_supplemental_output_file_0_conflicts_with_an_existing_file,
+		    {collision->FileName});
+	}
+	if (auto* transformError =
+	        gostd::errorAs<contentmapper::TransformError*>(err)) {
+		switch (transformError->Kind) {
+		case contentmapper::TransformErrorKindInitialize: {
+			if (auto* initializeError =
+			        gostd::errorAs<contentmapper::InitializeError*>(err)) {
+				switch (initializeError->Kind) {
+				case contentmapper::InitializeErrorKindPositionEncoding:
+					return contentMapperTransformDiagnosticChain(
+					    file, label,
+					    The_content_mapper_selected_unsupported_position_encoding_0,
+					    {initializeError->PositionEncoding});
+				case contentmapper::InitializeErrorKindEmptyDiagnosticSource:
+					return contentMapperTransformDiagnosticChain(
+					    file, label,
+					    The_content_mapper_diagnostic_source_must_not_be_empty);
+				case contentmapper::InitializeErrorKindReservedDiagnosticSource:
+					return contentMapperTransformDiagnosticChain(
+					    file, label,
+					    The_content_mapper_diagnostic_source_0_is_reserved_by_TypeScript,
+					    {initializeError->DiagnosticSource});
+				}
+			}
+			return contentMapperTransformDiagnosticChain(
+			    file, label,
+			    The_content_mapper_process_could_not_be_started_or_initialized);
+		}
+		case contentmapper::TransformErrorKindProject:
+			return contentMapperTransformDiagnosticChain(
+			    file, label, contentMapperProjectErrorDiagnostic(err));
+		case contentmapper::TransformErrorKindRequest:
+			return contentMapperTransformDiagnosticChain(
+			    file, label,
+			    The_content_mapper_process_failed_while_handling_the_transform_request);
+		case contentmapper::TransformErrorKindResponse: {
+			if (auto* extensionError = gostd::errorAs<
+			        contentmapper::InvalidVirtualExtensionError*>(err)) {
+				return contentMapperTransformDiagnosticChain(
+				    file, label,
+				    The_content_mapper_returned_an_output_with_unsupported_virtual_extension_0,
+				    {extensionError->Extension});
+			}
+			if (auto* directiveError = gostd::errorAs<
+			        contentmapper::DiagnosticDirectiveError*>(err)) {
+				Diagnostic* detail = nullptr;
+				switch (directiveError->Kind) {
+				case contentmapper::DiagnosticDirectiveErrorKindInvalidRange:
+					detail = tsoptions::newCompilerDiagnostic(
+					    Diagnostic_directive_0_returned_by_the_content_mapper_has_an_invalid_range,
+					    {std::to_string(directiveError->Index)});
+					break;
+				case contentmapper::DiagnosticDirectiveErrorKindInvalidPolicy:
+					detail = tsoptions::newCompilerDiagnostic(
+					    The_content_mapper_returned_a_diagnostic_directive_with_invalid_policy_0,
+					    {std::to_string(directiveError->Policy)});
+					break;
+				case contentmapper::DiagnosticDirectiveErrorKindExpectMissingUnusedDiagnostic:
+					detail = tsoptions::newCompilerDiagnostic(
+					    Diagnostic_directive_0_returned_by_the_content_mapper_must_specify_unusedExpectDirectiveIndex_when_there_is_not_exactly_one_unusedExpectDirectiveDiagnostics_entry,
+					    {std::to_string(directiveError->Index)});
+					break;
+				case contentmapper::DiagnosticDirectiveErrorKindInvalidUnusedDiagnosticIndex:
+					detail = tsoptions::newCompilerDiagnostic(
+					    Diagnostic_directive_0_returned_by_the_content_mapper_has_an_invalid_unusedExpectDirectiveIndex,
+					    {std::to_string(directiveError->Index)});
+					break;
+				case contentmapper::DiagnosticDirectiveErrorKindOverlap:
+					detail = tsoptions::newCompilerDiagnostic(
+					    The_content_mapper_returned_diagnostic_directives_with_overlapping_virtual_ranges);
+					break;
+				}
+				if (detail != nullptr) {
+					if (directiveError->SupplementalIndex >= 0) {
+						detail = newDiagnosticChain(
+						    detail,
+						    The_invalid_diagnostic_directive_is_in_supplemental_output_0_returned_by_the_content_mapper,
+						    {std::to_string(
+						        directiveError->SupplementalIndex)});
+					}
+					return contentMapperTransformDiagnosticWithDetail(
+					    file, label, detail);
+				}
+			}
+			return contentMapperTransformDiagnosticChain(
+			    file, label,
+			    The_content_mapper_returned_an_invalid_transform_response);
+		}
+		case contentmapper::TransformErrorKindMappings:
+			return newDiagnostic(
+			    file, TextRange{0, 0},
+			    The_content_mapper_0_did_not_provide_the_required_position_mappings,
+			    {label});
+		default:
+			break;
+		}
+	}
+	return newDiagnostic(
+	    file, TextRange{0, 0},
+	    The_content_mapper_0_failed_to_transform_this_file, {label});
+}
+
+// fileloader.go:578 getContentMapperTransformIdentity.
+std::string filesLoader::getContentMapperTransformIdentity(
+    contentmapper::Mapper* mapper) {
+	if (contentmapper::Project* project = host->ContentMapperProject();
+	    project != nullptr) {
+		if (auto [identity, ierr] = project->Identity(mapper);
+		    ierr == nullptr) {
+			return identity;
+		}
+	}
+	// fmt.Sprintf("%x", bytes) — lowercase hex of the 16-byte fingerprint.
+	static constexpr char hexdigits[] = "0123456789abcdef";
+	std::string hex;
+	hex.reserve(32);
+	for (uint8_t b :
+	     mapper->TransformIdentity(compilerOptions).Bytes()) {
+		hex += hexdigits[b >> 4];
+		hex += hexdigits[b & 0xF];
+	}
+	return hex;
+}
+
+// fileloader.go:587 emptyContentMappedFile — empty TS source file retaining
+// the original content for diagnostics; importers see an empty module. It
+// is still marked content-mapped so it is excluded from emit.
+SourceFile* filesLoader::emptyContentMappedFile(
+    SourceFileParseOptions& opts, const std::string& mapperIdentity,
+    const std::string& transformIdentity) {
+	auto content = host->fs->ReadFile(opts.FileName);
+	SourceFile* sourceFile = tsc::parseSourceFile(
+	    opts, "", ScriptKind::TS);
+	sourceFile->SetContentMapperInfo(ContentMapperSourceFileInfo{
+	    /*ContentMapper*/ mapperIdentity,
+	    /*TransformIdentity*/ transformIdentity,
+	    /*ParseOptions*/ opts,
+	    /*VirtualFileName*/ opts.FileName +
+	        std::string(tspath::extensionTs),
+	    /*OriginalText*/ content.first,
+	});
+	return sourceFile;
+}
+
+// fileloader.go:602 ContentMapperInitializationDiagnostic — fileless
+// diagnostic for a mapper initialization failure.
+static Diagnostic* contentMapperInitializationDiagnostic(
+    const std::string& labelIn, const gostd::Error& err) {
+	auto* initializeError =
+	    gostd::errorAs<contentmapper::InitializeError*>(err);
+	std::string label = labelIn;
+	if (initializeError != nullptr && label.empty()) {
+		label = initializeError->MapperName;
+	}
+	Diagnostic* diagnostic = tsoptions::newCompilerDiagnostic(
+	    The_content_mapper_0_could_not_be_initialized, {label});
+	if (initializeError != nullptr) {
+		switch (initializeError->Kind) {
+		case contentmapper::InitializeErrorKindProcessStart:
+			return diagnostic->AddMessageChain(tsoptions::newCompilerDiagnostic(
+			    The_content_mapper_command_0_could_not_be_started_Colon_1,
+			    {initializeError->Command, initializeError->Detail}));
+		case contentmapper::InitializeErrorKindProcessExit:
+			return diagnostic->AddMessageChain(tsoptions::newCompilerDiagnostic(
+			    The_content_mapper_process_exited_before_responding_to_the_initialize_request_exit_code_0,
+			    {std::to_string(initializeError->ExitCode)}));
+		case contentmapper::InitializeErrorKindNoResponse:
+			return diagnostic->AddMessageChain(tsoptions::newCompilerDiagnostic(
+			    The_content_mapper_did_not_respond_to_the_initialize_request_within_0_seconds,
+			    {std::to_string(initializeError->TimeoutSeconds)}));
+		case contentmapper::InitializeErrorKindInvalidResponse:
+			return diagnostic->AddMessageChain(tsoptions::newCompilerDiagnostic(
+			    The_content_mapper_returned_an_initialize_response_that_could_not_be_decoded_Colon_0,
+			    {initializeError->Detail}));
+		case contentmapper::InitializeErrorKindRequest:
+			return diagnostic->AddMessageChain(tsoptions::newCompilerDiagnostic(
+			    The_content_mapper_s_initialize_request_failed_Colon_0,
+			    {initializeError->Detail}));
+		case contentmapper::InitializeErrorKindPositionEncoding:
+			return diagnostic->AddMessageChain(tsoptions::newCompilerDiagnostic(
+			    The_content_mapper_selected_unsupported_position_encoding_0,
+			    {initializeError->PositionEncoding}));
+		case contentmapper::InitializeErrorKindEmptyDiagnosticSource:
+			return diagnostic->AddMessageChain(tsoptions::newCompilerDiagnostic(
+			    The_content_mapper_diagnostic_source_must_not_be_empty));
+		case contentmapper::InitializeErrorKindReservedDiagnosticSource:
+			return diagnostic->AddMessageChain(tsoptions::newCompilerDiagnostic(
+			    The_content_mapper_diagnostic_source_0_is_reserved_by_TypeScript,
+			    {initializeError->DiagnosticSource}));
+		}
+	}
+	return diagnostic->AddMessageChain(tsoptions::newCompilerDiagnostic(
+	    The_content_mapper_process_could_not_be_started_or_initialized));
+}
+
+// fileloader.go:630 ContentMapperProjectDiagnostic — fileless diagnostic
+// for project setup or mapper initialization.
+static Diagnostic* contentMapperProjectDiagnostic(const gostd::Error& err) {
+	if (gostd::errorAs<contentmapper::InitializeError*>(err) != nullptr) {
+		return contentMapperInitializationDiagnostic("" /*label*/, err);
+	}
+	return tsoptions::newCompilerDiagnostic(
+	    contentMapperProjectErrorDiagnostic(err));
+}
+
+// fileloader.go:637 contentMapperUnavailable — whether mapper failed
+// initialization or exceeded its failure budget.
+bool filesLoader::contentMapperUnavailable(contentmapper::Mapper* mapper) {
+	if (mapper == nullptr) {
+		return false;
+	}
+	std::lock_guard<std::mutex> lock(contentMapperMu);
+	return contentMapperInitFailed.count(mapper) != 0 ||
+	       contentMapperFailures[mapper] >= maxContentMapperFailures;
+}
+
+// fileloader.go:647 recordContentMapperInitializationFailure.
+void filesLoader::recordContentMapperInitializationFailure(
+    contentmapper::Mapper* mapper, const std::string& label,
+    const gostd::Error& err) {
+	std::lock_guard<std::mutex> lock(contentMapperMu);
+	if (contentMapperInitFailed.count(mapper) != 0) {
+		return;
+	}
+	contentMapperInitFailed.insert(mapper);
+	contentMapperDiagnostics.push_back(
+	    contentMapperInitializationDiagnostic(label, err));
+}
+
+// fileloader.go:660 recordContentMapperFailure — counts a transform failure
+// for mapper; returns whether the failure should be reported for this file
+// (false once the mapper is already disabled). On the failure that reaches
+// maxContentMapperFailures a single program diagnostic disables the mapper.
+bool filesLoader::recordContentMapperFailure(contentmapper::Mapper* mapper,
+                                             const std::string& label) {
+	std::lock_guard<std::mutex> lock(contentMapperMu);
+	if (contentMapperFailures[mapper] >= maxContentMapperFailures) {
+		return false;
+	}
+	contentMapperFailures[mapper]++;
+	if (contentMapperFailures[mapper] >= maxContentMapperFailures) {
+		contentMapperDiagnostics.push_back(tsoptions::newCompilerDiagnostic(
+		    The_content_mapper_0_failed_1_times_and_will_not_be_used,
+		    {label, std::to_string(maxContentMapperFailures)}));
+	}
+	return true;
+}
+
+// fileloader.go:438 parseContentMappedFile.
+SourceFile* filesLoader::parseContentMappedFile(SourceFileParseOptions opts) {
+	contentmapper::Mapper* mapper = program->CommandLine()
+	                                    ->GetContentMapperForFileName(
+	                                        opts.FileName);
+	std::string label = mapper->DiagnosticName();
+	std::string transformIdentity =
+	    getContentMapperTransformIdentity(mapper);
+	if (contentMapperUnavailable(mapper)) {
+		// The mapper failed initialization or exceeded its failure budget;
+		// add the file empty without re-reporting.
+		return emptyContentMappedFile(opts, mapper->Identity(),
+		                              transformIdentity);
+	}
+	auto [files, err] = host->GetContentMappedSourceFiles(opts, mapper);
+	if (err != nullptr) {
+		SourceFile* sourceFile = emptyContentMappedFile(
+		    opts, mapper->Identity(), transformIdentity);
+		if (auto* transformError =
+		        gostd::errorAs<contentmapper::TransformError*>(err);
+		    transformError != nullptr &&
+		    transformError->Kind ==
+		        contentmapper::TransformErrorKindInitialize) {
+			recordContentMapperInitializationFailure(mapper, label, err);
+			return sourceFile;
+		}
+		if (recordContentMapperFailure(mapper, label)) {
+			Diagnostic* diagnostic;
+			if (auto* problem =
+			        gostd::errorAs<spanmap::MappingError*>(err);
+			    problem != nullptr) {
+				diagnostic = contentMapperMappingDiagnostic(
+				    sourceFile, label, problem);
+			} else {
+				diagnostic = contentMapperTransformDiagnostic(
+				    sourceFile, label, err);
+			}
+			sourceFile->diagnostics.push_back(diagnostic);
+		}
+		return sourceFile;
+	}
+	return files.Canonical;
 }
 
 // fileloader.go:689 getSourceFileFromReference

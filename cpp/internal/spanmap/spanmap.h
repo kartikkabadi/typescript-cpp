@@ -19,6 +19,7 @@
 #include <vector>
 
 #include "internal/core/text.h"
+#include "internal/gostd/gostd.h"
 
 namespace tsc::spanmap {
 
@@ -132,15 +133,23 @@ inline constexpr MappingErrorKind MappingErrorKindFeature = 4;
 // MappingError describes a single span map validation failure, including the offsets involved so the mapper's
 // author can locate it. VirtualPos is an offset into the virtual text; OriginalPos is an offset into the
 // original content. Either may be unused (zero) depending on Kind.
-// spanmap.go:159
-struct MappingError {
+// spanmap.go:159 — MappingError is itself a Go `error` (it implements
+// Error() string), so callers use errors.AsType to recover it from a
+// transform error chain. It therefore derives from gostd::ErrObj so
+// gostd::errorAs<spanmap::MappingError> works the same way.
+struct MappingError : gostd::ErrObj {
 	MappingErrorKind Kind;
 	TextPos VirtualPos;
 	TextPos OriginalPos;
 
+	MappingError() = default;
+	MappingError(MappingErrorKind kind, TextPos virtualPos,
+	             TextPos originalPos)
+	    : Kind(kind), VirtualPos(virtualPos), OriginalPos(originalPos) {}
+
 	// Error describes the invalid mapping and the coordinate at which it was detected.
 	// spanmap.go:166
-	std::string Error() const;
+	std::string Error() const override;
 };
 
 struct originalIndex;

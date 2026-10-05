@@ -297,9 +297,35 @@ SimpleProgram::SimpleProgram(CompilerHost* host_,
                              const CompilerOptions& opts,
                              std::vector<std::string> rootFileNames,
                              bool skipModuleResolution_)
+	: SimpleProgram(host_, opts, std::move(rootFileNames),
+	                nullptr /*config*/, skipModuleResolution_) {}
+
+SimpleProgram::SimpleProgram(CompilerHost* host_,
+                             tsoptions::ParsedCommandLine* config,
+                             bool skipModuleResolution_)
+	: SimpleProgram(host_, *config->CompilerOptions(), config->FileNames(),
+	                config, skipModuleResolution_) {}
+
+SimpleProgram::SimpleProgram(CompilerHost* host_,
+                             const CompilerOptions& opts,
+                             std::vector<std::string> rootFileNames,
+                             tsoptions::ParsedCommandLine* config,
+                             bool skipModuleResolution_)
 	: options(opts), skipModuleResolution(skipModuleResolution_) {
 	host = host_;
 	host->compilerOptions = &options;
+
+	// === slice: incremental ===
+	// opts.Config — the program's ParsedCommandLine (program.go NewProgram
+	// receives the caller's). Borrowed when constructed from a config;
+	// otherwise synthesize a bare one from options+fileNames.
+	commandLine_ = config;
+	if (commandLine_ == nullptr) {
+		commandLineOwned_.reset(tsoptions::NewParsedCommandLine(
+		    &options, rootFileNames, {}, comparePathsOptions()));
+		commandLine_ = commandLineOwned_.get();
+	}
+	// === end slice: incremental ===
 
 	// fileLoader{} setup (processAllProgramFiles body, fileloader.go:152)
 	filesLoader loader;
@@ -314,6 +340,8 @@ SimpleProgram::SimpleProgram(CompilerHost* host_,
 	loader.defaultLibraryPath = tspath::getNormalizedAbsolutePath(
 	    host->DefaultLibraryPath(), host->GetCurrentDirectory());
 	loader.useCaseSensitiveFileNames = true; // POSIX FS — vfs UseCaseSensitiveFileNames
+	// fileloader.go:178 — extensions the configured content mappers claim.
+	loader.contentMapperExtensions = commandLine_->ContentMapperExtensions();
 	loader.supportedExtensions =
 	    tsoptions::getSupportedExtensions(&options, {});
 	loader.supportedExtensionsWithJsonIfResolveJsonModule =
@@ -359,18 +387,13 @@ SimpleProgram::SimpleProgram(CompilerHost* host_,
 	redirectTargetsMap = std::move(parser.redirectTargetsMap);
 	redirectFilesByPath = std::move(parser.redirectFilesByPath);
 	fileNameList = std::move(rootFileNames);
+	// filesparser.go:584 — loader's content-mapper failure diagnostics.
+	contentMapperDiagnostics = std::move(loader.contentMapperDiagnostics);
 
 	// initCheckerPool — lazily: getChecker() materializes the single
 	// checker.
 	verifyCompilerOptions();
-	// collectContentMapperOptionDiagnostics — no content mappers.
-
-	// === slice: incremental ===
-	// opts.Config — the program's ParsedCommandLine (program.go: built at
-	// NewProgram). fileNameList already holds the root names here.
-	commandLine_.reset(tsoptions::NewParsedCommandLine(
-	    &options, fileNameList, {}, comparePathsOptions()));
-	// === end slice: incremental ===
+	collectContentMapperOptionDiagnostics();
 }
 
 // program.go:570 BindSourceFiles (single-threaded)
@@ -593,11 +616,32 @@ std::vector<Diagnostic*> SimpleProgram::GetSemanticDiagnostics(
 	    });
 }
 
+// program.go:828 collectContentMapperOptionDiagnostics
+void SimpleProgram::collectContentMapperOptionDiagnostics() {
+	contentmapper::Project* project = ContentMapperProject();
+	if (project == nullptr) {
+		return;
+	}
+	for (const contentmapper::OptionDiagnostic& diagnostic :
+	     project->Diagnostics()) {
+		auto [file, loc] =
+		    tsoptions::GetContentMapperOptionDiagnosticLocation(
+		        commandLine_, diagnostic.Mapper, diagnostic.Path);
+		contentMapperOptionDiagnostics.push_back(newExternalDiagnostic(
+		    file, loc, diagnostic.Source, DiagnosticCategory::Error,
+		    diagnostic.Code, diagnostic.MessageText));
+	}
+}
+
 // program.go:826 GetProgramDiagnostics
 std::vector<Diagnostic*> SimpleProgram::GetProgramDiagnostics() {
-	// programDiagnostics + contentMapperDiagnostics(none) +
-	// contentMapperOptionDiagnostics(none) + includeProcessor globals
+	// programDiagnostics + contentMapperDiagnostics +
+	// contentMapperOptionDiagnostics + includeProcessor globals
 	std::vector<Diagnostic*> all = programDiagnostics;
+	all.insert(all.end(), contentMapperDiagnostics.begin(),
+	           contentMapperDiagnostics.end());
+	all.insert(all.end(), contentMapperOptionDiagnostics.begin(),
+	           contentMapperOptionDiagnostics.end());
 	auto ipGlobals =
 	    includeProcessor_.getDiagnostics(this)->GetGlobalDiagnostics();
 	all.insert(all.end(), ipGlobals.begin(), ipGlobals.end());

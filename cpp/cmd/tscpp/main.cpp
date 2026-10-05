@@ -412,8 +412,7 @@ static void checkFile(int argc, char** argv) {
 		return;
 	}
 
-	compiler::SimpleProgram program(&host, *parsed->ParsedConfig->CompilerOptions,
-	                              parsed->ParsedConfig->FileNames);
+	compiler::SimpleProgram program(&host, parsed);
 	program.BindSourceFiles();
 	auto diags = compiler::getDiagnosticsOfAnyProgram(&program, {}, false);
 
@@ -464,8 +463,7 @@ static void emitFile(int argc, char** argv) {
 		return;
 	}
 
-	compiler::SimpleProgram program(&host, *parsed->ParsedConfig->CompilerOptions,
-	                              parsed->ParsedConfig->FileNames);
+	compiler::SimpleProgram program(&host, parsed);
 	program.BindSourceFiles();
 	auto diags = compiler::getDiagnosticsOfAnyProgram(&program, {}, false);
 
@@ -494,8 +492,7 @@ static void emitdumpFile(int argc, char** argv) {
 		return;
 	}
 
-	compiler::SimpleProgram program(&host, *parsed->ParsedConfig->CompilerOptions,
-	                              parsed->ParsedConfig->FileNames);
+	compiler::SimpleProgram program(&host, parsed);
 	program.BindSourceFiles();
 	auto diags = compiler::getDiagnosticsOfAnyProgram(&program, {}, false);
 

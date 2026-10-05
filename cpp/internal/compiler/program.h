@@ -104,9 +104,22 @@ public:
 	                          SourceFileMetaData metaData);
 
 	// === slice: incremental ===
-	// host.go ContentMapperProject — no content mappers in this port;
-	// always nullptr.
-	contentmapper::Project* ContentMapperProject() const { return nullptr; }
+	// host.go:37-39 — extendedConfigCache / contentMapperProject host state.
+	tsoptions::ExtendedConfigCache* extendedConfigCache{};
+	std::shared_ptr<contentmapper::Project> contentMapperProject{};
+
+	// host.go:115 ContentMapperProject — the project-scoped content mapper
+	// used by this host, or nullptr when no project is in scope (CLI).
+	contentmapper::Project* ContentMapperProject() const {
+		return contentMapperProject.get();
+	}
+	// host.go:100 GetContentMappedSourceFiles.
+	std::pair<contentmapper::SourceFiles, gostd::Error>
+	GetContentMappedSourceFiles(const SourceFileParseOptions& parseOptions,
+	                            contentmapper::Mapper* mapper);
+	// host.go:119 GetResolvedProjectReference.
+	tsoptions::ParsedCommandLine* GetResolvedProjectReference(
+	    const std::string& fileName, const tspath::Path& path);
 	// === end slice: incremental ===
 };
 
@@ -389,6 +402,15 @@ struct filesLoader {
 	std::string defaultLibraryPath;
 	bool useCaseSensitiveFileNames{};
 	std::vector<std::string> contentMapperExtensions;
+	// fileloader.go:71-76 — content-mapper bookkeeping. contentMapperMu
+	// guards the maps/vector, which Go may write concurrently from parse
+	// workers; kept here for faithfulness even when parsing is serial.
+	std::mutex contentMapperMu;
+	std::unordered_map<contentmapper::Mapper*, int> contentMapperFailures;
+	std::unordered_set<contentmapper::Mapper*> contentMapperInitFailed;
+	// Program-level diagnostics reported when a content mapper fails
+	// fatally (reported once per mapper).
+	std::vector<Diagnostic*> contentMapperDiagnostics;
 	std::vector<std::vector<std::string_view>> supportedExtensions;
 	std::vector<std::vector<std::string_view>>
 	    supportedExtensionsWithJsonIfResolveJsonModule;
@@ -434,6 +456,18 @@ struct filesLoader {
 	void resolveAutomaticTypeDirectives(parseTask* t);
 	SourceFileMetaData loadSourceFileMetaData(const std::string& fileName);
 	SourceFile* parseSourceFile(parseTask* t);
+	// fileloader.go:438 parseContentMappedFile + helpers (:578-677).
+	SourceFile* parseContentMappedFile(SourceFileParseOptions opts);
+	std::string getContentMapperTransformIdentity(contentmapper::Mapper* mapper);
+	SourceFile* emptyContentMappedFile(SourceFileParseOptions& opts,
+	                                   const std::string& mapperIdentity,
+	                                   const std::string& transformIdentity);
+	bool contentMapperUnavailable(contentmapper::Mapper* mapper);
+	void recordContentMapperInitializationFailure(contentmapper::Mapper* mapper,
+	                                              const std::string& label,
+	                                              const gostd::Error& err);
+	bool recordContentMapperFailure(contentmapper::Mapper* mapper,
+	                                const std::string& label);
 
 	includeProcessor* ip{};
 };
@@ -475,6 +509,12 @@ public:
 	includeProcessor includeProcessor_;
 	std::unique_ptr<module::DefaultResolver> resolver_;
 	std::vector<Diagnostic*> programDiagnostics;
+	// program.go:76 contentMapperDiagnostics — diagnostics reported once per
+	// content mapper when it fails fatally (moved in from the loader).
+	std::vector<Diagnostic*> contentMapperDiagnostics;
+	// program.go:107 contentMapperOptionDiagnostics — option diagnostics
+	// from the host's content-mapper project.
+	std::vector<Diagnostic*> contentMapperOptionDiagnostics;
 	std::vector<Diagnostic*> configFileParsingDiagnostics;
 
 	std::unique_ptr<checker::Checker> checker_;
@@ -483,9 +523,13 @@ public:
 
 	// === slice: incremental ===
 	// program.go — the program's ParsedCommandLine (opts.Config) and tracing
-	// session (opts.Tracing). commandLine_ is built in the ctor; Tracing is
-	// set by callers that run a trace session (nullptr otherwise).
-	std::unique_ptr<tsoptions::ParsedCommandLine> commandLine_;
+	// session (opts.Tracing). commandLine_ is borrowed when the program is
+	// constructed from a caller-owned ParsedCommandLine (the config ctor),
+	// or points into commandLineOwned_ when the program synthesizes one
+	// (the options/fileNames ctor). Tracing is set by callers that run a
+	// trace session (nullptr otherwise).
+	tsoptions::ParsedCommandLine* commandLine_ = nullptr;
+	std::unique_ptr<tsoptions::ParsedCommandLine> commandLineOwned_;
 	tracing::Tracing* tr_ = nullptr;
 	// === end slice: incremental ===
 
@@ -499,6 +543,18 @@ public:
 	SimpleProgram(CompilerHost* host, const CompilerOptions& options,
 	              std::vector<std::string> rootFileNames,
 	              bool skipModuleResolution = false);
+	// program.go NewProgram(ProgramOptions{Config}) — the parsed command
+	// line supplies compiler options, root file names, project references
+	// and content mappers; the program borrows it (caller-owned).
+	SimpleProgram(CompilerHost* host, tsoptions::ParsedCommandLine* config,
+	              bool skipModuleResolution = false);
+	// Shared implementation for the two public ctors: a non-null `config`
+	// is borrowed as the program's opts.Config; nullptr synthesizes a bare
+	// ParsedCommandLine from `options`/`rootFileNames`.
+	SimpleProgram(CompilerHost* host, const CompilerOptions& options,
+	              std::vector<std::string> rootFileNames,
+	              tsoptions::ParsedCommandLine* config,
+	              bool skipModuleResolution);
 
 	// --- checker.Program interface ---
 	const CompilerOptions* Options() override { return &options; }
@@ -544,6 +600,8 @@ public:
 	std::vector<Diagnostic*> GetConfigFileParsingDiagnostics() {
 		return configFileParsingDiagnostics;
 	}
+	// program.go:828 collectContentMapperOptionDiagnostics.
+	void collectContentMapperOptionDiagnostics();
 	std::vector<Diagnostic*> GetProgramDiagnostics();
 	std::vector<Diagnostic*> GetGlobalDiagnostics();
 	std::vector<Diagnostic*> GetSyntacticDiagnostics(SourceFile* sourceFile);
@@ -665,7 +723,7 @@ public:
 	    module::ModeAwareCache<module::ResolvedTypeReferenceDirective*>>&
 	GetResolvedTypeReferenceDirectives() { return typeResolutionsInFile; }
 	// program.go — opts.Config / opts.Tracing accessors.
-	tsoptions::ParsedCommandLine* CommandLine() { return commandLine_.get(); }
+	tsoptions::ParsedCommandLine* CommandLine() { return commandLine_; }
 	tracing::Tracing* Tracing() { return tr_; }
 	void SetTracing(tracing::Tracing* t) { tr_ = t; }
 	// program.go PackageJsonCacheEntries — delegates to the resolver's
@@ -674,8 +732,10 @@ public:
 	    const std::function<bool(
 	        tspath::Path,
 	        const std::shared_ptr<packagejson::InfoCacheEntry>&)>& f);
-	// host.go:115 — no content mappers in this port; always nullptr.
-	contentmapper::Project* ContentMapperProject() { return nullptr; }
+	// program.go:138 ContentMapperProject — delegates to the host.
+	contentmapper::Project* ContentMapperProject() {
+		return host != nullptr ? host->ContentMapperProject() : nullptr;
+	}
 	// program.go SingleThreaded — options.SingleThreaded == TS true.
 	bool SingleThreaded() { return options.SingleThreaded == Tristate::True; }
 	// program.go:804 GetSemanticDiagnosticsForIncremental — per-file

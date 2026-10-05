@@ -40,7 +40,7 @@ std::pair<SourceFiles, gostd::Error> ParseResult(
 	if (auto problem =
 	        spanmap::Validate(result.Mappings, result.Text, content);
 	    problem.has_value()) {
-		return {SourceFiles{}, gostd::newError(problem->Error())};
+		return {SourceFiles{}, gostd::Error(std::make_shared<spanmap::MappingError>(*problem))};
 	}
 	const std::string& virtualExtension = result.VirtualExtension;
 	if (!IsSupportedVirtualExtension(virtualExtension)) {
@@ -80,7 +80,7 @@ std::pair<SourceFiles, gostd::Error> ParseResult(
 		if (auto problem = spanmap::Validate(supplemental.Mappings,
 		                                     supplemental.Text, content);
 		    problem.has_value()) {
-			return {SourceFiles{}, gostd::newError(problem->Error())};
+			return {SourceFiles{}, gostd::Error(std::make_shared<spanmap::MappingError>(*problem))};
 		}
 		SourceFileParseOptions supplementalOptions = baseParseOptions;
 		if (!IsSupportedVirtualExtension(supplemental.VirtualExtension)) {
