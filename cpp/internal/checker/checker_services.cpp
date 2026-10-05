@@ -15,10 +15,7 @@
 namespace tsc {
 namespace checker {
 
-// emitresolver.go — emit resolver slice (not yet ported).
-EmitResolver* newEmitResolver(Checker* c) {
-	TSC_UNREACHABLE("newEmitResolver — emitresolver slice");
-}
+// (deduped: newEmitResolver defined in cpp/internal/checker/checker_emitresolver.cpp)
 
 // checker.go:32070 — GetSymbolAtLocation
 Symbol* Checker::GetSymbolAtLocation(Node* node) {

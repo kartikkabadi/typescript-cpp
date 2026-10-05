@@ -18,12 +18,7 @@
 namespace tsc::checker {
 
 // --- checkNotCanceled — utilities.go:1716 ----------------------------------
-
-void Checker::checkNotCanceled() {
-	if (wasCanceled) {
-		TSC_UNREACHABLE("Checker was previously cancelled");
-	}
-}
+// (deduped: defined in cpp/internal/checker/checker_walk.cpp)
 
 // --- getSignatureFromDeclaration — ported with the signatures slice ---------
 

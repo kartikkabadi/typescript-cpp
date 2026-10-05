@@ -1111,10 +1111,6 @@ printer::SymbolAccessibilityResult Checker::isSymbolAccessibleWorker(
 
 // === dep stubs — removed when owner slice lands ===
 
-// emitresolver.go:384 — hasVisibleDeclarations (emitresolver slice)
-printer::SymbolAccessibilityResult* EmitResolver::hasVisibleDeclarations(
-	Symbol* symbol, bool shouldComputeAliasesToMakeVisible) {
-	TSC_UNREACHABLE("EmitResolver::hasVisibleDeclarations — emitresolver slice");
-}
+// (deduped: EmitResolver::hasVisibleDeclarations defined in checker_emitresolver.cpp)
 
 } // namespace tsc::checker

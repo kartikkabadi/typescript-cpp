@@ -69,6 +69,53 @@ struct SymbolAccessibilityResult {
 	std::string ErrorModuleName;
 };
 
+// --- TypeReferenceSerializationKind (printer/emitresolver.go:33) -------------
+
+// Indicates how to serialize the name for a TypeReferenceNode when emitting
+// decorator metadata.
+enum class TypeReferenceSerializationKind : int32_t {
+	// The TypeReferenceNode could not be resolved.
+	// The type name should be emitted using a safe fallback.
+	Unknown = 0,
+
+	// The TypeReferenceNode resolves to a type with a constructor
+	// function that can be reached at runtime (e.g. a `class`
+	// declaration or a `var` declaration for the static side
+	// of a type, such as the global `Promise` type in lib.d.ts).
+	TypeWithConstructSignatureAndValue,
+
+	// The TypeReferenceNode resolves to a Void-like, Nullable, or Never type.
+	VoidNullableOrNeverType,
+
+	// The TypeReferenceNode resolves to a Number-like type.
+	NumberLikeType,
+
+	// The TypeReferenceNode resolves to a BigInt-like type.
+	BigIntLikeType,
+
+	// The TypeReferenceNode resolves to a String-like type.
+	StringLikeType,
+
+	// The TypeReferenceNode resolves to a Boolean-like type.
+	BooleanType,
+
+	// The TypeReferenceNode resolves to an Array-like type.
+	ArrayLikeType,
+
+	// The TypeReferenceNode resolves to the ESSymbol type.
+	ESSymbolType,
+
+	// The TypeReferenceNode resolved to the global Promise constructor symbol.
+	Promise,
+
+	// The TypeReferenceNode resolves to a Function type or a type with call
+	// signatures.
+	TypeWithCallSignature,
+
+	// The TypeReferenceNode resolves to any other type.
+	ObjectType,
+};
+
 // --- side-table value types (emitcontext.go / helpers.go) --------------------
 
 using AutoGenerateId = uint32_t;
