@@ -1179,4 +1179,16 @@ bool hasAbstractModifier(Node* node);
 bool hasAmbientModifier(Node* node);
 bool isModuleWithStringLiteralName(Node* node);
 
+// === slice: grammarchecks — utilities.go helpers ===
+bool isCommaExpression(Node* node);
+bool isCommaSequence(Node* node);
+bool isIterationStatement(Node* node, bool lookInLabeledStatements);
+bool isStringLiteralLikeType(Node* node);
+Node* walkUpParenthesizedTypes(Node* node);
+bool canHaveModifiers(Node* node);
+bool canHaveIllegalModifiers(Node* node);
+bool hasModifier(Node* node, ModifierFlags flags);
+Node* getContainingFunction(Node* node);
+bool isEffectiveExternalModule(SourceFile* node, const CompilerOptions* compilerOptions);
+
 }  // namespace tsc
