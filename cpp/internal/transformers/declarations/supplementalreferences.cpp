@@ -7,16 +7,12 @@ namespace tsc::transformers::declarations {
 
 namespace {
 
-// ast.go:2654 SourceFile::SupplementalSourceFiles —
-// ContentMapperSourceFileInfo is forward-declared in ast.h but not yet
-// defined by the content-mapper slice; when it lands this reads
-// `sourceFile->contentMapperInfo->SupplementalSourceFiles`.
+// ast.go:2654 SourceFile::SupplementalSourceFiles.
 std::vector<SourceFile*> supplementalSourceFiles(SourceFile* sourceFile) {
 	if (sourceFile->contentMapperInfo == nullptr) {
 		return {};
 	}
-	TSC_UNREACHABLE(
-		"ContentMapperSourceFileInfo — owned by content-mapper slice");
+	return sourceFile->contentMapperInfo->SupplementalSourceFiles;
 }
 
 }  // namespace
