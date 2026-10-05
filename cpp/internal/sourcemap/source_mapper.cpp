@@ -809,67 +809,69 @@ DocumentPositionMapper* convertDocumentToSourceMapper(
 } // namespace
 
 // DocumentPositionMapper.GetSourcePosition — source_mapper.go:169
+// Free function (spanmap convention): Go callers may invoke on a nil mapper.
 DocumentPosition*
-DocumentPositionMapper::GetSourcePosition(const DocumentPosition* loc) {
-	if (this == nullptr) {
+GetSourcePosition(const DocumentPositionMapper* m, const DocumentPosition* loc) {
+	if (m == nullptr) {
 		return nullptr;
 	}
-	if (generatedMappings.empty()) {
+	if (m->generatedMappings.empty()) {
 		return nullptr;
 	}
 
 	int targetIndex = binarySearchFunc(
-	    generatedMappings, loc->Pos,
-	    [](const MappedPosition* m, int pos) {
-		    return static_cast<int64_t>(m->generatedPosition) - pos;
+	    m->generatedMappings, loc->Pos,
+	    [](const MappedPosition* mp, int pos) {
+		    return static_cast<int64_t>(mp->generatedPosition) - pos;
 	    });
 
 	if (targetIndex < 0 ||
-	    targetIndex >= static_cast<int>(generatedMappings.size())) {
+	    targetIndex >= static_cast<int>(m->generatedMappings.size())) {
 		return nullptr;
 	}
 
-	MappedPosition* mapping = generatedMappings[targetIndex];
+	MappedPosition* mapping = m->generatedMappings[targetIndex];
 	if (!mapping->isSourceMappedPosition()) {
 		return nullptr;
 	}
 	if (mapping->sourceIndex < 0 ||
 	    mapping->sourceIndex >=
-	        static_cast<SourceIndex>(sourceFileAbsolutePaths.size())) {
+	        static_cast<SourceIndex>(m->sourceFileAbsolutePaths.size())) {
 		TSC_UNREACHABLE("index out of range"); // Go slice-index panic
 	}
 
 	// Closest position
-	return new DocumentPosition{sourceFileAbsolutePaths[mapping->sourceIndex],
+	return new DocumentPosition{m->sourceFileAbsolutePaths[mapping->sourceIndex],
 	                            mapping->sourcePosition};
 }
 
 // DocumentPositionMapper.GetGeneratedPosition — source_mapper.go:197
 DocumentPosition*
-DocumentPositionMapper::GetGeneratedPosition(const DocumentPosition* loc) {
-	if (this == nullptr) {
+GetGeneratedPosition(const DocumentPositionMapper* m,
+                     const DocumentPosition* loc) {
+	if (m == nullptr) {
 		return nullptr;
 	}
-	auto it = sourceToSourceIndexMap.find(tspath::getCanonicalFileName(
-	    loc->FileName, useCaseSensitiveFileNames));
-	if (it == sourceToSourceIndexMap.end()) {
+	auto it = m->sourceToSourceIndexMap.find(tspath::getCanonicalFileName(
+	    loc->FileName, m->useCaseSensitiveFileNames));
+	if (it == m->sourceToSourceIndexMap.end()) {
 		return nullptr;
 	}
 	SourceIndex sourceIndex = it->second;
 	// Go checks against len(d.sourceMappings) — the MAP's key count
 	if (sourceIndex < 0 ||
-	    sourceIndex >= static_cast<SourceIndex>(sourceMappings.size())) {
+	    sourceIndex >= static_cast<SourceIndex>(m->sourceMappings.size())) {
 		return nullptr;
 	}
 	// Go: sourceMappings := d.sourceMappings[sourceIndex] — absent key yields
 	// a nil (empty) list; no insertion like operator[] would perform.
 	static const std::vector<SourceMappedPosition*> emptyMappings;
-	auto smIt = sourceMappings.find(sourceIndex);
+	auto smIt = m->sourceMappings.find(sourceIndex);
 	const std::vector<SourceMappedPosition*>& list =
-	    smIt != sourceMappings.end() ? smIt->second : emptyMappings;
+	    smIt != m->sourceMappings.end() ? smIt->second : emptyMappings;
 	int targetIndex = binarySearchFunc(
-	    list, loc->Pos, [](const SourceMappedPosition* m, int pos) {
-		    return static_cast<int64_t>(m->sourcePosition) - pos;
+	    list, loc->Pos, [](const SourceMappedPosition* mp, int pos) {
+		    return static_cast<int64_t>(mp->sourcePosition) - pos;
 	    });
 
 	if (targetIndex < 0 || targetIndex >= static_cast<int>(list.size())) {
@@ -882,7 +884,7 @@ DocumentPositionMapper::GetGeneratedPosition(const DocumentPosition* loc) {
 	}
 
 	// Closest position
-	return new DocumentPosition{generatedAbsoluteFilePath,
+	return new DocumentPosition{m->generatedAbsoluteFilePath,
 	                            mapping->generatedPosition};
 }
 

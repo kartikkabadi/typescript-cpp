@@ -249,9 +249,14 @@ struct DocumentPositionMapper {
 	std::vector<MappedPosition*> generatedMappings;
 	std::unordered_map<SourceIndex, std::vector<SourceMappedPosition*>> sourceMappings;
 
-	DocumentPosition* GetSourcePosition(const DocumentPosition* loc);
-	DocumentPosition* GetGeneratedPosition(const DocumentPosition* loc);
 };
+
+// Free functions (spanmap convention): Go callers may invoke these on a nil
+// *documentPositionMapper — nil-safe by construction.
+DocumentPosition* GetSourcePosition(const DocumentPositionMapper* m,
+                                    const DocumentPosition* loc);
+DocumentPosition* GetGeneratedPosition(const DocumentPositionMapper* m,
+                                       const DocumentPosition* loc);
 
 DocumentPositionMapper* GetDocumentPositionMapper(Host* host,
                                                   std::string_view generatedFileName);

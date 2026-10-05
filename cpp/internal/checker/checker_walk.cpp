@@ -844,7 +844,7 @@ void Checker::checkConstEnumAccess(Node* node, Type* t) {
 		auto* redirect = program->GetProjectReferenceFromOutputDts(getSourceFileOfNode(constEnumDeclaration)->Path());
 		if (constEnumDeclaration->flags & NodeFlagsAmbient &&
 			!isValidTypeOnlyAliasUseSite(node) &&
-			(redirect == nullptr ||
+			(redirect == nullptr || redirect->resolved == nullptr ||
 			 !redirect->resolved->CompilerOptions()->ShouldPreserveConstEnums())) {
 			error(node, Cannot_access_ambient_const_enums_when_0_is_enabled, {getIsolatedModulesLikeFlagName()});
 		}

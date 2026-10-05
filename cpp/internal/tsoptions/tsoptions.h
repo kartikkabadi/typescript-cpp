@@ -757,14 +757,16 @@ struct ParsedCommandLine : module::ResolvedProjectReference,
 	std::pair<std::string, std::string> fileGlobPatterns();
 	// module::ResolvedProjectReference overrides (const) + Go spellings.
 	std::string ConfigName() const override;
+	// Go's nil-receiver guard is carried by callers (a member call on null is
+	// UB in C++ and clang folds `this == nullptr` away at -O2).
 	const tsc::CompilerOptions* CompilerOptions() const override {
-		if (this == nullptr || ParsedConfig == nullptr) {
+		if (ParsedConfig == nullptr) {
 			return nullptr;
 		}
 		return ParsedConfig->CompilerOptions;
 	}
 	tsc::CompilerOptions* CompilerOptions() {
-		if (this == nullptr || ParsedConfig == nullptr) {
+		if (ParsedConfig == nullptr) {
 			return nullptr;
 		}
 		return ParsedConfig->CompilerOptions;

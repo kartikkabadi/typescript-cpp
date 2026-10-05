@@ -2600,7 +2600,12 @@ void Checker::checkAliasSymbol(Node* node) {
 				(constEnumDeclaration->flags & NodeFlagsAmbient) != 0) {
 				auto* redirect = program->GetProjectReferenceFromOutputDts(
 					getSourceFileOfNode(constEnumDeclaration)->Path());
-				if (redirect == nullptr || !redirect->resolved->CompilerOptions()->ShouldPreserveConstEnums()) {
+				// Go: redirect.Resolved.CompilerOptions() — Resolved is a
+				// *ParsedCommandLine; nil receiver returns nil, then
+				// ShouldPreserveConstEnums would panic — Resolved is never nil in
+				// practice; the guard keeps us graceful.
+				if (redirect == nullptr || redirect->resolved == nullptr ||
+					!redirect->resolved->CompilerOptions()->ShouldPreserveConstEnums()) {
 					error(node, Cannot_access_ambient_const_enums_when_0_is_enabled,
 						getIsolatedModulesLikeFlagName());
 				}

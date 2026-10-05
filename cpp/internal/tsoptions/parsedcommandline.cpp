@@ -89,7 +89,8 @@ ParsedCommandLine* ParsedCommandLine::WithFileNames(
 
 // ConfigName — parsedcommandline.go:120.
 std::string ParsedCommandLine::ConfigName() const {
-	if (this == nullptr || ConfigFile == nullptr) {
+	// Go: `p == nil` receiver guard — carried by callers (member-on-null is UB).
+	if (ConfigFile == nullptr) {
 		return "";
 	}
 	return ConfigFile->SourceFile->FileName();
@@ -248,9 +249,7 @@ std::string ParsedCommandLine::GetBuildInfoFileName() {
 // WildcardDirectories — parsedcommandline.go:258.
 std::unordered_map<std::string, bool>*
 ParsedCommandLine::WildcardDirectories() {
-	if (this == nullptr) {
-		return nullptr;
-	}
+	// Go's nil-receiver guard is carried by callers.
 
 	std::call_once(wildcardDirectoriesOnce, [&] {
 		if (wildcardDirectories == nullptr) {
@@ -320,7 +319,7 @@ ParsedCommandLine::FileNamesByPath() {
 
 // ContentMappers — parsedcommandline.go:349.
 std::vector<contentmapper::Mapper*> ParsedCommandLine::ContentMappers() {
-	if (this == nullptr || ParsedConfig == nullptr) {
+	if (ParsedConfig == nullptr) {
 		return {};
 	}
 	return ParsedConfig->ContentMappers;
@@ -370,7 +369,7 @@ std::vector<std::string> ParsedCommandLine::ResolvedProjectReferencePaths() {
 
 // ExtendedSourceFiles — parsedcommandline.go:386.
 std::vector<std::string> ParsedCommandLine::ExtendedSourceFiles() {
-	if (this == nullptr || ConfigFile == nullptr) {
+	if (ConfigFile == nullptr) {
 		return {};
 	}
 	return ConfigFile->ExtendedSourceFiles;
