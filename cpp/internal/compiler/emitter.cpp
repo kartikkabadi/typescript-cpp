@@ -11,6 +11,7 @@
 #include "internal/tsoptions/tsoptions.h"
 #include "internal/transformers/estransforms/estransforms.h"
 #include "internal/transformers/inliners/inliners.h"
+#include "internal/transformers/jsxtransforms/jsxtransforms.h"
 #include "internal/transformers/moduletransforms/moduletransforms.h"
 #include "internal/transformers/tstransforms/tstransforms.h"
 
@@ -20,9 +21,9 @@
 #include <vector>
 
 // === dep-stubs for transformer factories owned by in-flight slices =====
-// DELETE each as the owning slice lands: tstransforms (5), jsxtransforms (1),
-// estransforms GetESTransformer+NewUseStrictTransformer (2). Declared here in
-// the owning namespace so callers already use the final names.
+// DELETE each as the owning slice lands: tstransforms (5), estransforms
+// GetESTransformer+NewUseStrictTransformer (2). Declared here in the owning
+// namespace so callers already use the final names.
 
 namespace tsc::transformers::tstransforms {
 // owned by the tstransforms slice
@@ -43,13 +44,6 @@ Transformer* NewLegacyDecoratorsTransformer(TransformOptions* /*opts*/) {
 	    "NewLegacyDecoratorsTransformer — owned by tstransforms slice");
 }
 } // namespace tsc::transformers::tstransforms
-
-namespace tsc::transformers::jsxtransforms {
-// owned by the jsxtransforms slice (ported as newJSXTransformer there)
-Transformer* NewJSXTransformer(TransformOptions* /*opts*/) {
-	TSC_UNREACHABLE("NewJSXTransformer — owned by jsxtransforms slice");
-}
-} // namespace tsc::transformers::jsxtransforms
 
 namespace tsc::transformers::estransforms {
 // owned by the estransforms slice
@@ -187,7 +181,7 @@ Transformer* getModuleTransformer(TransformOptions* opts) {
 	case ModuleKind::Preserve:
 		// `ESModuleTransformer` contains logic for preserving CJS input syntax
 		// in `--module preserve`
-		return transformers::moduletransforms::newESModuleTransformer(opts);
+		return transformers::moduletransforms::NewESModuleTransformer(opts);
 
 	case ModuleKind::ESNext:
 	case ModuleKind::ES2022:
@@ -198,10 +192,10 @@ Transformer* getModuleTransformer(TransformOptions* opts) {
 	case ModuleKind::Node16:
 	case ModuleKind::NodeNext:
 	case ModuleKind::CommonJS:
-		return transformers::moduletransforms::newImpliedModuleTransformer(opts);
+		return transformers::moduletransforms::NewImpliedModuleTransformer(opts);
 
 	default:
-		return transformers::moduletransforms::newCommonJSModuleTransformer(
+		return transformers::moduletransforms::NewCommonJSModuleTransformer(
 		    opts);
 	}
 }
@@ -291,7 +285,7 @@ std::vector<Transformer*> getScriptTransformers(
 	// inlining (formerly done via substitutions)
 	if (!options->GetIsolatedModules()) {
 		tx.push_back(
-		    transformers::inliners::newConstEnumInliningTransformer(&opts));
+		    transformers::inliners::NewConstEnumInliningTransformer(&opts));
 	}
 	return tx;
 }

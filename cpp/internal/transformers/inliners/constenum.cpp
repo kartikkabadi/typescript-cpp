@@ -137,7 +137,7 @@ struct ConstEnumInliningTransformer : Transformer {
 
 } // namespace
 
-Transformer* newConstEnumInliningTransformer(TransformOptions* opt) {
+Transformer* NewConstEnumInliningTransformer(TransformOptions* opt) {
 	return ConstEnumInliningTransformer::create(opt);
 }
 

@@ -6,6 +6,6 @@
 namespace tsc::transformers::inliners {
 
 // NewConstEnumInliningTransformer — constenum.go:22
-Transformer* newConstEnumInliningTransformer(TransformOptions* opt);
+Transformer* NewConstEnumInliningTransformer(TransformOptions* opt);
 
 }  // namespace tsc::transformers::inliners

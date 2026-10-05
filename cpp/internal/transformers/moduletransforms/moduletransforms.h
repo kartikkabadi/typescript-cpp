@@ -57,11 +57,11 @@ bool isSimpleInlineableExpression(Node* expression);
 // --- impliedmodule.go -------------------------------------------------------
 
 // NewImpliedModuleTransformer — impliedmodule.go:19
-Transformer* newImpliedModuleTransformer(TransformOptions* opts);
+Transformer* NewImpliedModuleTransformer(TransformOptions* opts);
 
 // --- esmodule.go / commonjsmodule.go (owned by moduletransforms slice) ------
 
-Transformer* newESModuleTransformer(TransformOptions* opts);
-Transformer* newCommonJSModuleTransformer(TransformOptions* opts);
+Transformer* NewESModuleTransformer(TransformOptions* opts);
+Transformer* NewCommonJSModuleTransformer(TransformOptions* opts);
 
 }  // namespace tsc::transformers::moduletransforms

@@ -711,6 +711,8 @@ std::pair<ResolutionMode, bool> getResolutionModeOverride(
 bool hasResolutionModeOverride(Node* node);
 bool isResolutionModeOverrideHost(Node* node);
 bool isJsxOpeningLikeElement(Node* node);
+// utilities.go:3834 — GetSemanticJsxChildren.
+std::vector<Node*> getSemanticJsxChildren(const std::vector<Node*>& children);
 Node* getNodeAtPosition(SourceFile* file, int position, bool includeJSDoc);
 void setImportsOfSourceFile(SourceFile* file, std::vector<Node*> imports);
 bool forEachDynamicImportOrRequireCall(
