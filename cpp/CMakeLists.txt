@@ -195,6 +195,9 @@ add_library(tsc STATIC
 	internal/execute/incremental/referencemap.cpp
 	internal/execute/incremental/snapshot.cpp
 	internal/execute/incremental/snapshottobuildinfo.cpp
+	# === slice: bundled ===
+	internal/bundled/bundled.cpp
+	internal/bundled/bundled_generated.cpp
 	# === slice: vfs ===
 	internal/vfs/vfs.cpp
 	internal/vfs/internal/internal.cpp
