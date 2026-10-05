@@ -1992,6 +1992,11 @@ public:
 	Type* checkJsxFragment(Node* node);
 	Type* checkJsxAttributes(Node* node, CheckMode checkMode);
 	Type* checkNonNullExpression(Node* node);
+	Type* checkNonNullType(Type* t, Node* node);
+	Type* checkNonNullTypeWithReporter(Type* t, Node* node,
+	                                   void (*reportError)(Checker*, Node*, TypeFacts));
+	Type* checkNonNullNonVoidType(Type* t, Node* node);
+	void reportObjectPossiblyNullOrUndefinedError(Node* node, TypeFacts facts);
 	bool isSymbolOrSymbolForCall(Node* node);
 	Signature* resolveUntypedCall(Node* node);
 	void checkFunctionExpressionOrObjectLiteralMethodDeferred(Node* node);

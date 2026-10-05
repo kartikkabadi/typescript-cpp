@@ -1222,7 +1222,7 @@ Type* Checker::checkJsxElement(Node* node, CheckMode checkMode) { TSC_UNREACHABL
 Type* Checker::checkJsxSelfClosingElement(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkJsxSelfClosingElement — jsx slice"); }
 Type* Checker::checkJsxFragment(Node* node) { TSC_UNREACHABLE("checkJsxFragment — jsx slice"); }
 Type* Checker::checkJsxAttributes(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkJsxAttributes — jsx slice"); }
-Type* Checker::checkNonNullExpression(Node* node) { TSC_UNREACHABLE("checkNonNullExpression — expressions slice"); }
+// (deduped: checkNonNullExpression ported in checker_utilities.cpp)
 bool Checker::isSymbolOrSymbolForCall(Node* node) { TSC_UNREACHABLE("isSymbolOrSymbolForCall — expressions slice"); }
 
 // owner: deferred-check callees (wave-3)

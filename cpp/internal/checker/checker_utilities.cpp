@@ -1312,5 +1312,98 @@ std::string quotedAndCommaSeparated(const std::vector<std::string>& items) {
 }
 
 
+
+// checker.go:7577 — checkNonNullExpression
+Type* Checker::checkNonNullExpression(Node* node) {
+	return checkNonNullType(checkExpression(node), node);
+}
+
+// checker.go:7581 — checkNonNullType
+Type* Checker::checkNonNullType(Type* t, Node* node) {
+	return checkNonNullTypeWithReporter(
+	    t, node,
+	    [](Checker* c, Node* n, TypeFacts f) {
+		    c->reportObjectPossiblyNullOrUndefinedError(n, f);
+	    });
+}
+
+// checker.go:7585 — checkNonNullTypeWithReporter
+Type* Checker::checkNonNullTypeWithReporter(
+    Type* t, Node* node, void (*reportError)(Checker*, Node*, TypeFacts)) {
+	if (strictNullChecks && (t->flags & TypeFlagsUnknown) != 0) {
+		if (isEntityNameExpression(node)) {
+			std::string nodeText = entityNameToString(node);
+			if (nodeText.size() < 100) {
+				error(node, X_0_is_of_type_unknown, nodeText);
+				return errorType;
+			}
+		}
+		error(node, Object_is_of_type_unknown);
+		return errorType;
+	}
+	TypeFacts facts = getTypeFacts(t, TypeFactsIsUndefinedOrNull);
+	if ((facts & TypeFactsIsUndefinedOrNull) != 0) {
+		reportError(this, node, facts);
+		Type* nonNullable = GetNonNullableType(t);
+		if ((nonNullable->flags & (TypeFlagsNullable | TypeFlagsNever)) != 0) {
+			return errorType;
+		}
+		return nonNullable;
+	}
+	return t;
+}
+
+// checker.go:7609 — checkNonNullNonVoidType
+Type* Checker::checkNonNullNonVoidType(Type* t, Node* node) {
+	Type* nonNullType = checkNonNullType(t, node);
+	if ((nonNullType->flags & TypeFlagsVoid) != 0) {
+		if (isEntityNameExpression(node)) {
+			std::string nodeText = entityNameToString(node);
+			if (isIdentifier(node) && nodeText == "undefined") {
+				error(node, The_value_0_cannot_be_used_here, nodeText);
+				return nonNullType;
+			}
+			if (nodeText.size() < 100) {
+				error(node, X_0_is_possibly_undefined, nodeText);
+				return nonNullType;
+			}
+		}
+		error(node, Object_is_possibly_undefined);
+	}
+	return nonNullType;
+}
+
+// checker.go:7628 — reportObjectPossiblyNullOrUndefinedError
+void Checker::reportObjectPossiblyNullOrUndefinedError(Node* node,
+                                                       TypeFacts facts) {
+	std::string nodeText;
+	if (isEntityNameExpression(node)) {
+		nodeText = entityNameToString(node);
+	}
+	if (node->kind == Kind::NullKeyword) {
+		error(node, The_value_0_cannot_be_used_here, "null");
+		return;
+	}
+	if (!nodeText.empty() && nodeText.size() < 100) {
+		if (isIdentifier(node) && nodeText == "undefined") {
+			error(node, The_value_0_cannot_be_used_here, "undefined");
+			return;
+		}
+		error(node,
+		      (facts & TypeFactsIsUndefined) != 0
+		          ? ((facts & TypeFactsIsNull) != 0
+		                 ? X_0_is_possibly_null_or_undefined
+		                 : X_0_is_possibly_undefined)
+		          : X_0_is_possibly_null,
+		      nodeText);
+	} else {
+		error(node, (facts & TypeFactsIsUndefined) != 0
+		                ? ((facts & TypeFactsIsNull) != 0
+		                       ? Object_is_possibly_null_or_undefined
+		                       : Object_is_possibly_undefined)
+		                : Object_is_possibly_null);
+	}
+}
+
 }  // namespace checker
 }  // namespace tsc
