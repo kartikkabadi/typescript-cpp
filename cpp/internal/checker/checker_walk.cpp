@@ -1086,14 +1086,7 @@ Type* Checker::checkPrivateIdentifierExpression(Node* node) {
 // file — identical ports; theirs is the surviving definition.)
 
 // checker.go:10217
-void Checker::skippedGenericFunction(Node* node, CheckMode checkMode) {
-	if (checkMode & CheckModeInferential) {
-		// We have skipped a generic function during inferential typing. Obtain the inference context and
-		// indicate this has occurred such that we know a second pass of inference is be needed.
-		InferenceContext* context = getInferenceContext(node);
-		context->flags |= InferenceFlagsSkippedGenericFunction;
-	}
-}
+// (deduped: skippedGenericFunction defined in checker_expressions_a.cpp)
 
 // ---------------------------------------------------------------------------
 // === dep stubs — owned by other slices; deleted from here when the owner's
@@ -1160,21 +1153,11 @@ void Checker::skippedGenericFunction(Node* node, CheckMode checkMode) {
 
 // owner: expression-check slices (wave-3)
 Type* Checker::checkSuperExpression(Node* node) { TSC_UNREACHABLE("checkSuperExpression — expressions slice"); }
-Type* Checker::checkTemplateExpression(Node* node) { TSC_UNREACHABLE("checkTemplateExpression — expressions slice"); }
-Type* Checker::checkRegularExpressionLiteral(Node* node) { TSC_UNREACHABLE("checkRegularExpressionLiteral — expressions slice"); }
-Type* Checker::checkArrayLiteral(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkArrayLiteral — expressions slice"); }
+// (deduped: checkArrayLiteral defined in owning slice file)
 // (deduped: checkObjectLiteral defined in cpp/internal/checker/checker_expressions_c.cpp)
 // (deduped: checkPropertyAccessExpression defined in the owning slice file)
 
-// (deduped: checkObjectLiteral defined in the owning slice file)
-Type* Checker::checkQualifiedName(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkQualifiedName — expressions slice"); }
-Type* Checker::checkIndexedAccess(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkIndexedAccess — expressions slice"); }
-Type* Checker::checkCallExpression(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkCallExpression — expressions slice"); }
-Type* Checker::checkImportCallExpression(Node* node) { TSC_UNREACHABLE("checkImportCallExpression — expressions slice"); }
-Type* Checker::checkTaggedTemplateExpression(Node* node) { TSC_UNREACHABLE("checkTaggedTemplateExpression — expressions slice"); }
-Type* Checker::checkParenthesizedExpression(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkParenthesizedExpression — expressions slice"); }
-Type* Checker::checkClassExpression(Node* node) { TSC_UNREACHABLE("checkClassExpression — expressions slice"); }
-Type* Checker::checkFunctionExpressionOrObjectLiteralMethod(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkFunctionExpressionOrObjectLiteralMethod — expressions slice"); }
+// (deduped: checkFunctionExpressionOrObjectLiteralMethod defined in owning slice file)
 // (deduped: checkAssertion defined in cpp/internal/checker/checker_expressions_c.cpp)
 // (deduped: checkTypeOfExpression defined in the owning slice file)
 // (deduped: checkNonNullAssertion defined in the owning slice file)
@@ -1198,13 +1181,12 @@ Type* Checker::checkJsxElement(Node* node, CheckMode checkMode) { TSC_UNREACHABL
 Type* Checker::checkJsxSelfClosingElement(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkJsxSelfClosingElement — jsx slice"); }
 Type* Checker::checkJsxFragment(Node* node) { TSC_UNREACHABLE("checkJsxFragment — jsx slice"); }
 Type* Checker::checkJsxAttributes(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkJsxAttributes — jsx slice"); }
-// (deduped: checkNonNullExpression ported in checker_utilities.cpp)
-bool Checker::isSymbolOrSymbolForCall(Node* node) { TSC_UNREACHABLE("isSymbolOrSymbolForCall — expressions slice"); }
+// (deduped: isSymbolOrSymbolForCall defined in owning slice file)
 
 // owner: deferred-check callees (wave-3)
-Signature* Checker::resolveUntypedCall(Node* node) { TSC_UNREACHABLE("resolveUntypedCall — call-resolution slice"); }
-void Checker::checkFunctionExpressionOrObjectLiteralMethodDeferred(Node* node) { TSC_UNREACHABLE("checkFunctionExpressionOrObjectLiteralMethodDeferred — expressions slice"); }
-void Checker::checkClassExpressionDeferred(Node* node) { TSC_UNREACHABLE("checkClassExpressionDeferred — expressions slice"); }
+// (deduped: resolveUntypedCall defined in checker_expressions_a.cpp)
+// (deduped: checkFunctionExpressionOrObjectLiteralMethodDeferred defined in checker_expressions_a.cpp)
+// (deduped: checkClassExpressionDeferred defined in checker_expressions_a.cpp)
 void Checker::checkJsxSelfClosingElementDeferred(Node* node) { TSC_UNREACHABLE("checkJsxSelfClosingElementDeferred — jsx slice"); }
 void Checker::checkJsxElementDeferred(Node* node) { TSC_UNREACHABLE("checkJsxElementDeferred — jsx slice"); }
 // (deduped: checkAssertionDeferred defined in cpp/internal/checker/checker_expressions_c.cpp)
@@ -1237,8 +1219,7 @@ void Checker::checkExpressionStatement(Node* node) { TSC_UNREACHABLE("checkExpre
 // (deduped: getIsolatedModulesLikeFlagName defined in cpp/internal/checker/checker_declchecks2.cpp)
 
 
-// dep stubs — owned by slices not yet merged
-Node* Checker::getEffectiveCheckNode(Node* argument) { TSC_UNREACHABLE("getEffectiveCheckNode — expr-a slice"); }
+// (deduped: getEffectiveCheckNode defined in owning slice file)
 // (deduped: getImportAttributesTypeForModuleSpecifier defined in owning slice file)
 Symbol* Checker::getSymbolOfPartOfRightHandSideOfImportEquals(Node* entityName) { TSC_UNREACHABLE("getSymbolOfPartOfRightHandSideOfImportEquals — symboltype slice"); }
 Symbol* Checker::getIntrinsicTagSymbol(Node* node) { TSC_UNREACHABLE("getIntrinsicTagSymbol — jsx slice"); }

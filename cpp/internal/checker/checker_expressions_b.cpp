@@ -2574,10 +2574,7 @@ bool Checker::isNodeUsedDuringClassInitialization(Node* node) {
 	}) != nullptr;
 }
 
-bool Checker::isNodeWithinClass(Node* node, Node* classDeclaration) {
-	return forEachEnclosingClass(
-	    node, [&](Node* n) { return n == classDeclaration; });
-}
+// (deduped: isNodeWithinClass defined in owning slice file)
 
 bool Checker::forEachEnclosingClass(
     Node* node, const std::function<bool(Node*)>& callback) {
@@ -2863,11 +2860,7 @@ Type* Checker::tryGetThisTypeAtEx(Node* node, bool includeGlobalThis,
 
 // (deduped: checkTruthinessOfType defined in the owning slice file)
 
-std::vector<Type*> Checker::checkTypeArguments(
-    Signature* signature, const std::vector<Node*>& typeArgumentNodes,
-    bool reportErrors, const DiagnosticMessage* headMessage) {
-	TSC_UNREACHABLE("checkTypeArguments — checker.go:9414 slice");
-}
+// (deduped: checkTypeArguments defined in owning slice file)
 
 // (deduped: getIterationTypeOfIterable defined in owning slice file)
 
@@ -2877,10 +2870,7 @@ std::vector<Type*> Checker::checkTypeArguments(
 
 // (deduped: getThisTypeOfObjectLiteralFromContextualType defined in the owning slice file)
 
-bool Checker::hasCorrectTypeArgumentArity(
-    Signature* signature, const std::vector<Node*>& typeArguments) {
-	TSC_UNREACHABLE("hasCorrectTypeArgumentArity — checker.go:9406 slice");
-}
+// (deduped: hasCorrectTypeArgumentArity defined in owning slice file)
 
 // (deduped: hasMatchingArgument defined in the owning slice file)
 

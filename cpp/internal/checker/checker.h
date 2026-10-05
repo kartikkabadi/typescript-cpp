@@ -704,6 +704,24 @@ struct InferenceKeyHash {
 	}
 };
 
+// CallState (checker.go:9009)
+
+struct CallState {
+	Node* node{};
+	std::vector<Node*> typeArguments;
+	std::vector<Node*> args;
+	std::vector<Signature*> candidates;
+	CheckMode argCheckMode{};
+	bool isSingleNonGenericCandidate{};
+	bool signatureHelpTrailingComma{};
+	bool recursiveResolution{};
+	std::vector<Signature*> candidatesForArgumentError;
+	Signature* candidateForArgumentArityError{};
+	Signature* candidateForTypeArgumentError{};
+};
+
+// InferenceState (free-list pooled)
+
 struct InferenceState {
 	std::vector<InferenceInfo*> inferences;
 	Type* originalSource{};
@@ -2250,7 +2268,7 @@ public:
 	ElementFlags getTupleElementFlags(Node* node);
 	bool isArrayLikeType(Type* t);
 	Type* getNullableType(Type* t, TypeFlags flags);
-	void checkIndexedAccessIndexType(Type* t, Node* node);
+	Type* checkIndexedAccessIndexType(Type* t, Node* accessNode);
 	void checkExternalEmitHelpers(Node* location, ExternalEmitHelpers helpers);
 	Type* createMarkerType(Symbol* symbol, Type* source, Type* target);
 	bool checkGeneratorInstantiationAssignabilityToReturnType(Type* returnType,
@@ -3707,6 +3725,132 @@ public:
 	void reportDiagnostic(Diagnostic* diagnostic,
 	                      std::vector<Diagnostic*>* diagnosticOutput);     // relater slice
 	// === end slice: declchecks2 ===
+	// === slice: expr_a === (checker.go:8090-10491)
+	bool isInConstructorArgumentInitializer(Node* node, Node* constructorDecl);
+	bool isTemplateLiteralContext(Node* node);
+	bool isTemplateLiteralContextualType(Type* t);
+	Type* createArrayLiteralType(Type* t);
+	Type* checkElementAccessChain(Node* node, CheckMode checkMode);
+	Type* checkElementAccessExpression(Node* node, Type* exprType, CheckMode checkMode);
+	bool isForInVariableForNumericPropertyNames(Node* expr);
+	Symbol* getForInVariableSymbol(Node* node);
+	bool hasNumericPropertyNames(Type* t);
+	Symbol* getConstituentProperty(Type* objectType, const std::string& propertyName);
+	Diagnostic* addDeprecatedSuggestionWithSignature(Node* location, Node* declaration,
+	                                                 const std::string& deprecatedEntity,
+	                                                 const std::string& signatureString);
+	Signature* resolveSignature(Node* node, std::vector<Signature*>* candidatesOutArray,
+	                          CheckMode checkMode);
+	Signature* resolveCallExpression(Node* node, std::vector<Signature*>* candidatesOutArray,
+	                               CheckMode checkMode);
+	Signature* resolveNewExpression(Node* node, std::vector<Signature*>* candidatesOutArray,
+	                              CheckMode checkMode);
+	bool typeHasProtectedAccessibleBase(Symbol* target, Type* t);
+	Signature* resolveTaggedTemplateExpression(Node* node,
+	                                           std::vector<Signature*>* candidatesOutArray,
+	                                           CheckMode checkMode);
+	Signature* resolveDecorator(Node* node, std::vector<Signature*>* candidatesOutArray,
+	                          CheckMode checkMode);
+	bool isPotentiallyUncalledDecorator(Node* decorator,
+	                                    const std::vector<Signature*>& signatures);
+	const DiagnosticMessage* getDiagnosticHeadMessageForDecoratorResolution(Node* node);
+	Signature* resolveInstanceofExpression(Node* node,
+	                                       std::vector<Signature*>* candidatesOutArray,
+	                                       CheckMode checkMode);
+	Signature* resolveCall(Node* node, std::vector<Signature*> signatures,
+	                       std::vector<Signature*>* candidatesOutArray, CheckMode checkMode,
+	                       SignatureFlags callChainFlags,
+	                       const DiagnosticMessage* headMessage);
+	std::vector<Signature*> reorderCandidates(std::vector<Signature*> signatures,
+	                                          SignatureFlags callChainFlags);
+	Signature* getOptionalCallSignature(Signature* signature, SignatureFlags callChainFlags);
+	Signature* chooseOverload(CallState* s, Relation* relation);
+	bool hasCorrectArity(Node* node, std::vector<Node*> args, Signature* signature,
+	                     bool signatureHelpTrailingComma);
+	int getDecoratorArgumentCount(Node* node, Signature* signature);
+	int getLegacyDecoratorArgumentCount(Node* node, Signature* signature);
+	bool isSignatureApplicable(Node* node, const std::vector<Node*>& args,
+	                           Signature* signature, Relation* relation, CheckMode checkMode,
+	                           bool reportErrors,
+	                           std::vector<Diagnostic*>* diagnosticOutput);
+	void maybeAddMissingAwaitInfo(Node* errorNode, Type* source, Type* target,
+	                              Relation* relation, bool reportErrors,
+	                              std::vector<Diagnostic*>* diagnosticOutput);
+	Node* getThisArgumentOfCall(Node* node);
+	Type* getThisArgumentType(Node* node);
+	std::vector<Type*> inferTypeArguments(Node* node, Signature* signature,
+	                                      const std::vector<Node*>& args, CheckMode checkMode,
+	                                      InferenceContext* context);
+	Signature* getCandidateForOverloadFailure(Node* node,
+	                                          std::vector<Signature*> candidates,
+	                                          std::vector<Node*> args,
+	                                          bool hasCandidatesOutArray,
+	                                          CheckMode checkMode);
+	Signature* pickLongestCandidateSignature(Node* node,
+	                                         std::vector<Signature*>& candidates,
+	                                         std::vector<Node*> args, CheckMode checkMode);
+	int getLongestCandidateIndex(const std::vector<Signature*>& candidates, int argsCount);
+	std::vector<Type*> getTypeArgumentsFromNodes(std::vector<Node*> typeArgumentNodes,
+	                                           const std::vector<Type*>& typeParameters);
+	Signature* inferSignatureInstantiationForOverloadFailure(
+		Node* node, const std::vector<Type*>& typeParameters, Signature* candidate,
+		std::vector<Node*> args, CheckMode checkMode);
+	Signature* createUnionOfSignaturesForOverloadFailure(
+		const std::vector<Signature*>& candidates);
+	Symbol* createCombinedSymbolFromTypes(const std::vector<Symbol*>& sources,
+	                                      const std::vector<Type*>& types);
+	Symbol* createCombinedSymbolForOverloadFailure(
+		const std::vector<Symbol*>& sources, Type* t);
+	Type* getRestTypeOfSignature(Signature* signature);
+	Type* tryGetRestTypeOfSignature(Signature* signature);
+	void reportCallResolutionErrors(Node* node, CallState* s,
+	                                const std::vector<Signature*>& signatures,
+	                                const DiagnosticMessage* headMessage);
+	void addImplementationSuccessElaboration(CallState* s, Signature* failed,
+	                                       Diagnostic* diagnostic);
+	Diagnostic* getArgumentArityError(Node* node,
+	                                const std::vector<Signature*>& signatures,
+	                                const std::vector<Node*>& args,
+	                                const DiagnosticMessage* headMessage);
+	bool isPromiseResolveArityError(Node* node);
+	Diagnostic* getTypeArgumentArityError(Node* node,
+	                                      const std::vector<Signature*>& signatures,
+	                                      const std::vector<Node*>& typeArguments,
+	                                      const DiagnosticMessage* headMessage);
+	void reportCannotInvokePossiblyNullOrUndefinedError(Node* node, TypeFacts facts);
+	Signature* resolveErrorCall(Node* node);
+	bool isUntypedFunctionCall(Type* funcType, Type* apparentFuncType,
+	                           int numCallSignatures, int numConstructSignatures);
+	Diagnostic* invocationErrorDetails(Node* errorTarget, Type* apparentType,
+	                                 SignatureKind kind);
+	void invocationError(Node* errorTarget, Type* apparentType, SignatureKind kind,
+	                     Diagnostic* relatedInformation);
+	void invocationErrorRecovery(Type* apparentType, SignatureKind kind,
+	                           Diagnostic* diagnostic);
+	bool isGenericFunctionReturningFunction(Signature* signature);
+	void checkClassExpressionExternalHelpers(ClassExpression* node);
+	void contextuallyCheckFunctionExpressionOrObjectLiteralMethod(Node* node,
+	                                                            CheckMode checkMode);
+	void inferFromAnnotatedParametersAndReturn(Signature* sig, Signature* context,
+	                                           InferenceContext* inferenceContext);
+	bool checkTypeRelatedToEx(Type* source, Type* target, Relation* relation,
+	                        Node* errorNode, const DiagnosticMessage* headMessage,
+	                        std::vector<Diagnostic*>* diagnosticOutput);             // relater.go:358 — relater slice
+	bool checkTypeRelatedToAndOptionallyElaborate(
+		Type* source, Type* target, Relation* relation, Node* errorNode, Node* expr,
+		const DiagnosticMessage* headMessage,
+		std::vector<Diagnostic*>* diagnosticOutput);                                 // relater.go:428 — relater slice
+	Type* getNonArrayRestType(Signature* signature);                                 // relater.go:1891 — relater slice
+	std::string signatureToString(Signature* signature);                             // printer.go:179 — printer slice
+	Signature* resolveJsxOpeningLikeElement(
+		Node* node, std::vector<Signature*>* candidatesOutArray,
+		CheckMode checkMode);                                                        // jsx.go:545 — jsx slice
+	std::vector<Type*> inferJsxTypeArguments(Node* node, Signature* signature,
+	                                       CheckMode checkMode,
+	                                       InferenceContext* context);               // jsx.go:198 — jsx slice
+	bool checkApplicableSignatureForJsxCallLikeElement(
+		Node* node, Signature* signature, Relation* relation, CheckMode checkMode,
+		bool reportErrors, std::vector<Diagnostic*>* diagnosticOutput);              // jsx.go:591 — jsx slice
 };  // class Checker
 
 // moduletarget-slice file-local callees hoisted for the dep graph (defs in

@@ -3222,10 +3222,7 @@ void Checker::checkDeprecatedSignature(Signature* signature, Node* node) {
 	TSC_UNREACHABLE("checkDeprecatedSignature — expressions slice");
 }
 
-// checker.go:10246 — expressions slice
-Node* Checker::getFirstTransformableStaticClassElement(Node* node) {
-	TSC_UNREACHABLE("getFirstTransformableStaticClassElement — expressions slice");
-}
+// (deduped: getFirstTransformableStaticClassElement defined in owning slice file)
 
 // (deduped: checkPropertyAccessibility defined in owning slice file)
 

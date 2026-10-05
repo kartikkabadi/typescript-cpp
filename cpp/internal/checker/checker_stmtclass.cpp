@@ -1819,12 +1819,7 @@ bool Checker::checkTypeComparableTo(Type* source, Type* target, Node* errorNode,
 	TSC_UNREACHABLE("checkTypeComparableTo — relater slice");
 }
 
-// owner: members slice (checker.go:19186-20143 + 20987-22284)
-ConstructorAccessibilityError* Checker::getConstructorAccessibilityError(
-    Node* node, const std::vector<Signature*>& signatures,
-    ModifierFlags modifiers) {
-	TSC_UNREACHABLE("getConstructorAccessibilityError — members slice");
-}
+// (deduped: getConstructorAccessibilityError defined in owning slice file)
 
 
 // owner: decltypes slice (checker.go:16720-19097)

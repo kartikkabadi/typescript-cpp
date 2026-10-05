@@ -42,6 +42,7 @@ add_library(tsc STATIC
 	internal/checker/checker_decltypes.cpp
 	internal/checker/checker_contextual.cpp
 	internal/checker/checker_expressions_b.cpp
+	internal/checker/checker_expressions_a.cpp
 	internal/checker/checker_typeops.cpp
 	internal/checker/checker_expressions_c.cpp
 	internal/checker/checker_utilities.cpp
