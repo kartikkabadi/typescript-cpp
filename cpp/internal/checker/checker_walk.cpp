@@ -1154,14 +1154,9 @@ Type* Checker::instantiateContextualType(Type* contextualType, Node* node, Conte
 // owner: typenodes slice
 Type* Checker::getTypeFromTypeNode(Node* node) { TSC_UNREACHABLE("getTypeFromTypeNode — typenodes slice"); }
 
-// owner: widen slice
-Type* Checker::GetNonNullableType(Type* t) { TSC_UNREACHABLE("GetNonNullableType — widen slice"); }
-Type* Checker::getRegularTypeOfLiteralType(Type* t) { TSC_UNREACHABLE("getRegularTypeOfLiteralType — widen slice"); }
-Type* Checker::getFreshTypeOfLiteralType(Type* t) { TSC_UNREACHABLE("getFreshTypeOfLiteralType — widen slice"); }
-Type* Checker::getStringLiteralType(const std::string& value) { TSC_UNREACHABLE("getStringLiteralType — widen slice"); }
-Type* Checker::getNumberLiteralType(Number value) { TSC_UNREACHABLE("getNumberLiteralType — widen slice"); }
-Type* Checker::getBigIntLiteralType(const PseudoBigInt& value) { TSC_UNREACHABLE("getBigIntLiteralType — widen slice"); }
-bool Checker::isLiteralOfContextualType(Type* candidateType, Type* contextualType) { TSC_UNREACHABLE("isLiteralOfContextualType — widen slice"); }
+// owner: decltypes slice (checker.go:16720-19097)
+Type* Checker::GetNonNullableType(Type* t) { TSC_UNREACHABLE("GetNonNullableType — decltypes slice"); }
+// widen slice landed in checker_widen.cpp — its stubs here were removed.
 
 // owner: members slice
 Signature* Checker::getSingleSignature(Type* t, SignatureKind kind, bool allowMembers) { TSC_UNREACHABLE("getSingleSignature — members slice"); }
