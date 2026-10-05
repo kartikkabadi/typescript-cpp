@@ -131,6 +131,13 @@ add_library(tsc STATIC
 	internal/modulespecifiers/preferences.cpp
 	internal/packagejson/packagejson.cpp
 	internal/pseudochecker/pseudochecker.cpp
+	# === slice: contentmapper ===
+	internal/json/json.cpp
+	internal/jsonrpc/jsonrpc.cpp
+	internal/contentmapper/contentmapper.cpp
+	internal/contentmapper/host.cpp
+	internal/contentmapper/hostimpl.cpp
+	internal/contentmapper/transform.cpp
 	# === slice: tsoptions ===
 	internal/tsoptions/commandlineoption.cpp
 	internal/tsoptions/commandlineparser.cpp

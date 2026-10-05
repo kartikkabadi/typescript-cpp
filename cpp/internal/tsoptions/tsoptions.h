@@ -16,7 +16,9 @@
 
 #include "internal/ast/ast.h"
 #include "internal/collections/collections.h"
+#include "internal/contentmapper/contentmapper.h"
 #include "internal/core/types.h"
+#include "internal/locale/locale.h"
 #include "internal/module/types.h"
 #include "internal/outputpaths/outputpaths.h"
 #include "internal/parser/parser.h" // getErrorSpanForNode
@@ -612,50 +614,12 @@ std::pair<Glob*, bool> Parse(std::string_view pattern);
 // outputpaths dep-stub block removed — the real outputpaths.h port is in
 // tsc::outputpaths; unqualified `outputpaths::` lookups below resolve to it.
 
-namespace locale {  // dep-stub decls — owned by the locale slice
-// locale.go — a BCP-47 language tag; zero value is Default.
-struct Locale {
-	std::string tag;
-	std::string String() const { return tag; }
-	bool operator==(const Locale&) const = default;
-};
-inline Locale Default{};
-// locale.Parse — locale.go:36. dep-stubbed in tsconfigparsing' TU.
-std::pair<Locale, bool> Parse(std::string_view localeStr);
-}  // namespace locale
+// locale dep-stub block removed — the real locale decls are in tsc::locale
+// (internal/locale/locale.h); unqualified `locale::` below resolves to it.
 
-namespace contentmapper {  // minimal decls — contentmapper package types.
-// contentmapper.go — types only (the package's Host machinery isn't ported
-// here). Definition.Options is raw JSON (Go json.Value).
-struct Definition {
-	std::string Package;
-	std::vector<std::string> Extensions;
-	std::string Options;
-};
-struct Manifest {
-	std::string Name;
-	std::string Version;
-	std::vector<std::string> Exec;
-	std::vector<std::string> CompilerOptions;
-	bool DynamicConfig = false;
-};
-struct Mapper {
-	Definition Definition;
-	Manifest Manifest;
-	// PackageDirectory is the real path directory returned by package
-	// resolution for package-based mappers.
-	std::string PackageDirectory;
-	// ContributionID is provided by an LSP client extension for inferred
-	// project content mappers.
-	std::string ContributionID;
-};
-// host.go:209
-struct OptionPathSegment {
-	std::string Property;
-	int Index = 0;
-	bool IsIndex = false;
-};
-}  // namespace contentmapper
+// contentmapper dep-stub block removed — the real package port is in
+// tsc::contentmapper (internal/contentmapper/contentmapper.h); unqualified
+// `contentmapper::` below resolves to it.
 
 struct ParsedOptions {
 	CompilerOptions* CompilerOptions = nullptr;

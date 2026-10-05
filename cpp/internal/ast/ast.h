@@ -348,6 +348,43 @@ struct Uint128 {
 	bool operator==(const Uint128&) const = default;
 };
 
+// === slice: contentmapper ===
+// positionmap.go — bidirectional mapping between UTF-8 byte offsets (used by
+// Go) and UTF-16 code unit offsets. For ASCII-only text the two are
+// identical; multi-byte UTF-8 sequences map to different numbers of UTF-16
+// code units.
+struct PositionMap {
+	bool asciiOnly = true;
+	// For each multi-byte character: the UTF-8 byte offset AFTER the character
+	// and the cumulative (utf8 - utf16) delta through it. O(log n) conversion.
+	struct Entry {
+		int utf8Pos = 0;
+		int delta = 0;
+	};
+	std::vector<Entry> entries;
+
+	bool IsAsciiOnly() const { return asciiOnly; }
+	// UTF8ToUTF16 converts a UTF-8 byte offset to a UTF-16 code unit offset.
+	int UTF8ToUTF16(int utf8Offset) const;
+	// UTF16ToUTF8 converts a UTF-16 code unit offset to a UTF-8 byte offset.
+	int UTF16ToUTF8(int utf16Offset) const;
+};
+
+// computePositionMap builds a PositionMap for the given text —
+// positionmap.go:40. (Defined in the contentmapper TU until the ast slice
+// reconciles.)
+PositionMap* computePositionMap(std::string_view text);
+
+// newExternalDiagnostic creates a diagnostic reported by an external source
+// such as a content mapper — diagnostic.go:247. The message text is already
+// localized and the code is shown with the given source prefix instead of
+// "TS". The location refers to the file's original, untransformed content.
+Diagnostic* newExternalDiagnostic(SourceFile* file, TextRange loc,
+                                  std::string_view source,
+                                  DiagnosticCategory category, int32_t code,
+                                  std::string_view messageText);
+// === end slice: contentmapper ===
+
 // std::once replacement used for lazily-computed SourceFile fields.
 struct OnceFlag {
 	template <class F>
