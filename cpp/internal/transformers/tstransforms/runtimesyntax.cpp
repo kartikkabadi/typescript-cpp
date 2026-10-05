@@ -504,7 +504,7 @@ struct RuntimeSyntaxTransformer : Transformer {
 		//             ^
 		Node* expression = member->Initializer; // NOTE: already visited
 
-		bool useExplicitReverseMapping;
+		bool useExplicitReverseMapping = false;
 
 		Node* parseNode = emitContext()->parseNode(memberNode);
 		EvalResult result = emitResolver->GetEnumMemberValue(parseNode);
