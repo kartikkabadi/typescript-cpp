@@ -207,10 +207,7 @@ static int getTotalFixedElementCount(TupleType* t) {
 	return t->fixedLength + getEndElementCount(t, ElementFlagsFixed);
 }
 
-// utilities.go:286 — IsTypeAny
-static bool isTypeAny(Type* t) {
-	return t != nullptr && t->flags & TypeFlagsAny;
-}
+// isTypeAny — canonical def in checker_utilities.cpp
 
 // utilities.go:867 — isObjectLiteralType
 static bool isObjectLiteralType(Type* t) {

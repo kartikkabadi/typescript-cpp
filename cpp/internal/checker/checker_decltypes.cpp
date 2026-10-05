@@ -151,24 +151,7 @@ bool isRightSideOfAccessExpression(Node* node) {
 			 node->parent->as<ElementAccessExpression>()->ArgumentExpression == node);
 }
 
-// isRightSideOfQualifiedNameOrPropertyAccess —
-// ast.IsRightSideOfQualifiedNameOrPropertyAccess
-bool isRightSideOfQualifiedNameOrPropertyAccess(Node* node) {
-	Node* parent = node->parent;
-	if (parent == nullptr) {
-		return false;
-	}
-	switch (parent->kind) {
-	case Kind::QualifiedName:
-		return parent->as<QualifiedName>()->Right == node;
-	case Kind::PropertyAccessExpression:
-		return parent->name() == node;
-	case Kind::MetaProperty:
-		return parent->name() == node;
-	}
-	return false;
-}
-
+// isRightSideOfQualifiedNameOrPropertyAccess — canonical def in ast.cpp
 // isDeclarationName — ast.IsDeclarationName. isDeclarationNode is currently a
 // generated stub returning false; the port stays faithful so it becomes live
 // when the real predicate lands.

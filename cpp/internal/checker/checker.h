@@ -3143,6 +3143,28 @@ public:
 	Symbol* GetAliasedSymbol(Symbol* symbol);                    // checker.go:32660
 	bool callLikeExpressionMayHaveTypeArguments(Node* node);     // utilities.go:1132
 	// === end slice: utilities ===
+
+	// === slice: services === — checker.go:32070-32660 (API-facing tail)
+	Symbol* GetSymbolAtLocation(Node* node);
+	std::vector<Node*> getIndexSignaturesAtLocation(Node* node);
+	Symbol* getSymbolOfNameOrPropertyAccessExpression(Node* name);
+	bool isThisPropertyAndThisTyped(Node* node);
+	Type* getThisTypeOfObjectLiteralFromContextualType(Node* containingLiteral, Type* contextualType);
+	Type* getThisTypeFromContextualType(Type* t);
+	Type* getThisTypeArgument(Type* t);
+	Symbol* getApplicableIndexSymbol(Type* t, Type* keyType);
+	Type* getRegularTypeOfExpression(Node* expr);
+	Type* GetTypeAtLocation(Node* node);
+	EmitResolver* GetEmitResolver();
+	Type* getImportAttributesTypeForModuleSpecifier(Node* moduleSpecifier);
+	Symbol* getSymbolOfPartOfRightHandSideOfImportEquals(Node* entityName);
+	// expr/jsx/emitresolver-owned deps (stubs until those slices land)
+	Symbol* checkNewTargetMetaProperty(Node* node);
+	Type* checkMetaPropertyKeyword(Node* node);
+	Type* getSymbolHasInstanceMethodOfObjectType(Type* t);
+	Symbol* getIntrinsicTagSymbol(Node* node);
+	Type* checkImportAttributesExpression(Node* node);
+	// === end slice: services ===
 };  // class Checker
 
 // Free helpers used across checker translation units.
@@ -3159,6 +3181,14 @@ std::vector<std::string> FormatTypeFlags(TypeFlags flags); // types.go:556
 // === slice: jsdoc ===
 std::vector<Node*> getAllJSDocTags(Node* node);
 std::string entityNameToString(Node* name); // utilities.go — defined in checker.cpp
+bool isTypeReferenceIdentifier(Node* node);              // utilities.go:161
+bool isInRightSideOfImportOrExportAssignment(Node* node); // utilities.go:1150
+bool nodeStartsNewLexicalEnvironment(Node* node);         // utilities.go:1763
+bool isJsxIntrinsicTagName(Node* tagName);              // utilities.go:1159
+Node* isImportTypeQualifierPart(Node* node);           // utilities.go:1174
+bool isInNameOfExpressionWithTypeArgumentsOrHeritageTypeReference(Node* node);  // utilities.go:1188
+Node* getContainingObjectLiteral(Node* f);              // utilities.go:1163
+bool isTypeAny(Type* t);                              // utilities.go
 
 // === slice: nodecopy ===
 // NodeBuilder machinery shared by nodecopy.go + the future nodebuilderimpl

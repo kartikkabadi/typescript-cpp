@@ -263,9 +263,7 @@ std::string getSymbolNameForPrivateIdentifier(Symbol* containingClassSymbol,
 }
 
 // utilities.go:286 — IsTypeAny
-bool isTypeAny(Type* t) {
-	return t != nullptr && (t->flags & TypeFlagsAny) != 0;
-}
+// isTypeAny — canonical def in checker_utilities.cpp
 
 // checker.cpp — literal value accessors (file-local copies)
 std::string getStringLiteralValue(Type* t) {

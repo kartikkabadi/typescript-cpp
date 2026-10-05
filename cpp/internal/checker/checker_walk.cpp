@@ -30,7 +30,7 @@ static bool isCallChain(Node* node) {
 }
 
 // utilities.go:1150 — owner: utilities slice (also defined here statically; internal linkage, no conflict)
-static bool isInRightSideOfImportOrExportAssignment(Node* node) {
+bool isInRightSideOfImportOrExportAssignment(Node* node) {
 	while (node->parent->kind == Kind::QualifiedName) {
 		node = node->parent;
 	}
@@ -53,33 +53,7 @@ static bool isInstanceOfExpression(Node* node) {
 	return isBinaryExpression(node) && node->as<BinaryExpression>()->OperatorToken->kind == Kind::InstanceOfKeyword;
 }
 
-// utilities.go:4065-4097 — owner: ast utilities (static; internal linkage, no conflict)
-static Node* getJSDocRoot(Node* node) {
-	return findAncestor(node->parent, [](Node* n) { return n->kind == Kind::JSDoc; });
-}
-
-static Node* getJSDocHost(Node* node) {
-	Node* jsDoc = getJSDocRoot(node);
-	if (jsDoc == nullptr) {
-		return nullptr;
-	}
-	return jsDoc->parent;
-}
-
-static Node* getHostSignatureFromJSDoc(Node* node) {
-	Node* host = getJSDocHost(node);
-	if (host == nullptr) {
-		return nullptr;
-	}
-	// !!! Strada's getEffectiveJSDocHost applies JS assignment pattern transforms (getSourceOfAssignment, getSourceOfDefaultedAssignment, etc.) not yet ported
-	if (isPropertySignatureDeclaration(host) && host->type() != nullptr && isFunctionLikeKind(host->type()->kind)) {
-		return host->type();
-	}
-	if (isFunctionLikeKind(host->kind)) {
-		return host;
-	}
-	return nullptr;
-}
+// utilities.go:4065-4097 getJSDocRoot/getJSDocHost/getHostSignatureFromJSDoc — canonical in ast.cpp
 
 // ast utilities: literal kinds (IsLiteralKind/IsLiteralExpression — ast_generated.go:9818, utilities.go:319)
 static bool isLiteralKind(Kind kind) {

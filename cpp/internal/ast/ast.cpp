@@ -1128,7 +1128,7 @@ bool isModuleExportsAccessExpression(Node* node) {
 	return false;
 }
 
-static bool isBindableObjectDefinePropertyCall(Node* node) {
+bool isBindableObjectDefinePropertyCall(Node* node) {
 	auto args = node->arguments();
 	if (args.size() == 3) {
 		if (Node* expr = node->expression();
@@ -2128,6 +2128,202 @@ static Node* getExternalModuleIndicator(
 void setExternalModuleIndicator(
     SourceFile* file, const ExternalModuleIndicatorOptions& opts) {
 	file->ExternalModuleIndicator = getExternalModuleIndicator(file, opts);
+}
+
+
+// utilities.go:1315 — IsDeclarationNameOrImportPropertyName
+bool isDeclarationNameOrImportPropertyName(Node* name) {
+	switch (name->parent->kind) {
+	case Kind::ImportSpecifier:
+	case Kind::ExportSpecifier:
+		return isIdentifier(name) || name->kind == Kind::StringLiteral;
+	default:
+		return isDeclarationName(name);
+	}
+}
+
+// utilities.go:1324 — IsLiteralComputedPropertyDeclarationName
+bool isLiteralComputedPropertyDeclarationName(Node* node) {
+	return isStringOrNumericLiteralLike(node) &&
+	       node->parent->kind == Kind::ComputedPropertyName &&
+	       isDeclaration(node->parent->parent);
+}
+
+// utilities.go:1330 — IsExternalModuleImportEqualsDeclaration
+bool isExternalModuleImportEqualsDeclaration(Node* node) {
+	return node->kind == Kind::ImportEqualsDeclaration &&
+	       node->as<ImportEqualsDeclaration>()->ModuleReference->kind ==
+	           Kind::ExternalModuleReference;
+}
+
+// utilities.go:1351 — IsImportOrExportSpecifier
+bool isImportOrExportSpecifier(Node* node) {
+	return isImportSpecifier(node) || isExportSpecifier(node);
+}
+
+// utilities.go:3287 — GetExternalModuleImportEqualsDeclarationExpression
+Node* getExternalModuleImportEqualsDeclarationExpression(Node* node) {
+	TSC_ASSERT(isExternalModuleImportEqualsDeclaration(node),
+	           "expected external module import equals declaration");
+	return node->as<ImportEqualsDeclaration>()
+	    ->ModuleReference->expression();
+}
+
+// utilities.go:1445 — TryGetClassImplementingOrExtendingHeritageClauseElement
+Node* tryGetClassImplementingOrExtendingHeritageClauseElement(
+    Node* node, bool* isImplements) {
+	if ((isExpressionWithTypeArguments(node) || isTypeReferenceNode(node)) &&
+	    isHeritageClause(node->parent) && isClassLike(node->parent->parent)) {
+		*isImplements = node->parent->as<HeritageClause>()->Token ==
+		                Kind::ImplementsKeyword;
+		return node->parent->parent;
+	}
+	return nullptr;
+}
+
+// utilities.go:1434 — TryGetClassExtendingExpressionWithTypeArguments
+Node* tryGetClassExtendingExpressionWithTypeArguments(Node* node) {
+	if (!isExpressionWithTypeArguments(node)) {
+		return nullptr;
+	}
+	bool isImplements = false;
+	Node* cls = tryGetClassImplementingOrExtendingHeritageClauseElement(
+	    node, &isImplements);
+	if (cls != nullptr && !isImplements) {
+		return cls;
+	}
+	return nullptr;
+}
+
+// utilities.go:1430 — IsExpressionWithTypeArgumentsInClassExtendsClause
+bool isExpressionWithTypeArgumentsInClassExtendsClause(Node* node) {
+	return tryGetClassExtendingExpressionWithTypeArguments(node) != nullptr;
+}
+
+// utilities.go:535 — IsClassOrInterfaceLike
+bool isClassOrInterfaceLike(Node* node) {
+	return node->kind == Kind::ClassDeclaration ||
+	       node->kind == Kind::ClassExpression ||
+	       node->kind == Kind::InterfaceDeclaration;
+}
+
+// utilities.go:4058 — IsJSDocNameReferenceContext
+bool isJSDocNameReferenceContext(Node* node) {
+	return (node->flags & NodeFlagsJSDoc) != 0 &&
+	       findAncestor(node, [](Node* n) {
+			       return isJSDocNameReference(n) || isJSDocLinkLike(n);
+		       }) != nullptr;
+}
+
+// utilities.go:3032 — IsThisInTypeQuery
+bool isThisInTypeQuery(Node* node) {
+	if (!isThisIdentifier(node)) {
+		return false;
+	}
+	while (isQualifiedName(node->parent) &&
+	       node->parent->as<QualifiedName>()->Left == node) {
+		node = node->parent;
+	}
+	return node->parent->kind == Kind::TypeQuery;
+}
+
+// utilities.go:3735 — IsRightSideOfQualifiedNameOrPropertyAccess
+bool isRightSideOfQualifiedNameOrPropertyAccess(Node* node) {
+	Node* parent = node->parent;
+	switch (parent->kind) {
+	case Kind::QualifiedName:
+		return parent->as<QualifiedName>()->Right == node;
+	case Kind::PropertyAccessExpression:
+		return parent->as<PropertyAccessExpression>()->name == node;
+	case Kind::MetaProperty:
+		return parent->as<MetaProperty>()->name == node;
+	}
+	return false;
+}
+
+// utilities.go:3791 — CompareNodePositions
+int compareNodePositions(Node* n1, Node* n2) {
+	return compareTextRanges(n1->loc, n2->loc);
+}
+
+// utilities.go:4548 — GetReparsedNodeForNode (+ findCloneInNode helper)
+static Node* findCloneInNode(Node* node, Node* original) {
+	for (;;) {
+		if (node->kind == original->kind && node->loc == original->loc) {
+			return node;
+		}
+		bool foundContainingChild =
+		    node->forEachChild([&](Node* n) -> bool {
+			    if (original->loc.containedBy(n->loc)) {
+				    node = n;
+				    return true;
+			    }
+			    return false;
+		    });
+		if (!foundContainingChild) {
+			return nullptr;
+		}
+	}
+}
+
+Node* getReparsedNodeForNode(Node* node) {
+	if (node != nullptr && (node->flags & NodeFlagsJSDoc) != 0 &&
+	    (node->flags & NodeFlagsReparsed) == 0) {
+		SourceFile* file = getSourceFileOfNode(node);
+		if (file != nullptr && !file->ReparsedClones.empty()) {
+			auto& clones = file->ReparsedClones;
+			auto it = std::lower_bound(
+			    clones.begin(), clones.end(), node,
+			    [](Node* a, Node* b) {
+				    return compareNodePositions(a, b) < 0;
+			    });
+			size_t pos = it - clones.begin();
+			if (pos >= clones.size() ||
+			    compareNodePositions(clones[pos], node) != 0) {
+				if (pos > 0) pos--;
+			}
+			Node* candidate = clones[pos];
+			if (node->loc.containedBy(candidate->loc)) {
+				if (Node* reparsed =
+				        findCloneInNode(candidate, node)) {
+					return reparsed;
+				}
+			}
+		}
+	}
+	return node;
+}
+
+// utilities.go:4066 — GetJSDocRoot
+Node* getJSDocRoot(Node* node) {
+	return findAncestor(node->parent,
+	                    [](Node* n) { return n->kind == Kind::JSDoc; });
+}
+
+// utilities.go:4072 — GetJSDocHost
+Node* getJSDocHost(Node* node) {
+	Node* jsDoc = getJSDocRoot(node);
+	if (jsDoc == nullptr) {
+		return nullptr;
+	}
+	return jsDoc->parent;
+}
+
+// utilities.go:4082 — GetHostSignatureFromJSDoc
+Node* getHostSignatureFromJSDoc(Node* node) {
+	Node* host = getJSDocHost(node);
+	if (host == nullptr) {
+		return nullptr;
+	}
+	// !!! getEffectiveJSDocHost JS assignment pattern transforms not yet ported
+	if (isPropertySignatureDeclaration(host) && host->type() != nullptr &&
+	    isFunctionLike(host->type())) {
+		return host->type();
+	}
+	if (isFunctionLike(host)) {
+		return host;
+	}
+	return nullptr;
 }
 
 }  // namespace tsc

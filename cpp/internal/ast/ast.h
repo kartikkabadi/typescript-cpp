@@ -586,6 +586,26 @@ void setParentInChildren(Node* node);
 bool isTypeNodeKind(Kind kind);
 inline bool isTypeNode(const Node* node) { return isTypeNodeKind(node->kind); }
 bool isDeclarationName(Node* name);
+bool isDeclaration(Node* node);                                   // utilities.go:1302
+bool isDeclarationNameOrImportPropertyName(Node* name);           // utilities.go:1315
+bool isLiteralComputedPropertyDeclarationName(Node* node);        // utilities.go:1324
+bool isImportOrExportSpecifier(Node* node);                       // utilities.go:1351
+bool isExternalModuleImportEqualsDeclaration(Node* node);         // utilities.go:1330
+Node* getExternalModuleImportEqualsDeclarationExpression(Node* node);  // utilities.go:3287
+bool isBindableObjectDefinePropertyCall(Node* node);              // utilities.go:1581
+Node* tryGetClassImplementingOrExtendingHeritageClauseElement(Node* node,
+                                                              bool* isImplements);  // utilities.go:1445
+Node* tryGetClassExtendingExpressionWithTypeArguments(Node* node);  // utilities.go:1434
+bool isExpressionWithTypeArgumentsInClassExtendsClause(Node* node); // utilities.go:1430
+bool isClassOrInterfaceLike(Node* node);                          // utilities.go:535
+bool isJSDocNameReferenceContext(Node* node);                     // utilities.go:4058
+bool isThisInTypeQuery(Node* node);                               // utilities.go:3032
+bool isRightSideOfQualifiedNameOrPropertyAccess(Node* node);      // utilities.go:3735
+int compareNodePositions(Node* a, Node* b);                       // utilities.go:3791
+Node* getReparsedNodeForNode(Node* node);                         // utilities.go:4548
+Node* getJSDocRoot(Node* node);                                   // utilities.go:4066
+Node* getJSDocHost(Node* node);                                   // utilities.go:4072
+Node* getHostSignatureFromJSDoc(Node* node);                      // utilities.go:4082
 inline bool isParseTreeNode(const Node* node) {
 	return !(node->flags & NodeFlagsSynthesized);
 }

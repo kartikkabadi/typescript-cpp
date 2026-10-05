@@ -81,16 +81,7 @@ static AssignmentKind getAssignmentTargetKind(Node* node) {
 }
 
 // ast/utilities.go:3032 — owner: ast utilities (static; internal linkage, no conflict)
-static bool isThisInTypeQuery(Node* node) {
-	if (!isThisIdentifier(node)) {
-		return false;
-	}
-	while (isQualifiedName(node->parent) && node->parent->as<QualifiedName>()->Left == node) {
-		node = node->parent;
-	}
-	return node->parent->kind == Kind::TypeQuery;
-}
-
+// isThisInTypeQuery — canonical def in ast.cpp
 // ast/utilities.go:921 — owner: ast utilities (static; internal linkage, no conflict)
 template <typename... F>
 static std::array<Node*, sizeof...(F)> findManyAncestors(Node* node, F... callbacks) {
@@ -163,11 +154,7 @@ static bool isInvalidComputedPropertyName(Node* node) {
 }
 
 // utilities.go:1159 — owner: utilities slice (static here; internal linkage, no conflict)
-static bool isJsxIntrinsicTagName(Node* tagName) {
-	return isIdentifier(tagName) && isIntrinsicJsxName(tagName->text()) ||
-		isJsxNamespacedName(tagName);
-}
-
+// isJsxIntrinsicTagName — canonical def in checker_utilities.cpp
 // ---------------------------------------------------------------------------
 // markLinkedReferences — checker.go:28655-29018
 // ---------------------------------------------------------------------------

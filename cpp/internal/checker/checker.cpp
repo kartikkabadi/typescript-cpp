@@ -4804,7 +4804,7 @@ void Checker::setRequiresScopeChangeCache(Node* node, Tristate value) {
 	nodeLinks.Get(node)->declarationRequiresScopeChange = value;
 }
 
-static bool isTypeReferenceIdentifier(Node* node);
+bool isTypeReferenceIdentifier(Node* node);
 
 // The invalid initializer error is needed in two situation:
 // 1. When result is undefined, after checking for a missing "this."
@@ -4884,7 +4884,7 @@ bool Checker::checkAndReportErrorForMissingPrefix(Node* errorLocation,
 	return false;
 }
 
-static bool isTypeReferenceIdentifier(Node* node);
+bool isTypeReferenceIdentifier(Node* node);
 
 static bool isPrimitiveTypeName(const std::string& s) {
 	return s == "any" || s == "string" || s == "number" || s == "boolean" ||
@@ -4896,7 +4896,7 @@ static bool isES2015OrLaterConstructorName(const std::string& s) {
 	       s == "Set" || s == "WeakSet";
 }
 
-static bool isTypeReferenceIdentifier(Node* node) /* impl below */ {
+bool isTypeReferenceIdentifier(Node* node) /* impl below */ {
 	while (node->parent->kind == Kind::QualifiedName) {
 		node = node->parent;
 	}

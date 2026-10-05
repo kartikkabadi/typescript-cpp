@@ -28,6 +28,8 @@ struct TextRange {
 	}
 	constexpr bool intersects(TextRange o) const { return o.pos() < end() && o.end() > pos_; }
 
+	constexpr bool containedBy(TextRange t2) const { return t2.pos() <= pos_ && t2.end() >= end_; }
+
 	constexpr bool operator==(const TextRange&) const = default;
 
 	static constexpr TextRange undefined() { return {-1, -1}; }

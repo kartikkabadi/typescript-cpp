@@ -14,7 +14,7 @@ namespace tsc::checker {
 // ---------------------------------------------------------------------------
 
 // utilities.go:1763
-static bool nodeStartsNewLexicalEnvironment(Node* node) {
+bool nodeStartsNewLexicalEnvironment(Node* node) {
 	switch (node->kind) {
 		case Kind::Constructor:
 		case Kind::FunctionExpression:

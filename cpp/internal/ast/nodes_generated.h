@@ -7696,7 +7696,8 @@ inline bool isWriteOnlyAccess(const Node*) { return false; /* TODO: IsWriteOnlyA
 inline bool isWriteAccess(const Node*) { return false; /* TODO: IsWriteAccess */ }
 inline bool isWriteAccessForReference(const Node*) { return false; /* TODO: IsWriteAccessForReference */ }
 inline bool isArrayLiteralOrObjectLiteralDestructuringPattern(const Node*) { return false; /* TODO: IsArrayLiteralOrObjectLiteralDestructuringPattern */ }
-inline bool isDeclarationNode(const Node*) { return false; /* TODO: IsDeclarationNode */ }
+// ast.go:1515 — IsDeclarationNode: node->declarationData().symbol != nullptr
+inline bool isDeclarationNode(Node* n) { return n->declarationData().symbol != nullptr; }
 inline bool isLocalsContainer(const Node*) { return false; /* TODO: IsLocalsContainer */ }
 inline bool isTypeOrJSTypeAliasDeclaration(const Node* n) { return n->kind == Kind::TypeAliasDeclaration || n->kind == Kind::JSTypeAliasDeclaration; }
 inline bool isImportDeclarationOrJSImportDeclaration(const Node* n) { return n->kind == Kind::ImportDeclaration || n->kind == Kind::JSImportDeclaration; }
