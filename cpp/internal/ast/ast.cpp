@@ -1128,42 +1128,6 @@ bool isModuleExportsAccessExpression(Node* node) {
 	return false;
 }
 
-static bool isLiteralLikeElementAccess(Node* node) {
-	return isElementAccessExpression(node) &&
-	       isStringOrNumericLiteralLike(
-		       node->as<ElementAccessExpression>()->ArgumentExpression);
-}
-
-static bool isBindableStaticAccessExpression(Node* node,
-                                             bool excludeThisKeyword);
-static bool isBindableStaticElementAccessExpression(Node* node,
-                                                    bool excludeThisKeyword);
-
-static bool isBindableStaticNameExpression(Node* node,
-                                           bool excludeThisKeyword) {
-	return isEntityNameExpression(node) ||
-	       isBindableStaticAccessExpression(node, excludeThisKeyword);
-}
-
-static bool isBindableStaticAccessExpression(Node* node,
-                                             bool excludeThisKeyword) {
-	return (isPropertyAccessExpression(node) &&
-	        ((!excludeThisKeyword &&
-	          node->expression()->kind == Kind::ThisKeyword) ||
-	         (isIdentifier(node->name()) &&
-	          isBindableStaticNameExpression(node->expression(), true)))) ||
-	       isBindableStaticElementAccessExpression(node, excludeThisKeyword);
-}
-
-static bool isBindableStaticElementAccessExpression(Node* node,
-                                                    bool excludeThisKeyword) {
-	return isLiteralLikeElementAccess(node) &&
-	       ((!excludeThisKeyword &&
-	         node->expression()->kind == Kind::ThisKeyword) ||
-	        isEntityNameExpression(node->expression()) ||
-	        isBindableStaticAccessExpression(node->expression(), true));
-}
-
 static bool isBindableObjectDefinePropertyCall(Node* node) {
 	auto args = node->arguments();
 	if (args.size() == 3) {

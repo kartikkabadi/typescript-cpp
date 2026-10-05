@@ -1228,14 +1228,6 @@ struct TupleNormalizer {
 
 }  // namespace
 
-Type* Checker::createNormalizedTypeReference(
-	Type* target, const std::vector<Type*>& typeArguments) {
-	if (target->objectFlags & ObjectFlagsTuple) {
-		return createNormalizedTupleType(target, typeArguments);
-	}
-	return createTypeReference(target, typeArguments);
-}
-
 Type* Checker::createNormalizedTupleTypeEx(
 	Type* target, const std::vector<Type*>& elementTypes,
 	ObjectFlags objectFlags) {
@@ -2356,19 +2348,6 @@ Type* Checker::createTupleType(const std::vector<Type*>& elementTypes) {
 	return createTupleTypeEx(elementTypes, elementInfos, /*readonly*/ false);
 }
 
-Type* Checker::createTupleTypeEx(const std::vector<Type*>& elementTypes,
-								 const std::vector<TupleElementInfo>& elementInfos,
-								 bool readonly) {
-	Type* tupleTarget = getTupleTargetType(elementInfos, readonly);
-	if (tupleTarget == emptyGenericType) {
-		return emptyObjectType;
-	}
-	if (!elementTypes.empty()) {
-		return createNormalizedTypeReference(tupleTarget, elementTypes);
-	}
-	return tupleTarget;
-}
-
 Type* Checker::getTupleTargetType(
 	const std::vector<TupleElementInfo>& elementInfos, bool readonly) {
 	if (elementInfos.size() == 1 &&
@@ -2723,17 +2702,7 @@ std::vector<Type*> Checker::getTypeArguments(Type* t) {
 	TSC_UNREACHABLE("getTypeArguments — typenodes dep");
 }
 
-int Checker::getMinTypeArgumentCount(
-	const std::vector<Type*>& typeParameters) {
-	TSC_UNREACHABLE("getMinTypeArgumentCount — typenodes dep");
-}
 
-std::vector<Type*> Checker::fillMissingTypeArguments(
-	const std::vector<Type*>& typeArguments,
-	const std::vector<Type*>& typeParameters, int minTypeArgumentCount,
-	bool isJs) {
-	TSC_UNREACHABLE("fillMissingTypeArguments — typenodes dep");
-}
 
 std::string Checker::TypeToStringEx(Type* t, Node* enclosingDeclaration,
 									TypeFormatFlags flags,

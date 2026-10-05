@@ -1036,7 +1036,6 @@ bool Checker::isConstContext(Node* /*node*/) { TSC_UNREACHABLE("isConstContext �
 void Checker::reportImplicitAny(Node* /*declaration*/, Type* /*t*/, WideningKind /*wideningKind*/) { TSC_UNREACHABLE("reportImplicitAny — signatures dep"); }
 std::vector<Symbol*> Checker::getPropertiesOfObjectType(Type* /*t*/) { TSC_UNREACHABLE("getPropertiesOfObjectType — owned by members"); }
 Symbol* Checker::instantiateSymbol(Symbol* /*symbol*/, TypeMapper* /*m*/) { TSC_UNREACHABLE("instantiateSymbol — owned by instantiate"); }
-std::vector<Symbol*> Checker::instantiateSymbols(std::vector<Symbol*> /*symbols*/, TypeMapper* /*m*/) { TSC_UNREACHABLE("instantiateSymbols — owned by instantiate"); }
 std::vector<Type*> Checker::getTypeArguments(Type* /*t*/) { TSC_UNREACHABLE("getTypeArguments — signatures dep"); }
 Type* Checker::cloneTypeParameter(Type* /*tp*/) { TSC_UNREACHABLE("cloneTypeParameter — owned by instantiate"); }
 bool Checker::isArrayOrTupleType(Type* /*t*/) { TSC_UNREACHABLE("isArrayOrTupleType — owned by typeops"); }

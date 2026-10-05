@@ -2238,4 +2238,62 @@ bool isEffectiveExternalModule(SourceFile* node, const CompilerOptions* compiler
 	        node->CommonJSModuleIndicator != nullptr);
 }
 
+// utilities.go: IsLiteralLikeElementAccess (1397)
+bool isLiteralLikeElementAccess(Node* node) {
+	return isElementAccessExpression(node) &&
+		isStringOrNumericLiteralLike(node->as<ElementAccessExpression>()->ArgumentExpression);
+}
+
+// utilities.go: IsBindableStaticElementAccessExpression (1381)
+bool isBindableStaticElementAccessExpression(Node* node, bool excludeThisKeyword) {
+	return isLiteralLikeElementAccess(node) &&
+		((!excludeThisKeyword && node->expression()->kind == Kind::ThisKeyword) ||
+			isEntityNameExpression(node->expression()) ||
+			isBindableStaticAccessExpression(node->expression(), true /*excludeThisKeyword*/));
+}
+
+// utilities.go: IsBindableStaticAccessExpression (1375)
+bool isBindableStaticAccessExpression(Node* node, bool excludeThisKeyword) {
+	return isPropertyAccessExpression(node) &&
+		((!excludeThisKeyword && node->expression()->kind == Kind::ThisKeyword) ||
+			(isIdentifier(node->name()) &&
+				isBindableStaticNameExpression(node->expression(), true /*excludeThisKeyword*/))) ||
+		isBindableStaticElementAccessExpression(node, excludeThisKeyword);
+}
+
+// utilities.go: IsBindableStaticNameExpression (1579)
+bool isBindableStaticNameExpression(Node* node, bool excludeThisKeyword) {
+	return isEntityNameExpression(node) || isBindableStaticAccessExpression(node, excludeThisKeyword);
+}
+
+// utilities.go: IsPrototypeAccess (1388)
+bool isPrototypeAccess(Node* node) {
+	if (isBindableStaticAccessExpression(node, false /*excludeThisKeyword*/)) {
+		if (Node* name = getElementOrPropertyAccessName(node)) {
+			return name->text() == "prototype";
+		}
+	}
+	return false;
+}
+
+// utilities.go: IsNameOfHeritageClauseTypeReference (1766)
+bool isNameOfHeritageClauseTypeReference(Node* node) {
+	while (isQualifiedName(node->parent)) {
+		node = node->parent;
+	}
+	return isTypeReferenceNode(node->parent) &&
+		node->parent->as<TypeReferenceNode>()->TypeName == node &&
+		isHeritageClause(node->parent->parent);
+}
+
+// utilities.go: IsCallOrNewExpression (3779)
+bool isCallOrNewExpression(Node* node) {
+	return isCallExpression(node) || isNewExpression(node);
+}
+
+// utilities.go: IsExpandoPropertyDeclaration (4584)
+bool isExpandoPropertyDeclaration(Node* node) {
+	return node != nullptr && isBinaryExpression(node);
+}
+
 } // namespace tsc

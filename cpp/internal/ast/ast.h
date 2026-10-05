@@ -1278,5 +1278,13 @@ bool canHaveIllegalModifiers(Node* node);
 bool hasModifier(Node* node, ModifierFlags flags);
 Node* getContainingFunction(Node* node);
 bool isEffectiveExternalModule(SourceFile* node, const CompilerOptions* compilerOptions);
+bool isBindableStaticElementAccessExpression(Node* node, bool excludeThisKeyword);
+bool isLiteralLikeElementAccess(Node* node);
+bool isBindableStaticAccessExpression(Node* node, bool excludeThisKeyword);
+bool isBindableStaticNameExpression(Node* node, bool excludeThisKeyword);
+bool isPrototypeAccess(Node* node);
+bool isNameOfHeritageClauseTypeReference(Node* node);
+bool isCallOrNewExpression(Node* node);
+bool isExpandoPropertyDeclaration(Node* node);
 
 }  // namespace tsc

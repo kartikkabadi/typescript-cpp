@@ -2299,7 +2299,6 @@ public:
 	Type* getYieldedTypeOfYieldExpression(Node* node, Type* expressionType, Type* sentType, bool isAsync);
 	bool isConstContext(Node* node);
 	Symbol* instantiateSymbol(Symbol* symbol, TypeMapper* m);
-	std::vector<Symbol*> instantiateSymbols(std::vector<Symbol*> symbols, TypeMapper* m);
 	std::vector<Type*> getTypeArguments(Type* t);
 	Type* cloneTypeParameter(Type* tp);
 	bool isArrayOrTupleType(Type* t);
@@ -2338,8 +2337,6 @@ public:
 	bool checkNoTypeArguments(Node* node, Symbol* symbol);
 	bool isResolvedByTypeAlias(Node* node);
 	bool mayResolveTypeAlias(Node* node);
-	Type* createNormalizedTypeReference(
-		Type* target, const std::vector<Type*>& typeArguments);
 	Type* createNormalizedTupleTypeEx(Type* target,
 									  const std::vector<Type*>& elementTypes,
 									  ObjectFlags objectFlags);
@@ -2389,9 +2386,6 @@ public:
 	Type* createIterableType(Type* iteratedType);
 	TupleElementInfo getTupleElementInfo(Node* node);
 	Type* createTupleType(const std::vector<Type*>& elementTypes);
-	Type* createTupleTypeEx(const std::vector<Type*>& elementTypes,
-							const std::vector<TupleElementInfo>& elementInfos,
-							bool readonly);
 	Type* getTupleTargetType(
 		const std::vector<TupleElementInfo>& elementInfos, bool readonly);
 	Type* createTupleTargetType(
@@ -2419,9 +2413,9 @@ public:
 	Type* getIndexType(Type* t);
 	int getMinTypeArgumentCount(const std::vector<Type*>& typeParameters);
 	std::vector<Type*> fillMissingTypeArguments(
-		const std::vector<Type*>& typeArguments,
+		std::vector<Type*> typeArguments,
 		const std::vector<Type*>& typeParameters, int minTypeArgumentCount,
-		bool isJs);
+		bool isJavaScriptImplicitAny);
 	std::string TypeToStringEx(Type* t, Node* enclosingDeclaration,
 							   TypeFormatFlags flags, void* verbosityContext);
 	Symbol* getPropertyOfTypeEx(Type* type, const std::string& name,
@@ -2592,6 +2586,59 @@ public:
 	std::vector<Type*> getEffectiveTypeArguments(
 		Node* node, const std::vector<Type*>& typeParameters);
 	// === end slice: members ===
+
+	// === slice: instantiate ===
+	// checker.go:22285-23219 — instantiation machinery (checker_instantiate.cpp).
+	// (getTypeArguments, getEffectiveTypeArguments, getMinTypeArgumentCount,
+	// fillMissingTypeArguments, getNamedMembers, isNamedMember, symbolIsValue[Ex],
+	// couldContainTypeVariablesWorker, getConditionalTypeInstantiation,
+	// getHomomorphicTypeVariable, get{TypeParameter,ConstraintType,NameType,
+	// TemplateType}FromMappedType, isMappedTypeWithKeyofConstraintDeclaration,
+	// forEachMappedTypePropertyKeyTypeAndIndexSignatureKeyType, instantiateType,
+	// instantiateTypes, instantiateSignatures, instantiateIndexInfos are declared
+	// in the members block above.)
+
+	// Spare cache maps for pushActiveMapper/popActiveMapper, mirroring Go's
+	// cap-reuse of the activeTypeMappersCaches backing array.
+	std::vector<CacheMap<Type*>*> freeTypeMappersCaches;
+
+	bool hasTypeParameterDefault(Type* t);
+	Type* getDefaultTypeArgumentType(bool isInJavaScriptFile);
+	Type* getDefaultOrUnknownFromTypeParameter(Type* t);
+	bool isDeclarationContainedBy(Symbol* symbol, Symbol* container);
+	std::vector<std::string> getCircularTypeNames();
+	void pushActiveMapper(TypeMapper* mapper);
+	void popActiveMapper();
+	int findActiveMapper(TypeMapper* mapper);
+	void clearActiveMapperCaches();
+	bool isNonGenericTopLevelType(Type* t);
+	Type* instantiateTypeWorker(Type* t, TypeMapper* m, TypeAlias* alias);
+	Type* getObjectTypeInstantiation(Type* t, TypeMapper* m, TypeAlias* alias);
+	Type* instantiateAnonymousType(Type* t, TypeMapper* m, TypeAlias* alias);
+	Type* instantiateMappedType(Type* t, TypeMapper* m, TypeAlias* alias);
+	bool hasArrayOrTypeTypeConstraint(Type* typeVariable);
+	Type* instantiateMappedArrayType(Type* arrayType, Type* mappedType, TypeMapper* m);
+	Type* instantiateMappedTupleType(Type* tupleType, Type* mappedType,
+									 Type* typeVariable, TypeMapper* m);
+	Type* instantiateMappedTypeTemplate(Type* t, Type* key, bool isOptional,
+										TypeMapper* m);
+	Node* getConstraintDeclarationForMappedType(Type* t);
+	Type* getApparentMappedTypeKeys(Type* nameType, Type* targetType);
+	Type* instantiateReverseMappedType(Type* t, TypeMapper* m);
+	std::vector<Symbol*> instantiateSymbols(const std::vector<Symbol*>& symbols,
+											TypeMapper* m);
+	template <typename T>
+	std::vector<T> instantiateList(const std::vector<T>& values, TypeMapper* m,
+								   T (Checker::*instantiator)(T, TypeMapper*));
+
+	// Dep stubs — declared here, defined at the bottom of checker_instantiate.cpp.
+	Type* createNormalizedTypeReference(Type* target,
+										std::vector<Type*> typeArguments);
+	Type* createTupleTypeEx(std::vector<Type*> elementTypes,
+							std::vector<TupleElementInfo> elementInfos, bool readonly);
+	Type* inferTypeForHomomorphicMappedType(Type* source, Type* target,
+											Type* constraint);
+	// === end slice: instantiate ===
 };
 
 // Free helpers used across checker translation units.

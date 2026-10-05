@@ -22,7 +22,7 @@ oracle.
 | JSDoc parser | `parser/jsdoc.go` | `cpp/internal/parser/jsdoc.cpp` | complete |
 | Reparser (JSDoc→declarations) | `parser/reparser.go` | `cpp/internal/parser/reparser.cpp` | complete |
 | Binder | `binder/` | `cpp/internal/binder` | complete |
-| Checker | `checker/` | `cpp/internal/checker` | in progress — bootstrap, symbol merge, entity/alias/external-module resolution, evaluator, mapper, link store (~281/~2,900 funcs; stubs `TSC_UNREACHABLE`) |
+| Checker | `checker/` | `cpp/internal/checker` | in progress — bootstrap, mapper/link store, JSDoc, tracer, grammar checks, node copy, module resolution, statements/class machinery, signatures, members, typenodes (~1,050 defs across 12 files; ~400 `TSC_UNREACHABLE` dep stubs pending later slices) |
 | Emitter | `printer/`, `transformers/` | — | not started |
 
 ## Conformance
