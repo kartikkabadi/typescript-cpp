@@ -66,6 +66,15 @@ add_library(tsc STATIC
 	internal/parser/jsdoc.cpp
 	internal/parser/reparser.cpp
 	internal/parser/references.cpp
+	# === slice: printer ===
+	internal/printer/textwriter.cpp
+	internal/printer/emitcontext.cpp
+	internal/printer/namegenerator.cpp
+	internal/printer/utilities.cpp
+	internal/printer/helpers.cpp
+	internal/printer/factory.cpp
+	internal/printer/printer.cpp
+	internal/printer/syntheticfile.cpp
 	# === slice: module ===
 	internal/core/compileroptions.cpp
 	internal/module/util.cpp

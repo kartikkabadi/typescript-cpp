@@ -149,24 +149,6 @@ bool containsVec(const std::vector<T>& v, const T& x) {
 // ast.* helpers missing from internal/ast (file-local copies)
 // ---------------------------------------------------------------------------
 
-// utilities.go:319 — IsLiteralKind
-bool isLiteralKind(Kind kind) {
-	return kind >= Kind::NumericLiteral && kind <= Kind::NoSubstitutionTemplateLiteral;
-}
-
-// utilities.go:3278 — IsTemplateLiteralKind
-bool isTemplateLiteralKind(Kind kind) {
-	return kind >= KindFirstTemplateToken && kind <= KindLastTemplateToken;
-}
-
-// utilities.go:3795 — IsUnterminatedLiteral
-bool isUnterminatedLiteral(Node* node) {
-	return isLiteralKind(node->kind) &&
-			(*node->literalLikeData().tokenFlags & TokenFlagsUnterminated) != 0 ||
-		isTemplateLiteralKind(node->kind) &&
-			(*node->templateLiteralLikeData().templateFlags & TokenFlagsUnterminated) != 0;
-}
-
 // utilities.go:3801 — IsInitializedProperty
 bool isInitializedProperty(Node* member) {
 	return member->kind == Kind::PropertyDeclaration && member->initializer() != nullptr;

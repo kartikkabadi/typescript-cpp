@@ -580,17 +580,15 @@ Node* NodeBuilder::TryJSTypeNodeToTypeNode(
 
 } // namespace tsc::checker
 
-// printer package (emittextwriter.go / textwriter.go /
-// singlelinestringwriter.go / printer.go) — the real printer lands with the
-// emitter slice (Stage 4).
+// printer package — printer.go entry points still pending in this slice.
+// (NewTextWriter / GetSingleLineStringWriter now live in
+// internal/printer/textwriter.cpp.)
 namespace tsc::printer {
 
-EmitTextWriter* NewTextWriter(const std::string& newLine, int indentSize) {
-	TSC_UNREACHABLE("printer::NewTextWriter — printer (emitter) slice");
-}
-
-std::pair<EmitTextWriter*, std::function<void()>> GetSingleLineStringWriter() {
-	TSC_UNREACHABLE("printer::GetSingleLineStringWriter — printer (emitter) slice");
+Printer* NewPrinter(const PrinterOptions& options,
+                    const PrintHandlers& handlers,
+                    EmitContext* emitContext) {
+	TSC_UNREACHABLE("printer::NewPrinter — printer (emitter) slice");
 }
 
 std::string Printer::Emit(Node* node, SourceFile* sourceFile) {
@@ -598,7 +596,7 @@ std::string Printer::Emit(Node* node, SourceFile* sourceFile) {
 }
 
 void Printer::Write(Node* node, SourceFile* sourceFile, EmitTextWriter* writer,
-                    void* sourceMapGenerator) {
+                    sourcemap::Generator* sourceMapGenerator) {
 	TSC_UNREACHABLE("Printer::Write — printer (emitter) slice");
 }
 
