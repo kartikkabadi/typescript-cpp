@@ -2,9 +2,12 @@
 // compileroptions.go bits needed by the front end).
 #pragma once
 
+#include <cctype>
 #include <cstdint>
 #include <string>
 #include <vector>
+
+#include "internal/tspath/tspath.h"
 
 namespace tsc {
 
@@ -22,6 +25,32 @@ enum class ScriptKind : int32_t {
 	JSON = 6,
 	Deferred = 7,
 };
+
+// core.go: GetScriptKindFromFileName / EnsureScriptKindFromFileName
+inline ScriptKind getScriptKindFromFileName(std::string_view fileName) {
+	auto dotPos = fileName.rfind('.');
+	if (dotPos != std::string_view::npos) {
+		std::string ext(fileName.substr(dotPos));
+		for (auto& c : ext)
+			c = static_cast<char>(std::tolower((unsigned char)c));
+		if (ext == ".js" || ext == ".cjs" || ext == ".mjs")
+			return ScriptKind::JS;
+		if (ext == ".jsx") return ScriptKind::JSX;
+		if (ext == ".ts" || ext == ".cts" || ext == ".mts")
+			return ScriptKind::TS;
+		if (ext == ".tsx") return ScriptKind::TSX;
+		if (ext == ".json") return ScriptKind::JSON;
+	}
+	return ScriptKind::Unknown;
+}
+
+inline ScriptKind ensureScriptKindFromFileName(std::string_view fileName) {
+	if (auto kind = getScriptKindFromFileName(fileName);
+	    kind != ScriptKind::Unknown) {
+		return kind;
+	}
+	return ScriptKind::TS;
+}
 
 enum class ScriptTarget : int32_t {
 	None = 0,
@@ -45,9 +74,11 @@ enum class ScriptTarget : int32_t {
 };
 
 enum class Tristate : int32_t {
-	False = 0,
-	True = 1,
-	Unknown = 2,
+	// tristate.go — Go order; zero value is Unknown so zero-init options
+	// match the oracle.
+	Unknown = 0,
+	False = 1,
+	True = 2,
 };
 
 inline constexpr bool tristateIsTrue(Tristate t) { return t == Tristate::True; }
@@ -388,6 +419,31 @@ struct CompilerOptions {
 	}
 	bool GetEmitDeclarations() const {
 		return tristateIsTrue(Declaration) || tristateIsTrue(Composite);
+	}
+	// compileroptions.go:305 GetEffectiveTypeRoots
+	std::pair<std::vector<std::string>, bool> GetEffectiveTypeRoots(
+	    const std::string& currentDirectory) const {
+		if (!TypeRoots.empty()) {
+			return {TypeRoots, true};
+		}
+		std::string baseDir;
+		if (!ConfigFilePath.empty()) {
+			baseDir = tspath::getDirectoryPath(ConfigFilePath);
+		} else {
+			baseDir = currentDirectory;
+			if (baseDir.empty()) {
+				// Go panics here; unreachable for `tsc --noEmit <file>`.
+			}
+		}
+		std::vector<std::string> typeRoots;
+		tspath::forEachAncestorDirectory<bool>(
+		    baseDir, [&](std::string_view dir) -> std::pair<bool, bool> {
+			    typeRoots.push_back(
+			        tspath::combinePaths(dir,
+			                             {"node_modules", "@types"}));
+			    return {false, false};
+		    });
+		return {typeRoots, false};
 	}
 	bool GetAreDeclarationMapsEnabled() const {
 		return DeclarationMap == Tristate::True && GetEmitDeclarations();

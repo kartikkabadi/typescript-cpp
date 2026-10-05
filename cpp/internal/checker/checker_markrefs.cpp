@@ -1001,14 +1001,10 @@ Node* Checker::getJsxFactoryEntity(Node* location) { TSC_UNREACHABLE("getJsxFact
 // owner: relater slice (relater.go)
 int Checker::getParameterCount(Signature* signature) { TSC_UNREACHABLE("getParameterCount — relater slice"); }
 // owner: signatures slice (checker.go:20143-20986)
-Node* Checker::getAnnotatedAccessorTypeNode(Node* accessor) {
-	TSC_UNREACHABLE("getAnnotatedAccessorTypeNode — signatures slice");
-}
 // owner: declchecks slice (checker.go:5081-5929 module-declaration checks)
 bool Checker::checkExternalImportOrExportDeclaration(Node* node) {
 	TSC_UNREACHABLE("checkExternalImportOrExportDeclaration — declchecks slice");
 }
 // owner: instantiate slice (checker.go:22285-23219)
-bool Checker::symbolIsValue(Symbol* symbol) { TSC_UNREACHABLE("symbolIsValue — instantiate slice"); }
 
 }  // namespace tsc::checker

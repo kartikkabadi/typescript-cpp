@@ -549,8 +549,5 @@ std::string Checker::TypeToString(Type* t) {
 }
 
 // checker.go:28593
-Type* Checker::getModifiersTypeFromMappedType(Type* t) {
-	TSC_UNREACHABLE("getModifiersTypeFromMappedType — ported with the mapped-type slice");
-}
 
 } // namespace tsc::checker

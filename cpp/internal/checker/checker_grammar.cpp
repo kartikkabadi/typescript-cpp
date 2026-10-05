@@ -2551,9 +2551,6 @@ bool Checker::isGenericType(Type* t) {
 
 // checker.go: getGenericObjectFlags — needs isGenericMappedType /
 // isGenericTupleType / isGenericStringLikeType, which are not ported yet.
-ObjectFlags Checker::getGenericObjectFlags(Type* t) {
-	TSC_UNREACHABLE("getGenericObjectFlags — ported with the genericity slice");
-}
 
 // checker.go: isValidIndexKeyType
 bool Checker::isValidIndexKeyType(Type* t) {

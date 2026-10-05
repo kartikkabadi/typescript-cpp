@@ -1287,4 +1287,32 @@ bool isNameOfHeritageClauseTypeReference(Node* node);
 bool isCallOrNewExpression(Node* node);
 bool isExpandoPropertyDeclaration(Node* node);
 
+// === slice: program === — utilities.go/parseoptions.go format + pragma helpers
+bool isSourceFileJS(SourceFile* file);
+bool isCheckJSEnabledForFile(SourceFile* sourceFile,
+                             const CompilerOptions* compilerOptions);
+bool shouldTransformImportCall(std::string_view fileName,
+                               const CompilerOptions* options,
+                               ModuleKind impliedNodeFormatForEmit);
+ModuleKind getImpliedNodeFormatForFile(std::string_view path,
+                                       std::string_view packageJsonType);
+ResolutionMode getImpliedNodeFormatForEmitWorker(
+    std::string_view fileName, ModuleKind emitModuleKind,
+    const SourceFileMetaData& sourceFileMetaData);
+ModuleKind getEmitModuleFormatOfFileWorker(
+    std::string_view fileName, const CompilerOptions* options,
+    const SourceFileMetaData& sourceFileMetaData);
+ExternalModuleIndicatorOptions getExternalModuleIndicatorOptions(
+    std::string_view fileName, const CompilerOptions* options,
+    const SourceFileMetaData& metadata);
+ExternalModuleIndicatorOptions getExternalModuleIndicatorOptions(
+    const SourceFileMetaData& metadata);
+const Pragma* getPragmaFromSourceFile(const SourceFile* file,
+                                      std::string_view name);
+std::string getPragmaArgument(const Pragma* pragma, std::string_view name);
+std::string getJSXImplicitImportBase(const CompilerOptions* compilerOptions,
+                                     SourceFile* file);
+std::string getJSXRuntimeImport(std::string_view base,
+                                const CompilerOptions* options);
+
 }  // namespace tsc

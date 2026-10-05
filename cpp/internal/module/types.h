@@ -109,6 +109,16 @@ struct PackageId {
 		}
 		return Name;
 	}
+	bool operator==(const PackageId& o) const noexcept {
+		return Name == o.Name && SubModuleName == o.SubModuleName &&
+		       Version == o.Version && PeerDependencies == o.PeerDependencies;
+	}
+};
+
+struct PackageIdHash {
+	size_t operator()(const PackageId& p) const noexcept {
+		return std::hash<std::string>{}(p.String());
+	}
 };
 
 // ResolvedModule — full module resolution result. checker's tsc::ResolvedModule

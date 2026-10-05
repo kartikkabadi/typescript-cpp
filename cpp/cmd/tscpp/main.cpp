@@ -25,6 +25,7 @@
 #include "internal/ast/ast.h"
 #include "internal/ast/flow.h"
 #include "internal/binder/binder.h"
+#include "internal/compiler/program.h"
 #include "internal/diagnostics/diagnostics.h"
 #include "internal/parser/parser.h"
 #include "internal/scanner/scanner.h"
@@ -309,16 +310,84 @@ static void bindFile(const char* path, const std::string& src) {
 //   G <code>                file-less diagnostics
 //   F <fileName>            per file that has diagnostics
 //   T <code> <pos> <end>    diagnostics in that file
-// TODO(program slice): this currently parses+binds only the root file and
-// emits no diagnostics — the multi-file Program (lib closure, module
-// resolution) and the check walker land in their own slices.
-static void checkFile(const char* path, const std::string& src) {
-	SourceFileParseOptions opts;
-	opts.FileName = path;
-	opts.Path = path;
-	SourceFile* file = parseSourceFile(opts, src, scriptKindFromFileName(path));
-	bindSourceFile(file);
-	(void)file;
+// Mirrors tsc/cmd/checkdump/main.go exactly (see that file for the format).
+static std::string findBundledLibsRoot() {
+	namespace fs = std::filesystem;
+	// Locate tsc/internal/bundled/libs relative to the executable, then CWD.
+	fs::path exe = fs::canonical("/proc/self/exe");
+	for (fs::path dir = exe.parent_path(); !dir.empty();
+	     dir = dir.parent_path()) {
+		fs::path cand = dir / "tsc" / "internal" / "bundled" / "libs";
+		if (fs::is_directory(cand))
+			return cand.string();
+		if (dir == dir.root_path())
+			break;
+	}
+	fs::path cwd = fs::current_path() / "tsc" / "internal" / "bundled" / "libs";
+	if (fs::is_directory(cwd))
+		return cwd.string();
+	return "";
+}
+
+static void checkFile(const char* path, const std::string& /*src*/) {
+	compiler::CompilerHost host;
+	host.currentDirectory =
+	    tspath::normalizePath(std::filesystem::current_path().string());
+	host.bundledLibsRoot = findBundledLibsRoot();
+
+	// `tsc --noEmit <file>` — ParseCommandLine defaults for a bare file arg:
+	// NoEmit set, everything else at defaults (no config file).
+	CompilerOptions options;
+	options.NoEmit = Tristate::True;
+
+	compiler::SimpleProgram program(&host, options, {path});
+	program.BindSourceFiles();
+	auto diags = compiler::getDiagnosticsOfAnyProgram(&program, {}, false);
+
+	// Canonical dump (checkdump/main.go).
+	std::unordered_map<SourceFile*, std::vector<Diagnostic*>> byFile;
+	std::vector<Diagnostic*> global;
+	for (auto* d : diags) {
+		if (d->File() != nullptr) {
+			byFile[d->File()].push_back(d);
+		} else {
+			global.push_back(d);
+		}
+	}
+	std::sort(global.begin(), global.end(),
+	          [](Diagnostic* a, Diagnostic* b) {
+		          return a->Code() < b->Code();
+	          });
+	std::string out;
+	char buf[64];
+	for (auto* d : global) {
+		std::snprintf(buf, sizeof(buf), "G %d\n", d->Code());
+		out += buf;
+	}
+	std::vector<std::string> names;
+	std::unordered_map<std::string, SourceFile*> nameToFile;
+	for (auto& [f, ds] : byFile) {
+		names.push_back(f->FileName());
+		nameToFile[f->FileName()] = f;
+	}
+	std::sort(names.begin(), names.end());
+	for (auto& name : names) {
+		out += "F " + name + "\n";
+		auto& ds = byFile[nameToFile[name]];
+		std::sort(ds.begin(), ds.end(), [](Diagnostic* a, Diagnostic* b) {
+			if (a->Pos() != b->Pos())
+				return a->Pos() < b->Pos();
+			if (a->End() != b->End())
+				return a->End() < b->End();
+			return a->Code() < b->Code();
+		});
+		for (auto* d : ds) {
+			std::snprintf(buf, sizeof(buf), "T %d %d %d\n", d->Code(),
+			              d->Pos(), d->End());
+			out += buf;
+		}
+	}
+	std::fwrite(out.data(), 1, out.size(), stdout);
 }
 
 static void parseFile(const char* path, const std::string& src) {

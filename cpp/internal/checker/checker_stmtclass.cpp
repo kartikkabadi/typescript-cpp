@@ -1792,51 +1792,8 @@ bool Checker::isPropertyWithoutInitializer(Node* node) {
 }
 
 // checker.go:5051
-bool Checker::isPropertyInitializedInStaticBlocks(Node* propName, Type* propType,
-                                                  const std::vector<Node*>& staticBlocks,
-                                                  int32_t startPos, int32_t endPos) {
-	for (Node* staticBlock : staticBlocks) {
-		// static block must be within the provided range as they are evaluated in document order (unlike constructors)
-		if (staticBlock->pos() >= startPos && staticBlock->pos() <= endPos) {
-			Node* reference = factory.newPropertyAccessExpression(
-			    factory.newKeywordExpression(Kind::ThisKeyword), nullptr,
-			    propName, NodeFlagsNone);
-			reference->expression()->parent = reference;
-			reference->parent = staticBlock;
-			*reference->flowNodeData().flowNode =
-			    staticBlock->as<ClassStaticBlockDeclaration>()->ReturnFlowNode;
-			Type* flowType = getFlowTypeOfReferenceEx(
-			    reference, propType, getOptionalType(propType, false), nullptr,
-			    nullptr);
-			if (!containsUndefinedType(flowType)) {
-				return true;
-			}
-		}
-	}
-	return false;
-}
 
 // checker.go:5068
-bool Checker::isPropertyInitializedInConstructor(Node* propName, Type* propType,
-                                                 Node* constructor) {
-	Node* reference;
-	if (isComputedPropertyName(propName)) {
-		reference = factory.newElementAccessExpression(
-		    factory.newKeywordExpression(Kind::ThisKeyword), nullptr,
-		    propName->expression(), NodeFlagsNone);
-	} else {
-		reference = factory.newPropertyAccessExpression(
-		    factory.newKeywordExpression(Kind::ThisKeyword), nullptr,
-		    propName, NodeFlagsNone);
-	}
-	reference->expression()->parent = reference;
-	reference->parent = constructor;
-	*reference->flowNodeData().flowNode =
-	    constructor->as<ConstructorDeclaration>()->ReturnFlowNode;
-	Type* flowType = getFlowTypeOfReferenceEx(
-	    reference, propType, getOptionalType(propType, false), nullptr, nullptr);
-	return !containsUndefinedType(flowType);
-}
 
 // ---------------------------------------------------------------------------
 // Dep stubs — callees owned by other slices (one TSC_UNREACHABLE body each;
@@ -1887,38 +1844,8 @@ bool Checker::checkTypeComparableTo(Type* source, Type* target, Node* errorNode,
                                     const DiagnosticMessage* headMessage) {
 	TSC_UNREACHABLE("checkTypeComparableTo — relater slice");
 }
-bool Checker::isTypeAssignableToKind(Type* source, TypeFlags kind) {
-	TSC_UNREACHABLE("isTypeAssignableToKind — typeops slice");
-}
 
 // owner: members slice (checker.go:19186-20143 + 20987-22284)
-std::vector<Symbol*> Checker::getPropertiesOfObjectType(Type* t) {
-	TSC_UNREACHABLE("getPropertiesOfObjectType — members slice");
-}
-Symbol* Checker::getPropertyOfObjectType(Type* t, const std::string& name) {
-	TSC_UNREACHABLE("getPropertyOfObjectType — members slice");
-}
-std::vector<Signature*> Checker::getConstructorsForTypeArguments(
-    Type* t, const std::vector<Node*>& typeArgumentNodes, Node* location) {
-	TSC_UNREACHABLE("getConstructorsForTypeArguments — members slice");
-}
-std::vector<Signature*> Checker::getInstantiatedConstructorsForTypeArguments(
-    Type* t, const std::vector<Node*>& typeArgumentNodes, Node* location) {
-	TSC_UNREACHABLE(
-	    "getInstantiatedConstructorsForTypeArguments — members slice");
-}
-bool Checker::isValidBaseType(Type* t) {
-	TSC_UNREACHABLE("isValidBaseType — members slice");
-}
-Type* Checker::getIndexTypeOfType(Type* t, Type* keyType) {
-	TSC_UNREACHABLE("getIndexTypeOfType — members slice");
-}
-Symbol* Checker::getIndexSymbol(Symbol* symbol) {
-	TSC_UNREACHABLE("getIndexSymbol — members slice");
-}
-Symbol* Checker::getTargetSymbol(Symbol* s) {
-	TSC_UNREACHABLE("getTargetSymbol — members slice");
-}
 ConstructorAccessibilityError* Checker::getConstructorAccessibilityError(
     Node* node, const std::vector<Signature*>& signatures,
     ModifierFlags modifiers) {
@@ -1932,9 +1859,6 @@ Type* Checker::getNonMissingTypeOfSymbol(Symbol* symbol) {
 }
 Type* Checker::getNonNullableTypeIfNeeded(Type* t) {
 	TSC_UNREACHABLE("getNonNullableTypeIfNeeded — decltypes slice");
-}
-bool Checker::isMixinConstructorType(Type* t) {
-	TSC_UNREACHABLE("isMixinConstructorType — decltypes slice");
 }
 Type* Checker::getLiteralTypeFromProperty(Symbol* prop, TypeFlags include,
                                           bool includeNonPublic) {
@@ -1972,8 +1896,5 @@ bool Checker::hasTypeFacts(Type* t, TypeFacts mask) {
 }
 
 // owner: decltypes slice (checker.go:17277)
-Type* Checker::getBaseConstructorTypeOfClass(Type* t) {
-	TSC_UNREACHABLE("getBaseConstructorTypeOfClass — decltypes slice");
-}
 
 } // namespace tsc::checker

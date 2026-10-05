@@ -183,36 +183,6 @@ bool mayReturnNever(Node* fn) {
 } // namespace
 
 // getSignaturesOfSymbol — checker.go:20143
-std::vector<Signature*> Checker::getSignaturesOfSymbol(Symbol* symbol) {
-	if (symbol == nullptr) {
-		return {};
-	}
-	std::vector<Signature*> result;
-	for (size_t i = 0; i < symbol->declarations.size(); i++) {
-		Node* decl = symbol->declarations[i];
-		if (!isFunctionLike(decl)) {
-			continue;
-		}
-		// Don't include signature if node is the implementation of an overloaded function. A node is considered
-		// an implementation node if it has a body and the previous node is of the same kind and immediately
-		// precedes the implementation node (i.e. has the same parent and ends where the implementation starts).
-		if (i > 0 && decl->body() != nullptr) {
-			Node* previous = symbol->declarations[i - 1];
-			if (decl->parent == previous->parent && decl->kind == previous->kind &&
-				(decl->pos() == previous->end() || (previous->flags & NodeFlagsReparsed) != 0)) {
-				continue;
-			}
-		}
-		// If this is a function or method declaration, get the signature from the @type tag for the sake of optional parameters.
-		// Exclude contextually-typed kinds because we already apply the @type tag to the context, plus applying it here to the initializer would suppress checks that the two are compatible.
-		Signature* sig = getSignatureOfFullSignatureType(decl);
-		if (sig == nullptr) {
-			sig = getSignatureFromDeclaration(decl);
-		}
-		result.push_back(sig);
-	}
-	return result;
-}
 
 // getSignatureFromDeclaration — checker.go:20174
 Signature* Checker::getSignatureFromDeclaration(Node* declaration) {
@@ -315,12 +285,6 @@ Symbol* Checker::getAnnotatedAccessorThisParameter(Node* accessor) {
 }
 
 // getAccessorThisParameter — checker.go:20272
-Node* Checker::getAccessorThisParameter(Node* accessor) {
-	if (accessor->parameters().size() == (isGetAccessorDeclaration(accessor) ? 1u : 2u)) {
-		return getThisParameter(accessor);
-	}
-	return nullptr;
-}
 
 // hasBindableName — checker.go:20282
 /**
@@ -1023,31 +987,17 @@ IndexInfo* Checker::instantiateIndexInfo(IndexInfo* info, TypeMapper* m) {
 }
 
 // === dep stubs — removed when owner slice lands ===
-
-Signature* Checker::getSingleCallSignature(Type* /*t*/) { TSC_UNREACHABLE("getSingleCallSignature — signatures dep"); }
-Type* Checker::getTypeAtPosition(Signature* /*signature*/, int /*pos*/) { TSC_UNREACHABLE("getTypeAtPosition — owned by typeops/relater"); }
 Type* Checker::getRestTypeAtPosition(Signature* /*source*/, int /*pos*/, bool /*readonly*/) { TSC_UNREACHABLE("getRestTypeAtPosition — owned by typeops/relater"); }
 TypePredicate* Checker::newTypePredicate(TypePredicateKind /*kind*/, const std::string& /*parameterName*/, int32_t /*parameterIndex*/, Type* /*t*/) { TSC_UNREACHABLE("newTypePredicate — owned by typeops/relater"); }
 bool Checker::isResolvingReturnTypeOfSignature(Signature* /*signature*/) { TSC_UNREACHABLE("isResolvingReturnTypeOfSignature — owned by typeops/relater"); }
-Type* Checker::checkExpressionCachedEx(Node* /*node*/, CheckMode /*checkMode*/) { TSC_UNREACHABLE("checkExpressionCachedEx — signatures dep"); }
-Type* Checker::checkExpressionEx(Node* /*node*/, CheckMode /*checkMode*/) { TSC_UNREACHABLE("checkExpressionEx — signatures dep"); }
 Type* Checker::getYieldedTypeOfYieldExpression(Node* /*node*/, Type* /*expressionType*/, Type* /*sentType*/, bool /*isAsync*/) { TSC_UNREACHABLE("getYieldedTypeOfYieldExpression — signatures dep"); }
 bool Checker::isConstContext(Node* /*node*/) { TSC_UNREACHABLE("isConstContext — signatures dep"); }
-void Checker::reportImplicitAny(Node* /*declaration*/, Type* /*t*/, WideningKind /*wideningKind*/) { TSC_UNREACHABLE("reportImplicitAny — signatures dep"); }
-std::vector<Symbol*> Checker::getPropertiesOfObjectType(Type* /*t*/) { TSC_UNREACHABLE("getPropertiesOfObjectType — owned by members"); }
-Symbol* Checker::instantiateSymbol(Symbol* /*symbol*/, TypeMapper* /*m*/) { TSC_UNREACHABLE("instantiateSymbol — owned by instantiate"); }
-std::vector<Type*> Checker::getTypeArguments(Type* /*t*/) { TSC_UNREACHABLE("getTypeArguments — signatures dep"); }
-Type* Checker::cloneTypeParameter(Type* /*tp*/) { TSC_UNREACHABLE("cloneTypeParameter — owned by instantiate"); }
-bool Checker::isArrayOrTupleType(Type* /*t*/) { TSC_UNREACHABLE("isArrayOrTupleType — owned by typeops"); }
-bool Checker::isGenericType(Type* /*t*/) { TSC_UNREACHABLE("isGenericType — owned by typeops"); }
 Type* Checker::GetPromisedTypeOfPromise(Type* /*t*/) { TSC_UNREACHABLE("GetPromisedTypeOfPromise — owned by typeops"); }
 Type* Checker::getContextualType(Node* /*node*/, ContextFlags /*contextFlags*/) { TSC_UNREACHABLE("getContextualType — owned by contextual"); }
 Type* Checker::getContextualIterationType(IterationTypeKind /*kind*/, Node* /*functionDecl*/) { TSC_UNREACHABLE("getContextualIterationType — owned by contextual"); }
 Type* Checker::getContextualReturnType(Node* /*functionDecl*/, ContextFlags /*contextFlags*/) { TSC_UNREACHABLE("getContextualReturnType — owned by contextual"); }
 Signature* Checker::getContextualSignatureForFunctionLikeDeclaration(Node* /*node*/) { TSC_UNREACHABLE("getContextualSignatureForFunctionLikeDeclaration — owned by contextual"); }
 Type* Checker::instantiateContextualType(Type* /*contextualType*/, Node* /*node*/, ContextFlags /*contextFlags*/) { TSC_UNREACHABLE("instantiateContextualType — owned by contextual"); }
-Type* Checker::checkAwaitedType(Type* /*t*/, bool /*withAlias*/, Node* /*errorNode*/, const DiagnosticMessage* /*diagnosticMessage*/) { TSC_UNREACHABLE("checkAwaitedType — owned by async/awaited"); }
-Type* Checker::getAwaitedTypeNoAlias(Type* /*t*/) { TSC_UNREACHABLE("getAwaitedTypeNoAlias — owned by async/awaited"); }
 Type* Checker::unwrapAwaitedType(Type* /*t*/) { TSC_UNREACHABLE("unwrapAwaitedType — owned by async/awaited"); }
 IterationTypes Checker::getIterationTypesOfIterable(Type* /*t*/, IterationUse /*use*/, Node* /*errorNode*/) { TSC_UNREACHABLE("getIterationTypesOfIterable — owned by iteration"); }
 Type* Checker::getIterationTypeOfGeneratorFunctionReturnType(IterationTypeKind /*typeKind*/, Type* /*returnType*/, bool /*isAsyncGenerator*/) { TSC_UNREACHABLE("getIterationTypeOfGeneratorFunctionReturnType — owned by iteration"); }

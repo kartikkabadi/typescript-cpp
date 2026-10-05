@@ -27,10 +27,6 @@ void Checker::checkNotCanceled() {
 
 // --- getSignatureFromDeclaration — ported with the signatures slice ---------
 
-Signature* Checker::getSignatureFromDeclaration(Node* node) {
-	TSC_UNREACHABLE("getSignatureFromDeclaration — ported with the signatures slice");
-}
-
 // --- IsSymbolAccessible — ported with the symbolaccessibility slice ---------
 
 printer::SymbolAccessibilityResult Checker::isSymbolAccessible(

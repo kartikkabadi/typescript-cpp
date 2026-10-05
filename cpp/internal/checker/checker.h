@@ -1402,6 +1402,17 @@ public:
 	bool isPatternLiteralPlaceholderType(Type* t);
 	bool isGenericStringLikeType(Type* t);
 	bool isGenericMappedType(Type* t);
+	// === slice: program ===
+	ObjectFlags getGenericObjectFlags(Type* t);
+	bool isGenericTupleType(Type* t);
+	Type* getTypeParameterFromMappedType(Type* t);
+	Type* getConstraintTypeFromMappedType(Type* t);
+	Type* getNameTypeFromMappedType(Type* t);
+	bool isNamedMember(Symbol* symbol, const std::string& id);
+	bool isDeclarationContainedBy(Symbol* symbol, Symbol* container);
+	bool symbolIsValue(Symbol* symbol);
+	bool symbolIsValueEx(Symbol* symbol, bool includeTypeOnlyMembers);
+	// === end slice: program ===
 	bool IsEmptyAnonymousObjectType(Type* t);
 	bool isEmptyResolvedType(StructuredType* t);
 	bool isEmptyObjectType(Type* t);
@@ -1726,6 +1737,9 @@ public:
 	Type* getReducedType(Type* t);
 	bool isNoInferType(Type* t);
 	Type* getNoInferType(Type* t);
+	bool isNoInferTargetType(Type* t);
+	Type* getSubstitutionType(Type* baseType, Type* constraint);
+	Type* getOrCreateSubstitutionType(Type* baseType, Type* constraint);
 	bool shouldDeferIndexType(Type* t, IndexFlags indexFlags);
 	Type* getIndexTypeForGenericType(Type* t, IndexFlags indexFlags);
 	Type* getIndexTypeForMappedType(Type* t, IndexFlags indexFlags);
@@ -2069,7 +2083,6 @@ public:
 	bool isGenericType(Type* t);
 	// grammarchecks.go dependencies stubbed — owned by other slices
 	Symbol* lookupSymbolForPrivateIdentifierDeclaration(const std::string& propName, Node* location);
-	ObjectFlags getGenericObjectFlags(Type* t);
 	std::pair<std::string, bool> tryGetNameFromType(Type* t);
 
 	// === slice: declchecks === (checker_declchecks.cpp)
@@ -2402,7 +2415,6 @@ public:
 	Type* getTupleElementTypeOutOfStartCount(Type* t, Number index,
 											 Type* undefinedLikeType);
 	bool isGenericObjectType(Type* t);
-	bool isGenericTupleType(Type* t);
 	bool isGenericReducibleType(Type* t);
 	bool isReducibleIntersection(Type* t);
 	Type* getConditionalFlowTypeOfType(Type* t, Node* node);
@@ -2437,10 +2449,6 @@ public:
 	Node* getConstraintDeclaration(Type* type);
 	bool isTypeParameterPossiblyReferenced(Type* tp, Node* node);
 	Type* getHomomorphicTypeVariable(Type* type);
-	Type* getTypeParameterFromMappedType(Type* type);
-	Type* getConstraintTypeFromMappedType(Type* type);
-	Type* getNameTypeFromMappedType(Type* type);
-	Type* getSubstitutionType(Type* baseType, Type* constraint);
 	Type* getInstantiationExpressionType(Type* exprType, Node* node);
 	// === end slice: typenodes ===
 
@@ -2546,9 +2554,6 @@ public:
 	bool isDiscriminantWithNeverType(Symbol* prop);
 
 	// members-slice dep stubs — defined TSC_UNREACHABLE in checker_members.cpp
-	bool isNamedMember(Symbol* symbol, const std::string& id);
-	bool symbolIsValue(Symbol* symbol);
-	bool symbolIsValueEx(Symbol* symbol, bool includeTypeOnlyMembers);
 	std::vector<Signature*> instantiateSignatures(
 		const std::vector<Signature*>& signatures, TypeMapper* m);
 	std::vector<IndexInfo*> instantiateIndexInfos(
@@ -2610,7 +2615,6 @@ public:
 	bool hasTypeParameterDefault(Type* t);
 	Type* getDefaultTypeArgumentType(bool isInJavaScriptFile);
 	Type* getDefaultOrUnknownFromTypeParameter(Type* t);
-	bool isDeclarationContainedBy(Symbol* symbol, Symbol* container);
 	std::vector<std::string> getCircularTypeNames();
 	void pushActiveMapper(TypeMapper* mapper);
 	void popActiveMapper();
@@ -2691,7 +2695,7 @@ public:
 	// owner: declchecks slice (checker.go:5081-5929)
 	bool checkExternalImportOrExportDeclaration(Node* node);
 	// owner: instantiate slice (checker.go:22285-23219)
-};
+};  // class Checker
 
 // Free helpers used across checker translation units.
 Diagnostic* NewDiagnosticForNode(Node* node, const DiagnosticMessage* message,

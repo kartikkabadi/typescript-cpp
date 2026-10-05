@@ -1,0 +1,1041 @@
+// checker_utilities.cpp — utilities slice: port of tsc/internal/checker/utilities.go.
+// Contains the utilities.go functions not already covered by other slices, in Go
+// file order. Skipped (already ported elsewhere): tokenIsIdentifierOrKeywordOrGreaterThan,
+// hasAsyncModifier, hasReadonlyModifier, isStaticPrivateIdentifierProperty,
+// isConstTypeReference(Name), getAliasDeclarationFromName, entityNameToString,
+// getContainingQualifiedNameNode, isSideEffectImport, isTypeReferenceIdentifier,
+// isTypeAlias, hasDotDotDotToken, isExclamationToken, isOptionalDeclaration,
+// isPrivateWithinAmbient, isTypeAssertion, createSymbolTable, sortSymbols,
+// compareSymbolsWorker, compareNodes, getDeclarationModifierFlagsFromSymbol(Ex),
+// isBinaryOperator, isObjectLiteralType, isValidNumericString portion of
+// isValidNumberString-helpers, isThisProperty, isValidESSymbolDeclaration,
+// isVariableDeclarationInVariableStatement, IsKnownSymbol, isLateBoundName,
+// isObjectOrArrayLiteralType, getContainingClassExcludingClassDecorators,
+// isThisTypeParameter, isInfinityOrNaNString, isConstantVariable,
+// isParameterOrMutableLocalVariable, isMutableLocalVariableDeclaration,
+// isInAmbientOrTypeNode, isCallChain, isSuperCall, getMembersOfDeclaration,
+// isInRightSideOfImportOrExportAssignment, isOptionalParameter,
+// forEachYieldExpression, getEnclosingContainer, getDeclarationsOfKind,
+// minAndMax, getFeatureMap, nodeStartsNewLexicalEnvironment, isCanceled,
+// checkNotCanceled, isUncheckedJSSuggestion, GetSetAccessorValueParameter,
+// signatureHasRestParameter (static copies live in the slices that needed them
+// before this file landed; new code uses the definitions here).
+
+#include "internal/checker/checker.h"
+
+#include <algorithm>
+#include <cstring>
+#include <string>
+
+#include "internal/checker/mapper.h"
+#include "internal/jsnum/jsnum.h"
+#include "internal/module/util.h"
+#include "internal/scanner/scanner.h"
+#include "internal/tspath/tspath.h"
+
+namespace tsc {
+namespace checker {
+
+// --- file-local copies of helpers owned by other files (static in their TUs) ---
+
+// checker.cpp — getBigIntLiteralValue (file-static there too).
+static PseudoBigInt getBigIntLiteralValue(Type* t) {
+	return std::get<PseudoBigInt>(t->AsLiteralType()->value);
+}
+
+// checker_declchecks.cpp — signatureHasRestParameter.
+static bool signatureHasRestParameter(Signature* sig) {
+	return (sig->flags & SignatureFlagsHasRestParameter) != 0;
+}
+
+// printer/utilities.go:30-181 — EscapeString support (file-statics until the
+// printer slice lands; keep names distinct from any future printer exports).
+namespace {
+
+const char kEscapedChars[] = "\t\v\f\b\r\n\0\"\'\\`";
+
+const char* getLiteralTextFlagsChar(char ch) {
+	switch (ch) {
+		case '\t': return "\\t";
+		case '\v': return "\\v";
+		case '\f': return "\\f";
+		case '\b': return "\\b";
+		case '\r': return "\\r";
+		case '\n': return "\\n";
+		case '\0': return "\\0";
+		case '\"': return "\\\"";
+		case '\'': return "\\'";
+		case '\\': return "\\\\";
+		case '`': return "\\`";
+	}
+	return nullptr;
+}
+
+std::string encodeUtf16EscapeSequence(uint32_t charCode) {
+	char buf[16];
+	snprintf(buf, sizeof(buf), "\\u%04x", charCode);
+	return buf;
+}
+
+bool isDoubleQuote(char ch) { return ch == '\"' || ch == '\''; }
+
+std::string escapeStringWorker(std::string_view s, char quoteChar) {
+	std::string escaped;
+	escaped.reserve(s.size());
+	for (size_t i = 0; i < s.size(); i++) {
+		char ch = s[i];
+		const char* repl = getLiteralTextFlagsChar(ch);
+		if (repl != nullptr) {
+			escaped += repl;
+			continue;
+		}
+		if (quoteChar != '\0' && ch == quoteChar) {
+			escaped += '\\';
+			escaped += ch;
+			continue;
+		}
+		unsigned char uch = static_cast<unsigned char>(ch);
+		if (uch < 0x20 || uch == 0x7F) {
+			escaped += encodeUtf16EscapeSequence(uch);
+			continue;
+		}
+		escaped += ch;
+	}
+	return escaped;
+}
+
+// printer.EscapeString — escapes non-printable ASCII and the given quote char.
+std::string escapeString(std::string_view s, char quoteChar) {
+	return escapeStringWorker(s, quoteChar);
+}
+
+} // anonymous namespace
+
+// utilities.go: hasOverrideModifier (55)
+bool hasOverrideModifier(Node* node) {
+	return hasSyntacticModifier(node, ModifierFlagsOverride);
+}
+
+// utilities.go: getSelectedModifierFlags (63)
+ModifierFlags getSelectedModifierFlags(Node* node, ModifierFlags flags) {
+	return static_cast<ModifierFlags>(node->modifierFlagsCache() & flags);
+}
+
+// utilities.go: AssignmentKind (79)
+// (enum declared in checker.h)
+
+// utilities.go: isEmptyObjectLiteral (75)
+bool isEmptyObjectLiteral(Node* expression) {
+	return isObjectLiteralExpression(expression) && expression->properties().empty();
+}
+
+// utilities.go: getAssignmentTargetKind (89)
+AssignmentKind getAssignmentTargetKind(Node* node) {
+	Node* target = getAssignmentTarget(node);
+	if (target == nullptr) {
+		return AssignmentKindNone;
+	}
+	switch (target->kind) {
+		case Kind::BinaryExpression: {
+			Kind binaryOperator = target->as<BinaryExpression>()->OperatorToken->kind;
+			if (binaryOperator == Kind::EqualsToken ||
+				isLogicalOrCoalescingAssignmentOperator(binaryOperator)) {
+				return AssignmentKindDefinite;
+			}
+			return AssignmentKindCompound;
+		}
+		case Kind::PrefixUnaryExpression:
+		case Kind::PostfixUnaryExpression:
+			return AssignmentKindCompound;
+		case Kind::ForInStatement:
+		case Kind::ForOfStatement:
+			return AssignmentKindDefinite;
+	}
+	TSC_UNREACHABLE("Unhandled case in getAssignmentTargetKind");
+}
+
+// utilities.go: isDeleteTarget (109)
+bool isDeleteTarget(Node* node) {
+	if (!isAccessExpression(node)) {
+		return false;
+	}
+	node = walkUpParenthesizedExpressions(node->parent);
+	return node != nullptr && node->kind == Kind::DeleteExpression;
+}
+
+// utilities.go: isInCompoundLikeAssignment (117)
+bool isInCompoundLikeAssignment(Node* node) {
+	Node* target = getAssignmentTarget(node);
+	return target != nullptr && isAssignmentExpression(target, true /*excludeCompoundAssignment*/) &&
+		isCompoundLikeAssignment(target);
+}
+
+// utilities.go: isCompoundLikeAssignment (122)
+bool isCompoundLikeAssignment(Node* assignment) {
+	Node* right = skipParentheses(assignment->as<BinaryExpression>()->Right);
+	return right->kind == Kind::BinaryExpression &&
+		isShiftOperatorOrHigher(right->as<BinaryExpression>()->OperatorToken->kind);
+}
+
+// utilities.go: GetSingleVariableOfVariableStatement (154)
+Node* getSingleVariableOfVariableStatement(Node* node) {
+	if (!isVariableStatement(node)) {
+		return nullptr;
+	}
+	auto& declarations = node->as<VariableStatement>()->DeclarationList->as<VariableDeclarationList>()->Declarations->nodes;
+	return declarations.empty() ? nullptr : declarations[0];
+}
+
+// utilities.go: IsInTypeQuery (168)
+bool isInTypeQuery(Node* node) {
+	return findAncestorOrQuit(node, [](Node* n) {
+		switch (n->kind) {
+			case Kind::TypeQuery:
+				return FindAncestorResult::True;
+			case Kind::Identifier:
+			case Kind::QualifiedName:
+				return FindAncestorResult::False;
+		}
+		return FindAncestorResult::Quit;
+	}) != nullptr;
+}
+
+// utilities.go: canHaveLocals (183)
+bool canHaveLocals(Node* node) {
+	switch (node->kind) {
+		case Kind::ArrowFunction: case Kind::Block: case Kind::CallSignature:
+		case Kind::CaseBlock: case Kind::CatchClause: case Kind::ClassStaticBlockDeclaration:
+		case Kind::ConditionalType: case Kind::Constructor: case Kind::ConstructorType:
+		case Kind::ConstructSignature: case Kind::ForStatement: case Kind::ForInStatement:
+		case Kind::ForOfStatement: case Kind::FunctionDeclaration: case Kind::FunctionExpression:
+		case Kind::FunctionType: case Kind::GetAccessor: case Kind::IndexSignature:
+		case Kind::JSDocSignature: case Kind::MappedType: case Kind::MethodDeclaration:
+		case Kind::MethodSignature: case Kind::ModuleDeclaration: case Kind::SetAccessor:
+		case Kind::SourceFile: case Kind::TypeAliasDeclaration: case Kind::JSTypeAliasDeclaration:
+			return true;
+	}
+	return false;
+}
+
+// utilities.go: isShorthandAmbientModuleSymbol (197)
+bool isShorthandAmbientModuleSymbol(Symbol* moduleSymbol) {
+	return isShorthandAmbientModule(moduleSymbol->valueDeclaration);
+}
+
+// utilities.go: isShorthandAmbientModule (201)
+bool isShorthandAmbientModule(Node* node) {
+	// The only kind of module that can be missing a body is a shorthand ambient module.
+	return node != nullptr && node->kind == Kind::ModuleDeclaration && node->body() == nullptr;
+}
+
+// utilities.go: getExternalModuleRequireArgument (233)
+Node* getExternalModuleRequireArgument(Node* node) {
+	if (isVariableDeclarationInitializedToRequire(node)) {
+		return node->initializer()->arguments()[0];
+	}
+	return nullptr;
+}
+
+// utilities.go: isRightSideOfAccessExpression (240)
+bool isRightSideOfAccessExpression(Node* node) {
+	return node->parent != nullptr &&
+		((isPropertyAccessExpression(node->parent) && node->parent->name() == node) ||
+		 (isElementAccessExpression(node->parent) &&
+		  node->parent->as<ElementAccessExpression>()->ArgumentExpression == node));
+}
+
+// utilities.go: isTopLevelInExternalModuleAugmentation (245)
+bool isTopLevelInExternalModuleAugmentation(Node* node) {
+	return node != nullptr && node->parent != nullptr && isModuleBlock(node->parent) &&
+		isExternalModuleAugmentation(node->parent->parent);
+}
+
+// utilities.go: isSyntacticDefault (249)
+bool isSyntacticDefault(Node* node) {
+	return (isExportAssignment(node) && !node->as<ExportAssignment>()->IsExportEquals) ||
+		hasSyntacticModifier(node, ModifierFlagsDefault) ||
+		isExportSpecifier(node) ||
+		isNamespaceExport(node);
+}
+
+// utilities.go: hasExportAssignmentSymbol (256)
+bool hasExportAssignmentSymbol(Symbol* moduleSymbol) {
+	return moduleSymbol->exports.count(InternalSymbolNameExportEquals) != 0;
+}
+
+// utilities.go: hasOnlyExpressionInitializer (264)
+bool hasOnlyExpressionInitializer(Node* node) {
+	switch (node->kind) {
+		case Kind::VariableDeclaration:
+		case Kind::Parameter:
+		case Kind::BindingElement:
+		case Kind::PropertyDeclaration:
+		case Kind::PropertyAssignment:
+		case Kind::EnumMember:
+			return true;
+	}
+	return false;
+}
+
+// utilities.go: IsTypeAny (286)
+bool isTypeAny(Type* t) {
+	return t != nullptr && (t->flags & TypeFlagsAny) != 0;
+}
+
+// utilities.go: isJSDocOptionalParameter (290)
+bool isJSDocOptionalParameter(ParameterDeclaration* /*node*/) {
+	return false; // !!!
+}
+
+// utilities.go: isEmptyArrayLiteral (329)
+bool isEmptyArrayLiteral(Node* expression) {
+	return isArrayLiteralExpression(expression) && expression->elements().empty();
+}
+
+// utilities.go: declarationBelongsToPrivateAmbientMember (333)
+static bool isPrivateWithinAmbient(Node* node);
+bool declarationBelongsToPrivateAmbientMember(Node* declaration) {
+	Node* root = getRootDeclaration(declaration);
+	Node* memberDeclaration = root;
+	if (root->kind == Kind::Parameter) {
+		memberDeclaration = root->parent;
+	}
+	return isPrivateWithinAmbient(memberDeclaration);
+}
+
+static bool isPrivateWithinAmbient(Node* node) {
+	return (hasModifier(node, ModifierFlagsPrivate) ||
+		isPrivateIdentifierClassElementDeclaration(node)) &&
+		(node->flags & NodeFlagsAmbient) != 0;
+}
+
+// utilities.go: CompareTypes (414)
+int CompareTypes(Type* t1, Type* t2) {
+	if (t1 == t2) {
+		return 0;
+	}
+	if (t1 == nullptr) {
+		return -1;
+	}
+	if (t2 == nullptr) {
+		return 1;
+	}
+	if (t1->checker != t2->checker) {
+		TSC_UNREACHABLE("Cannot compare types from different checkers");
+	}
+	// First sort in order of increasing type flags values.
+	if (int c = getSortOrderFlags(t1) - getSortOrderFlags(t2); c != 0) {
+		return c;
+	}
+	// Order named types by name and, in the case of aliased types, by alias type arguments.
+	if (int c = compareTypeNames(t1, t2); c != 0) {
+		return c;
+	}
+	// We have unnamed types or types with identical names. Now sort by data specific to the type.
+	switch (0) {
+		case 0: {
+		if (t1->flags & (TypeFlagsAny | TypeFlagsUnknown | TypeFlagsString | TypeFlagsNumber |
+						 TypeFlagsBoolean | TypeFlagsBigInt | TypeFlagsESSymbol | TypeFlagsVoid |
+						 TypeFlagsUndefined | TypeFlagsNull | TypeFlagsNever | TypeFlagsNonPrimitive)) {
+			// Only distinguished by type IDs, handled below.
+		} else if (t1->flags & TypeFlagsObject) {
+			// Order instantiation expression types without relying on lazy symbol IDs.
+			// Order other unnamed or identically named object types by symbol.
+			if ((t1->objectFlags & ObjectFlagsInstantiationExpressionType) &&
+				(t2->objectFlags & ObjectFlagsInstantiationExpressionType)) {
+				Node *declaration1 = nullptr, *declaration2 = nullptr;
+				if (t1->symbol != nullptr && !t1->symbol->declarations.empty()) {
+					declaration1 = t1->symbol->declarations[0];
+				}
+				if (t2->symbol != nullptr && !t2->symbol->declarations.empty()) {
+					declaration2 = t2->symbol->declarations[0];
+				}
+				// A single instantiation expression can produce multiple types for union constituents,
+				// so compare their source declarations before comparing the shared expression node.
+				if (int c = t1->checker->compareNodes(declaration1, declaration2); c != 0) {
+					return c;
+				}
+				if (int c = t1->checker->compareNodes(t1->AsInstantiationExpressionType()->node,
+													t2->AsInstantiationExpressionType()->node);
+					c != 0) {
+					return c;
+				}
+			} else if (int c = t1->checker->compareSymbols(t1->symbol, t2->symbol); c != 0) {
+				return c;
+			}
+			// When object types have the same or no symbol, order by kind. We order type references before other kinds.
+			if ((t1->objectFlags & ObjectFlagsReference) && (t2->objectFlags & ObjectFlagsReference)) {
+				auto r1 = t1->AsTypeReference();
+				auto r2 = t2->AsTypeReference();
+				if ((r1->target->objectFlags & ObjectFlagsTuple) &&
+					(r2->target->objectFlags & ObjectFlagsTuple)) {
+					// Tuple types have no associated symbol, instead we order by tuple element information.
+					if (int c = compareTupleTypes(r1->target->AsTupleType(), r2->target->AsTupleType());
+						c != 0) {
+						return c;
+					}
+				}
+				// Here we know we have references to instantiations of the same type because we have matching targets.
+				if (r1->node == nullptr && r2->node == nullptr) {
+					// Non-deferred type references with the same target are sorted by their type argument lists.
+					if (int c = compareTypeLists(t1->AsTypeReference()->resolvedTypeArguments,
+												 t2->AsTypeReference()->resolvedTypeArguments);
+						c != 0) {
+						return c;
+					}
+				} else {
+					// Deferred type references with the same target are ordered by the source location of the reference.
+					if (int c = t1->checker->compareNodes(r1->node, r2->node); c != 0) {
+						return c;
+					}
+					// Instantiations of the same deferred type reference are ordered by their associated type mappers
+					// (which reflect the mapping of in-scope type parameters to type arguments).
+					if (int c = compareTypeMappers(t1->AsObjectType()->mapper, t2->AsObjectType()->mapper);
+						c != 0) {
+						return c;
+					}
+				}
+			} else if (t1->objectFlags & ObjectFlagsReference) {
+				return -1;
+			} else if (t2->objectFlags & ObjectFlagsReference) {
+				return 1;
+			} else {
+				// Order unnamed non-reference object types by kind and instantiation data.
+				if (int c = static_cast<int>(t1->objectFlags & ObjectFlagsObjectTypeKindMask) -
+							static_cast<int>(t2->objectFlags & ObjectFlagsObjectTypeKindMask);
+					c != 0) {
+					return c;
+				}
+				if (t1->objectFlags & ObjectFlagsReverseMapped) {
+					auto r1 = t1->AsReverseMappedType();
+					auto r2 = t2->AsReverseMappedType();
+					if (int c = CompareTypes(r1->source, r2->source); c != 0) {
+						return c;
+					}
+					if (int c = CompareTypes(r1->mappedType, r2->mappedType); c != 0) {
+						return c;
+					}
+					if (int c = CompareTypes(r1->constraintType, r2->constraintType); c != 0) {
+						return c;
+					}
+				}
+				TypeMapper* m1 = t1->AsObjectType()->mapper;
+				TypeMapper* m2 = t2->AsObjectType()->mapper;
+				if (t1->objectFlags & ObjectFlagsMapped) {
+					// instantiateAnonymousType prepends a fresh type parameter mapping.
+					// Compare the effective instantiation, not the identity of that fresh parameter.
+					if (m1 != nullptr) {
+						m1 = static_cast<CompositeTypeMapper*>(m1->data())->m2;
+					}
+					if (m2 != nullptr) {
+						m2 = static_cast<CompositeTypeMapper*>(m2->data())->m2;
+					}
+				}
+				if (int c = compareTypeMappers(m1, m2); c != 0) {
+					return c;
+				}
+			}
+		} else if (t1->flags & TypeFlagsUnion) {
+			// Unions are ordered by origin and then constituent type lists.
+			Type* o1 = t1->AsUnionType()->origin;
+			Type* o2 = t2->AsUnionType()->origin;
+			if (o1 == nullptr && o2 == nullptr) {
+				if (int c = compareTypeLists(t1->types(), t2->types()); c != 0) {
+					return c;
+				}
+			} else if (o1 == nullptr) {
+				return 1;
+			} else if (o2 == nullptr) {
+				return -1;
+			} else {
+				if (int c = CompareTypes(o1, o2); c != 0) {
+					return c;
+				}
+			}
+		} else if (t1->flags & TypeFlagsIntersection) {
+			// Intersections are ordered by their constituent type lists.
+			if (int c = compareTypeLists(t1->types(), t2->types()); c != 0) {
+				return c;
+			}
+		} else if (t1->flags & (TypeFlagsEnum | TypeFlagsEnumLiteral | TypeFlagsUniqueESSymbol)) {
+			// Enum members are ordered by their symbol (and thus their declaration order).
+			if (int c = t1->checker->compareSymbols(t1->symbol, t2->symbol); c != 0) {
+				return c;
+			}
+		} else if (t1->flags & TypeFlagsStringLiteral) {
+			// String literal types are ordered by their values.
+			if (int c = std::get<std::string>(t1->AsLiteralType()->value)
+								.compare(std::get<std::string>(t2->AsLiteralType()->value));
+				c != 0) {
+				return c;
+			}
+		} else if (t1->flags & TypeFlagsNumberLiteral) {
+			// Numeric literal types are ordered by their values.
+			Number n1 = std::get<Number>(t1->AsLiteralType()->value);
+			Number n2 = std::get<Number>(t2->AsLiteralType()->value);
+			if (n1.v != n2.v) {
+				return n1.v < n2.v ? -1 : 1;
+			}
+		} else if (t1->flags & TypeFlagsBigIntLiteral) {
+			if (int c = getBigIntLiteralValue(t1).compare(getBigIntLiteralValue(t2)); c != 0) {
+				return c;
+			}
+		} else if (t1->flags & TypeFlagsBooleanLiteral) {
+			bool b1 = std::get<bool>(t1->AsLiteralType()->value);
+			bool b2 = std::get<bool>(t2->AsLiteralType()->value);
+			if (b1 != b2) {
+				if (b1) {
+					return 1;
+				}
+				return -1;
+			}
+		} else if (t1->flags & TypeFlagsTypeParameter) {
+			if (int c = t1->checker->compareSymbols(t1->symbol, t2->symbol); c != 0) {
+				return c;
+			}
+		} else if (t1->flags & TypeFlagsIndex) {
+			if (int c = CompareTypes(t1->AsIndexType()->target, t2->AsIndexType()->target); c != 0) {
+				return c;
+			}
+			if (int c = static_cast<int>(t1->AsIndexType()->indexFlags) -
+						static_cast<int>(t2->AsIndexType()->indexFlags);
+				c != 0) {
+				return c;
+			}
+		} else if (t1->flags & TypeFlagsIndexedAccess) {
+			if (int c = CompareTypes(t1->AsIndexedAccessType()->objectType,
+									 t2->AsIndexedAccessType()->objectType);
+				c != 0) {
+				return c;
+			}
+			if (int c = CompareTypes(t1->AsIndexedAccessType()->indexType,
+									 t2->AsIndexedAccessType()->indexType);
+				c != 0) {
+				return c;
+			}
+		} else if (t1->flags & TypeFlagsConditional) {
+			if (int c = t1->checker->compareNodes(t1->AsConditionalType()->root->node->asNode(),
+												t2->AsConditionalType()->root->node->asNode());
+				c != 0) {
+				return c;
+			}
+			if (int c = compareTypeMappers(t1->AsConditionalType()->mapper,
+										 t2->AsConditionalType()->mapper);
+				c != 0) {
+				return c;
+			}
+		} else if (t1->flags & TypeFlagsSubstitution) {
+			if (int c = CompareTypes(t1->AsSubstitutionType()->baseType,
+									 t2->AsSubstitutionType()->baseType);
+				c != 0) {
+				return c;
+			}
+			if (int c = CompareTypes(t1->AsSubstitutionType()->constraint,
+									 t2->AsSubstitutionType()->constraint);
+				c != 0) {
+				return c;
+			}
+		} else if (t1->flags & TypeFlagsTemplateLiteral) {
+			if (int c = [&]() -> int {
+					auto& a = t1->AsTemplateLiteralType()->texts;
+					auto& b = t2->AsTemplateLiteralType()->texts;
+					size_t n = std::min(a.size(), b.size());
+					for (size_t i = 0; i < n; i++) {
+						if (int r = a[i].compare(b[i]); r != 0) {
+							return r;
+						}
+					}
+					return static_cast<int>(a.size()) - static_cast<int>(b.size());
+				}();
+				c != 0) {
+				return c;
+			}
+			if (int c = compareTypeLists(t1->AsTemplateLiteralType()->types,
+									   t2->AsTemplateLiteralType()->types);
+				c != 0) {
+				return c;
+			}
+		} else if (t1->flags & TypeFlagsStringMapping) {
+			if (int c = CompareTypes(t1->AsStringMappingType()->target,
+									 t2->AsStringMappingType()->target);
+				c != 0) {
+				return c;
+			}
+		}
+		break;
+		}
+	}
+	// Fall back to type IDs. This results in type creation order for built-in types.
+	return static_cast<int>(t1->id) - static_cast<int>(t2->id);
+}
+
+// utilities.go: getSortOrderFlags (624)
+int getSortOrderFlags(Type* t) {
+	// Return TypeFlagsEnum for all enum-like unit types (they'll be sorted by their symbols)
+	if ((t->flags & (TypeFlagsEnumLiteral | TypeFlagsEnum)) &&
+		!(t->flags & TypeFlagsUnion)) {
+		return static_cast<int>(TypeFlagsEnum);
+	}
+	return static_cast<int>(t->flags);
+}
+
+// utilities.go: compareTypeNames (632)
+int compareTypeNames(Type* t1, Type* t2) {
+	Symbol* s1 = getTypeNameSymbol(t1);
+	Symbol* s2 = getTypeNameSymbol(t2);
+	if (s1 == s2) {
+		return compareTypeLists(t1->alias->TypeArguments(), t2->alias->TypeArguments());
+	}
+	if (s1 == nullptr) {
+		return 1;
+	}
+	if (s2 == nullptr) {
+		return -1;
+	}
+	if (int c = s1->name.compare(s2->name); c != 0) {
+		return c;
+	}
+	// Keep distinct same-named declarations together before comparing alias arguments or structure.
+	return t1->checker->compareSymbols(s1, s2);
+}
+
+// utilities.go: getTypeNameSymbol (651)
+Symbol* getTypeNameSymbol(Type* t) {
+	if (t->alias != nullptr) {
+		return t->alias->symbol;
+	}
+	if ((t->flags & (TypeFlagsTypeParameter | TypeFlagsStringMapping)) ||
+		(t->objectFlags & (ObjectFlagsClassOrInterface | ObjectFlagsReference))) {
+		return t->symbol;
+	}
+	return nullptr;
+}
+
+// utilities.go: getObjectTypeName (661)
+Symbol* getObjectTypeName(Type* t) {
+	if (t->objectFlags & (ObjectFlagsClassOrInterface | ObjectFlagsReference)) {
+		return t->symbol;
+	}
+	return nullptr;
+}
+
+// utilities.go: compareTupleTypes (668)
+int compareTupleTypes(TupleType* t1, TupleType* t2) {
+	if (t1 == t2) {
+		return 0;
+	}
+	if (t1->readonly != t2->readonly) {
+		return t1->readonly ? 1 : -1;
+	}
+	if (t1->elementInfos.size() != t2->elementInfos.size()) {
+		return static_cast<int>(t1->elementInfos.size()) - static_cast<int>(t2->elementInfos.size());
+	}
+	for (size_t i = 0; i < t1->elementInfos.size(); i++) {
+		if (int c = static_cast<int>(t1->elementInfos[i].flags) -
+					static_cast<int>(t2->elementInfos[i].flags);
+			c != 0) {
+			return c;
+		}
+	}
+	for (size_t i = 0; i < t1->elementInfos.size(); i++) {
+		if (int c = compareElementLabels(t1->elementInfos[i].labeledDeclaration,
+									   t2->elementInfos[i].labeledDeclaration);
+			c != 0) {
+			return c;
+		}
+	}
+	return 0;
+}
+
+// utilities.go: compareElementLabels (691)
+int compareElementLabels(Node* n1, Node* n2) {
+	if (n1 == n2) {
+		return 0;
+	}
+	if (n1 == nullptr) {
+		return -1;
+	}
+	if (n2 == nullptr) {
+		return 1;
+	}
+	return n1->name()->text().compare(n2->name()->text());
+}
+
+// utilities.go: compareTypeLists (704)
+int compareTypeLists(const std::vector<Type*>& s1, const std::vector<Type*>& s2) {
+	if (s1.size() != s2.size()) {
+		return static_cast<int>(s1.size()) - static_cast<int>(s2.size());
+	}
+	for (size_t i = 0; i < s1.size(); i++) {
+		if (int c = CompareTypes(s1[i], s2[i]); c != 0) {
+			return c;
+		}
+	}
+	return 0;
+}
+
+// utilities.go: compareTypeMappers (716)
+int compareTypeMappers(TypeMapper* m1, TypeMapper* m2) {
+	if (m1 == m2) {
+		return 0;
+	}
+	if (m1 == nullptr) {
+		return 1;
+	}
+	if (m2 == nullptr) {
+		return -1;
+	}
+	auto kind1 = m1->kind();
+	auto kind2 = m2->kind();
+	if (kind1 != kind2) {
+		return static_cast<int>(kind1) - static_cast<int>(kind2);
+	}
+	switch (kind1) {
+		case TypeMapperKind::Simple: {
+			auto* s1 = static_cast<SimpleTypeMapper*>(m1->data());
+			auto* s2 = static_cast<SimpleTypeMapper*>(m2->data());
+			if (int c = CompareTypes(s1->source, s2->source); c != 0) {
+				return c;
+			}
+			return CompareTypes(s1->target, s2->target);
+		}
+		case TypeMapperKind::Array: {
+			auto* a1 = static_cast<ArrayTypeMapper*>(m1->data());
+			auto* a2 = static_cast<ArrayTypeMapper*>(m2->data());
+			if (int c = compareTypeLists(a1->sources, a2->sources); c != 0) {
+				return c;
+			}
+			return compareTypeLists(a1->targets, a2->targets);
+		}
+		case TypeMapperKind::Merged: {
+			auto* g1 = static_cast<MergedTypeMapper*>(m1->data());
+			auto* g2 = static_cast<MergedTypeMapper*>(m2->data());
+			if (int c = compareTypeMappers(g1->m1, g2->m1); c != 0) {
+				return c;
+			}
+			return compareTypeMappers(g1->m2, g2->m2);
+		}
+	}
+	return 0;
+}
+
+// utilities.go: isExponentiationOperator (800)
+bool isExponentiationOperator(Kind kind) {
+	return kind == Kind::AsteriskAsteriskToken;
+}
+
+// utilities.go: isMultiplicativeOperator (804)
+bool isMultiplicativeOperator(Kind kind) {
+	return kind == Kind::AsteriskToken || kind == Kind::SlashToken || kind == Kind::PercentToken;
+}
+
+// utilities.go: isMultiplicativeOperatorOrHigher (808)
+bool isMultiplicativeOperatorOrHigher(Kind kind) {
+	return isExponentiationOperator(kind) || isMultiplicativeOperator(kind);
+}
+
+// utilities.go: isAdditiveOperator (812)
+bool isAdditiveOperator(Kind kind) {
+	return kind == Kind::PlusToken || kind == Kind::MinusToken;
+}
+
+// utilities.go: isAdditiveOperatorOrHigher (816)
+bool isAdditiveOperatorOrHigher(Kind kind) {
+	return isAdditiveOperator(kind) || isMultiplicativeOperatorOrHigher(kind);
+}
+
+// utilities.go: isShiftOperator (820)
+bool isShiftOperator(Kind kind) {
+	return kind == Kind::LessThanLessThanToken || kind == Kind::GreaterThanGreaterThanToken ||
+		kind == Kind::GreaterThanGreaterThanGreaterThanToken;
+}
+
+// utilities.go: isShiftOperatorOrHigher (825)
+bool isShiftOperatorOrHigher(Kind kind) {
+	return isShiftOperator(kind) || isAdditiveOperatorOrHigher(kind);
+}
+
+// utilities.go: isRelationalOperator (829)
+bool isRelationalOperator(Kind kind) {
+	return kind == Kind::LessThanToken || kind == Kind::LessThanEqualsToken ||
+		kind == Kind::GreaterThanToken || kind == Kind::GreaterThanEqualsToken ||
+		kind == Kind::InstanceOfKeyword || kind == Kind::InKeyword;
+}
+
+// utilities.go: isRelationalOperatorOrHigher (834)
+bool isRelationalOperatorOrHigher(Kind kind) {
+	return isRelationalOperator(kind) || isShiftOperatorOrHigher(kind);
+}
+
+// utilities.go: isEqualityOperator (838)
+bool isEqualityOperator(Kind kind) {
+	return kind == Kind::EqualsEqualsToken || kind == Kind::EqualsEqualsEqualsToken ||
+		kind == Kind::ExclamationEqualsToken || kind == Kind::ExclamationEqualsEqualsToken;
+}
+
+// utilities.go: isEqualityOperatorOrHigher (843)
+bool isEqualityOperatorOrHigher(Kind kind) {
+	return isEqualityOperator(kind) || isRelationalOperatorOrHigher(kind);
+}
+
+// utilities.go: isBitwiseOperator (847)
+bool isBitwiseOperator(Kind kind) {
+	return kind == Kind::AmpersandToken || kind == Kind::BarToken || kind == Kind::CaretToken;
+}
+
+// utilities.go: isBitwiseOperatorOrHigher (851)
+bool isBitwiseOperatorOrHigher(Kind kind) {
+	return isBitwiseOperator(kind) || isEqualityOperatorOrHigher(kind);
+}
+
+// utilities.go: isLogicalOperatorOrHigher (855)
+bool isLogicalOperatorOrHigher(Kind kind) {
+	return isLogicalBinaryOperator(kind) || isBitwiseOperatorOrHigher(kind);
+}
+
+// utilities.go: isAssignmentOperatorOrHigher (859)
+bool isAssignmentOperatorOrHigher(Kind kind) {
+	return kind == Kind::QuestionQuestionToken || isLogicalOperatorOrHigher(kind) ||
+		isAssignmentOperator(kind);
+}
+
+// utilities.go: isValidNumberString (970)
+bool isValidNumberString(const std::string& s, bool roundTripOnly) {
+	if (s.empty()) {
+		return false;
+	}
+	Number n = numberFromString(s);
+	return !n.isNaN() && !n.isInf() && (!roundTripOnly || n.string() == s);
+}
+
+// utilities.go: isValidBigIntString (978)
+bool isValidBigIntString(const std::string& s, bool roundTripOnly) {
+	if (s.empty()) {
+		return false;
+	}
+	Scanner scanner;
+	scanner.setSkipTrivia(false);
+	bool success = true;
+	scanner.setOnError([&success](const DiagnosticMessage*, int, int, const std::vector<std::string>&) {
+		success = false;
+	});
+	scanner.setText(s + "n");
+	Kind result = scanner.scan();
+	bool negative = result == Kind::MinusToken;
+	if (negative) {
+		result = scanner.scan();
+	}
+	TokenFlags flags = scanner.tokenFlags();
+	// validate that
+	// * scanning proceeded without error
+	// * a bigint can be scanned, and that when it is scanned, it is
+	// * the full length of the input string (so the scanner is one character beyond the augmented input length)
+	// * it does not contain a numeric separator (the `BigInt` constructor does not accept a numeric separator in its input)
+	return success && result == Kind::BigIntLiteral && scanner.tokenEnd() == static_cast<int>(s.size()) + 1 &&
+		!(flags & TokenFlagsContainsSeparator) &&
+		(!roundTripOnly ||
+		 s == PseudoBigInt::create(parsePseudoBigInt(scanner.tokenValue()), negative).string());
+}
+
+// utilities.go: IsPrivateIdentifierSymbol (1022)
+bool isPrivateIdentifierSymbol(Symbol* symbol) {
+	if (symbol == nullptr) {
+		return false;
+	}
+	return symbol->name.rfind(std::string(1, kInternalSymbolNamePrefix) + "#", 0) == 0;
+}
+
+// utilities.go: isClassInstanceProperty (1060)
+bool isClassInstanceProperty(Node* node) {
+	if (isInJSFile(node) && isExpandoPropertyDeclaration(node)) {
+		Node* left = node->as<BinaryExpression>()->Left;
+		return (!isBindableStaticAccessExpression(left, false /*excludeThisKeyword*/) ||
+				!isPrototypeAccess(left->expression())) &&
+			!isBindableStaticNameExpression(left, true /*excludeThisKeyword*/);
+	}
+	return node->parent != nullptr && isClassLike(node->parent) &&
+		isPropertyDeclaration(node) && !hasAccessorModifier(node);
+}
+
+// utilities.go: isThisInitializedObjectBindingExpression (1069)
+bool isThisInitializedObjectBindingExpression(Node* node) {
+	return node != nullptr && (isShorthandPropertyAssignment(node) || isPropertyAssignment(node)) &&
+		isBinaryExpression(node->parent->parent) &&
+		node->parent->parent->as<BinaryExpression>()->OperatorToken->kind == Kind::EqualsToken &&
+		node->parent->parent->as<BinaryExpression>()->Right->kind == Kind::ThisKeyword;
+}
+
+// utilities.go: isThisInitializedDeclaration (1075)
+bool isThisInitializedDeclaration(Node* node) {
+	return node != nullptr && isVariableDeclaration(node) && node->initializer() != nullptr &&
+		node->initializer()->kind == Kind::ThisKeyword;
+}
+
+// utilities.go: isLiteralExpressionOfObject (1107)
+bool isLiteralExpressionOfObject(Node* node) {
+	switch (node->kind) {
+		case Kind::ObjectLiteralExpression:
+		case Kind::ArrayLiteralExpression:
+		case Kind::RegularExpressionLiteral:
+		case Kind::FunctionExpression:
+		case Kind::ClassExpression:
+			return true;
+	}
+	return false;
+}
+
+// utilities.go: canHaveFlowNode (1116)
+bool canHaveFlowNode(Node* node) {
+	return node->flowNodeData() != nullptr;
+}
+
+// utilities.go: isNonNullAccess (1120)
+bool isNonNullAccess(Node* node) {
+	return isAccessExpression(node) && isNonNullExpression(node->expression());
+}
+
+// utilities.go: getBindingElementPropertyName (1124)
+Node* getBindingElementPropertyName(Node* node) {
+	return node->propertyNameOrName();
+}
+
+// utilities.go: callLikeExpressionMayHaveTypeArguments (1132)
+bool Checker::callLikeExpressionMayHaveTypeArguments(Node* node) {
+	return isCallOrNewExpression(node) || isTaggedTemplateExpression(node) ||
+		isJsxOpeningLikeElement(node);
+}
+
+// utilities.go: isJsxIntrinsicTagName (1159)
+bool isJsxIntrinsicTagName(Node* tagName) {
+	return (isIdentifier(tagName) && isIntrinsicJsxName(tagName->text())) ||
+		isJsxNamespacedName(tagName);
+}
+
+// utilities.go: getContainingObjectLiteral (1163)
+Node* getContainingObjectLiteral(Node* f) {
+	if ((f->kind == Kind::MethodDeclaration || f->kind == Kind::GetAccessor ||
+		 f->kind == Kind::SetAccessor) &&
+		f->parent->kind == Kind::ObjectLiteralExpression) {
+		return f->parent;
+	} else if (f->kind == Kind::FunctionExpression && f->parent->kind == Kind::PropertyAssignment) {
+		return f->parent->parent;
+	}
+	return nullptr;
+}
+
+// utilities.go: isImportTypeQualifierPart (1174)
+Node* isImportTypeQualifierPart(Node* node) {
+	Node* parent = node->parent;
+	while (isQualifiedName(parent)) {
+		node = parent;
+		parent = parent->parent;
+	}
+	if (parent != nullptr && parent->kind == Kind::ImportType &&
+		parent->as<ImportTypeNode>()->Qualifier == node) {
+		return parent;
+	}
+	return nullptr;
+}
+
+// utilities.go: isInNameOfExpressionWithTypeArgumentsOrHeritageTypeReference (1188)
+bool isInNameOfExpressionWithTypeArgumentsOrHeritageTypeReference(Node* node) {
+	while (node->parent->kind == Kind::PropertyAccessExpression ||
+		   node->parent->kind == Kind::QualifiedName) {
+		node = node->parent;
+	}
+	return node->parent->kind == Kind::ExpressionWithTypeArguments ||
+		isNameOfHeritageClauseTypeReference(node);
+}
+
+// utilities.go: getIndexSymbolFromSymbolTable (1197)
+Symbol* getIndexSymbolFromSymbolTable(SymbolTable& symbolTable) {
+	auto it = symbolTable.find(InternalSymbolNameIndex);
+	return it != symbolTable.end() ? it->second : nullptr;
+}
+
+// utilities.go: expressionResultIsUnused (1203)
+bool expressionResultIsUnused(Node* node) {
+	for (;;) {
+		Node* parent = node->parent;
+		// walk up parenthesized expressions, but keep a pointer to the top-most parenthesized expression
+		if (isParenthesizedExpression(parent)) {
+			node = parent;
+			continue;
+		}
+		// result is unused in an expression statement, `void` expression, or the initializer or incrementer of a `for` loop
+		if (isExpressionStatement(parent) || isVoidExpression(parent) ||
+			(isForStatement(parent) &&
+			 (parent->initializer() == node || parent->as<ForStatement>()->Incrementor == node))) {
+			return true;
+		}
+		if (isBinaryExpression(parent) &&
+			parent->as<BinaryExpression>()->OperatorToken->kind == Kind::CommaToken) {
+			// left side of comma is always unused
+			if (node == parent->as<BinaryExpression>()->Left) {
+				return true;
+			}
+			// right side of comma is unused if parent is unused
+			node = parent;
+			continue;
+		}
+		return false;
+	}
+}
+
+// utilities.go: pseudoBigIntToString (1228)
+std::string pseudoBigIntToString(const PseudoBigInt& value) {
+	return value.string();
+}
+
+// utilities.go: getSuperContainer (1232)
+Node* getSuperContainer(Node* node, bool stopOnFunctions) {
+	for (;;) {
+		node = node->parent;
+		if (node == nullptr) {
+			return nullptr;
+		}
+		switch (node->kind) {
+			case Kind::ComputedPropertyName:
+				node = node->parent;
+				break;
+			case Kind::FunctionDeclaration:
+			case Kind::FunctionExpression:
+			case Kind::ArrowFunction:
+				if (!stopOnFunctions) {
+					continue;
+				}
+				[[fallthrough]];
+			case Kind::PropertyDeclaration:
+			case Kind::PropertySignature:
+			case Kind::MethodDeclaration:
+			case Kind::MethodSignature:
+			case Kind::Constructor:
+			case Kind::GetAccessor:
+			case Kind::SetAccessor:
+			case Kind::ClassStaticBlockDeclaration:
+				return node;
+			case Kind::Decorator:
+				// Decorators are always applied outside of the body of a class or method.
+				if (isParameterDeclaration(node->parent) && isClassElement(node->parent->parent)) {
+					// If the decorator's parent is a Parameter, we resolve the this container from
+					// the grandparent class declaration.
+					node = node->parent->parent;
+				} else if (isClassElement(node->parent)) {
+					// If the decorator's parent is a class element, we resolve the 'this' container
+					// from the parent class declaration.
+					node = node->parent;
+				}
+				break;
+		}
+	}
+}
+
+// utilities.go: hasType (1308)
+bool hasType(Node* node) {
+	return node->type() != nullptr;
+}
+
+// utilities.go: getNonRestParameterCount (1312)
+int getNonRestParameterCount(Signature* sig) {
+	return static_cast<int>(sig->parameters.size()) - (signatureHasRestParameter(sig) ? 1 : 0);
+}

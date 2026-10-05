@@ -406,87 +406,15 @@ Type* Checker::getDefaultOrUnknownFromTypeParameter(Type* t) {
 
 // getNamedMembers — checker.go:22443-22470
 
-std::vector<Symbol*> Checker::getNamedMembers(const SymbolTable& members, Symbol* typeSymbol) {
-	if (members.empty()) {
-		return {};
-	}
-	// For classes and interfaces, we store explicitly declared members ahead of inherited members. This ensures we process
-	// explicitly declared members first in type relations, which is beneficial because explicitly declared members are more
-	// likely to contain discriminating differences. See for example https://github.com/microsoft/TypeScript/tsc/issues/1968.
-	std::vector<Symbol*> result;
-	result.reserve(members.size());
-	size_t containedCount = 0;
-	if (typeSymbol != nullptr &&
-		(typeSymbol->flags & (SymbolFlagsClass | SymbolFlagsInterface)) != 0) {
-		for (const auto& [id, symbol] : members) {
-			if (isNamedMember(symbol, id) && isDeclarationContainedBy(symbol, typeSymbol)) {
-				result.push_back(symbol);
-			}
-		}
-		containedCount = result.size();
-	}
-	for (const auto& [id, symbol] : members) {
-		if (isNamedMember(symbol, id) &&
-			(typeSymbol == nullptr ||
-			 (typeSymbol->flags & (SymbolFlagsClass | SymbolFlagsInterface)) == 0 ||
-			 !isDeclarationContainedBy(symbol, typeSymbol))) {
-			result.push_back(symbol);
-		}
-	}
-	// sortSymbols sorts a whole vector; the Go code sorts the two partitions of
-	// result independently, so sort each partition separately here.
-	std::vector<Symbol*> contained(result.begin(), result.begin() + (ptrdiff_t)containedCount);
-	std::vector<Symbol*> rest(result.begin() + (ptrdiff_t)containedCount, result.end());
-	sortSymbols(contained);
-	sortSymbols(rest);
-	result.clear();
-	result.insert(result.end(), contained.begin(), contained.end());
-	result.insert(result.end(), rest.begin(), rest.end());
-	return result;
-}
-
 // isDeclarationContainedBy — checker.go:22471-22478
-
-bool Checker::isDeclarationContainedBy(Symbol* symbol, Symbol* container) {
-	if (Node* declaration = symbol->valueDeclaration; declaration != nullptr) {
-		for (Node* d : container->declarations) {
-			// TextRange.ContainedBy: other.pos <= loc.pos && loc.end <= other.end
-			if (d->loc.pos() <= declaration->loc.pos() &&
-				declaration->loc.end() <= d->loc.end()) {
-				return true;
-			}
-		}
-	}
-	return false;
-}
 
 // isNamedMember — checker.go:22479-22482
 
-bool Checker::isNamedMember(Symbol* symbol, const std::string& id) {
-	return !isReservedMemberName(id) && symbolIsValue(symbol);
-}
-
 // symbolIsValue — checker.go:22483-22486
-
-bool Checker::symbolIsValue(Symbol* symbol) {
-	return symbolIsValueEx(symbol, false /*includeTypeOnlyMembers*/);
-}
 
 // symbolIsValueEx — checker.go:22487-22491
 
-bool Checker::symbolIsValueEx(Symbol* symbol, bool includeTypeOnlyMembers) {
-	return (symbol->flags & SymbolFlagsValue) != 0 ||
-		((symbol->flags & SymbolFlagsAlias) != 0 &&
-		 (getSymbolFlagsEx(symbol, !includeTypeOnlyMembers,
-						   false /*excludeLocalMeanings*/) &
-		  SymbolFlagsValue) != 0);
-}
-
 // instantiateType — checker.go:22492-22494
-
-Type* Checker::instantiateType(Type* t, TypeMapper* mapper) {
-	return instantiateTypeWithAlias(t, mapper, nullptr /*alias*/);
-}
 
 // instantiateTypeWithAlias — checker.go:22496-22548
 
@@ -1214,41 +1142,9 @@ Type* Checker::instantiateMappedTypeTemplate(Type* t, Type* key, bool isOptional
 
 // getTypeParameterFromMappedType — checker.go:23091-23097
 
-Type* Checker::getTypeParameterFromMappedType(Type* t) {
-	MappedType* m = t->AsMappedType();
-	if (m->typeParameter == nullptr) {
-		m->typeParameter = getDeclaredTypeOfTypeParameter(
-			getSymbolOfDeclaration(m->declaration->as<MappedTypeNode>()->TypeParameter));
-	}
-	return m->typeParameter;
-}
-
 // getConstraintTypeFromMappedType — checker.go:23099-23106
 
-Type* Checker::getConstraintTypeFromMappedType(Type* t) {
-	MappedType* m = t->AsMappedType();
-	if (m->constraintType == nullptr) {
-		m->constraintType = getConstraintOfTypeParameter(getTypeParameterFromMappedType(t));
-		if (m->constraintType == nullptr) {
-			m->constraintType = errorType;
-		}
-	}
-	return m->constraintType;
-}
-
 // getNameTypeFromMappedType — checker.go:23107-23116
-
-Type* Checker::getNameTypeFromMappedType(Type* t) {
-	MappedType* m = t->AsMappedType();
-	if (m->declaration->as<MappedTypeNode>()->NameType == nullptr) {
-		return nullptr;
-	}
-	if (m->nameType == nullptr) {
-		m->nameType = instantiateType(
-			getTypeFromTypeNode(m->declaration->as<MappedTypeNode>()->NameType), m->mapper);
-	}
-	return m->nameType;
-}
 
 // getTemplateTypeFromMappedType — checker.go:23118-23129
 
@@ -1352,11 +1248,6 @@ TypeAlias* Checker::instantiateTypeAlias(TypeAlias* alias, TypeMapper* m) {
 
 // instantiateTypes — checker.go:23188-23191
 
-std::vector<Type*> Checker::instantiateTypes(const std::vector<Type*>& types,
-											 TypeMapper* mapper) {
-	return instantiateList(types, mapper, &Checker::instantiateType);
-}
-
 // instantiateSymbols — checker.go:23192-23195
 
 std::vector<Symbol*> Checker::instantiateSymbols(const std::vector<Symbol*>& symbols,
@@ -1408,34 +1299,9 @@ Type* Checker::getIndexedAccessTypeEx(Type* objectType, Type* indexType,
 									  TypeAlias* alias) {
 	TSC_UNREACHABLE("getIndexedAccessTypeEx — instantiate dep");
 }
-Type* Checker::getConditionalType(ConditionalRoot* root, TypeMapper* mapper,
-								  bool forConstraint, TypeAlias* alias) {
-	TSC_UNREACHABLE("getConditionalType — instantiate dep");
-}
-Type* Checker::getSubstitutionType(Type* baseType, Type* constraint) {
-	TSC_UNREACHABLE("getSubstitutionType — instantiate dep");
-}
-Type* Checker::getRestrictiveInstantiation(Type* t) {
-	TSC_UNREACHABLE("getRestrictiveInstantiation — instantiate dep");
-}
 Type* Checker::createNormalizedTypeReference(Type* target,
 											 std::vector<Type*> typeArguments) {
 	TSC_UNREACHABLE("createNormalizedTypeReference — instantiate dep");
-}
-IndexInfo* Checker::instantiateIndexInfo(IndexInfo* info, TypeMapper* m) {
-	TSC_UNREACHABLE("instantiateIndexInfo — instantiate dep");
-}
-bool Checker::isArrayType(Type* t) {
-	TSC_UNREACHABLE("isArrayType — instantiate dep");
-}
-Type* Checker::getElementTypeOfArrayType(Type* t) {
-	TSC_UNREACHABLE("getElementTypeOfArrayType — instantiate dep");
-}
-std::vector<Type*> Checker::getElementTypes(Type* t) {
-	TSC_UNREACHABLE("getElementTypes — instantiate dep");
-}
-bool Checker::isReadonlyArrayType(Type* t) {
-	TSC_UNREACHABLE("isReadonlyArrayType — instantiate dep");
 }
 Type* Checker::createTupleTypeEx(std::vector<Type*> elementTypes,
 								 std::vector<TupleElementInfo> elementInfos, bool readonly) {
@@ -1451,9 +1317,6 @@ Type* Checker::inferTypeForHomomorphicMappedType(Type* source, Type* target,
 Type* Checker::getActualTypeVariable(Type* t) {
 	TSC_UNREACHABLE("getActualTypeVariable — instantiate dep");
 }
-Symbol* Checker::getSymbolFromTypeReference(Node* node) {
-	TSC_UNREACHABLE("getSymbolFromTypeReference — instantiate dep");
-}
 
 // Free-function dep stubs (checker package / utilities.go).
 
@@ -1464,6 +1327,50 @@ CacheKey getTypeInstantiationKey(const std::vector<Type*>& typeArguments, TypeAl
 CacheKey getConditionalTypeKey(const std::vector<Type*>& typeArguments, TypeAlias* alias,
 							   bool forConstraint) {
 	TSC_UNREACHABLE("getConditionalTypeKey — instantiate dep");
+}
+// checker.go:27288 isNoInferType + 27860 getNoInferType (real ports; their only
+// callers landed with this slice).
+// checker.go:27877-27894 getSubstitutionType / getOrCreateSubstitutionType +
+// 27866 isNoInferTargetType.
+Type* Checker::getSubstitutionType(Type* baseType, Type* constraint) {
+	if ((constraint->flags & TypeFlagsAnyOrUnknown) != 0 ||
+	    constraint == baseType || (baseType->flags & TypeFlagsAny) != 0) {
+		return baseType;
+	}
+	return getOrCreateSubstitutionType(baseType, constraint);
+}
+Type* Checker::getOrCreateSubstitutionType(Type* baseType, Type* constraint) {
+	SubstitutionTypeKey key{baseType->id, constraint->id};
+	if (auto cached = substitutionTypes.find(key); cached != substitutionTypes.end()) {
+		return cached->second;
+	}
+	Type* result = newSubstitutionType(baseType, constraint);
+	substitutionTypes[key] = result;
+	return result;
+}
+bool Checker::isNoInferTargetType(Type* t) {
+	// This is effectively a more conservative and predictable form of
+	// couldContainTypeVariables. We want to preserve NoInfer<T> only for types
+	// that could contain type variables, but we don't want to exhaustively
+	// examine all object type members.
+	return (t->flags & TypeFlagsUnionOrIntersection) != 0 &&
+	           anyOf(t->AsUnionOrIntersectionType()->types,
+	                 [this](Type* u) { return isNoInferTargetType(u); }) ||
+	       (t->flags & TypeFlagsSubstitution) != 0 && !isNoInferType(t) &&
+	           isNoInferTargetType(t->AsSubstitutionType()->baseType) ||
+	       (t->flags & TypeFlagsObject) != 0 && !IsEmptyAnonymousObjectType(t) ||
+	       (t->flags & (TypeFlagsInstantiable & ~TypeFlagsSubstitution)) != 0 &&
+	           !isPatternLiteralType(t);
+}
+bool Checker::isNoInferType(Type* t) {
+	return (t->flags & TypeFlagsSubstitution) != 0 &&
+	       (t->AsSubstitutionType()->constraint->flags & TypeFlagsUnknown) != 0;
+}
+Type* Checker::getNoInferType(Type* t) {
+	if (isNoInferTargetType(t)) {
+		return getOrCreateSubstitutionType(t, unknownType);
+	}
+	return t;
 }
 bool isReservedMemberName(const std::string& name) {
 	TSC_UNREACHABLE("isReservedMemberName — instantiate dep");

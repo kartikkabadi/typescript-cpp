@@ -503,14 +503,6 @@ std::vector<Signature*> Checker::getSignaturesOfType(Type* t, SignatureKind kind
 	return getSignaturesOfStructuredType(getReducedApparentType(t), kind);
 }
 
-std::vector<Symbol*> Checker::getPropertiesOfType(Type* t) {
-	t = getReducedApparentType(t);
-	if (t->flags & TypeFlagsUnionOrIntersection) {
-		return getPropertiesOfUnionOrIntersectionType(t);
-	}
-	return getPropertiesOfObjectType(t);
-}
-
 std::vector<Symbol*> Checker::getPropertiesOfObjectType(Type* t) {
 	if (t->flags & TypeFlagsObject) {
 		return resolveStructuredTypeMembers(t)->properties;
@@ -724,33 +716,6 @@ Symbol* Checker::getPropertyOfType(Type* type, const std::string& name) {
 // ---------------------------------------------------------------------------
 // resolveStructuredTypeMembers — checker.go:19407-19495
 // ---------------------------------------------------------------------------
-
-StructuredType* Checker::resolveStructuredTypeMembers(Type* t) {
-	if (!(t->objectFlags & ObjectFlagsMembersResolved)) {
-		if (t->flags & TypeFlagsObject) {
-			if (t->objectFlags & ObjectFlagsReference) {
-				resolveTypeReferenceMembers(t);
-			} else if (t->objectFlags & ObjectFlagsClassOrInterface) {
-				resolveClassOrInterfaceMembers(t);
-			} else if (t->objectFlags & ObjectFlagsReverseMapped) {
-				resolveReverseMappedTypeMembers(t);
-			} else if (t->objectFlags & ObjectFlagsAnonymous) {
-				resolveAnonymousTypeMembers(t);
-			} else if (t->objectFlags & ObjectFlagsMapped) {
-				resolveMappedTypeMembers(t);
-			} else {
-				TSC_UNREACHABLE("Unhandled case in resolveStructuredTypeMembers");
-			}
-		} else if (t->flags & TypeFlagsUnion) {
-			resolveUnionTypeMembers(t);
-		} else if (t->flags & TypeFlagsIntersection) {
-			resolveIntersectionTypeMembers(t);
-		} else {
-			TSC_UNREACHABLE("Unhandled case in resolveStructuredTypeMembers");
-		}
-	}
-	return t->AsStructuredType();
-}
 
 void Checker::resolveClassOrInterfaceMembers(Type* t) {
 	resolveObjectTypeMembers(t, t, {}, {});
@@ -1514,13 +1479,6 @@ bool Checker::isNumericComputedName(Node* name) {
 	// It seems odd to consider an expression of type Any to result in a numeric name,
 	// but this behavior is consistent with checkIndexedAccess
 	return isTypeAssignableToKind(checkComputedPropertyName(name), TypeFlagsNumberLike);
-}
-
-bool Checker::isValidIndexKeyType(Type* t) {
-	return (t->flags & (TypeFlagsString | TypeFlagsNumber | TypeFlagsESSymbol)) != 0 ||
-		isPatternLiteralType(t) ||
-		((t->flags & TypeFlagsIntersection) != 0 && !isGenericType(t) &&
-			someList(t->types(), [this](Type* u) { return isValidIndexKeyType(u); }));
 }
 
 Symbol* Checker::getIndexSymbol(Symbol* symbol) {
@@ -2808,49 +2766,6 @@ bool Checker::isMappedTypeGenericIndexedAccess(Type* t) {
  * boolean, and symbol primitive types, return the corresponding object types. Otherwise return the
  * type itself.
  */
-Type* Checker::getApparentType(Type* t) {
-	Type* originalType = t;
-	if (t->flags & TypeFlagsInstantiable) {
-		t = getBaseConstraintOfType(t);
-		if (t == nullptr) {
-			t = unknownType;
-		}
-	}
-	if (t->objectFlags & ObjectFlagsMapped) {
-		return getApparentTypeOfMappedType(t);
-	}
-	if ((t->objectFlags & ObjectFlagsReference) && t != originalType) {
-		return getTypeWithThisArgument(t, originalType, false /*needsApparentType*/);
-	}
-	if (t->flags & TypeFlagsIntersection) {
-		return getApparentTypeOfIntersectionType(t, originalType);
-	}
-	if (t->flags & TypeFlagsStringLike) {
-		return globalStringType;
-	}
-	if (t->flags & TypeFlagsNumberLike) {
-		return globalNumberType;
-	}
-	if (t->flags & TypeFlagsBigIntLike) {
-		return getGlobalBigIntType();
-	}
-	if (t->flags & TypeFlagsBooleanLike) {
-		return globalBooleanType;
-	}
-	if (t->flags & TypeFlagsESSymbolLike) {
-		return getGlobalESSymbolType();
-	}
-	if (t->flags & TypeFlagsNonPrimitive) {
-		return emptyObjectType;
-	}
-	if (t->flags & TypeFlagsIndex) {
-		return stringNumberSymbolType;
-	}
-	if ((t->flags & TypeFlagsUnknown) && !strictNullChecks) {
-		return emptyObjectType;
-	}
-	return t;
-}
 
 Type* Checker::getApparentTypeOfMappedType(Type* t) {
 	MappedType* m = t->AsMappedType();
@@ -3051,26 +2966,6 @@ bool Checker::isDiscriminantWithNeverType(Symbol* prop) {
 Type* Checker::getBaseConstructorTypeOfClass(Type* t) {
 	TSC_UNREACHABLE("getBaseConstructorTypeOfClass — owned by checker.go:17277 slice");
 }
-Type* Checker::getTypeFromClassOrInterfaceReference(Node* node, Symbol* symbol) {
-	TSC_UNREACHABLE(
-		"getTypeFromClassOrInterfaceReference — owned by checker.go:23626 slice");
-}
-Type* Checker::getReturnTypeOfSignature(Signature* sig) {
-	TSC_UNREACHABLE("getReturnTypeOfSignature — owned by signatures slice");
-}
-Signature* Checker::getSignatureFromDeclaration(Node* declaration) {
-	TSC_UNREACHABLE("getSignatureFromDeclaration — owned by signatures slice");
-}
-Signature* Checker::getSignatureOfFullSignatureType(Node* node) {
-	TSC_UNREACHABLE("getSignatureOfFullSignatureType — owned by signatures slice");
-}
-Signature* Checker::instantiateSignature(Signature* sig, TypeMapper* m) {
-	TSC_UNREACHABLE("instantiateSignature — owned by signatures slice");
-}
-Signature* Checker::instantiateSignatureEx(Signature* sig, TypeMapper* m,
-	bool eraseTypeParameters) {
-	TSC_UNREACHABLE("instantiateSignatureEx — owned by signatures slice");
-}
 InferenceContext* Checker::newInferenceContext(
 	const std::vector<Type*>& typeParameters, Signature* signature,
 	InferenceFlags flags, TypeComparer compareTypes) {
@@ -3095,45 +2990,14 @@ void Checker::applyToReturnTypes(Signature* source, Signature* target,
 Type* Checker::getEffectiveRestType(Signature* signature) {
 	TSC_UNREACHABLE("getEffectiveRestType — owned by relater.go slice");
 }
-Type* Checker::getConstraintOfTypeParameter(Type* typeParameter) {
-	TSC_UNREACHABLE("getConstraintOfTypeParameter — owned by checker.go:17379 slice");
-}
 bool Checker::isTypeAssignableToKind(Type* source, TypeFlags kind) {
 	TSC_UNREACHABLE("isTypeAssignableToKind — owned by checker.go:28107 slice");
-}
-bool Checker::isGenericType(Type* t) {
-	TSC_UNREACHABLE("isGenericType — owned by checker.go:25334 slice");
-}
-bool Checker::isGenericTupleType(Type* t) {
-	TSC_UNREACHABLE("isGenericTupleType — owned by checker.go:25370 slice");
 }
 Type* Checker::getKnownKeysOfTupleType(Type* t) {
 	TSC_UNREACHABLE("getKnownKeysOfTupleType — owned by relater.go slice");
 }
-Type* Checker::getRestTypeOfTupleType(Type* t) {
-	TSC_UNREACHABLE("getRestTypeOfTupleType — owned by checker.go:25317 slice");
-}
-bool Checker::isArrayOrTupleType(Type* t) {
-	TSC_UNREACHABLE("isArrayOrTupleType — owned by checker.go:23962 slice");
-}
-bool Checker::isArrayOrTupleOrIntersection(Type* t) {
-	TSC_UNREACHABLE("isArrayOrTupleOrIntersection — owned by checker.go:24017 slice");
-}
 MappedTypeNameTypeKind Checker::getMappedTypeNameTypeKind(Type* t) {
 	TSC_UNREACHABLE("getMappedTypeNameTypeKind — owned by checker.go:27308 slice");
-}
-Type* Checker::getTemplateTypeFromMappedType(Type* t) {
-	TSC_UNREACHABLE("getTemplateTypeFromMappedType — owned by checker.go:23118 slice");
-}
-bool Checker::isMappedTypeWithKeyofConstraintDeclaration(Type* t) {
-	TSC_UNREACHABLE(
-		"isMappedTypeWithKeyofConstraintDeclaration — owned by checker.go:23130 slice");
-}
-void Checker::forEachMappedTypePropertyKeyTypeAndIndexSignatureKeyType(
-	Type* t, TypeFlags include, bool stringsOnly,
-	const std::function<void(Type*)>& cb) {
-	TSC_UNREACHABLE(
-		"forEachMappedTypePropertyKeyTypeAndIndexSignatureKeyType — owned by checker.go:23148 slice");
 }
 Type* Checker::getModifiersTypeFromMappedType(Type* t) {
 	TSC_UNREACHABLE("getModifiersTypeFromMappedType — owned by checker.go:28593 slice");
@@ -3183,9 +3047,6 @@ Ternary Checker::compareProperties(Symbol* sourceProp, Symbol* targetProp,
 bool Checker::isMixinConstructorType(Type* t) {
 	TSC_UNREACHABLE("isMixinConstructorType — owned by checker.go:17346 slice");
 }
-int Checker::getParameterCount(Signature* signature) {
-	TSC_UNREACHABLE("getParameterCount — owned by relater.go slice");
-}
 bool Checker::hasEffectiveRestParameter(Signature* signature) {
 	TSC_UNREACHABLE("hasEffectiveRestParameter — owned by relater.go slice");
 }
@@ -3200,9 +3061,6 @@ int Checker::getMinArgumentCount(Signature* signature) {
 }
 std::string Checker::getParameterNameAtPosition(Signature* signature, int pos) {
 	TSC_UNREACHABLE("getParameterNameAtPosition — owned by relater.go slice");
-}
-std::vector<Type*> Checker::getTypeArgumentsFromNode(Node* node) {
-	TSC_UNREACHABLE("getTypeArgumentsFromNode — owned by checker.go:23673 slice");
 }
 Type* Checker::getIndexedAccessType(Type* objectType, Type* indexType) {
 	TSC_UNREACHABLE("getIndexedAccessType — owned by checker.go:27389 slice");

@@ -1702,68 +1702,12 @@ void Checker::reportImplicitAny(Node* declaration, Type* t, WideningKind widenin
 	TSC_UNREACHABLE("reportImplicitAny — decltypes slice");
 }
 // owner: signatures slice (checker.go:20143-20986)
-bool Checker::hasBindableName(Node* node) {
-	TSC_UNREACHABLE("hasBindableName — signatures slice");
-}
-Signature* Checker::getSignatureFromDeclaration(Node* declaration) {
-	TSC_UNREACHABLE("getSignatureFromDeclaration — signatures slice");
-}
-std::vector<Signature*> Checker::getSignaturesOfSymbol(Symbol* symbol) {
-	TSC_UNREACHABLE("getSignaturesOfSymbol — signatures slice");
-}
-bool Checker::functionHasImplicitReturn(Node* fn) {
-	TSC_UNREACHABLE("functionHasImplicitReturn — signatures slice");
-}
-Type* Checker::unwrapReturnType(Type* returnType, FunctionFlags functionFlags) {
-	TSC_UNREACHABLE("unwrapReturnType — signatures slice");
-}
 // owner: members slice (checker.go:19186-20143, 20987-22284)
-Signature* Checker::getErasedSignature(Signature* signature) {
-	TSC_UNREACHABLE("getErasedSignature — members slice");
-}
-Type* Checker::getReturnTypeFromAnnotation(Node* declaration) {
-	TSC_UNREACHABLE("getReturnTypeFromAnnotation — members slice");
-}
-Type* Checker::getReducedType(Type* t) { TSC_UNREACHABLE("getReducedType — members slice"); }
 ModifierFlags Checker::getCombinedModifierFlagsCached(Node* node) {
 	TSC_UNREACHABLE("getCombinedModifierFlagsCached — decltypes slice");
 }
 // owner: instantiate slice (checker.go:22285-23219)
-std::vector<Type*> Checker::getEffectiveTypeArguments(Node* node,
-                                                    const std::vector<Type*>& typeParameters) {
-	TSC_UNREACHABLE("getEffectiveTypeArguments — instantiate slice");
-}
-Type* Checker::getDefaultFromTypeParameter(Type* t) {
-	TSC_UNREACHABLE("getDefaultFromTypeParameter — instantiate slice");
-}
-Type* Checker::getResolvedTypeParameterDefault(Type* t) {
-	TSC_UNREACHABLE("getResolvedTypeParameterDefault — instantiate slice");
-}
-Type* Checker::getNameTypeFromMappedType(Type* t) {
-	TSC_UNREACHABLE("getNameTypeFromMappedType — instantiate slice");
-}
 // owner: typenodes slice (checker.go:23220-25738)
-Type* Checker::getTypeFromThisTypeNode(Node* node) {
-	TSC_UNREACHABLE("getTypeFromThisTypeNode — typenodes slice");
-}
-Type* Checker::getTypeFromTypeLiteralOrFunctionOrConstructorTypeNode(Node* node) {
-	TSC_UNREACHABLE("getTypeFromTypeLiteralOrFunctionOrConstructorTypeNode — typenodes slice");
-}
-Type* Checker::getTypeFromIndexedAccessTypeNode(Node* node) {
-	TSC_UNREACHABLE("getTypeFromIndexedAccessTypeNode — typenodes slice");
-}
-Type* Checker::getTypeFromTypeQueryNode(Node* node) {
-	TSC_UNREACHABLE("getTypeFromTypeQueryNode — typenodes slice");
-}
-Type* Checker::getTypeFromMappedTypeNode(Node* node) {
-	TSC_UNREACHABLE("getTypeFromMappedTypeNode — typenodes slice");
-}
-ElementFlags Checker::getTupleElementFlags(Node* node) {
-	TSC_UNREACHABLE("getTupleElementFlags — typenodes slice");
-}
-bool Checker::isArrayLikeType(Type* t) {
-	TSC_UNREACHABLE("isArrayLikeType — typenodes slice");
-}
 Type* Checker::getNullableType(Type* t, TypeFlags flags) {
 	TSC_UNREACHABLE("getNullableType — typenodes slice");
 }
@@ -1832,12 +1776,6 @@ void Checker::checkImportAttributes(Node* node) {
 }
 ModifierFlags Checker::getTypeParameterModifiers(Type* typeParameter) {
 	TSC_UNREACHABLE("getTypeParameterModifiers — decltypes slice");
-}
-Type* Checker::getDeclaredTypeOfTypeParameter(Symbol* symbol) {
-	TSC_UNREACHABLE("getDeclaredTypeOfTypeParameter — decltypes slice");
-}
-bool Checker::isTypeAssignableTo(Type* source, Type* target) {
-	TSC_UNREACHABLE("isTypeAssignableTo — relater slice");
 }
 
 }  // namespace tsc::checker

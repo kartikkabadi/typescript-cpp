@@ -1317,12 +1317,6 @@ int Checker::getTypeReferenceArity(Type* t) {
 		interfaceTypeTypeParameters(targetInterfaceType(t)).size());
 }
 
-bool Checker::isArrayType(Type* t) {
-	return (t->objectFlags & ObjectFlagsReference) &&
-		   (typeTarget(t) == globalArrayType ||
-			typeTarget(t) == globalReadonlyArrayType);
-}
-
 bool Checker::isReadonlyArrayType(Type* t) {
 	return (t->objectFlags & ObjectFlagsReference) &&
 		   typeTarget(t) == globalReadonlyArrayType;
@@ -2084,23 +2078,6 @@ Type* Checker::getRestrictiveInstantiation(Type* t) {
 	return result;
 }
 
-Type* Checker::getRestrictiveTypeParameter(Type* t) {
-	if ((t->AsTypeParameter()->constraint == nullptr &&
-		 getConstraintDeclaration(t) == nullptr) ||
-		t->AsTypeParameter()->constraint == noConstraintType) {
-		return t;
-	}
-	CachedTypeKey key{CachedTypeKind::RestrictiveTypeParameter, t->id};
-	auto it = cachedTypes.find(key);
-	if (it != cachedTypes.end()) {
-		return it->second;
-	}
-	Type* result = newTypeParameter(t->symbol);
-	result->AsTypeParameter()->constraint = noConstraintType;
-	cachedTypes[key] = result;
-	return result;
-}
-
 // NOTE: restrictiveMapperWorker and permissiveMapperWorker are already ported
 // in checker.cpp (~4488, ~4495) — not duplicated here.
 
@@ -2497,70 +2474,8 @@ Type* Checker::getTupleElementTypeOutOfStartCount(Type* t, Number index,
 	});
 }
 
-bool Checker::isGenericType(Type* t) {
-	return getGenericObjectFlags(t) != 0;
-}
-
 bool Checker::isGenericObjectType(Type* t) {
 	return (getGenericObjectFlags(t) & ObjectFlagsIsGenericObjectType) != 0;
-}
-
-bool Checker::isGenericIndexType(Type* t) {
-	return (getGenericObjectFlags(t) & ObjectFlagsIsGenericIndexType) != 0;
-}
-
-ObjectFlags Checker::getGenericObjectFlags(Type* t) {
-	ObjectFlags combinedFlags = ObjectFlagsNone;
-	if (t->flags & (TypeFlagsUnionOrIntersection | TypeFlagsSubstitution)) {
-		if (!(t->objectFlags & ObjectFlagsIsGenericTypeComputed)) {
-			if (t->flags & TypeFlagsUnionOrIntersection) {
-				for (Type* u : t->types()) {
-					combinedFlags |= getGenericObjectFlags(u);
-				}
-			} else {
-				combinedFlags =
-					getGenericObjectFlags(t->AsSubstitutionType()->baseType) |
-					getGenericObjectFlags(t->AsSubstitutionType()->constraint);
-			}
-			t->objectFlags |= ObjectFlagsIsGenericTypeComputed | combinedFlags;
-		}
-		return t->objectFlags & ObjectFlagsIsGenericType;
-	}
-	if ((t->flags & TypeFlagsInstantiableNonPrimitive) ||
-		isGenericMappedType(t) || isGenericTupleType(t)) {
-		combinedFlags |= ObjectFlagsIsGenericObjectType;
-	}
-	if ((t->flags & (TypeFlagsInstantiableNonPrimitive | TypeFlagsIndex)) ||
-		isGenericStringLikeType(t)) {
-		combinedFlags |= ObjectFlagsIsGenericIndexType;
-	}
-	return combinedFlags;
-}
-
-bool Checker::isGenericTupleType(Type* t) {
-	return isTupleType(t) &&
-		   (targetTupleType(t)->combinedFlags & ElementFlagsVariadic);
-}
-
-bool Checker::isGenericMappedType(Type* t) {
-	if (t->objectFlags & ObjectFlagsMapped) {
-		Type* constraint = getConstraintTypeFromMappedType(t);
-		if (isGenericIndexType(constraint)) {
-			return true;
-		}
-		// A mapped type is generic if the 'as' clause references generic types
-		// other than the iteration type. To determine this, we substitute the
-		// constraint type (that we now know isn't generic) for the iteration
-		// type and check whether the resulting type is generic.
-		Type* nameType = getNameTypeFromMappedType(t);
-		if (nameType != nullptr &&
-			isGenericIndexType(instantiateType(
-				nameType, newSimpleTypeMapper(
-							  getTypeParameterFromMappedType(t), constraint)))) {
-			return true;
-		}
-	}
-	return false;
 }
 
 /**
@@ -2668,38 +2583,8 @@ Type* Checker::getImpliedConstraint(Type* t, Node* checkNode,
 // decltypes, members, signatures, printer, flow.
 // ---------------------------------------------------------------------------
 
-Type* Checker::getNullableType(Type* t, TypeFlags flags) {
-	TSC_UNREACHABLE("getNullableType — typenodes dep");
-}
-
 Type* Checker::addOptionality(Type* t) {
 	TSC_UNREACHABLE("addOptionality — typenodes dep");
-}
-
-Type* Checker::addOptionalityEx(Type* t, bool isProperty, bool isOptional) {
-	TSC_UNREACHABLE("addOptionalityEx — typenodes dep");
-}
-
-Type* Checker::getIndexedAccessType(Type* objectType, Type* indexType) {
-	TSC_UNREACHABLE("getIndexedAccessType — typenodes dep");
-}
-
-Type* Checker::getIndexedAccessTypeEx(Type* objectType, Type* indexType,
-									  AccessFlags accessFlags,
-									  Node* accessNode, TypeAlias* alias) {
-	TSC_UNREACHABLE("getIndexedAccessTypeEx — typenodes dep");
-}
-
-Type* Checker::getIndexType(Type* t) {
-	TSC_UNREACHABLE("getIndexType — typenodes dep");
-}
-
-Type* Checker::getIndexTypeOfType(Type* t, Type* keyType) {
-	TSC_UNREACHABLE("getIndexTypeOfType — typenodes dep");
-}
-
-std::vector<Type*> Checker::getTypeArguments(Type* t) {
-	TSC_UNREACHABLE("getTypeArguments — typenodes dep");
 }
 
 
@@ -2710,70 +2595,8 @@ std::string Checker::TypeToStringEx(Type* t, Node* enclosingDeclaration,
 	TSC_UNREACHABLE("TypeToStringEx — typenodes dep");
 }
 
-
-
-Symbol* Checker::getPropertyOfTypeEx(Type* type, const std::string& name,
-									 bool skipObjectFunctionPropertyAugment,
-									 bool includeTypeOnlyMembers) {
-	TSC_UNREACHABLE("getPropertyOfTypeEx — typenodes dep");
-}
-
-Type* Checker::instantiateTypeWithAlias(Type* t, TypeMapper* mapper,
-										TypeAlias* alias) {
-	TSC_UNREACHABLE("instantiateTypeWithAlias — typenodes dep");
-}
-
-TypeAlias* Checker::instantiateTypeAlias(TypeAlias* alias, TypeMapper* mapper) {
-	TSC_UNREACHABLE("instantiateTypeAlias — typenodes dep");
-}
-
-InferenceContext* Checker::newInferenceContext(
-	const std::vector<Type*>& typeParameters, Signature* signature,
-	InferenceFlags flags,
-	std::function<Ternary(Type*, Type*, bool)> compareTypes) {
-	TSC_UNREACHABLE("newInferenceContext — typenodes dep");
-}
-
-void Checker::inferTypes(std::vector<InferenceInfo*>& inferences,
-						 Type* originalSource, Type* originalTarget,
-						 InferencePriority priority, bool contravariant) {
-	TSC_UNREACHABLE("inferTypes — typenodes dep");
-}
-
-Type* Checker::getActualTypeVariable(Type* t) {
-	TSC_UNREACHABLE("getActualTypeVariable — typenodes dep");
-}
-
 Node* Checker::getConstraintDeclaration(Type* type) {
 	TSC_UNREACHABLE("getConstraintDeclaration — typenodes dep");
-}
-
-bool Checker::isTypeParameterPossiblyReferenced(Type* tp, Node* node) {
-	TSC_UNREACHABLE("isTypeParameterPossiblyReferenced — typenodes dep");
-}
-
-Type* Checker::getHomomorphicTypeVariable(Type* type) {
-	TSC_UNREACHABLE("getHomomorphicTypeVariable — typenodes dep");
-}
-
-Type* Checker::getTypeParameterFromMappedType(Type* type) {
-	TSC_UNREACHABLE("getTypeParameterFromMappedType — typenodes dep");
-}
-
-Type* Checker::getConstraintTypeFromMappedType(Type* type) {
-	TSC_UNREACHABLE("getConstraintTypeFromMappedType — typenodes dep");
-}
-
-Type* Checker::getNameTypeFromMappedType(Type* type) {
-	TSC_UNREACHABLE("getNameTypeFromMappedType — typenodes dep");
-}
-
-Type* Checker::getConstraintOfTypeParameter(Type* typeParameter) {
-	TSC_UNREACHABLE("getConstraintOfTypeParameter — typenodes dep");
-}
-
-Type* Checker::getSubstitutionType(Type* baseType, Type* constraint) {
-	TSC_UNREACHABLE("getSubstitutionType — typenodes dep");
 }
 
 Type* Checker::getInstantiationExpressionType(Type* exprType, Node* node) {

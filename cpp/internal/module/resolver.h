@@ -463,4 +463,9 @@ std::vector<std::string> GetAutomaticTypeDirectiveNames(
 
 std::string_view moduleResolutionKindToString(ModuleResolutionKind kind);
 
+// GetResolutionDiagnostic — util.go:125 (ported with program slice).
+const DiagnosticMessage* getResolutionDiagnostic(
+    const CompilerOptions* options, const ResolvedModule& resolvedModule,
+    SourceFile* file);
+
 }  // namespace tsc::module

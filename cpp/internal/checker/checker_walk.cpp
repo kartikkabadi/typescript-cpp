@@ -781,10 +781,6 @@ Node* Checker::getContextNode(Node* node) {
 	return node;
 }
 
-Type* Checker::checkExpressionCached(Node* node) {
-	return checkExpressionCachedEx(node, CheckModeNormal);
-}
-
 Type* Checker::checkExpressionCachedEx(Node* node, CheckMode checkMode) {
 	if (checkMode != CheckModeNormal) {
 		return checkExpressionEx(node, checkMode);
@@ -819,10 +815,6 @@ Type* Checker::getContextFreeTypeOfExpression(Node* node) {
 	contextFreeTypes[node] = t;
 	popContextualType();
 	return t;
-}
-
-Type* Checker::checkExpression(Node* node) {
-	return checkExpressionEx(node, CheckModeNormal);
 }
 
 Type* Checker::checkExpressionEx(Node* node, CheckMode checkMode) {
@@ -1137,7 +1129,6 @@ void Checker::skippedGenericFunction(Node* node, CheckMode checkMode) {
 // (grammar dep-stubs removed — grammarchecks slice landed the real definitions.)
 
 // owner: flow slice (flow.go)
-bool Checker::isReachableFlowNode(FlowNode* flow) { TSC_UNREACHABLE("isReachableFlowNode — flow slice"); }
 
 // owner: contextual slice
 Type* Checker::getAwaitedType(Type* t) { TSC_UNREACHABLE("getAwaitedType — contextual slice"); }
@@ -1149,29 +1140,19 @@ void Checker::popContextualType() { TSC_UNREACHABLE("popContextualType — conte
 void Checker::pushInferenceContext(Node* node, InferenceContext* inferenceContext) { TSC_UNREACHABLE("pushInferenceContext — contextual slice"); }
 void Checker::popInferenceContext() { TSC_UNREACHABLE("popInferenceContext — contextual slice"); }
 InferenceContext* Checker::getInferenceContext(Node* node) { TSC_UNREACHABLE("getInferenceContext — contextual slice"); }
-Type* Checker::instantiateContextualType(Type* contextualType, Node* node, ContextFlags contextFlags) { TSC_UNREACHABLE("instantiateContextualType — contextual slice"); }
 
 // owner: typenodes slice
-Type* Checker::getTypeFromTypeNode(Node* node) { TSC_UNREACHABLE("getTypeFromTypeNode — typenodes slice"); }
 
 // owner: decltypes slice (checker.go:16720-19097)
 Type* Checker::GetNonNullableType(Type* t) { TSC_UNREACHABLE("GetNonNullableType — decltypes slice"); }
 // widen slice landed in checker_widen.cpp — its stubs here were removed.
 
 // owner: members slice
-Signature* Checker::getSingleSignature(Type* t, SignatureKind kind, bool allowMembers) { TSC_UNREACHABLE("getSingleSignature — members slice"); }
-Signature* Checker::getSingleCallOrConstructSignature(Type* t) { TSC_UNREACHABLE("getSingleCallOrConstructSignature — members slice"); }
-Signature* Checker::getSignatureInstantiationWithoutFillingInTypeArguments(Signature* sig, const std::vector<Type*>& typeArguments) { TSC_UNREACHABLE("getSignatureInstantiationWithoutFillingInTypeArguments — members slice"); }
-Type* Checker::getOrCreateTypeFromSignature(Signature* sig) { TSC_UNREACHABLE("getOrCreateTypeFromSignature — members slice"); }
 Signature* Checker::instantiateSignatureInContextOf(Signature* signature, Signature* contextualSignature, InferenceContext* inferenceContext, TypeMapper* compareTypes) { TSC_UNREACHABLE("instantiateSignatureInContextOf — members slice"); }
-Symbol* Checker::getPropertyOfType(Type* t, const std::string& name) { TSC_UNREACHABLE("getPropertyOfType — members slice"); }
 
 // owner: signatures slice
-Type* Checker::getReturnTypeOfSignature(Signature* sig) { TSC_UNREACHABLE("getReturnTypeOfSignature — signatures slice"); }
 
 // owner: decltypes slice
-Type* Checker::getTypeOfSymbol(Symbol* symbol) { TSC_UNREACHABLE("getTypeOfSymbol — decltypes slice"); }
-Type* Checker::getDeclaredTypeOfSymbol(Symbol* symbol) { TSC_UNREACHABLE("getDeclaredTypeOfSymbol — decltypes slice"); }
 
 // owner: typeops slice
 bool Checker::maybeTypeOfKind(Type* type, TypeFlags flags) { TSC_UNREACHABLE("maybeTypeOfKind — typeops slice"); }
@@ -1179,9 +1160,6 @@ void Checker::markPropertyAsReferenced(Symbol* symbol, Node* nodeForCheckWriteOn
 
 // owner: inference slice (inference.go)
 bool Checker::isSkipDirectInferenceNode(Node* node) { TSC_UNREACHABLE("isSkipDirectInferenceNode — inference slice"); }
-void Checker::inferTypes(std::vector<InferenceInfo*>& inferences, Type* originalSource, Type* originalTarget, InferencePriority priority, bool contravariant) { TSC_UNREACHABLE("inferTypes — inference slice"); }
-void Checker::applyToParameterTypes(Signature* source, Signature* target, const std::function<void(Type*, Type*)>& callback) { TSC_UNREACHABLE("applyToParameterTypes — inference slice"); }
-void Checker::applyToReturnTypes(Signature* source, Signature* target, const std::function<void(Type*, Type*)>& callback) { TSC_UNREACHABLE("applyToReturnTypes — inference slice"); }
 bool Checker::hasOverlappingInferences(std::vector<InferenceInfo*>& a, std::vector<InferenceInfo*>& b) { TSC_UNREACHABLE("hasOverlappingInferences — inference slice"); }
 void Checker::mergeInferences(std::vector<InferenceInfo*>& target, const std::vector<InferenceInfo*>& source) { TSC_UNREACHABLE("mergeInferences — inference slice"); }
 // `newInferenceInfo` / `hasInferenceCandidates` are free fns (inference.go:1626,1651):
@@ -1207,7 +1185,6 @@ Type* Checker::checkFunctionExpressionOrObjectLiteralMethod(Node* node, CheckMod
 Type* Checker::checkAssertion(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkAssertion — expressions slice"); }
 Type* Checker::checkTypeOfExpression(Node* node) { TSC_UNREACHABLE("checkTypeOfExpression — expressions slice"); }
 Type* Checker::checkNonNullAssertion(Node* node) { TSC_UNREACHABLE("checkNonNullAssertion — expressions slice"); }
-Type* Checker::checkExpressionWithTypeArguments(Node* node) { TSC_UNREACHABLE("checkExpressionWithTypeArguments — expressions slice"); }
 Type* Checker::checkSatisfiesExpression(Node* node) { TSC_UNREACHABLE("checkSatisfiesExpression — expressions slice"); }
 Type* Checker::checkMetaProperty(Node* node) { TSC_UNREACHABLE("checkMetaProperty — expressions slice"); }
 Type* Checker::checkDeleteExpression(Node* node) { TSC_UNREACHABLE("checkDeleteExpression — expressions slice"); }
@@ -1227,7 +1204,6 @@ Type* Checker::checkJsxFragment(Node* node) { TSC_UNREACHABLE("checkJsxFragment 
 Type* Checker::checkJsxAttributes(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkJsxAttributes — jsx slice"); }
 Type* Checker::checkNonNullExpression(Node* node) { TSC_UNREACHABLE("checkNonNullExpression — expressions slice"); }
 bool Checker::isSymbolOrSymbolForCall(Node* node) { TSC_UNREACHABLE("isSymbolOrSymbolForCall — expressions slice"); }
-Symbol* Checker::lookupSymbolForPrivateIdentifierDeclaration(const std::string& name, Node* location) { TSC_UNREACHABLE("lookupSymbolForPrivateIdentifierDeclaration — expressions slice"); }
 
 // owner: deferred-check callees (wave-3)
 Signature* Checker::resolveUntypedCall(Node* node) { TSC_UNREACHABLE("resolveUntypedCall — call-resolution slice"); }
@@ -1241,22 +1217,7 @@ void Checker::checkContextualDeprecations(Node* node) { TSC_UNREACHABLE("checkCo
 // owner: walker per-node checks (wave-3)
 void Checker::checkVariableStatement(Node* node) { TSC_UNREACHABLE("checkVariableStatement — declchecks slice"); }
 void Checker::checkExpressionStatement(Node* node) { TSC_UNREACHABLE("checkExpressionStatement — stmtchecks slice"); }
-void Checker::checkIfStatement(Node* node) { TSC_UNREACHABLE("checkIfStatement — stmtchecks slice"); }
-void Checker::checkDoStatement(Node* node) { TSC_UNREACHABLE("checkDoStatement — stmtchecks slice"); }
-void Checker::checkWhileStatement(Node* node) { TSC_UNREACHABLE("checkWhileStatement — stmtchecks slice"); }
-void Checker::checkForStatement(Node* node) { TSC_UNREACHABLE("checkForStatement — stmtchecks slice"); }
-void Checker::checkForInStatement(Node* node) { TSC_UNREACHABLE("checkForInStatement — stmtchecks slice"); }
-void Checker::checkForOfStatement(Node* node) { TSC_UNREACHABLE("checkForOfStatement — stmtchecks slice"); }
-void Checker::checkBreakOrContinueStatement(Node* node) { TSC_UNREACHABLE("checkBreakOrContinueStatement — stmtchecks slice"); }
-void Checker::checkReturnStatement(Node* node) { TSC_UNREACHABLE("checkReturnStatement — stmtchecks slice"); }
-void Checker::checkWithStatement(Node* node) { TSC_UNREACHABLE("checkWithStatement — stmtchecks slice"); }
-void Checker::checkSwitchStatement(Node* node) { TSC_UNREACHABLE("checkSwitchStatement — stmtchecks slice"); }
-void Checker::checkLabeledStatement(Node* node) { TSC_UNREACHABLE("checkLabeledStatement — stmtchecks slice"); }
-void Checker::checkThrowStatement(Node* node) { TSC_UNREACHABLE("checkThrowStatement — stmtchecks slice"); }
-void Checker::checkTryStatement(Node* node) { TSC_UNREACHABLE("checkTryStatement — stmtchecks slice"); }
 void Checker::checkVariableDeclaration(Node* node) { TSC_UNREACHABLE("checkVariableDeclaration — declchecks slice"); }
-void Checker::checkBindingElement(Node* node) { TSC_UNREACHABLE("checkBindingElement — declchecks slice"); }
-void Checker::checkClassDeclaration(Node* node) { TSC_UNREACHABLE("checkClassDeclaration — declchecks slice"); }
 void Checker::checkInterfaceDeclaration(Node* node) { TSC_UNREACHABLE("checkInterfaceDeclaration — declchecks slice"); }
 void Checker::checkTypeAliasDeclaration(Node* node) { TSC_UNREACHABLE("checkTypeAliasDeclaration — declchecks slice"); }
 void Checker::checkEnumDeclaration(Node* node) { TSC_UNREACHABLE("checkEnumDeclaration — declchecks slice"); }

@@ -348,7 +348,5 @@ bool Checker::isLiteralOfContextualType(Type* candidateType, Type* contextualTyp
 // ---------------------------------------------------------------------------
 
 // owner: typeops slice (checker.go:26020-28654)
-Type* Checker::getBaseConstraintOrType(Type* t) { TSC_UNREACHABLE("getBaseConstraintOrType — typeops slice"); }
-Type* Checker::getBaseConstraintOfType(Type* t) { TSC_UNREACHABLE("getBaseConstraintOfType — typeops slice"); }
 
 }  // namespace tsc::checker

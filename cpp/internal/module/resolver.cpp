@@ -3163,4 +3163,72 @@ resolutionState::getMatchedStarForPatternEntrypoint(
 	return {"", false};
 }
 
+
+// GetResolutionDiagnostic — util.go:125 (ported with program slice).
+const DiagnosticMessage* getResolutionDiagnostic(
+    const CompilerOptions* options, const ResolvedModule& resolvedModule,
+    SourceFile* file) {
+	if (resolvedModule.ResolvedUsingExtraExtensions) {
+		return nullptr;
+	}
+
+	const std::string& extension = resolvedModule.Extension;
+	// Needing a resolution diagnostic means these two things are in conflict:
+	// - the current file's syntax (e.g. needJsx || needAllowJs)
+	// - the resolved file's extension (tsx, jsx, js, mjs, cjs, json or
+	//   arbitrary extension)
+
+	auto needJsx = [&]() -> const DiagnosticMessage* {
+		if (options->Jsx != JsxEmit::None) {
+			return nullptr;
+		}
+		return Module_0_was_resolved_to_1_but_jsx_is_not_set;
+	};
+	auto needAllowJs = [&]() -> const DiagnosticMessage* {
+		if (options->GetAllowJS() ||
+		    !options->DefaultIfUnknown(options->NoImplicitAny,
+		                               options->Strict)) {
+			return nullptr;
+		}
+		return Could_not_find_a_declaration_file_for_module_0_1_implicitly_has_an_any_type;
+	};
+	auto needResolveJsonModule = [&]() -> const DiagnosticMessage* {
+		if (options->GetResolveJsonModule()) {
+			return nullptr;
+		}
+		return Module_0_was_resolved_to_1_but_resolveJsonModule_is_not_used;
+	};
+	auto needAllowArbitraryExtensions = [&]() -> const DiagnosticMessage* {
+		if (file->IsDeclarationFile ||
+		    tristateIsTrue(options->AllowArbitraryExtensions)) {
+			return nullptr;
+		}
+		return Module_0_was_resolved_to_1_but_allowArbitraryExtensions_is_not_set;
+	};
+
+	if (extension == tspath::extensionTs || extension == tspath::extensionDts ||
+	    extension == tspath::extensionMts ||
+	    extension == tspath::extensionDmts ||
+	    extension == tspath::extensionCts ||
+	    extension == tspath::extensionDcts) {
+		return nullptr;
+	}
+	if (extension == tspath::extensionTsx) {
+		return needJsx();
+	}
+	if (extension == tspath::extensionJsx) {
+		if (auto* msg = needJsx()) return msg;
+		return needAllowJs();
+	}
+	if (extension == tspath::extensionJs ||
+	    extension == tspath::extensionMjs ||
+	    extension == tspath::extensionCjs) {
+		return needAllowJs();
+	}
+	if (extension == tspath::extensionJson) {
+		return needResolveJsonModule();
+	}
+	return needAllowArbitraryExtensions();
+}
+
 }  // namespace tsc::module

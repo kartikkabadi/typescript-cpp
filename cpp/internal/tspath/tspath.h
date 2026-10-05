@@ -809,6 +809,28 @@ inline const std::vector<std::string_view> supportedTSImplementationExtensions =
 	extensionTs, extensionTsx, extensionMts, extensionCts};
 inline const std::vector<std::string_view> supportedJSExtensionsFlat = {
 	extensionJs, extensionJsx, extensionMjs, extensionCjs};
+inline const std::vector<std::vector<std::string_view>> allSupportedExtensions = {
+	{extensionTs, extensionTsx, extensionDts, extensionJs, extensionJsx},
+	{extensionCts, extensionDcts, extensionCjs},
+	{extensionMts, extensionDmts, extensionMjs}};
+inline const std::vector<std::vector<std::string_view>> supportedTSExtensions = {
+	{extensionTs, extensionTsx, extensionDts},
+	{extensionCts, extensionDcts},
+	{extensionMts, extensionDmts}};
+inline const std::vector<std::vector<std::string_view>> supportedJSExtensions = {
+	{extensionJs, extensionJsx}, {extensionMjs}, {extensionCjs}};
+inline const std::vector<std::vector<std::string_view>>
+	allSupportedExtensionsWithJson = [] {
+		auto v = allSupportedExtensions;
+		v.push_back({extensionJson});
+		return v;
+	}();
+inline const std::vector<std::vector<std::string_view>>
+	supportedTSExtensionsWithJson = [] {
+		auto v = supportedTSExtensions;
+		v.push_back({extensionJson});
+		return v;
+	}();
 inline const std::vector<std::string_view> supportedTSExtensionsWithJsonFlat = {
 	extensionTs, extensionTsx, extensionDts, extensionCts, extensionDcts,
 	extensionMts, extensionDmts, extensionJson};
@@ -1120,6 +1142,15 @@ inline T forEachAncestorDirectoryStoppingAtGlobalCache(
 		    return std::pair{std::move(result), false};
 	    });
 	return std::move(result);
+}
+
+// path.go: GetNormalizedAbsolutePathWithoutRoot (program slice).
+inline std::string getNormalizedAbsolutePathWithoutRoot(
+    std::string_view fileName, std::string_view currentDirectory) {
+	std::string absolutePath =
+	    getNormalizedAbsolutePath(fileName, currentDirectory);
+	int rootLength = getRootLength(absolutePath);
+	return absolutePath.substr(rootLength);
 }
 
 }  // namespace tsc::tspath
