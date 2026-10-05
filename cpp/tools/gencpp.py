@@ -520,6 +520,38 @@ def gen_nodes():
         calls = re.findall(r"(visitModifiers|visitNodeList|visit)\(v, node\.(\w+)\)", body)
         foreach[sname] = calls
 
+    # Update* factory methods (Go: func (f *NodeFactory) UpdateX(node *X, ...) *Node)
+    upd_methods = {}   # sname -> (uname, [(argname, gtype)], body)
+    for m in re.finditer(
+            r"func \(f \*NodeFactory\) (Update\w+)\(node \*(\w+), (.*?)\) \*Node \{\n(.*?)\n\}",
+            src_all, re.S):
+        uname, sname, args_src, body = m.groups()
+        args = []
+        for argm in re.finditer(r"(\w+)\s+([^\s,\)]+(?:\[\]\*?\w+)?)", args_src):
+            args.append((argm.group(1), argm.group(2)))
+        upd_methods[sname] = (uname, args, body)
+
+    # VisitEachChild bodies per struct (Go: func (node *X) VisitEachChild(v *NodeVisitor) *Node)
+    vec_methods = {}
+    for m in re.finditer(
+            r"func \(node \*(\w+)\) VisitEachChild\(v \*NodeVisitor\) \*Node \{\n(.*?)\n\}",
+            src_all, re.S):
+        vec_methods[m.group(1)] = m.group(2)
+
+    # visitEachChild_* helpers some VisitEachChild bodies delegate to
+    vec_helpers = {}
+    for m in re.finditer(
+            r"func visitEachChild_(\w+)\(node \*(\w+), v \*NodeVisitor\) \*Node \{\n(.*?)\n\}",
+            src_all, re.S):
+        vec_helpers[m.group(2)] = m.group(3)
+
+    # Clone bodies per struct (Go: func (node *X) Clone(f NodeFactoryCoercible) *Node)
+    clone_methods = {}
+    for m in re.finditer(
+            r"func \(node \*(\w+)\) Clone\(f NodeFactoryCoercible\) \*Node \{\n(.*?)\n\}",
+            src_all, re.S):
+        clone_methods[m.group(1)] = m.group(2)
+
     # Simple accessors: func (node *X) Foo() *T { return node.f }
     accessors = {}  # accessor -> {struct: (ret_type, field)}
     acc_pat = re.compile(
@@ -585,6 +617,10 @@ def gen_nodes():
             "\tconst std::vector<::tsc::TextPos>& ecmaLineMap();\n"
             "\tstd::vector<::tsc::Node*> resolveJSDoc(::tsc::Node* n);\n"
             "\tvoid setHasLazyJSDoc(bool lazy) { hasLazyJSDoc = lazy; }\n"
+            "\tconst std::string& FileName() const { return fileName; }\n"
+            "\tconst std::string& Path() const { return fileName; }\n"
+            "\t::tsc::Arena nodeArena;\n"
+            "\tvoid copyFrom(SourceFile* other);\n"
         ),
     }
 
@@ -647,6 +683,113 @@ def gen_nodes():
             out.append("\treturn node;\n}\n\n")
         else:
             out.append(f"\treturn newNode({k}, data);\n}}\n\n")
+
+    # ---- Update* methods ----
+    # Go `UpdateX` bodies all follow `if (args differ) return updateNode(
+    # f.NewX(args...), node.AsNode(), f.hooks); return node.AsNode()`.
+    NODE_BASE_FIELDS = {"Kind": "kind", "Flags": "flags", "Loc": "loc",
+                      "Parent": "parent", "Id": "id"}
+
+    def go_args(arg_src):
+        """Split a Go call-arg list on top-level commas."""
+        parts, depth, cur = [], 0, ""
+        for ch in arg_src:
+            if ch in "([{":
+                depth += 1
+            elif ch in ")]}":
+                depth -= 1
+            if ch == "," and depth == 0:
+                parts.append(cur)
+                cur = ""
+            else:
+                cur += ch
+        if cur.strip():
+            parts.append(cur)
+        return [p.strip() for p in parts]
+
+    def go_expr(expr, out_recv="node", renames=None):
+        """Translate a Go expression fragment found inside Update*/Clone/
+        VisitEachChild bodies; `node.` field accesses map to `out_recv->`.
+        `renames` maps Go arg names that are C++ keywords to their sanitized
+        form (must match the emitted signature)."""
+        e = expr.strip()
+        if renames:
+            for go_name, cpp_name in renames.items():
+                e = re.sub(r"\b" + re.escape(go_name) + r"\b", cpp_name, e)
+        e = re.sub(r"!core\.Same\(([^,()]+),\s*([^()]+)\)",
+                   r"(\1 != \2)", e)
+        e = re.sub(r"core\.Same\(([^,()]+),\s*([^()]+)\)",
+                   r"(\1 == \2)", e)
+        e = e.replace("f.AsNodeFactory().", "f.")
+        e = e.replace("node.AsNode()", out_recv)
+        # node.AsXxx() is the templated cast.
+        e = re.sub(r"node\.As(\w+)\(\)", out_recv + "->as<\\1>()", e)
+        # node.Modifiers()/node.Name()/... are base-class accessors; structs
+        # carry same-named fields (modifiers, name) that would shadow them, so
+        # qualify the call with Node:: explicitly.
+        e = re.sub(r"node\.(\w+)\(\)",
+                   lambda m: out_recv + "->Node::" + m.group(1)[0].lower() +
+                   m.group(1)[1:] + "()", e)
+        e = re.sub(r"node\.(\w+)",
+                   lambda m: out_recv + "->" +
+                   NODE_BASE_FIELDS.get(m.group(1), sanitize(m.group(1))), e)
+        e = re.sub(r"f\.(\w+)\(",
+                   lambda m: m.group(1)[0].lower() + m.group(1)[1:] + "(", e)
+        return e
+
+    out.append("// Update* methods (generated from Update* in\n"
+               "// ast_generated.go + ast.go).\n\n")
+    for sname in sorted(upd_methods):
+        uname, args, body = upd_methods[sname]
+        cxx = uname[0].lower() + uname[1:]
+        sig = ", ".join(f"{go_type_to_cpp(t, node_structs, aliases)} {sanitize(n)}"
+                        for n, t in args)
+        decls.append(f"\tNode* {cxx}({sname}* node, {sig});\n")
+        # Go arg names may be C++ keywords (operator, template, namespace, ...)
+        # — sanitize() renames them in the signature; rewrite them in bodies too.
+        renames = {n: sanitize(n) for n, _ in args if sanitize(n) != n}
+        if sname == "SourceFile":
+            out.append(
+                f"inline Node* NodeFactory::{cxx}({sname}* node, {sig}) {{\n"
+                "\tif (statements != node->Statements ||"
+                " endOfFileToken != node->EndOfFileToken) {\n"
+                "\t\tauto* updated = newSourceFile(node->parseOptions,"
+                " node->text, statements, endOfFileToken)->as<SourceFile>();\n"
+                "\t\tupdated->copyFrom(node);\n"
+                "\t\treturn updateNode(updated, node, hooks);\n"
+                "\t}\n"
+                "\treturn node;\n}\n\n")
+            continue
+        m2 = re.match(
+            r"\s*if (.*?) \{\s*"
+            r"return updateNode\(f\.(\w+)\((.*)\),\s*node\.AsNode\(\),\s*f\.hooks\)\s*\}"
+            r"\s*return node\.AsNode\(\)\s*$", body, re.S)
+        out.append(f"inline Node* NodeFactory::{cxx}({sname}* node, {sig}) {{\n")
+        if m2:
+            cond, newcall = m2.group(1), f"f.{m2.group(2)}({m2.group(3)})"
+            out.append(f"\tif ({go_expr(cond, renames=renames)}) {{\n")
+            out.append(f"\t\treturn updateNode({go_expr(newcall, renames=renames)}, node, hooks);\n")
+            out.append("\t}\n\treturn node;\n}\n\n")
+            continue
+        # Kind-switched variant: `if (args differ) { switch node.Kind { case
+        # K: return updateNode(f.NewY(args), node.AsNode(), f.hooks) ...
+        # default: panic } } return node.AsNode()`
+        m3 = re.match(
+            r"\s*if (.*?) \{\s*switch node\.Kind \{\s*(.*?)\s*default:\s*"
+            r"panic\(.*?\)\s*\}\s*\}\s*return node\.AsNode\(\)\s*$",
+            body, re.S)
+        assert m3, f"unhandled Update body for {sname}: {body[:200]}"
+        cond = m3.group(1)
+        out.append(f"\tif ({go_expr(cond, renames=renames)}) {{\n\t\tswitch (node->kind) {{\n")
+        for cm in re.finditer(
+                r"case (\w+):\s*return updateNode\(f\.(\w+)\((.*?)\),\s*"
+                r"node\.AsNode\(\),\s*f\.hooks\)", m3.group(2), re.S):
+            k, newcall = cm.group(1), f"f.{cm.group(2)}({cm.group(3)})"
+            out.append(f"\t\tcase Kind::{k[4:]}:\n")
+            out.append(f"\t\t\treturn updateNode({go_expr(newcall, renames=renames)}, node, hooks);\n")
+        out.append("\t\tdefault:\n"
+                   f"\t\t\tTSC_UNREACHABLE(\"unexpected kind in {cxx}\");\n"
+                   "\t\t}\n\t}\n\treturn node;\n}\n\n")
 
     # ---- dispatch ----
     out.append("// forEachChild / name / modifiers dispatch (generated).\n\n")
@@ -1139,6 +1282,147 @@ def gen_nodes():
     out.append("\t\tdefault:\n\t\t\treturn computeSubtreeFacts();\n\t}\n}\n\n")
     node_decls.append("\tSubtreeFacts subtreeFacts() const;\n")
 
+    # ---- visitor machinery (visitor.go): Node::clone / Node::visitEachChild /
+    # SourceFile::copyFrom, emitted into nodes_visitor_generated.h which is
+    # included at the end of visitor.h (needs a complete NodeVisitor). ----
+    node_decls.append("\tNode* clone(NodeFactory& f);\n")
+    node_decls.append("\tNode* visitEachChild(NodeVisitor& v);\n")
+
+    vout = ["// Clone + visitEachChild kind dispatch and SourceFile::copyFrom,\n",
+            "// generated from ast_generated.go + ast.go by gencpp.py. DO NOT EDIT.\n",
+            "#pragma once\n\nnamespace tsc {\n\n"]
+
+    # SourceFile::copyFrom (ast.go) — Go stores a *copy* of contentMapperInfo;
+    # our ContentMapperSourceFileInfo is an opaque pointer, so we share it.
+    vout.append(
+        "inline void SourceFile::copyFrom(SourceFile* other) {\n"
+        "\t// Do not copy fields set by newSourceFile (text, fileName,\n"
+        "\t// parseOptions, statements).\n"
+        "\tif (other->contentMapperInfo != nullptr) {\n"
+        "\t\tcontentMapperInfo = other->contentMapperInfo;\n"
+        "\t}\n"
+        "\tLanguageVariant = other->LanguageVariant;\n"
+        "\tScriptKind = other->ScriptKind;\n"
+        "\tIsDeclarationFile = other->IsDeclarationFile;\n"
+        "\tUsesUriStyleNodeCoreModules = other->UsesUriStyleNodeCoreModules;\n"
+        "\timports = other->imports;\n"
+        "\tModuleAugmentations = other->ModuleAugmentations;\n"
+        "\tAmbientModuleNames = other->AmbientModuleNames;\n"
+        "\tCommentDirectives = other->CommentDirectives;\n"
+        "\tPragmas = other->Pragmas;\n"
+        "\tReferencedFiles = other->ReferencedFiles;\n"
+        "\tTypeReferenceDirectives = other->TypeReferenceDirectives;\n"
+        "\tLibReferenceDirectives = other->LibReferenceDirectives;\n"
+        "\tCommonJSModuleIndicator = other->CommonJSModuleIndicator;\n"
+        "\tExternalModuleIndicator = other->ExternalModuleIndicator;\n"
+        "\tflags |= other->flags;\n"
+        "}\n\n")
+
+    # ---- Clone dispatch ----
+    def visit_arg(a):
+        m = re.match(r"v\.(visit\w+)\(node\.(\w+)\)", a.strip())
+        if m:
+            return f"v.{m.group(1)}Hooked(n->{sanitize(m.group(2))})"
+        return go_expr(a, "n")
+
+    vout.append("inline Node* Node::clone(NodeFactory& f) {\n"
+                "\tswitch (kind) {\n")
+    seen_kinds = set()
+    for sname in sorted(struct_kinds):
+        cases = kinds_case(sname, seen_kinds)
+        if not cases:
+            continue
+        vout.append(cases)
+        body = clone_methods.get(sname)
+        if body is None or sname == "SourceFile":
+            if sname == "SourceFile":
+                vout.append(
+                    "\t\t{\n"
+                    "\t\t\tauto* n = static_cast<SourceFile*>(this);\n"
+                    "\t\t\tauto* updated = f.newSourceFile(n->parseOptions,"
+                    " n->text, n->Statements, n->EndOfFileToken);\n"
+                    "\t\t\tupdated->as<SourceFile>()->copyFrom(n);\n"
+                    "\t\t\treturn cloneNode(updated, n, f.hooks);\n"
+                    "\t\t}\n")
+            else:
+                # structs without a Clone body (or the NodeDefault fallback)
+                vout.append("\t\t{\n\t\t\treturn nullptr;\n\t\t}\n")
+            continue
+        # Kind-switched Clone bodies (multi-kind structs like
+        # ImportDeclaration/TypeAliasDeclaration) dispatch on node.Kind.
+        mswitch = re.search(r"switch node\.Kind \{\s*(.*?)\s*default:\s*"
+                            r"panic\(.*?\)", body, re.S)
+        if mswitch:
+            vout.append(f"\t\t{{\n\t\t\tauto* n = static_cast<{sname}*>(this);\n"
+                        "\t\t\tswitch (kind) {\n")
+            for cm in re.finditer(
+                    r"case (\w+):\s*return cloneNode\(f\.AsNodeFactory\(\)\."
+                    r"(\w+)\((.*?)\),\s*node\.AsNode\(\),\s*f\.AsNodeFactory\(\)"
+                    r"\.hooks\)", mswitch.group(1), re.S):
+                k, newname, args_src = cm.group(1), cm.group(2), cm.group(3)
+                args = ", ".join(go_expr(a, "n") for a in go_args(args_src))
+                vout.append(f"\t\t\tcase Kind::{k[4:]}:\n"
+                            f"\t\t\t\treturn cloneNode("
+                            f"f.{newname[0].lower() + newname[1:]}({args}), "
+                            f"n, f.hooks);\n")
+            vout.append("\t\t\tdefault:\n"
+                        f"\t\t\t\tTSC_UNREACHABLE(\"unexpected kind in "
+                        f"{sname}::clone\");\n\t\t\t}}\n\t\t}}\n")
+            continue
+        m2 = re.search(
+            r"cloneNode\(f\.AsNodeFactory\(\)\.(\w+)\((.*)\),\s*node\.AsNode\(\),\s*"
+            r"f\.AsNodeFactory\(\)\.hooks\)", body, re.S)
+        assert m2, f"unhandled Clone body for {sname}: {body[:200]}"
+        newname, args_src = m2.group(1), m2.group(2)
+        args = ", ".join(go_expr(a, "n") for a in go_args(args_src))
+        vout.append(f"\t\t{{\n\t\t\tauto* n = static_cast<{sname}*>(this);\n"
+                    f"\t\t\treturn cloneNode(f.{newname[0].lower() + newname[1:]}"
+                    f"({args}), n, f.hooks);\n\t\t}}\n")
+    vout.append("\t\tdefault:\n\t\t\treturn nullptr;\n\t}\n}\n\n")
+
+    # ---- VisitEachChild dispatch ----
+    vout.append("inline Node* Node::visitEachChild(NodeVisitor& v) {\n"
+                "\tswitch (kind) {\n")
+    seen_kinds = set()
+    for sname in sorted(struct_kinds):
+        cases = kinds_case(sname, seen_kinds)
+        if not cases:
+            continue
+        body = vec_methods.get(sname)
+        if body is not None:
+            hm = re.match(r"\s*return visitEachChild_\w+\(node, v\)\s*$", body)
+            if hm:
+                body = vec_helpers[sname]
+        vout.append(cases)
+        if body is None:
+            # NodeBase/Token fallback — returns the node itself.
+            vout.append("\t\t{\n\t\t\treturn this;\n\t\t}\n")
+            continue
+        vout.append(f"\t\t{{\n\t\t\tauto* n = static_cast<{sname}*>(this);\n")
+        sm = re.search(r"(\w+) := core\.SameMap\(node\.(\w+),", body)
+        if sm:
+            var, field = sm.group(1), sanitize(sm.group(2))
+            vout.append(
+                f"\t\t\tstd::vector<Node*> {var};\n"
+                f"\t\t\t{var}.reserve(n->{field}.size());\n"
+                f"\t\t\tfor (auto* c : n->{field})"
+                f" {var}.push_back(v.visitNodeHooked(c));\n")
+        um = re.search(r"return v\.Factory\.(\w+)\(node,\s*(.*)\)\s*$",
+                       body, re.S)
+        assert um, f"unhandled VisitEachChild body for {sname}: {body[:200]}"
+        uname, args_src = um.group(1), um.group(2)
+        args = []
+        for a in go_args(args_src):
+            if sm and a == sm.group(1):
+                args.append(f"std::move({a})")
+            else:
+                args.append(visit_arg(a))
+        vout.append(f"\t\t\treturn v.factory->{uname[0].lower() + uname[1:]}"
+                    f"(n, {', '.join(args)});\n\t\t}}\n")
+    vout.append("\t\tdefault:\n\t\t\treturn this;\n\t}\n}\n\n")
+
+    vout.append("\n}  // namespace tsc\n")
+
     out.append("\n}  // namespace tsc\n")
     def fix_flag_cmp(t):
         # Go `a & b != 0` parses as `(a & b) != 0`; C++ binds `!=` first.
@@ -1163,7 +1447,16 @@ def gen_nodes():
     open(out_path, "w").write(fix_flag_cmp("".join(out)))
     open(os.path.join(OUT, "ast", "nodes_factory_decl.inc"), "w").write("".join(decls))
     open(os.path.join(OUT, "ast", "nodes_node_decl.inc"), "w").write("".join(node_decls))
-    print(f"wrote {out_path} (+ node/factory decl includes)")
+    open(os.path.join(OUT, "ast", "nodes_visitor_generated.h"),
+         "w").write(fix_flag_cmp("".join(vout)))
+    # forward declarations for every node payload struct; included before
+    # class NodeFactory in ast.h so update* decls can take typed pointers.
+    fwd = ["// Forward declarations for every node payload struct.\n",
+           "// Generated; DO NOT EDIT.\n"]
+    for sname in sorted(node_structs):
+        fwd.append(f"struct {sname};\n")
+    open(os.path.join(OUT, "ast", "nodes_fwd_decl.inc"), "w").write("".join(fwd))
+    print(f"wrote {out_path} (+ node/factory/fwd decl + visitor includes)")
 
 
 if __name__ == "__main__":

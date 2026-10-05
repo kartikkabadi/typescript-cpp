@@ -37,9 +37,13 @@ namespace tsc {
 struct Node;
 struct NodeList;
 struct ModifierList;
-struct NodeFactory;
+class NodeFactory;
+struct NodeVisitor;
+struct NodeVisitorHooks;
 struct SourceFile;
 struct SourceFileParseOptions;
+
+#include "internal/ast/nodes_fwd_decl.inc"
 struct Diagnostic;
 struct FlowNode;
 struct PositionMap;
@@ -201,10 +205,16 @@ struct NodeList {
 	bool hasTrailingComma() const {
 		return !nodes.empty() && nodes.back()->end() < loc.end();
 	}
+
+	// Clone (ast.go): a new NodeList over the same nodes, same Loc.
+	NodeList* clone(NodeFactory& f);
 };
 
 struct ModifierList : NodeList {
 	ModifierFlags ModifierFlags{};
+
+	// Clone (ast.go): a new ModifierList copying loc/nodes/ModifierFlags.
+	ModifierList* clone(NodeFactory& f);
 };
 
 template <class F>
@@ -408,13 +418,24 @@ Diagnostic* newDiagnosticFromText(SourceFile* file, TextRange loc,
 // NodeFactory
 // ---------------------------------------------------------------------------
 
+// NodeFactoryHooks — hooks invoked when the factory produces a node
+// (mirrors ast.NodeFactoryHooks).
+struct NodeFactoryHooks {
+	std::function<void(Node* node)> onCreate;
+	std::function<void(Node* node, Node* original)> onUpdate;
+	std::function<void(Node* node, Node* original)> onClone;
+};
+
 class NodeFactory {
 	Arena arena_;
 	int32_t nodeCount_ = 0;
 	int32_t textCount_ = 0;
 
 public:
+	NodeFactoryHooks hooks;
+
 	NodeFactory() = default;
+	explicit NodeFactory(NodeFactoryHooks h) : hooks(std::move(h)) {}
 	NodeFactory(const NodeFactory&) = delete;
 	NodeFactory& operator=(const NodeFactory&) = delete;
 
@@ -430,6 +451,9 @@ public:
 	Node* newNode(Kind kind, Node* data) {
 		data->kind = kind;
 		nodeCount_++;
+		if (hooks.onCreate) {
+			hooks.onCreate(data);
+		}
 		return data;
 	}
 
@@ -469,6 +493,44 @@ public:
 
 #include "internal/ast/nodes_factory_decl.inc"
 };
+
+// NodeList::Clone / ModifierList::Clone (ast.go).
+inline NodeList* NodeList::clone(NodeFactory& f) {
+	NodeList* result = f.newNodeList(nodes);
+	result->loc = loc;
+	return result;
+}
+
+inline ModifierList* ModifierList::clone(NodeFactory& f) {
+	auto* res = f.arena().alloc<ModifierList>();
+	res->loc = loc;
+	res->nodes = nodes;
+	res->ModifierFlags = ModifierFlags;
+	return res;
+}
+
+// updateNode / cloneNode (ast.go): shared tail of Update*/Clone — copy the
+// original's Flags/Loc onto the new node and run the factory hooks.
+inline Node* updateNode(Node* updated, Node* original,
+                        const NodeFactoryHooks& hooks) {
+	if (updated != original) {
+		updated->flags = original->flags;
+		updated->loc = original->loc;
+		if (hooks.onUpdate) {
+			hooks.onUpdate(updated, original);
+		}
+	}
+	return updated;
+}
+
+inline Node* cloneNode(Node* updated, Node* original,
+                       const NodeFactoryHooks& hooks) {
+	updateNode(updated, original, hooks);
+	if (updated != original && hooks.onClone) {
+		hooks.onClone(updated, original);
+	}
+	return updated;
+}
 
 // ---------------------------------------------------------------------------
 // subtree-facts helpers (free functions mirroring subtreefacts.go)
@@ -523,6 +585,10 @@ void setParentInChildren(Node* node);
 // utilities.go — name-of-declaration resolution.
 bool isTypeNodeKind(Kind kind);
 inline bool isTypeNode(const Node* node) { return isTypeNodeKind(node->kind); }
+bool isDeclarationName(Node* name);
+inline bool isParseTreeNode(const Node* node) {
+	return !(node->flags & NodeFlagsSynthesized);
+}
 bool isStringLiteralLike(Node* node);
 bool isOptionalChain(Node* node);
 bool isOptionalChainRoot(Node* node);
@@ -591,6 +657,11 @@ struct hash<tsc::TokenCacheKey> : tsc::TokenCacheKeyHash {};
 
 // Node-kind payloads + generated member definitions.
 #include "internal/ast/nodes_generated.h"
+
+// NodeVisitor machinery (visitor.go); needs the complete node structs, so it
+// comes last. The generated clone/visitEachChild dispatch bodies live at the
+// end of visitor.h (nodes_visitor_generated.h).
+#include "internal/ast/visitor.h"
 
 namespace tsc {
 

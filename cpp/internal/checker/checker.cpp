@@ -3289,7 +3289,7 @@ Symbol* Checker::getTargetOfAliasDeclaration(Node* node) {
 // checker.go: declared types, enum member values, block-scope use-before-declare
 // ---------------------------------------------------------------------------
 
-static bool isNumericLiteralName(const std::string& name);
+bool isNumericLiteralName(const std::string& name);
 static bool isTypeAlias(Node* node);
 
 Type* Checker::getDeclaredTypeOfSymbol(Symbol* symbol) {
@@ -3924,7 +3924,7 @@ Type* Checker::getDeclaredTypeOfAlias(Symbol* symbol) {
 // utilities.go: numeric literal names
 // ---------------------------------------------------------------------------
 
-static bool isNumericLiteralName(const std::string& name) {
+bool isNumericLiteralName(const std::string& name) {
 	// The intent of numeric names is that
 	//     - they are names with text in a numeric form, and that
 	//     - setting properties/indexing with them is always equivalent to doing so
