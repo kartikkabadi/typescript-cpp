@@ -1,7 +1,7 @@
 // Port of tsc/internal/execute/incremental/host.go — Host interface: the
-// compiler host's FS plus file mtime get/set. vfs.FS is the CompilerHost
-// itself in this port; mtime goes through std::filesystem (atime is
-// ignored like Go's Chtimes(fileName, time.Time{}, mTime)).
+// compiler host's FS plus file mtime get/set. vfs.FS access goes through
+// CompilerHost::fs; mtime uses FS().Stat()/Chtimes exactly like Go
+// (atime is ignored like Go's Chtimes(fileName, time.Time{}, mTime)).
 #include "internal/execute/incremental/incremental.h"
 
 namespace tsc::execute::incremental {
@@ -23,11 +23,10 @@ public:
 	std::optional<std::string> SetMTime(
 	    const std::string& fileName,
 	    std::filesystem::file_time_type mTime) override {
-		std::error_code ec;
-		std::filesystem::last_write_time(host_->bundledPath(fileName),
-		                                 mTime, ec);
-		if (ec) {
-			return ec.message();
+		if (auto err = host_->fs->Chtimes(
+		        fileName, vfs::TimePoint{},
+		        std::chrono::file_clock::to_sys(mTime))) {
+			return err.str();
 		}
 		return std::nullopt;
 	}
@@ -38,16 +37,13 @@ Host* CreateHost(compiler::CompilerHost* compilerHost) {
 	return new host(compilerHost);
 }
 
-// host.go:58 GetMTime — Stat().ModTime(); zero time when stat fails.
+// host.go:58 GetMTime — FS().Stat().ModTime(); zero time when stat fails.
 std::filesystem::file_time_type GetMTime(compiler::CompilerHost* host,
                                          const std::string& fileName) {
-	std::error_code ec;
-	auto mTime =
-	    std::filesystem::last_write_time(host->bundledPath(fileName), ec);
-	if (ec) {
-		return std::filesystem::file_time_type{};
+	if (auto stat = host->fs->Stat(fileName)) {
+		return std::chrono::file_clock::from_sys(stat->ModTime());
 	}
-	return mTime;
+	return std::filesystem::file_time_type{};
 }
 
 }  // namespace tsc::execute::incremental

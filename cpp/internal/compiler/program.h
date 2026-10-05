@@ -24,6 +24,7 @@
 #include "internal/module/types.h"
 #include "internal/tsoptions/tsoptions.h"
 #include "internal/tspath/tspath.h"
+#include "internal/vfs/vfs.h"
 
 namespace tsc::sourcemap {
 struct RawSourceMap;
@@ -71,24 +72,24 @@ public:
 // === end slice: incremental ===
 
 // --- host.go: CompilerHost ---
-// Real-FS host; `bundled:///libs/<name>` reads from <bundledLibsRoot>/<name>
-// (tsc/internal/bundled/libs on disk) while keeping the bundled:/// name on
-// the SourceFile — matching the Go oracle's bundled.WrapFS naming.
+// host.go:35 compilerHost — serves SourceFiles over `fs` (e.g.
+// bundled.WrapFS(osvfs.FS())), keeping the bundled:/// name on the
+// SourceFile exactly like the Go oracle.
 class CompilerHost : public tsoptions::ParseConfigHost {
 public:
 	std::string currentDirectory;
-	std::string bundledLibsRoot;
+	std::shared_ptr<vfs::FS> fs;
+	// host.go:38 defaultLibraryPath — bundled.LibPath() "bundled:///libs"
+	std::string defaultLibraryPath;
 	CompilerOptions* compilerOptions{};
 
 	std::string GetCurrentDirectory() override { return currentDirectory; }
-	bool UseCaseSensitiveFileNames() override { return true; }
-
-	// host.go: DefaultLibraryPath — bundled.LibPath() "bundled:///libs"
-	std::string DefaultLibraryPath() const {
-		return "bundled:///libs";
+	bool UseCaseSensitiveFileNames() override {
+		return fs->UseCaseSensitiveFileNames();
 	}
 
-	std::string bundledPath(std::string_view fileName) const;
+	// host.go: DefaultLibraryPath
+	std::string DefaultLibraryPath() const { return defaultLibraryPath; }
 	bool FileExists(std::string_view fileName) override;
 	bool DirectoryExists(std::string_view directory) override;
 	std::optional<std::string> ReadFile(std::string_view fileName) override;

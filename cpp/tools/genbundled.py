@@ -13,24 +13,25 @@ LIBS = os.path.join(REPO, "tsc", "internal", "bundled", "libs")
 OUT = os.path.join(REPO, "cpp", "internal", "bundled", "bundled_generated.cpp")
 
 
-def c_escape(s: str) -> str:
+def c_escape(data: bytes) -> str:
+    # Escapes are emitted per byte so multi-byte UTF-8 sequences round-trip
+    # exactly as the on-disk file (Go's //go:embed stores raw bytes).
     out = []
-    for ch in s:
-        o = ord(ch)
-        if ch == "\\":
+    for b in data:
+        if b == 0x5C:
             out.append("\\\\")
-        elif ch == '"':
+        elif b == 0x22:
             out.append('\\"')
-        elif ch == "\n":
+        elif b == 0x0A:
             out.append("\\n")
-        elif ch == "\r":
+        elif b == 0x0D:
             out.append("\\r")
-        elif ch == "\t":
+        elif b == 0x09:
             out.append("\\t")
-        elif 32 <= o < 127:
-            out.append(ch)
+        elif 32 <= b < 127:
+            out.append(chr(b))
         else:
-            out.append(f"\\{o:03o}")
+            out.append(f"\\{b:03o}")
     return "".join(out)
 
 
@@ -49,7 +50,7 @@ def main() -> int:
         f.write("// embeddedContents — embed_generated.go (libs/<name> -> contents).\n")
         f.write("const std::unordered_map<std::string, std::string_view> embeddedContents = {\n")
         for n in names:
-            with open(os.path.join(LIBS, n), "r", encoding="utf-8") as src:
+            with open(os.path.join(LIBS, n), "rb") as src:
                 data = src.read()
             f.write(f'\t{{"libs/{n}", "{c_escape(data)}"}},\n')
         f.write("};\n\n")

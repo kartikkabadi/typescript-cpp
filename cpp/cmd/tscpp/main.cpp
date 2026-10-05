@@ -31,6 +31,8 @@
 #include "internal/parser/parser.h"
 #include "internal/scanner/scanner.h"
 #include "internal/tsoptions/tsoptions.h"
+#include "internal/bundled/bundled.h"
+#include "internal/vfs/osvfs/osvfs.h"
 
 using namespace tsc;
 
@@ -313,22 +315,12 @@ static void bindFile(const char* path, const std::string& src) {
 //   F <fileName>            per file that has diagnostics
 //   T <code> <pos> <end>    diagnostics in that file
 // Mirrors tsc/cmd/checkdump/main.go exactly (see that file for the format).
-static std::string findBundledLibsRoot() {
-	namespace fs = std::filesystem;
-	// Locate tsc/internal/bundled/libs relative to the executable, then CWD.
-	fs::path exe = fs::canonical("/proc/self/exe");
-	for (fs::path dir = exe.parent_path(); !dir.empty();
-	     dir = dir.parent_path()) {
-		fs::path cand = dir / "tsc" / "internal" / "bundled" / "libs";
-		if (fs::is_directory(cand))
-			return cand.string();
-		if (dir == dir.root_path())
-			break;
-	}
-	fs::path cwd = fs::current_path() / "tsc" / "internal" / "bundled" / "libs";
-	if (fs::is_directory(cwd))
-		return cwd.string();
-	return "";
+// checkdump/main.go: bundled.WrapFS(osvfs.FS()) — bundled:///libs/* reads
+// come from embeddedContents; everything else hits the OS fs. The osvfs
+// singleton outlives every caller, so the shared_ptr holds a no-op deleter.
+static std::shared_ptr<vfs::FS> makeBundledFS() {
+	return bundled::WrapFS(
+	    std::shared_ptr<vfs::FS>(vfs::osvfs::FS(), [](vfs::FS*) {}));
 }
 
 // Canonical dump (checkdump/main.go) — shared by check and emit modes.
@@ -407,7 +399,8 @@ static void checkFile(int argc, char** argv) {
 	compiler::CompilerHost host;
 	host.currentDirectory =
 	    tspath::normalizePath(std::filesystem::current_path().string());
-	host.bundledLibsRoot = findBundledLibsRoot();
+	host.fs = makeBundledFS();
+	host.defaultLibraryPath = bundled::LibPath();
 
 	// `tsc --noEmit <argv[2:]>` — "check" is our own subcommand, not a root
 	// filename (checkdump is invoked as `checkdump <file>`).
@@ -458,7 +451,8 @@ static void emitFile(int argc, char** argv) {
 	compiler::CompilerHost host;
 	host.currentDirectory =
 	    tspath::normalizePath(std::filesystem::current_path().string());
-	host.bundledLibsRoot = findBundledLibsRoot();
+	host.fs = makeBundledFS();
+	host.defaultLibraryPath = bundled::LibPath();
 
 	// `tsc <argv[2:]>` — no NoEmit; defaults like a bare file-args
 	// command line (execute/tsc.go).
@@ -487,7 +481,8 @@ static void emitdumpFile(int argc, char** argv) {
 	compiler::CompilerHost host;
 	host.currentDirectory =
 	    tspath::normalizePath(std::filesystem::current_path().string());
-	host.bundledLibsRoot = findBundledLibsRoot();
+	host.fs = makeBundledFS();
+	host.defaultLibraryPath = bundled::LibPath();
 
 	// `tsc <argv[2:]>` — no NoEmit; defaults like a bare file-args
 	// command line (execute/tsc.go).
