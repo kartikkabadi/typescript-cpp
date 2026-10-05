@@ -20,6 +20,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 add_library(tsc STATIC
 	internal/ast/ast.cpp
 	internal/ast/utilities.cpp
+	internal/astnav/tokens.cpp
 	internal/binder/binder.cpp
 	internal/binder/nameresolver.cpp
 	internal/checker/checker.cpp

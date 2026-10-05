@@ -16,6 +16,7 @@
 #include <utility>
 #include <vector>
 
+#include "internal/astnav/tokens.h"
 #include "internal/checker/checker.h"
 #include "internal/checker/mapper.h"
 #include "internal/checker/types.h"
@@ -212,10 +213,6 @@ bool isExportSpecifierAlias(Identifier* referenceLocation,
 	return exportSpecifier->parent->parent->moduleSpecifier() == nullptr;
 }
 
-// astnav.GetTouchingPropertyName — astnav token-navigation subsystem is not
-// ported yet; see the dep-stub block at the bottom of this file.
-Node* getTouchingPropertyName(SourceFile* sourceFile, int position);
-
 // services.go:646 — getPossibleSymbolReferenceNodes
 std::vector<Node*> getPossibleSymbolReferenceNodes(SourceFile* sourceFile,
 												   const std::string& symbolName,
@@ -292,7 +289,8 @@ std::vector<Node*> getPossibleSymbolReferenceNodes(SourceFile* sourceFile,
 	return mapNonNil(
 		getPossibleSymbolReferencePositions(sourceFile, symbolName, container),
 		[sourceFile](int pos) -> Node* {
-			if (Node* referenceLocation = getTouchingPropertyName(sourceFile, pos);
+			if (Node* referenceLocation =
+				    astnav::getTouchingPropertyName(sourceFile, pos);
 				referenceLocation != sourceFile) {
 				return referenceLocation;
 			}
@@ -1568,16 +1566,6 @@ Checker::getExpandedParameters(Signature* /*sig*/,
 							   bool /*skipUnionExpanding*/) {
 	TSC_UNREACHABLE("getExpandedParameters — nodebuilder slice");
 }
-
-namespace {
-
-// astnav.GetTouchingPropertyName — astnav slice (token navigation, ~600 lines
-// of astnav/tokens.go machinery, unported).
-Node* getTouchingPropertyName(SourceFile* /*sourceFile*/, int /*position*/) {
-	TSC_UNREACHABLE("getTouchingPropertyName — astnav slice");
-}
-
-}  // namespace
 
 }  // namespace tsc::checker
 
