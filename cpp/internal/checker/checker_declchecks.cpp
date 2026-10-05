@@ -1738,12 +1738,8 @@ void Checker::checkCollisionsForDeclarationName(Node* node, Node* name) {
 void Checker::setNodeLinksForPrivateIdentifierScope(Node* node) {
 	TSC_UNREACHABLE("setNodeLinksForPrivateIdentifierScope — expressions slice");
 }
-bool Checker::classDeclarationExtendsNull(Node* classDecl) {
-	TSC_UNREACHABLE("classDeclarationExtendsNull — expressions slice");
-}
-Symbol* Checker::getResolvedSymbolOrNil(Node* node) {
-	TSC_UNREACHABLE("getResolvedSymbolOrNil — expressions slice");
-}
+// (deduped: classDeclarationExtendsNull defined in cpp/internal/checker/checker_expressions_c.cpp)
+// (deduped: getResolvedSymbolOrNil defined in cpp/internal/checker/checker_expressions_c.cpp)
 // owner: diagnostics tail (checker.go:14185-14304)
 bool Checker::IsDeprecatedDeclaration(Node* declaration) {
 	TSC_UNREACHABLE("IsDeprecatedDeclaration — diagtail slice");

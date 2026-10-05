@@ -2462,9 +2462,7 @@ bool Checker::typePredicateKindsMatch(TypePredicate* a, TypePredicate* b) {
 bool Checker::isObjectTypeWithInferableIndex(Type* t) {
 	TSC_UNREACHABLE("isObjectTypeWithInferableIndex — relater slice");
 }
-bool Checker::isNonGenericObjectType(Type* t) {
-	TSC_UNREACHABLE("isNonGenericObjectType — checker.go:13743 slice");
-}
+// (deduped: isNonGenericObjectType defined in checker_expressions_c.cpp)
 
 }  // namespace checker
 }  // namespace tsc

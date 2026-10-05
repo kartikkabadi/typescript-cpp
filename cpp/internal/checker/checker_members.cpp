@@ -2975,12 +2975,8 @@ Type* Checker::getEffectiveRestType(Signature* signature) {
 Type* Checker::getKnownKeysOfTupleType(Type* t) {
 	TSC_UNREACHABLE("getKnownKeysOfTupleType — owned by relater.go slice");
 }
-bool Checker::isReadonlySymbol(Symbol* symbol) {
-	TSC_UNREACHABLE("isReadonlySymbol — owned by checker.go:14083 slice");
-}
-std::vector<IndexInfo*> Checker::getUnionIndexInfos(const std::vector<Type*>& types) {
-	TSC_UNREACHABLE("getUnionIndexInfos — owned by checker.go:13727 slice");
-}
+// (deduped: isReadonlySymbol defined in cpp/internal/checker/checker_expressions_c.cpp)
+// (deduped: getUnionIndexInfos defined in cpp/internal/checker/checker_expressions_c.cpp)
 // (deduped: resolveReverseMappedTypeMembers — inference slice, defined in
 // cpp/internal/checker/checker_inference.cpp)
 Signature* Checker::findMatchingSignature(const std::vector<Signature*>& signatureList,

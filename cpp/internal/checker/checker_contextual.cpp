@@ -3732,9 +3732,7 @@ Type* Checker::discriminateTypeByDiscriminableItems(
 	TSC_UNREACHABLE("discriminateTypeByDiscriminableItems — relater slice (relater.go:1205)");
 }
 
-bool Checker::isConstTypeVariable(Type* /*t*/, int /*depth*/) {
-	TSC_UNREACHABLE("isConstTypeVariable — checker.go:13879 slice");
-}
+// (deduped: isConstTypeVariable defined in cpp/internal/checker/checker_expressions_c.cpp)
 
 Type* Checker::discriminateContextualTypeByJSXAttributes(
 	Node* /*node*/, Type* /*contextualType*/) {
