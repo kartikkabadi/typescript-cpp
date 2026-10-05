@@ -330,29 +330,8 @@ static std::string findBundledLibsRoot() {
 	return "";
 }
 
-static void checkFile(int argc, char** argv) {
-	compiler::CompilerHost host;
-	host.currentDirectory =
-	    tspath::normalizePath(std::filesystem::current_path().string());
-	host.bundledLibsRoot = findBundledLibsRoot();
-
-	// `tsc --noEmit <argv[2:]>` — "check" is our own subcommand, not a root
-	// filename (checkdump is invoked as `checkdump <file>`); every
-	// remaining arg becomes a root file via ParseCommandLine.
-	std::vector<std::string> rootFileNames;
-	for (int i = 2; i < argc; i++) {
-		rootFileNames.push_back(argv[i]);
-	}
-
-	// ParseCommandLine defaults for bare file args: NoEmit set, everything
-	// else at defaults (no config file).
-	CompilerOptions options;
-	options.NoEmit = Tristate::True;
-
-	compiler::SimpleProgram program(&host, options, rootFileNames);
-	program.BindSourceFiles();
-	auto diags = compiler::getDiagnosticsOfAnyProgram(&program, {}, false);
-
+// Canonical dump (checkdump/main.go) — shared by check and emit modes.
+static void dumpDiagnostics(const std::vector<Diagnostic*>& diags) {
 	// Canonical dump (checkdump/main.go).
 	std::unordered_map<SourceFile*, std::vector<Diagnostic*>> byFile;
 	std::vector<Diagnostic*> global;
@@ -397,6 +376,32 @@ static void checkFile(int argc, char** argv) {
 		}
 	}
 	std::fwrite(out.data(), 1, out.size(), stdout);
+}
+
+static void checkFile(int argc, char** argv) {
+	compiler::CompilerHost host;
+	host.currentDirectory =
+	    tspath::normalizePath(std::filesystem::current_path().string());
+	host.bundledLibsRoot = findBundledLibsRoot();
+
+	// `tsc --noEmit <argv[2:]>` — "check" is our own subcommand, not a root
+	// filename (checkdump is invoked as `checkdump <file>`); every
+	// remaining arg becomes a root file via ParseCommandLine.
+	std::vector<std::string> rootFileNames;
+	for (int i = 2; i < argc; i++) {
+		rootFileNames.push_back(argv[i]);
+	}
+
+	// ParseCommandLine defaults for bare file args: NoEmit set, everything
+	// else at defaults (no config file).
+	CompilerOptions options;
+	options.NoEmit = Tristate::True;
+
+	compiler::SimpleProgram program(&host, options, rootFileNames);
+	program.BindSourceFiles();
+	auto diags = compiler::getDiagnosticsOfAnyProgram(&program, {}, false);
+
+	dumpDiagnostics(diags);
 
 	// Verbose diagnostics (TSC_FULL_DIAGS=1): formatted text + chains for
 	// divergence triage. Not part of the oracle-aligned dump.
@@ -424,6 +429,37 @@ static void checkFile(int argc, char** argv) {
 		for (auto* d : diags) dump(d, 0);
 		std::fwrite(v.data(), 1, v.size(), stderr);
 	}
+}
+
+// emitFile — `tsc <file>` equivalent (default emit). Runs the full program
+// pipeline (pre-emit diagnostics, then Emit writes .js/.d.ts via the host
+// WriteFile) and dumps every diagnostic in the canonical checkdump format.
+static void emitFile(int argc, char** argv) {
+	compiler::CompilerHost host;
+	host.currentDirectory =
+	    tspath::normalizePath(std::filesystem::current_path().string());
+	host.bundledLibsRoot = findBundledLibsRoot();
+
+	std::vector<std::string> rootFileNames;
+	for (int i = 2; i < argc; i++) {
+		rootFileNames.push_back(argv[i]);
+	}
+
+	// `tsc <argv[2:]>` — no NoEmit; defaults like a bare file-args
+	// command line (execute/tsc.go).
+	CompilerOptions options;
+
+	compiler::SimpleProgram program(&host, options, rootFileNames);
+	program.BindSourceFiles();
+	auto diags = compiler::getDiagnosticsOfAnyProgram(&program, {}, false);
+
+	compiler::EmitOptions emitOptions;
+	compiler::EmitResult* emitResult = program.Emit(&emitOptions);
+	if (emitResult != nullptr) {
+		diags.insert(diags.end(), emitResult->Diagnostics.begin(),
+		             emitResult->Diagnostics.end());
+	}
+	dumpDiagnostics(diags);
 }
 
 static void parseFile(const char* path, const std::string& src) {
@@ -545,13 +581,13 @@ int main(int argc, char** argv) {
 	if (argc < 3) {
 		std::fprintf(
 			stderr,
-			"usage: tscpp <lex|lex-json|bench|parse|bench-parse|parse-all|bind|check> <file|dir> [iters|workers]\n");
+			"usage: tscpp <lex|lex-json|bench|parse|bench-parse|parse-all|bind|check|emit> <file|dir> [iters|workers]\n");
 		return 2;
 	}
 	std::string mode = argv[1];
 	if (mode != "lex" && mode != "lex-json" && mode != "bench" &&
 	    mode != "parse" && mode != "bench-parse" && mode != "parse-all" &&
-	    mode != "bind" && mode != "check") {
+	    mode != "bind" && mode != "check" && mode != "emit") {
 		std::fprintf(stderr, "tscpp: unknown mode %s\n", mode.c_str());
 		return 2;
 	}
@@ -574,6 +610,8 @@ int main(int argc, char** argv) {
 		bindFile(argv[2], src);
 	} else if (mode == "check") {
 		checkFile(argc, argv);
+	} else if (mode == "emit") {
+		emitFile(argc, argv);
 	} else if (mode == "bench-parse") {
 		int iters = argc > 3 ? std::atoi(argv[3]) : 5;
 		benchParse(argv[2], src, iters);

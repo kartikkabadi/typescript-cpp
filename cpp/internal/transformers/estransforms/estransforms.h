@@ -153,5 +153,4 @@ Node* expandPreOrPostfixIncrementOrDecrementExpression(
     Node* expression, Node* resultVariable);
 
 
-||||||| bbde91a0b2
 }  // namespace tsc::transformers::estransforms

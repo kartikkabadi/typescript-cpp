@@ -84,14 +84,11 @@ Node* createPrivateStaticFieldInitializer(printer::NodeFactory* factory, Node* v
 Node* createPrivateInstanceFieldInitializer(printer::NodeFactory* factory, Node* receiver, Node* initializer, Node* weakMapName);
 Node* createPrivateInstanceMethodInitializer(printer::NodeFactory* factory, Node* receiver, Node* weakSetName);
 bool isStaticPropertyDeclarationOrClassStaticBlock(Node* node);
-bool classHasClassThisAssignment(printer::EmitContext* emitContext, Node* node);
 bool isNonStaticMethodOrAccessorWithPrivateName(Node* member);
 Node* createMemberAccessForPropertyName(printer::NodeFactory* factory, printer::EmitContext* emitContext, Node* receiver, Node* name, Node* location);
 bool shouldBeCapturedInTempVariable(Node* node);
 void flattenCommaList(Node* node, const std::function<bool(Node*)>& yield);
 bool flattenCommaListWorker(Node* node, const std::function<bool(Node*)>& yield);
-BinaryExpression* findComputedPropertyNameCacheAssignment(printer::EmitContext* emitContext, Node* name);
-Node* expandPreOrPostfixIncrementOrDecrementExpression(printer::NodeFactory* factory, printer::EmitContext* emitContext, Node* node, Node* expression, Node* resultVariable);
 
 // ast.CreateModifiersFromModifierFlags — utilities.go:3291
 std::vector<Node*> createModifiersFromModifierFlags(
@@ -3901,15 +3898,6 @@ bool isStaticPropertyDeclarationOrClassStaticBlock(Node* node) {
 		(isPropertyDeclaration(node) && hasStaticModifier(node));
 }
 
-// classHasClassThisAssignment checks if a class has a static block that is a class-this assignment.
-bool classHasClassThisAssignment(printer::EmitContext* emitContext, Node* node) {
-	for (Node* member : node->members()) {
-		if (isClassThisAssignmentBlock(emitContext, member)) {
-			return true;
-		}
-	}
-	return false;
-}
 
 bool isNonStaticMethodOrAccessorWithPrivateName(Node* member) {
 	return !isStatic(member) &&
@@ -3964,6 +3952,20 @@ bool flattenCommaListWorker(Node* node, const std::function<bool(Node*)>& yield)
 	} else {
 		return yield(node);
 	}
+}
+
+
+
+}  // namespace
+
+// classHasClassThisAssignment checks if a class has a static block that is a class-this assignment.
+bool classHasClassThisAssignment(printer::EmitContext* emitContext, Node* node) {
+	for (Node* member : node->members()) {
+		if (isClassThisAssignmentBlock(emitContext, member)) {
+			return true;
+		}
+	}
+	return false;
 }
 
 BinaryExpression* findComputedPropertyNameCacheAssignment(printer::EmitContext* emitContext, Node* name) {
@@ -4021,7 +4023,5 @@ Node* expandPreOrPostfixIncrementOrDecrementExpression(printer::NodeFactory* fac
 
 	return expression;
 }
-
-}  // namespace
 
 }  // namespace tsc::transformers::estransforms
