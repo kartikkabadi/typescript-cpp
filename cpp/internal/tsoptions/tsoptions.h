@@ -648,6 +648,17 @@ struct OptionPathSegment {
 	int Index = 0;
 	bool IsIndex = false;
 };
+// === slice: incremental ===
+// contentmapper.go Project — the host-side mapping process interface. No C++
+// host provides one yet, so the only concrete value is nullptr.
+class Project {
+public:
+	virtual ~Project() = default;
+	// Identities returns (identity strings, error message when failed).
+	virtual std::pair<std::vector<std::string>, std::optional<std::string>>
+	Identities() = 0;
+};
+// === end slice: incremental ===
 }  // namespace contentmapper
 
 struct ParsedOptions {

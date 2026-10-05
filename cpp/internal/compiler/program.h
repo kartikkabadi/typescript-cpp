@@ -28,10 +28,47 @@
 namespace tsc::sourcemap {
 struct RawSourceMap;
 }
+namespace tsc::tracing {
+class Tracing;
+}
 
 namespace tsc::compiler {
 
 class SimpleProgram;
+
+// === slice: incremental ===
+// program.go:1957 ProgramLike — implemented by SimpleProgram and by
+// execute/incremental::Program so HandleNoEmitOptions /
+// getDiagnosticsOfAnyProgram can run against either program kind.
+// (Go context.Context params are dropped.)
+struct EmitResult;
+struct EmitOptions;
+class ProgramLike {
+public:
+	virtual ~ProgramLike() = default;
+	virtual const CompilerOptions* Options() = 0;
+	virtual SourceFile* GetSourceFile(const std::string& path) = 0;
+	virtual std::vector<SourceFile*> GetSourceFiles() = 0;
+	virtual std::vector<Diagnostic*> GetConfigFileParsingDiagnostics() = 0;
+	virtual std::vector<Diagnostic*> GetSyntacticDiagnostics(
+	    SourceFile* file) = 0;
+	virtual std::vector<Diagnostic*> GetBindDiagnostics(SourceFile* file) = 0;
+	virtual std::vector<Diagnostic*> GetProgramDiagnostics() = 0;
+	virtual std::vector<Diagnostic*> GetGlobalDiagnostics() = 0;
+	virtual std::vector<Diagnostic*> GetSemanticDiagnostics(
+	    SourceFile* file) = 0;
+	virtual std::vector<Diagnostic*> GetDeclarationDiagnostics(
+	    SourceFile* file) = 0;
+	virtual std::vector<Diagnostic*> GetSuggestionDiagnostics(
+	    SourceFile* file) = 0;
+	virtual EmitResult* Emit(EmitOptions* options) = 0;
+	virtual std::string CommonSourceDirectory() = 0;
+	virtual bool IsSourceFileDefaultLibrary(const tspath::Path& path) const = 0;
+	// GetProgram — Go's `Program()` method (renamed: a member named
+	// `Program` inside `class Program` would be a constructor in C++).
+	virtual SimpleProgram* GetProgram() = 0;
+};
+// === end slice: incremental ===
 
 // --- host.go: CompilerHost ---
 // Real-FS host; `bundled:///libs/<name>` reads from <bundledLibsRoot>/<name>
@@ -64,6 +101,12 @@ public:
 
 	SourceFile* GetSourceFile(const SourceFileParseOptions& opts,
 	                          SourceFileMetaData metaData);
+
+	// === slice: incremental ===
+	// host.go ContentMapperProject — no content mappers in this port;
+	// always nullptr.
+	tsoptions::contentmapper::Project* ContentMapperProject() const { return nullptr; }
+	// === end slice: incremental ===
 };
 
 // --- program.go: LibFile / redirectsFile ---
@@ -395,9 +438,7 @@ struct filesLoader {
 };
 
 // === class SimpleProgram — checker.h `Program` + program.go ===
-struct EmitResult;
-struct EmitOptions;
-class SimpleProgram : public checker::Program {
+class SimpleProgram : public checker::Program, public ProgramLike {
 public:
 	CompilerHost* host{};
 	CompilerOptions options;
@@ -438,6 +479,14 @@ public:
 	std::unique_ptr<checker::Checker> checker_;
 	bool bindDone_{};
 	mutable std::optional<std::string> commonSourceDirectory_;
+
+	// === slice: incremental ===
+	// program.go — the program's ParsedCommandLine (opts.Config) and tracing
+	// session (opts.Tracing). commandLine_ is built in the ctor; Tracing is
+	// set by callers that run a trace session (nullptr otherwise).
+	std::unique_ptr<tsoptions::ParsedCommandLine> commandLine_;
+	tracing::Tracing* tr_ = nullptr;
+	// === end slice: incremental ===
 
 	// program.go: hasEmitBlockingDiagnostics / sourceFilesToEmit (+Once).
 	std::unordered_set<tspath::Path> hasEmitBlockingDiagnostics;
@@ -578,17 +627,68 @@ public:
 	    const std::function<std::vector<Diagnostic*>(SourceFile*)>& collect);
 	std::vector<Diagnostic*> getSemanticDiagnosticsWithChecker(
 	    SourceFile* sourceFile);
+	// program.go:1490 — includeDeferredGlobals == Go's
+	// getBindAndCheckDiagnosticsWithChecker(file, true): defers global
+	// diagnostics until the file's check, then appends the delta.
 	std::vector<Diagnostic*> getBindAndCheckDiagnosticsWithChecker(
-	    SourceFile* sourceFile);
+	    SourceFile* sourceFile, bool includeDeferredGlobals = false);
 	std::pair<std::vector<Diagnostic*>,
 	          std::unordered_map<int, CommentDirective>>
 	getDiagnosticsWithPrecedingDirectives(
 	    SourceFile* sourceFile, std::vector<Diagnostic*> diags);
+
+	// === slice: incremental ===
+	// --- ProgramLike members (see program.go:1957) ---
+	std::vector<SourceFile*> GetSourceFiles() override { return files; }
+	std::vector<Diagnostic*> GetSuggestionDiagnostics(
+	    SourceFile* sourceFile) override;
+	SimpleProgram* GetProgram() override { return this; }
+
+	// --- program.go methods the incremental Program delegates to ---
+	// program.go:616 GetTypeCheckerForFileExclusive — single checker; the
+	// release callback is a no-op like Go's when sharing the one checker.
+	std::pair<checker::Checker*, std::function<void()>>
+	GetTypeCheckerForFileExclusive(SourceFile* file);
+	// program.go:2068 GetParseFileRedirect — always "" (no content mappers).
+	std::string GetParseFileRedirect(const std::string& fileName) {
+		return "";
+	}
+	// program.go GetDefaultLibFile — libFiles lookup by path.
+	LibFile* GetDefaultLibFile(const tspath::Path& path) {
+		auto it = libFiles.find(path);
+		return it != libFiles.end() ? it->second : nullptr;
+	}
+	// program.go GetResolvedTypeReferenceDirectives.
+	const std::unordered_map<
+	    tspath::Path,
+	    module::ModeAwareCache<module::ResolvedTypeReferenceDirective*>>&
+	GetResolvedTypeReferenceDirectives() { return typeResolutionsInFile; }
+	// program.go — opts.Config / opts.Tracing accessors.
+	tsoptions::ParsedCommandLine* CommandLine() { return commandLine_.get(); }
+	tracing::Tracing* Tracing() { return tr_; }
+	void SetTracing(tracing::Tracing* t) { tr_ = t; }
+	// program.go PackageJsonCacheEntries — delegates to the resolver's
+	// package-json scope cache.
+	void PackageJsonCacheEntries(
+	    const std::function<bool(
+	        tspath::Path,
+	        const std::shared_ptr<packagejson::InfoCacheEntry>&)>& f);
+	// host.go:115 — no content mappers in this port; always nullptr.
+	tsoptions::contentmapper::Project* ContentMapperProject() { return nullptr; }
+	// program.go SingleThreaded — options.SingleThreaded == TS true.
+	bool SingleThreaded() { return options.SingleThreaded == Tristate::True; }
+	// program.go:804 GetSemanticDiagnosticsForIncremental — per-file
+	// bind+check diagnostics with deferred globals, sorted/deduped.
+	std::vector<std::pair<SourceFile*, std::vector<Diagnostic*>>>
+	GetSemanticDiagnosticsForIncremental(
+	    const std::vector<SourceFile*>& sourceFiles);
+	// === end slice: incremental ===
 };
 
-// program.go: GetDiagnosticsOfAnyProgram.
+// program.go: GetDiagnosticsOfAnyProgram — generalized to ProgramLike for
+// the incremental Program (execute/incremental).
 std::vector<Diagnostic*> getDiagnosticsOfAnyProgram(
-    SimpleProgram* program, const std::vector<SourceFile*>& files,
+    ProgramLike* program, const std::vector<SourceFile*>& files,
     bool skipNoEmitCheckForDtsDiagnostics);
 
 std::vector<Diagnostic*> sortAndDeduplicateDiagnostics(
@@ -666,7 +766,7 @@ EmitResult* CombineEmitResults(const std::vector<EmitResult*>& results);
 // emitBuildInfo nullptr == Go nil. Returns a heap EmitResult like Go
 // (nullptr result == Go nil return).
 EmitResult* HandleNoEmitOptions(
-    SimpleProgram* program, const std::vector<SourceFile*>* files,
+    ProgramLike* program, const std::vector<SourceFile*>* files,
     const std::function<EmitResult*()>& emitBuildInfo);
 
 // fileloader.go mode workers (file-level).

@@ -364,6 +364,13 @@ SimpleProgram::SimpleProgram(CompilerHost* host_,
 	// checker.
 	verifyCompilerOptions();
 	// collectContentMapperOptionDiagnostics — no content mappers.
+
+	// === slice: incremental ===
+	// opts.Config — the program's ParsedCommandLine (program.go: built at
+	// NewProgram). fileNameList already holds the root names here.
+	commandLine_.reset(tsoptions::NewParsedCommandLine(
+	    &options, fileNameList, {}, comparePathsOptions()));
+	// === end slice: incremental ===
 }
 
 // program.go:570 BindSourceFiles (single-threaded)
@@ -668,22 +675,44 @@ std::vector<Diagnostic*> filterNoEmitSemanticDiagnostics(
 	return out;
 }
 
-// program.go:1512 getBindAndCheckDiagnosticsWithChecker
-// includeDeferredGlobals only exists for incremental — always false here.
-// Checker::GetDiagnostics (per-file check walker) is ported with the check
-// slice; until then the checker contributes zero diagnostics.
+// program.go:1490 getBindAndCheckDiagnosticsWithChecker
+// includeDeferredGlobals is used by execute/incremental: defers global
+// diagnostics until the file's check, then appends the delta.
 std::vector<Diagnostic*>
 SimpleProgram::getBindAndCheckDiagnosticsWithChecker(
-    SourceFile* sourceFile) {
+    SourceFile* sourceFile, bool includeDeferredGlobals) {
 	if (SkipTypeChecking(sourceFile, false)) {
 		return {};
 	}
 	checker::Checker* fileChecker =
 	    getChecker(); // checker creation forces binding
 
+	std::vector<Diagnostic*> previousGlobals;
+	if (includeDeferredGlobals) {
+		previousGlobals = fileChecker->GetGlobalDiagnostics();
+	}
+
 	std::vector<Diagnostic*> diags = sourceFile->bindDiagnostics;
 	auto checkerDiags = fileChecker->GetDiagnostics(sourceFile);
 	diags.insert(diags.end(), checkerDiags.begin(), checkerDiags.end());
+
+	if (includeDeferredGlobals) {
+		if (fileChecker->WasCanceled()) {
+			return {};
+		}
+		auto currentGlobals = fileChecker->GetGlobalDiagnostics();
+		if (currentGlobals.size() > previousGlobals.size()) {
+			for (auto* diagnostic : currentGlobals) {
+				if (!std::binary_search(
+				        previousGlobals.begin(), previousGlobals.end(),
+				        diagnostic, [](Diagnostic* a, Diagnostic* b) {
+					        return CompareDiagnostics(a, b) < 0;
+				        })) {
+					diags.push_back(diagnostic);
+				}
+			}
+		}
+	}
 
 	bool isPlainJS = isPlainJSFile(sourceFile, options.CheckJs);
 	if (isPlainJS) {
@@ -1223,11 +1252,10 @@ EmitResult* CombineEmitResults(const std::vector<EmitResult*>& results) {
 	return result;
 }
 
-// program.go:1966 HandleNoEmitOptions — Go takes ProgramLike; SimpleProgram
-// is the only implementer this slice needs (the incremental slice can
-// generalize the parameter when it lands). emitBuildInfo nullptr == Go nil.
+// program.go:1966 HandleNoEmitOptions — program is a ProgramLike (Go);
+// emitBuildInfo nullptr == Go nil.
 EmitResult* HandleNoEmitOptions(
-    SimpleProgram* program, const std::vector<SourceFile*>* files,
+    ProgramLike* program, const std::vector<SourceFile*>* files,
     const std::function<EmitResult*()>& emitBuildInfo) {
 	if (program->Options()->NoEmit != Tristate::True) {
 		if (program->Options()->NoEmitOnError != Tristate::True) {
@@ -1936,9 +1964,10 @@ void SimpleProgram::verifyCompilerOptions() {
 // so this is a faithful no-op.
 void SimpleProgram::verifyProjectReferences() {}
 
-// program.go:2010 GetDiagnosticsOfAnyProgram
+// program.go:2010 GetDiagnosticsOfAnyProgram — generalized to ProgramLike
+// so the incremental Program can drive it (execute/incremental slice).
 std::vector<Diagnostic*> getDiagnosticsOfAnyProgram(
-    SimpleProgram* program, const std::vector<SourceFile*>& files,
+    ProgramLike* program, const std::vector<SourceFile*>& files,
     bool skipNoEmitCheckForDtsDiagnostics) {
 	std::vector<Diagnostic*> allDiagnostics =
 	    program->GetConfigFileParsingDiagnostics();
@@ -1981,7 +2010,7 @@ std::vector<Diagnostic*> getDiagnosticsOfAnyProgram(
 			return program->GetBindDiagnostics(f);
 		});
 
-		if (program->options.ListFilesOnly != Tristate::True) {
+		if (program->Options()->ListFilesOnly != Tristate::True) {
 			auto globals = program->GetGlobalDiagnostics();
 			allDiagnostics.insert(allDiagnostics.end(), globals.begin(),
 			                      globals.end());
@@ -1992,16 +2021,22 @@ std::vector<Diagnostic*> getDiagnosticsOfAnyProgram(
 				    allDiagnostics, [&](SourceFile* f) {
 					    return program->GetSemanticDiagnostics(f);
 				    });
-				// Late sweep of global diagnostics (in case checking
-				// produced globals).
-				auto globals2 = program->GetGlobalDiagnostics();
-				allDiagnostics.insert(allDiagnostics.end(),
-				                      globals2.begin(), globals2.end());
+				// Late program check to get global diagnostics — Go gates
+				// this on `program.(*Program)`, i.e. only for the
+				// concrete (non-incremental) program.
+				if (auto* concreteProgram =
+				        dynamic_cast<SimpleProgram*>(program);
+				    concreteProgram != nullptr) {
+					auto globals2 = concreteProgram->GetGlobalDiagnostics();
+					allDiagnostics.insert(allDiagnostics.end(),
+					                      globals2.begin(),
+					                      globals2.end());
+				}
 			}
 
 			if ((skipNoEmitCheckForDtsDiagnostics ||
-			     program->options.NoEmit == Tristate::True) &&
-			    program->options.GetEmitDeclarations() &&
+			     program->Options()->NoEmit == Tristate::True) &&
+			    program->Options()->GetEmitDeclarations() &&
 			    allDiagnostics.size() ==
 			        configFileParsingDiagnosticsLength) {
 				allDiagnostics = appendDiagnosticsForAllFiles(
@@ -2058,4 +2093,57 @@ SimpleProgram::GetPackagesMap() {
 	}
 	return *packagesMap;
 }
+
+// === slice: incremental ===
+
+// program.go:816 GetSuggestionDiagnostics.
+std::vector<Diagnostic*> SimpleProgram::GetSuggestionDiagnostics(
+    SourceFile* sourceFile) {
+	return collectCheckerDiagnostics(sourceFile, [&](SourceFile* file) {
+		// getSuggestionDiagnosticsWithChecker — program.go:1634.
+		if (SkipTypeChecking(file, false)) {
+			return std::vector<Diagnostic*>{};
+		}
+		return getChecker()->GetSuggestionDiagnostics(file);
+	});
+}
+
+// program.go:616 GetTypeCheckerForFileExclusive — the Go checker pool
+// hands out the file's dedicated checker; the single-checker port shares
+// the one checker, so DoneForFile is a no-op.
+std::pair<checker::Checker*, std::function<void()>>
+SimpleProgram::GetTypeCheckerForFileExclusive(SourceFile* file) {
+	return {getChecker(), []() {}};
+}
+
+// program.go:166 PackageJsonCacheEntries — delegates to the resolver's
+// package-json scope cache.
+void SimpleProgram::PackageJsonCacheEntries(
+    const std::function<bool(
+        tspath::Path, const std::shared_ptr<packagejson::InfoCacheEntry>&)>&
+        f) {
+	resolver_->PackageJsonCacheEntries(f);
+}
+
+// program.go:804 GetSemanticDiagnosticsForIncremental —
+// collectCheckerDiagnosticsFromFiles run sequentially (single checker):
+// per-file bind+check with deferred globals, then filter+sort.
+std::vector<std::pair<SourceFile*, std::vector<Diagnostic*>>>
+SimpleProgram::GetSemanticDiagnosticsForIncremental(
+    const std::vector<SourceFile*>& sourceFiles) {
+	std::vector<std::pair<SourceFile*, std::vector<Diagnostic*>>> result;
+	result.reserve(sourceFiles.size());
+	for (auto* file : sourceFiles) {
+		auto [fileChecker, done] = GetTypeCheckerForFileExclusive(file);
+		auto diags = getBindAndCheckDiagnosticsWithChecker(
+		    file, true /*includeDeferredGlobals*/);
+		done();
+		result.emplace_back(
+		    file, filterAndSortDiagnostics(std::move(diags)));
+	}
+	return result;
+}
+
+// === end slice: incremental ===
+
 }  // namespace tsc::compiler

@@ -1129,6 +1129,31 @@ Diagnostic* newDiagnosticFromText(SourceFile* file, TextRange loc,
 	return d;
 }
 
+// === slice: incremental ===
+// diagnostic.go:166 NewDiagnosticFromSerialized.
+Diagnostic* NewDiagnosticFromSerialized(
+    SourceFile* file, TextRange loc, int32_t code,
+    DiagnosticCategory category, const char* messageKey,
+    std::vector<std::string> messageArgs,
+    std::vector<Diagnostic*> messageChain,
+    std::vector<Diagnostic*> relatedInformation, bool reportsUnnecessary,
+    bool reportsDeprecated, bool skippedOnNoEmit) {
+	auto* d = new Diagnostic();
+	d->file = file;
+	d->loc = loc;
+	d->code = code;
+	d->category = category;
+	d->messageKey = messageKey;
+	d->messageArgs = std::move(messageArgs);
+	d->messageChain = std::move(messageChain);
+	d->relatedInformation = std::move(relatedInformation);
+	d->reportsUnnecessary = reportsUnnecessary;
+	d->reportsDeprecated = reportsDeprecated;
+	d->skippedOnNoEmit = skippedOnNoEmit;
+	return d;
+}
+// === end slice: incremental ===
+
 // ---------------------------------------------------------------------------
 // utilities.go — name-of-declaration resolution and support predicates
 // ---------------------------------------------------------------------------
