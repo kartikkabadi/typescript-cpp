@@ -4341,8 +4341,8 @@ bool NodeBuilderImpl::shouldWriteTypeOfFunctionSymbol(
 		// typeof is allowed only for static/non local functions
 		*outSymbol = symbol;
 		return ((ctx->flags & nodebuilder::FlagsUseTypeOfFunction) != 0 ||
-		        ctx->visitedTypes.count(typeId) > 0 ||
-		        (ctx->flags &
+		        ctx->visitedTypes.count(typeId) > 0) &&
+		       ((ctx->flags &
 		         nodebuilder::FlagsUseStructuralFallback) == 0 ||
 		        ch->IsValueSymbolAccessible(symbol,
 		                                    ctx->enclosingDeclaration));

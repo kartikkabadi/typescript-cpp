@@ -595,7 +595,12 @@ int compareTypeNames(Type* t1, Type* t2) {
 	Symbol* s1 = getTypeNameSymbol(t1);
 	Symbol* s2 = getTypeNameSymbol(t2);
 	if (s1 == s2) {
-		return compareTypeLists(t1->alias->TypeArguments(), t2->alias->TypeArguments());
+		static const std::vector<Type*> empty;
+		const std::vector<Type*>& args1 =
+			t1->alias != nullptr ? t1->alias->TypeArguments() : empty;
+		const std::vector<Type*>& args2 =
+			t2->alias != nullptr ? t2->alias->TypeArguments() : empty;
+		return compareTypeLists(args1, args2);
 	}
 	if (s1 == nullptr) {
 		return 1;
