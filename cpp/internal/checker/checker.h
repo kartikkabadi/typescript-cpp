@@ -1797,7 +1797,7 @@ public:
 	bool isEmptyResolvedType(StructuredType* t);
 	bool isEmptyObjectType(Type* t);
 	bool checkCrossProductUnion(const std::vector<Type*>& types);
-	int getCrossProductUnionSize(const std::vector<Type*>& types);
+	int64_t getCrossProductUnionSize(const std::vector<Type*>& types);
 	Type* getTypeOfModuleImportAttributes(Symbol* symbol);
 	Type* getTypeOfModuleDeclarationImportAttributes(Node* attributes);
 	std::string getTemplateStringForType(Type* t);

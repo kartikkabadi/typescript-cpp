@@ -192,6 +192,11 @@ inline std::string utf8String(char32_t r) {
 inline char32_t decodeJSStringRune(std::string_view s, size_t i, int* width) {
 	const auto* p = reinterpret_cast<const unsigned char*>(s.data());
 	const size_t n = s.size();
+	if (i >= n) {
+		// Go's DecodeRuneInString on an empty/short tail returns (RuneError, 0).
+		*width = 0;
+		return kRuneError;
+	}
 	unsigned char b0 = p[i];
 	if (b0 < 0x80) {
 		*width = 1;
