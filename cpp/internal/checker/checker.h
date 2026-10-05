@@ -5,6 +5,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <deque>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -896,6 +897,35 @@ struct symbolArenaLinkStore {
 		}
 		return nullptr;
 	}
+};
+
+// === slice: decltypes === (checker_decltypes.cpp)
+
+// IntersectionState — relater.go:38
+using IntersectionState = uint32_t;
+inline constexpr IntersectionState IntersectionStateNone = 0;
+inline constexpr IntersectionState IntersectionStateSource = 1 << 0;
+inline constexpr IntersectionState IntersectionStateTarget = 1 << 1;
+
+// WideningContext — checker.go:537-544. Go distinguishes nil from empty for the
+// lazily computed fields, so they are wrapped in std::optional.
+struct WideningContext {
+	WideningContext* parent{};                                       // Parent context
+	std::deque<WideningContext>* pool{};                             // Checker-owned pool for child contexts (C++-only plumbing)
+	std::string propertyName;                                        // Name of property in parent
+	std::optional<std::vector<Type*>> siblings;                      // Types of siblings
+	std::optional<std::vector<Symbol*>> resolvedProperties;          // Properties occurring in sibling object literals
+	std::optional<std::unordered_map<std::string, WideningContext*>> childContexts;
+	std::optional<std::unordered_map<Type*, Type*>> widenedTypes;
+	WideningContext* getChildContext(const std::string& propertyName);
+};
+
+// RecursionId — relater.go:89. Defined here (not just forward-declared)
+// because call sites build std::vector<RecursionId> which needs a complete
+// type. Go's `value any` carries a *Node | *Symbol | *Type pointer; a raw
+// uintptr is the faithful equivalent for identity-only use.
+struct RecursionId {
+	uintptr_t value{};
 };
 
 // Checker
@@ -2695,6 +2725,125 @@ public:
 	// owner: declchecks slice (checker.go:5081-5929)
 	bool checkExternalImportOrExportDeclaration(Node* node);
 	// owner: instantiate slice (checker.go:22285-23219)
+
+	// === slice: decltypes === (checker_decltypes.cpp; checker.go:16720-19097)
+
+	// Symbol type resolution — declared-type layer.
+	Type* GetTypeOfSymbolAtLocation(Symbol* symbol, Node* location);
+	Type* getTypeOfInstantiatedSymbol(Symbol* symbol);
+	Type* getWriteTypeOfInstantiatedSymbol(Symbol* symbol);
+	Type* getTypeOfVariableOrParameterOrProperty(Symbol* symbol);
+	bool isParameterOfContextSensitiveSignature(Symbol* symbol);
+	Type* getTypeOfVariableOrParameterOrPropertyWorker(Symbol* symbol);
+	Type* getWidenedTypeForVariableLikeDeclaration(Node* declaration, bool reportErrors);
+	Type* getTypeForVariableLikeDeclaration(Node* declaration, bool includeOptionality,
+		CheckMode checkMode);
+	Type* checkDeclarationInitializer(Node* declaration, CheckMode checkMode,
+		Type* contextualType);
+	Type* padObjectLiteralType(Type* t, Node* pattern);
+	std::string getPropertyNameFromBindingElement(Node* e);
+	Type* padTupleType(Type* t, Node* pattern);
+	Type* widenTypeInferredFromInitializer(Node* declaration, Type* t);
+	Type* getWidenedLiteralTypeForInitializer(Node* declaration, Type* t);
+	Type* getTypeOfFuncClassEnumModule(Symbol* symbol);
+	Type* getTypeOfFuncClassEnumModuleWorker(Symbol* symbol);
+	Type* getBaseTypeVariableOfClass(Symbol* symbol);
+	bool isFunctionType(Type* t);
+	bool isConstructorType(Type* t);
+	Type* getTypeOfParameter(Symbol* symbol);
+	Type* getConstraintOfType(Type* t);
+	bool hasNonCircularBaseConstraint(Type* t);
+	Type* getConstraintFromTypeParameter(Type* t);
+	Type* getConstraintOrUnknownFromTypeParameter(Type* t);
+	Type* getInferredTypeParameterConstraint(Type* t, bool omitTypeReferences);
+	std::vector<Type*> getTypeParametersForTypeAndSymbol(Type* t, Symbol* symbol);
+	Type* getEffectiveTypeArgumentAtIndex(Node* node,
+		const std::vector<Type*>& typeParameters, size_t index);
+	Type* getConstraintOfIndexedAccess(Type* t);
+	Type* getConstraintFromIndexedAccess(Type* t);
+	Type* getConstraintOfConditionalType(Type* t);
+	Type* getConstraintFromConditionalType(Type* t);
+	Type* getDefaultConstraintOfConditionalType(Type* t);
+	Type* getConstraintOfDistributiveConditionalType(Type* t);
+	bool isNullOrUndefined(Node* node);
+	Type* getTypeForBindingElement(Node* declaration);
+	Type* getTypeForBindingElementParent(Node* node, CheckMode checkMode);
+	Type* getBindingElementTypeFromParentType(Node* declaration, Type* parentType,
+		bool noTupleBoundsCheck);
+	Type* getRestType(Type* source, const std::vector<Node*>& properties, Symbol* symbol);
+	Type* getFlowTypeOfDestructuring(Node* node, Type* declaredType);
+	Node* getSyntheticElementAccess(Node* node);
+	Node* getParentElementAccess(Node* node);
+	Type* getTypeFromBindingPattern(Node* pattern, bool includePatternInType,
+		bool reportErrors);
+	Type* getTypeFromObjectBindingPattern(Node* pattern, bool includePatternInType,
+		bool reportErrors);
+	Type* getTypeFromArrayBindingPattern(Node* pattern, bool includePatternInType,
+		bool reportErrors);
+	Type* getTypeFromBindingElement(Node* element, bool includePatternInType,
+		bool reportErrors);
+	bool declarationBelongsToPrivateAmbientMember(Node* declaration);
+	Type* getTypeOfPrototypeProperty(Symbol* prototype);
+	Type* getWidenedTypeForAssignmentDeclaration(Symbol* symbol);
+	Type* getAssignmentDeclarationInitializerType(Node* node);
+	bool hasParentWithTypeAnnotation(Symbol* symbol);
+	bool containsSameNamedThisProperty(Node* thisProperty, Node* expression);
+	Type* getTypeFromPropertyDescriptor(Node* node);
+	std::pair<thisAssignmentDeclarationKind, Node*> isConstructorDeclaredThisProperty(Symbol* symbol);
+	bool isGlobalSymbolConstructor(Node* node);
+	Type* widenTypeForVariableLikeDeclaration(Type* t, Node* declaration,
+		bool reportErrors);
+	Type* getWidenedTypeWithContext(Type* t, WideningContext* context);
+	Type* getWidenedTypeOfObjectLiteral(Type* t, WideningContext* context);
+	Symbol* getWidenedProperty(Symbol* prop, WideningContext* context);
+	std::vector<Symbol*> getPropertiesOfContext(WideningContext* context);
+	std::vector<Type*> getSiblingsOfContext(WideningContext* context);
+	Symbol* getUndefinedProperty(Symbol* prop);
+	Type* getTypeOfEnumMember(Symbol* symbol);
+	Type* getWriteTypeOfAccessors(Symbol* symbol);
+	Type* getTypeOfAlias(Symbol* symbol);
+	bool IsNullableType(Type* t);
+
+		std::deque<WideningContext> wideningContextPool;  // storage for WideningContext::getChildContext
+
+// Owned elsewhere; declared here because checker_decltypes.cpp calls them.
+	// Bodies are TSC_UNREACHABLE stubs in checker_decltypes.cpp until their slices land.
+	Type* checkShorthandPropertyAssignment(Node* node, bool inDestructuringPattern,
+		CheckMode checkMode);
+	Type* getAdjustedTypeWithFacts(Type* t, TypeFacts facts);
+	Type* getContextualThisParameterType(Node* fn);
+	Type* getContextuallyTypedParameterType(Node* declaration);
+	Node* getDeclaringConstructor(Symbol* symbol);
+	std::pair<std::string, bool> getDestructuringPropertyName(Node* node);
+	Type* checkExpressionForMutableLocation(Node* node, CheckMode checkMode);
+	Type* checkIteratedTypeOrElementType(IterationUse use, Type* inputType,
+		Type* sentType, Node* errorNode);
+	Type* checkJsxAttribute(Node* node, CheckMode checkMode);
+	Type* checkObjectLiteralMethod(Node* node, CheckMode checkMode);
+	Type* checkPropertyAssignment(Node* node, CheckMode checkMode);
+	Type* getFlowTypeInConstructor(Symbol* symbol, Node* constructor);
+	Type* getFlowTypeInStaticBlocks(Symbol* symbol,
+		const std::vector<Node*>& staticBlocks);
+	Type* getFlowTypeOfReference(Node* reference, Type* declaredType);
+	Type* getNonUndefinedType(Type* t);
+	Type* getResolvedBaseConstraint(Type* t, const std::vector<RecursionId>& stack);
+	Type* getSimplifiedType(Type* t, bool writing);
+	Type* getSimplifiedTypeOrConstraint(Type* t);
+	Symbol* getSpreadSymbol(Symbol* prop, bool readonly);
+	Type* getTypeOfFirstParameterOfSignature(Signature* sig);
+	Type* getTypeOfInitializer(Node* declaration);
+	Type* getTypeOfPropertyInBaseClass(Symbol* symbol);
+	Type* getTypeOfReverseMappedSymbol(Symbol* symbol);
+	Type* getTypeWithFacts(Type* t, TypeFacts include);
+	bool hasDefaultValue(Node* node);
+	bool isContextSensitiveFunctionOrObjectLiteralMethod(Node* node);
+	bool isMatchingReference(Node* source, Node* target);
+	bool isSpreadableProperty(Symbol* prop);
+	Type* sliceTupleType(Type* t, int index, int endSkipCount);
+	bool isValidSpreadType(Type* t);
+	Type* removeMissingType(Type* t, bool isOptional);
+	Type* removeOptionalTypeMarker(Type* t);
+	Type* substituteIndexedMappedType(Type* objectType, Type* indexType);
 };  // class Checker
 
 // Free helpers used across checker translation units.

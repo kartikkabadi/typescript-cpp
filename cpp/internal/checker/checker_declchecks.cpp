@@ -1689,28 +1689,22 @@ bool Checker::isReferenceToType(Type* t, Type* target) {
 	TSC_UNREACHABLE("isReferenceToType — iterations slice");
 }
 // owner: decltypes slice (checker.go:16720-19097)
-Type* Checker::getConstraintOfTypeParameter(Type* typeParameter) {
-	TSC_UNREACHABLE("getConstraintOfTypeParameter — decltypes slice");
-}
-std::vector<Type*> Checker::getTypeParametersForTypeReferenceOrImport(Node* node) {
-	TSC_UNREACHABLE("getTypeParametersForTypeReferenceOrImport — decltypes slice");
-}
-Type* Checker::getTypeOfAccessors(Symbol* symbol) {
-	TSC_UNREACHABLE("getTypeOfAccessors — decltypes slice");
-}
-void Checker::reportImplicitAny(Node* declaration, Type* t, WideningKind wideningKind) {
-	TSC_UNREACHABLE("reportImplicitAny — decltypes slice");
-}
+// (deduped: getConstraintOfTypeParameter defined in cpp/internal/checker/checker_decltypes.cpp)
+
+// (deduped: getTypeParametersForTypeReferenceOrImport defined in cpp/internal/checker/checker_decltypes.cpp)
+
+// (deduped: getTypeOfAccessors defined in cpp/internal/checker/checker_decltypes.cpp)
+
+// (deduped: reportImplicitAny defined in cpp/internal/checker/checker_decltypes.cpp)
+
 // owner: signatures slice (checker.go:20143-20986)
 // owner: members slice (checker.go:19186-20143, 20987-22284)
-ModifierFlags Checker::getCombinedModifierFlagsCached(Node* node) {
-	TSC_UNREACHABLE("getCombinedModifierFlagsCached — decltypes slice");
-}
+// (deduped: getCombinedModifierFlagsCached defined in cpp/internal/checker/checker_decltypes.cpp)
+
 // owner: instantiate slice (checker.go:22285-23219)
 // owner: typenodes slice (checker.go:23220-25738)
-Type* Checker::getNullableType(Type* t, TypeFlags flags) {
-	TSC_UNREACHABLE("getNullableType — typenodes slice");
-}
+// (deduped: getNullableType defined in cpp/internal/checker/checker_decltypes.cpp)
+
 // owner: typeops slice (checker.go:26020-28654)
 void Checker::checkIndexedAccessIndexType(Type* t, Node* node) {
 	TSC_UNREACHABLE("checkIndexedAccessIndexType — typeops slice");

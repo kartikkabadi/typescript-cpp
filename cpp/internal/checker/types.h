@@ -222,6 +222,10 @@ struct ExportTypeLinks {
 struct CacheKey {
 	std::vector<uint64_t> w; // key words: type ids, symbol ids, flags, counts
 	bool operator==(const CacheKey&) const = default;
+
+	// === slice: decltypes ===
+	// CacheHashKey.IsZero — checker.go:17699
+	bool IsZero() const { return w.empty(); }
 };
 struct CacheKeyHash {
 	size_t operator()(const CacheKey& k) const noexcept {
@@ -701,6 +705,12 @@ struct Type {
 
 	// === slice: tracer ===
 	Type* Target();
+
+	// === slice: decltypes ===
+	// types.go:740-798 — target accessors used by the declared-type layer.
+	std::vector<Type*> Distributed();
+	InterfaceType* TargetInterfaceType();
+	TupleType* TargetTupleType();
 };
 
 // TypeData hierarchy — mirrors Go's embedded-struct chain. Each TypeData struct embeds

@@ -1144,7 +1144,8 @@ InferenceContext* Checker::getInferenceContext(Node* node) { TSC_UNREACHABLE("ge
 // owner: typenodes slice
 
 // owner: decltypes slice (checker.go:16720-19097)
-Type* Checker::GetNonNullableType(Type* t) { TSC_UNREACHABLE("GetNonNullableType — decltypes slice"); }
+// (deduped: GetNonNullableType defined in cpp/internal/checker/checker_decltypes.cpp)
+
 // widen slice landed in checker_widen.cpp — its stubs here were removed.
 
 // owner: members slice

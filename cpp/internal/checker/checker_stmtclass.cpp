@@ -1854,12 +1854,10 @@ ConstructorAccessibilityError* Checker::getConstructorAccessibilityError(
 
 
 // owner: decltypes slice (checker.go:16720-19097)
-Type* Checker::getNonMissingTypeOfSymbol(Symbol* symbol) {
-	TSC_UNREACHABLE("getNonMissingTypeOfSymbol — decltypes slice");
-}
-Type* Checker::getNonNullableTypeIfNeeded(Type* t) {
-	TSC_UNREACHABLE("getNonNullableTypeIfNeeded — decltypes slice");
-}
+// (deduped: getNonMissingTypeOfSymbol defined in cpp/internal/checker/checker_decltypes.cpp)
+
+// (deduped: getNonNullableTypeIfNeeded defined in cpp/internal/checker/checker_decltypes.cpp)
+
 Type* Checker::getLiteralTypeFromProperty(Symbol* prop, TypeFlags include,
                                           bool includeNonPublic) {
 	TSC_UNREACHABLE("getLiteralTypeFromProperty — decltypes slice");

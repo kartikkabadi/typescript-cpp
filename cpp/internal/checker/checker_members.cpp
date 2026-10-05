@@ -2963,9 +2963,8 @@ bool Checker::isDiscriminantWithNeverType(Symbol* prop) {
 // === dep stubs — removed when owner slice lands ===
 // ---------------------------------------------------------------------------
 
-Type* Checker::getBaseConstructorTypeOfClass(Type* t) {
-	TSC_UNREACHABLE("getBaseConstructorTypeOfClass — owned by checker.go:17277 slice");
-}
+// (deduped: getBaseConstructorTypeOfClass defined in cpp/internal/checker/checker_decltypes.cpp)
+
 InferenceContext* Checker::newInferenceContext(
 	const std::vector<Type*>& typeParameters, Signature* signature,
 	InferenceFlags flags, TypeComparer compareTypes) {
@@ -3044,9 +3043,8 @@ Ternary Checker::compareProperties(Symbol* sourceProp, Symbol* targetProp,
 	const std::function<Ternary(Type*, Type*)>& compareTypes) {
 	TSC_UNREACHABLE("compareProperties — owned by checker.go:28138 slice");
 }
-bool Checker::isMixinConstructorType(Type* t) {
-	TSC_UNREACHABLE("isMixinConstructorType — owned by checker.go:17346 slice");
-}
+// (deduped: isMixinConstructorType defined in cpp/internal/checker/checker_decltypes.cpp)
+
 bool Checker::hasEffectiveRestParameter(Signature* signature) {
 	TSC_UNREACHABLE("hasEffectiveRestParameter — owned by relater.go slice");
 }

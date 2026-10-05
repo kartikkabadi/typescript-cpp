@@ -1307,9 +1307,8 @@ Type* Checker::createTupleTypeEx(std::vector<Type*> elementTypes,
 								 std::vector<TupleElementInfo> elementInfos, bool readonly) {
 	TSC_UNREACHABLE("createTupleTypeEx — instantiate dep");
 }
-Type* Checker::addOptionalityEx(Type* t, bool isProperty, bool isOptional) {
-	TSC_UNREACHABLE("addOptionalityEx — instantiate dep");
-}
+// (deduped: addOptionalityEx defined in cpp/internal/checker/checker_decltypes.cpp)
+
 Type* Checker::inferTypeForHomomorphicMappedType(Type* source, Type* target,
 												 Type* constraint) {
 	TSC_UNREACHABLE("inferTypeForHomomorphicMappedType — instantiate dep");

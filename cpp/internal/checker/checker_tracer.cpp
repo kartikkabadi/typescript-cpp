@@ -20,15 +20,17 @@ namespace tsc::checker {
 //   typeFlagNames / FormatTypeFlags      — types.go:520-568
 // ---------------------------------------------------------------------------
 
-// relater.go:89 — type RecursionId struct{ value any }. The value is only ever
-// *ast.Node, *ast.Symbol or *Type, so a void* carries it faithfully.
-struct RecursionId {
-	void* value{};
-};
+// RecursionId comes from checker.h (uintptr_t identity wrapper).
 
-static RecursionId asRecursionId(Node* value) { return {value}; }
-static RecursionId asRecursionId(Symbol* value) { return {value}; }
-static RecursionId asRecursionId(Type* value) { return {value}; }
+static RecursionId asRecursionId(Node* value) {
+	return {reinterpret_cast<uintptr_t>(value)};
+}
+static RecursionId asRecursionId(Symbol* value) {
+	return {reinterpret_cast<uintptr_t>(value)};
+}
+static RecursionId asRecursionId(Type* value) {
+	return {reinterpret_cast<uintptr_t>(value)};
+}
 
 // checker.go:23946
 static bool isTupleType(Type* t) {
@@ -488,7 +490,7 @@ public:
 		return it != checker->patternForType.end() ? it->second : nullptr;
 	}
 
-	void* RecursionIdentity() override { return getRecursionIdentity(t).value; }
+	void* RecursionIdentity() override { return reinterpret_cast<void*>(getRecursionIdentity(t).value); }
 
 	std::string Display() override {
 		// Compute display text for types where it's valuable for trace analysis.

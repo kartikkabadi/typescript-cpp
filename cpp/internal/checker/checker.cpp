@@ -3003,6 +3003,15 @@ Type* Checker::getWriteTypeOfSymbol(Symbol* symbol) {
 		auto* links = valueSymbolLinks.Get(symbol);
 		return links->writeType != nullptr ? links->writeType : links->resolvedType;
 	}
+	if (symbol->flags & SymbolFlagsProperty) {
+		return removeMissingType(getTypeOfSymbol(symbol), (symbol->flags & SymbolFlagsOptional) != 0);
+	}
+	if (symbol->flags & SymbolFlagsAccessor) {
+		if (symbol->checkFlags & CheckFlagsInstantiated) {
+			return getWriteTypeOfInstantiatedSymbol(symbol);
+		}
+		return getWriteTypeOfAccessors(symbol);
+	}
 	return getTypeOfSymbol(symbol);
 }
 
@@ -4128,9 +4137,8 @@ bool Checker::isBlockScopedNameDeclaredBeforeUse(Node* declaration, Node* usage)
 // Pending ports — bodies land with their file's slice.
 // ---------------------------------------------------------------------------
 
-Type* Checker::getWidenedType(Type* t) {
-	TSC_UNREACHABLE("getWidenedType — ported with the widening slice");
-}
+// (deduped: getWidenedType defined in cpp/internal/checker/checker_decltypes.cpp)
+
 
 // getSignaturesOfType is defined in checker_members.cpp (members slice).
 
@@ -4151,10 +4159,6 @@ Type* Checker::getFlowTypeOfReferenceEx(Node* reference, Type* declaredType,
 										Type* initialType, Node* flowContainer,
 										FlowNode* flowNode) {
 	TSC_UNREACHABLE("getFlowTypeOfReferenceEx — ported with flow.go");
-}
-
-Type* Checker::getOptionalType(Type* t, bool isProperty) {
-	TSC_UNREACHABLE("getOptionalType — ported with checker.cpp:18980 slice");
 }
 
 bool Checker::containsUndefinedType(Type* t) {
@@ -7647,9 +7651,8 @@ Type* Checker::getTypeFromImportAttributes(Node* node) {
 	    "getTypeFromImportAttributes — ported with the type-node slice");
 }
 
-Type* Checker::getTypeOfSymbol(Symbol* symbol) {
-	TSC_UNREACHABLE("getTypeOfSymbol — ported with the type-resolution slice");
-}
+// (deduped: getTypeOfSymbol defined in cpp/internal/checker/checker_decltypes.cpp)
+
 
 // checker.go:25346 getGenericObjectFlags
 ObjectFlags Checker::getGenericObjectFlags(Type* t) {

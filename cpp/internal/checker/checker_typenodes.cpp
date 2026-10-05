@@ -2583,9 +2583,8 @@ Type* Checker::getImpliedConstraint(Type* t, Node* checkNode,
 // decltypes, members, signatures, printer, flow.
 // ---------------------------------------------------------------------------
 
-Type* Checker::addOptionality(Type* t) {
-	TSC_UNREACHABLE("addOptionality — typenodes dep");
-}
+// (deduped: addOptionality defined in cpp/internal/checker/checker_decltypes.cpp)
+
 
 
 

@@ -946,6 +946,49 @@ inline bool isLeftHandSideExpression(Node* node) {
 		skipPartiallyEmittedExpressions(node)->kind);
 }
 
+// ast/utilities.go:415
+inline bool isUnaryExpressionKind(Kind kind) {
+	switch (kind) {
+	case Kind::PrefixUnaryExpression:
+	case Kind::PostfixUnaryExpression:
+	case Kind::DeleteExpression:
+	case Kind::TypeOfExpression:
+	case Kind::VoidExpression:
+	case Kind::AwaitExpression:
+	case Kind::TypeAssertionExpression:
+		return true;
+	}
+	return isLeftHandSideExpressionKind(kind);
+}
+
+// ast/utilities.go:427
+inline bool isUnaryExpression(Node* node) {
+	return isUnaryExpressionKind(skipPartiallyEmittedExpressions(node)->kind);
+}
+
+// ast/utilities.go:434
+inline bool isExpressionKind(Kind kind) {
+	switch (kind) {
+	case Kind::ConditionalExpression:
+	case Kind::YieldExpression:
+	case Kind::ArrowFunction:
+	case Kind::BinaryExpression:
+	case Kind::SpreadElement:
+	case Kind::AsExpression:
+	case Kind::OmittedExpression:
+	case Kind::PartiallyEmittedExpression:
+	case Kind::SatisfiesExpression:
+		return true;
+	}
+	return isUnaryExpressionKind(kind);
+}
+
+// Determines whether a node is an expression based only on its kind.
+// ast/utilities.go:451
+inline bool isExpression(Node* node) {
+	return isExpressionKind(skipPartiallyEmittedExpressions(node)->kind);
+}
+
 inline ModifierFlags modifierToFlag(Kind token) {
 	switch (token) {
 	case Kind::StaticKeyword:
