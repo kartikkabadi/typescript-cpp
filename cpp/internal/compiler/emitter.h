@@ -24,7 +24,7 @@ namespace tsc::compiler {
 // declarations.DeclarationEmitHost + Options/SourceFiles/
 // UseCaseSensitiveFileNames/GetCurrentDirectory/CommonSourceDirectory/
 // IsEmitBlocked).
-struct emitHost : declarations::DeclarationEmitHost, printer::EmitHost {
+struct emitHost : transformers::declarations::DeclarationEmitHost, printer::EmitHost {
 	SimpleProgram* program{};
 	checker::EmitResolver* emitResolver{};
 
@@ -113,7 +113,7 @@ struct emitHost : declarations::DeclarationEmitHost, printer::EmitHost {
 	    Node* node, ModifierFlags flags) override {
 		return GetEmitResolver()->GetEffectiveDeclarationFlags(node, flags);
 	}
-	declarations::OutputPaths* GetOutputPathsFor(SourceFile* file,
+	transformers::declarations::OutputPaths* GetOutputPathsFor(SourceFile* file,
 	                                             bool forceDtsPaths) override;
 	bool SourceFileMayBeEmitted(SourceFile* file,
 	                            bool forceDtsEmit) override {
@@ -192,7 +192,7 @@ struct emitter {
 	WriteFile writeFile;
 
 	void emit();
-	std::vector<declarations::DeclarationTransformer*>
+	std::vector<transformers::declarations::DeclarationTransformer*>
 	getDeclarationTransformers(printer::EmitContext* emitContext,
 	                           SourceFile* sourceFile,
 	                           const std::string& declarationFilePath,

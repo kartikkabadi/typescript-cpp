@@ -84,7 +84,6 @@ add_library(tsc STATIC
 	internal/printer/syntheticfile.cpp
 	# === slice: transformers ===
 	internal/transformers/transformer.cpp
-	internal/transformers/declarations/declarations.cpp
 	internal/transformers/utilities.cpp
 	internal/transformers/destructuring.cpp
 	internal/transformers/estransforms/utilities.cpp
@@ -113,6 +112,11 @@ add_library(tsc STATIC
 	internal/transformers/inliners/constenum.cpp
 	# === slice: jsxtransforms ===
 	internal/transformers/jsxtransforms/jsxtransforms.cpp
+	internal/transformers/declarations/diagnostics.cpp
+	internal/transformers/declarations/supplementalreferences.cpp
+	internal/transformers/declarations/tracker.cpp
+	internal/transformers/declarations/transform.cpp
+	internal/transformers/declarations/util.cpp
 	# === slice: module ===
 	internal/core/compileroptions.cpp
 	internal/module/util.cpp

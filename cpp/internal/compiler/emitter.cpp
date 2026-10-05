@@ -56,8 +56,8 @@ using ::tsc::transformers::TransformOptions;
 namespace {
 
 // emitHost.go:88 GetOutputPathsFor — wraps outputpaths::OutputPaths in the
-// declarations::OutputPaths interface (Go structural interface).
-struct outputPathsAdapter : declarations::OutputPaths {
+// transformers::declarations::OutputPaths interface (Go structural interface).
+struct outputPathsAdapter : transformers::declarations::OutputPaths {
 	outputpaths::OutputPaths paths;
 	std::string DeclarationFilePath() override {
 		return paths.DeclarationFilePath();
@@ -91,7 +91,7 @@ declarationMapSource* newDeclarationMapSource(SourceFile* sourceFile) {
 // --- emitHost.go ---
 
 // emitHost.go:88
-declarations::OutputPaths* emitHost::GetOutputPathsFor(SourceFile* file,
+transformers::declarations::OutputPaths* emitHost::GetOutputPathsFor(SourceFile* file,
                                                      bool forceDtsPaths) {
 	// TODO: cache
 	auto* adapter = new outputPathsAdapter;
@@ -121,7 +121,7 @@ void emitter::emit() {
 }
 
 // emitter.go:60 getDeclarationTransformers
-std::vector<declarations::DeclarationTransformer*>
+std::vector<transformers::declarations::DeclarationTransformer*>
 emitter::getDeclarationTransformers(printer::EmitContext* emitContext,
                                     SourceFile* sourceFile,
                                     const std::string& declarationFilePath,
@@ -129,11 +129,11 @@ emitter::getDeclarationTransformers(printer::EmitContext* emitContext,
 	bool forceDtsEmit = emitOnly == EmitOnly::EmitOnlyBuilderSignature ||
 	                    (forceEmit && emitOnly == EmitOnly::EmitOnlyDts);
 	return {
-	    declarations::NewDeclarationTransformer(host, emitContext,
+	    transformers::declarations::NewDeclarationTransformer(host, emitContext,
 	                                            host->Options(),
 	                                            declarationFilePath,
 	                                            declarationMapPath),
-	    declarations::NewSupplementalReferencesTransformer(
+	    transformers::declarations::NewSupplementalReferencesTransformer(
 	        host, sourceFile, declarationFilePath, forceDtsEmit),
 	};
 }
@@ -752,7 +752,7 @@ std::vector<Diagnostic*> getDeclarationDiagnostics(emitHost* host,
 		return {};
 	}
 	const CompilerOptions* options = host->Options();
-	auto* transform = declarations::NewDeclarationTransformer(
+	auto* transform = transformers::declarations::NewDeclarationTransformer(
 	    host, nullptr, options, "", "");
 	transform->TransformSourceFile(file);
 	return transform->GetDiagnostics();
