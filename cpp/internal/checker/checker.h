@@ -18,6 +18,7 @@
 #include "internal/ast/flow.h"
 #include "internal/ast/symbol.h"
 #include "internal/checker/types.h"
+#include "internal/tracing/tracing.h"
 #include "internal/core/arena.h"
 #include "internal/core/linkstore.h"
 #include "internal/core/types.h"
@@ -748,9 +749,21 @@ struct VarianceStackEntry {
 	std::vector<Type*> typeParameters;
 };
 
-// Tracer — port deferred; kept as opaque pointer (nullable).
+// === slice: tracer === — tracer.go:13. Records types and trace events during
+// type checking. A null Checker::tracer is a valid no-op (Go nil *Tracer).
+struct Tracer {
+	tsc::tracing::Tracing* tracing{};
+	tsc::tracing::Tracer* recorder{};
+	int checkerIndex{};
 
-struct Tracer;
+	void RecordType(Type* typ);
+	std::function<void()> Push(tsc::tracing::Phase phase, const std::string& name,
+							   tsc::tracing::TraceArgs args, bool separateBeginAndEnd);
+	void Instant(tsc::tracing::Phase phase, const std::string& name,
+				 const tsc::tracing::TraceArgs& args);
+	tsc::tracing::TraceArgs copyWithCheckerIndex(const tsc::tracing::TraceArgs& args);
+	std::function<void()> temporarilyAddCheckerIndex(tsc::tracing::TraceArgs& args);
+};
 
 // EmitResolver — ported with emitresolver.go.
 
@@ -1777,6 +1790,17 @@ public:
 	void inferFromIntraExpressionSites(InferenceContext* context);
 	Type* getInferredType(InferenceContext* context, size_t index);
 
+	// === slice: tracer ===
+	Tracer* tracer{};
+	std::string TypeToString(Type* t);                 // printer.go — defined in checker_tracer.cpp
+	Type* getModifiersTypeFromMappedType(Type* t);     // checker.go:28593 — defined in checker_tracer.cpp
+
+	// === slice: jsdoc ===
+	void checkUnmatchedJSDocParameters(Node* node);
+	bool containsArgumentsReference(Node* node);
+	bool isArrayType(Type* t);
+	bool IsArgumentsSymbol(Symbol* symbol);
+
 	// === slice: walk === (checker_walk.cpp: diagnostics tail, check walker,
 	// deferred checks, JSDoc comment pass, expression entry + dispatch)
 	std::vector<std::function<void()>> deferredDiagnosticCallbacks;
@@ -1951,7 +1975,6 @@ public:
 	void checkExportAssignment(Node* node);
 	void checkMissingDeclaration(Node* node);
 	void checkJSDocType(Node* node);
-	std::string TypeToString(Type* t);
 	std::string getIsolatedModulesLikeFlagName();
 };
 
@@ -1959,5 +1982,13 @@ public:
 Type* getNonDistributedTypeParameter(Type* t);
 bool isThisTypeParameter(Type* t);
 void clearCachedInferences(std::vector<InferenceInfo*>& inferences);
+
+// === slice: tracer ===
+Tracer* newTracer(tsc::tracing::Tracing* tr, int checkerIndex);
+std::vector<std::string> FormatTypeFlags(TypeFlags flags); // types.go:556
+
+// === slice: jsdoc ===
+std::vector<Node*> getAllJSDocTags(Node* node);
+std::string entityNameToString(Node* name); // utilities.go — defined in checker.cpp
 
 } // namespace tsc::checker

@@ -698,6 +698,9 @@ struct Type {
 	// Constituent list for union/intersection types.
 	const std::vector<Type*>& types() const;
 	std::vector<Type*>& types();
+
+	// === slice: tracer ===
+	Type* Target();
 };
 
 // TypeData hierarchy — mirrors Go's embedded-struct chain. Each TypeData struct embeds
@@ -1098,5 +1101,25 @@ const std::vector<Type*>& Type::types() const {
 std::vector<Type*>& Type::types() {
 		return static_cast<UnionOrIntersectionType*>(data)->types;
 	}
+
+// === slice: tracer === — types.go:752
+inline Type* Type::Target() {
+	if (flags & TypeFlagsObject) {
+		return AsObjectType()->target;
+	}
+	if (flags & TypeFlagsTypeParameter) {
+		return AsTypeParameter()->target;
+	}
+	if (flags & TypeFlagsIndex) {
+		return AsIndexType()->target;
+	}
+	if (flags & TypeFlagsStringMapping) {
+		return AsStringMappingType()->target;
+	}
+	if ((flags & TypeFlagsObject) && (objectFlags & ObjectFlagsMapped)) {
+		return AsMappedType()->target;
+	}
+	TSC_UNREACHABLE("Unhandled case in Type.Target");
+}
 
 } // namespace tsc::checker

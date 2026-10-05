@@ -1318,8 +1318,7 @@ void Checker::checkUnusedRenamedBindingElements() { TSC_UNREACHABLE("checkUnused
 void Checker::checkExternalModuleExports(Node* moduleNode) { TSC_UNREACHABLE("checkExternalModuleExports — modulechecks slice"); }
 void Checker::registerForUnusedIdentifiersCheck(Node* node) { TSC_UNREACHABLE("registerForUnusedIdentifiersCheck — unusedcheck slice"); }
 
-// owner: nodebuilder slice
-std::string Checker::TypeToString(Type* t) { TSC_UNREACHABLE("TypeToString — nodebuilder slice"); }
+// (TypeToString dep-stub removed — tracer slice landed the real definition.)
 
 // owner: module/resolved-symbol helpers
 std::string Checker::getIsolatedModulesLikeFlagName() { TSC_UNREACHABLE("getIsolatedModulesLikeFlagName — modulechecks slice"); }
