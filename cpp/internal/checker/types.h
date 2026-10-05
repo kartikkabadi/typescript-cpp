@@ -193,6 +193,15 @@ struct AliasSymbolLinks {
 	Symbol* aliasTarget{};     // Resolved (non-alias) target of an alias
 	bool referenced{};         // True if alias symbol has been referenced as a value that can be emitted
 	Node* typeOnlyDeclaration{}; // First resolved alias declaration that makes the symbol only usable in type constructs
+	// Go gives each checker in the pool its own aliasSymbolLinks store, so a
+	// target cached while some other file was being checked does not
+	// short-circuit the owning checker's fresh resolution (and its
+	// diagnostics). These record the activeCheckFile each cached target was
+	// resolved under; nullptr means populated outside any file check (or
+	// seeded directly, e.g. createDefaultPropertyWrapperForModule) and is
+	// valid in every context.
+	SourceFile* immediateTargetCheckFile{};
+	SourceFile* aliasTargetCheckFile{};
 };
 
 // Links for module symbols
