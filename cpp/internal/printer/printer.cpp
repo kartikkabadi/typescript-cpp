@@ -5164,7 +5164,9 @@ bool Printer::emitHelpers(Node* node) {
 	std::vector<EmitHelper*> helpers = emitContext->getEmitHelpers(node);
 	if (!helpers.empty()) {
 		std::stable_sort(helpers.begin(), helpers.end(),
-		                 compareEmitHelpers);
+		                 [](const EmitHelper* x, const EmitHelper* y) {
+			                 return compareEmitHelpers(x, y) < 0;
+		                 });
 		for (EmitHelper* helper : helpers) {
 			if (!helper->Scoped) {
 				// Skip the helper if it can be skipped and the noEmitHelpers

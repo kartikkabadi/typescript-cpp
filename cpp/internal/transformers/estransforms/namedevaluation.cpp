@@ -645,17 +645,18 @@ Node* injectClassNamedEvaluationHelperBlockIfMissing(
 			node->name()->loc);
 	}
 
-	// slices.IndexFunc(node.Members(), isClassThisAssignmentBlock) + 1
-	int insertionIndex = 0;
-	for (Node* member : node->members()) {
-		if (isClassThisAssignmentBlock(emitContext, member)) {
+	// slices.IndexFunc(node.Members(), isClassThisAssignmentBlock) + 1 —
+	// IndexFunc is -1 on no match, leaving insertionIndex at 0.
+	const std::vector<Node*> nodeMembers = node->members();
+	int insertionIndex = -1;
+	for (size_t i = 0; i < nodeMembers.size(); i++) {
+		if (isClassThisAssignmentBlock(emitContext, nodeMembers[i])) {
+			insertionIndex = static_cast<int>(i);
 			break;
 		}
-		insertionIndex++;
 	}
 	insertionIndex += 1;
 
-	const std::vector<Node*>& nodeMembers = node->members();
 	std::vector<Node*> leading(nodeMembers.begin(),
 	                           nodeMembers.begin() + insertionIndex);
 	std::vector<Node*> trailing(nodeMembers.begin() + insertionIndex,
