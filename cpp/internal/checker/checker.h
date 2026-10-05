@@ -2152,7 +2152,6 @@ public:
 	    const std::vector<Node*>& declarations, const std::vector<Type*>& targetParameters,
 	    const std::function<std::vector<Node*>(Node*)>& getTypeParameterDeclarations);
 	ModifierFlags getTypeParameterModifiers(Type* typeParameter);
-||||||| 73b7201e13
 
 	// === slice: nodecopy ===
 	printer::SymbolAccessibilityResult isSymbolAccessible(
