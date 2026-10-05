@@ -1516,13 +1516,5 @@ bool EmitResolver::IsThisPropertyAssignmentDeclarationRedundant(Node* node) {
 
 }  // namespace tsc::checker
 
-// binder/referenceresolver.go — dep-stub until the referenceresolver slice lands.
-
-namespace tsc::binder {
-
-ReferenceResolver* NewReferenceResolver(
-	const CompilerOptions* /*options*/, ReferenceResolverHooks /*hooks*/) {
-	TSC_UNREACHABLE("binder::NewReferenceResolver — referenceresolver slice");
-}
-
-}  // namespace tsc::binder
+// (deduped: binder::NewReferenceResolver — real def lives in
+// internal/binder/referenceresolver.cpp)
