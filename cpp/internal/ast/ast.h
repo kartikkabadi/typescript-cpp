@@ -1057,6 +1057,23 @@ std::vector<Node*> getHeritageElements(Node* node, Kind kind);
 inline std::vector<Node*> getExtendsHeritageClauseElements(Node* node) {
 	return getHeritageElements(node, Kind::ExtendsKeyword);
 }
+// ast/utilities.go:3131 — GetClassExtendsHeritageElement
+inline Node* getClassExtendsHeritageElement(Node* node) {
+	auto elements = getHeritageElements(node, Kind::ExtendsKeyword);
+	return elements.empty() ? nullptr : elements.front();
+}
+// ast/utilities.go:1147 — IsFunctionOrModuleBlock
+inline bool isFunctionOrModuleBlock(Node* node) {
+	return isSourceFile(node) || isModuleBlock(node) ||
+	       (isBlock(node) && isFunctionLike(node->parent));
+}
+// ast/utilities.go:845 — WalkUpParenthesizedExpressions
+inline Node* walkUpParenthesizedExpressions(Node* node) {
+	while (node != nullptr && node->kind == Kind::ParenthesizedExpression) {
+		node = node->parent;
+	}
+	return node;
+}
 Node* getHeritageClauseElementName(Node* node);
 bool isPrologueDirective(Node* node);
 bool isDottedName(Node* node);

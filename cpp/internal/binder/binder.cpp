@@ -18,18 +18,7 @@
 
 namespace tsc {
 
-using ContainerFlags = int32_t;
-inline constexpr ContainerFlags ContainerFlagsNone = 0;
-inline constexpr ContainerFlags ContainerFlagsIsContainer = 1 << 0;
-inline constexpr ContainerFlags ContainerFlagsIsBlockScopedContainer = 1 << 1;
-inline constexpr ContainerFlags ContainerFlagsIsControlFlowContainer = 1 << 2;
-inline constexpr ContainerFlags ContainerFlagsIsFunctionLike = 1 << 3;
-inline constexpr ContainerFlags ContainerFlagsIsFunctionExpression = 1 << 4;
-inline constexpr ContainerFlags ContainerFlagsHasLocals = 1 << 5;
-inline constexpr ContainerFlags ContainerFlagsIsInterface = 1 << 6;
-inline constexpr ContainerFlags ContainerFlagsIsObjectLiteralOrClassExpressionMethodOrAccessor = 1 << 7;
-inline constexpr ContainerFlags ContainerFlagsIsThisContainer = 1 << 8;
-inline constexpr ContainerFlags ContainerFlagsPropagatesThisKeyword = 1 << 9;
+// ContainerFlags + getContainerFlags are declared in binder.h.
 
 static bool isNarrowingExpression(Node* expr);
 static bool isNarrowableReference(Node* node);

@@ -2064,6 +2064,92 @@ public:
 	Symbol* lookupSymbolForPrivateIdentifierDeclaration(const std::string& propName, Node* location);
 	ObjectFlags getGenericObjectFlags(Type* t);
 	std::pair<std::string, bool> tryGetNameFromType(Type* t);
+
+	// === slice: declchecks === (checker_declchecks.cpp)
+	// checker.go:2622-3830 — per-declaration and per-type-node check functions.
+	void checkJSDocTypeIsInJsFile(Node* node);
+	bool shouldCheckErasableSyntax(Node* node);
+	void checkAsyncFunctionReturnType(Node* node, Node* returnTypeNode);
+	Node* findFirstSuperCall(Node* node);
+	void checkTypeReferenceOrImport(Node* node);
+	bool checkTypeArgumentConstraints(Node* node, std::vector<Type*> typeParameters);
+	Node* getDeprecatedSuggestionNode(Node* node);
+	Node* getTypePredicateParent(Node* node);
+	bool checkIfTypePredicateVariableIsDeclaredInBindingPattern(
+	    Node* pattern, Node* predicateVariableNode, const std::string& predicateVariableName);
+	void checkObjectTypeForDuplicateDeclarations(Node* node, bool checkPrivateNames);
+	void reportDuplicateMemberErrors(Node* node, const std::string& name, bool checkStatic,
+	                                 bool isStatic, const DiagnosticMessage* message);
+	ResolutionMode getResolutionModeOverride(Node* node, bool reportErrors);
+	void checkFunctionOrMethodDeclaration(Node* node);
+	void checkFunctionOrConstructorSymbol(Symbol* symbol);
+	void checkFunctionOrConstructorSymbolWorker(Symbol* symbol);
+	ModifierFlags getEffectiveDeclarationFlags(Node* n, ModifierFlags flagsToCheck);
+	bool isImplementationCompatibleWithOverload(Signature* implementation, Signature* overload);
+	void checkAllCodePathsInNonVoidFunctionReturnOrThrow(Node* fn, Type* returnType);
+	bool isUnwrappedReturnTypeUndefinedVoidOrAny(Node* fn, Type* returnType);
+
+	// declchecks dep stubs — owned by other slices (see checker_declchecks.cpp
+	// bottom for the single TSC_UNREACHABLE body each)
+	void checkVariableLikeDeclaration(Node* node);
+	void checkDecorators(Node* node);
+	void checkIndexConstraints(Type* t, Symbol* symbol, bool isStaticIndex);
+	void checkTypeForDuplicateIndexSignatures(Node* node);
+	void checkTypeNameIsReserved(Node* name, const DiagnosticMessage* message);
+	void checkTypeParameters(const std::vector<Node*>& typeParameterDeclarations);
+	bool isReferenceToType(Type* t, Type* target);
+	Type* getConstraintOfTypeParameter(Type* typeParameter);
+	std::vector<Type*> getTypeParametersForTypeReferenceOrImport(Node* node);
+	Type* getTypeOfAccessors(Symbol* symbol);
+	void reportImplicitAny(Node* declaration, Type* t, WideningKind wideningKind);
+	bool hasBindableName(Node* node);
+	Signature* getSignatureFromDeclaration(Node* declaration);
+	std::vector<Signature*> getSignaturesOfSymbol(Symbol* symbol);
+	bool functionHasImplicitReturn(Node* fn);
+	Type* unwrapReturnType(Type* returnType, FunctionFlags functionFlags);
+	Signature* getErasedSignature(Signature* signature);
+	Type* getReturnTypeFromAnnotation(Node* declaration);
+	ModifierFlags getCombinedModifierFlagsCached(Node* node);
+	std::vector<Type*> getEffectiveTypeArguments(Node* node, std::vector<Type*> typeParameters);
+	Type* getDefaultFromTypeParameter(Type* t);
+	Type* getResolvedTypeParameterDefault(Type* t);
+	Type* getNameTypeFromMappedType(Type* t);
+	Type* getConstraintTypeFromMappedType(Type* t);
+	Type* getTypeFromThisTypeNode(Node* node);
+	Type* getTypeFromTypeLiteralOrFunctionOrConstructorTypeNode(Node* node);
+	Type* getTypeFromIndexedAccessTypeNode(Node* node);
+	Type* getTypeFromTypeQueryNode(Node* node);
+	Type* getTypeFromMappedTypeNode(Node* node);
+	ElementFlags getTupleElementFlags(Node* node);
+	bool isArrayLikeType(Type* t);
+	Type* getNullableType(Type* t, TypeFlags flags);
+	void checkIndexedAccessIndexType(Type* t, Node* node);
+	void checkExternalEmitHelpers(Node* location, ExternalEmitHelpers helpers);
+	Type* createMarkerType(Symbol* symbol, Type* source, Type* target);
+	bool checkGeneratorInstantiationAssignabilityToReturnType(Type* returnType,
+	                                                          FunctionFlags functionFlags,
+	                                                          Node* errorNode);
+	Type* checkAwaitedType(Type* t, bool withAlias, Node* errorNode,
+	                       const DiagnosticMessage* diagnosticMessage);
+	Type* getAwaitedTypeNoAlias(Type* t);
+	Signature* getContextualCallSignature(Type* t, Node* node);
+	bool checkTypeAssignableToEx(Type* source, Type* target, Node* errorNode,
+	                           const DiagnosticMessage* headMessage,
+	                           std::vector<Diagnostic*>* diagnosticOutput);
+	bool isSignatureAssignableTo(Signature* source, Signature* target, bool ignoreReturnTypes);
+	TypePredicate* getTypePredicateOfSignature(Signature* sig);
+	void checkCollisionsForDeclarationName(Node* node, Node* name);
+	void setNodeLinksForPrivateIdentifierScope(Node* node);
+	bool classDeclarationExtendsNull(Node* classDecl);
+	Symbol* getResolvedSymbolOrNil(Node* node);
+	bool IsDeprecatedDeclaration(Node* declaration);
+	Diagnostic* addDeprecatedSuggestion(Node* location, std::vector<Node*> declarations,
+	                                  const std::string& deprecatedEntity);
+	void checkImportAttributes(Node* node);
+	bool areTypeParametersIdentical(
+	    const std::vector<Node*>& declarations, const std::vector<Type*>& targetParameters,
+	    const std::function<std::vector<Node*>(Node*)>& getTypeParameterDeclarations);
+	ModifierFlags getTypeParameterModifiers(Type* typeParameter);
 };
 
 // Free helpers used across checker translation units.

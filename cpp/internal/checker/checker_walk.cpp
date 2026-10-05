@@ -1238,40 +1238,12 @@ Symbol* Checker::lookupSymbolForPrivateIdentifierDeclaration(const std::string& 
 Signature* Checker::resolveUntypedCall(Node* node) { TSC_UNREACHABLE("resolveUntypedCall — call-resolution slice"); }
 void Checker::checkFunctionExpressionOrObjectLiteralMethodDeferred(Node* node) { TSC_UNREACHABLE("checkFunctionExpressionOrObjectLiteralMethodDeferred — expressions slice"); }
 void Checker::checkClassExpressionDeferred(Node* node) { TSC_UNREACHABLE("checkClassExpressionDeferred — expressions slice"); }
-void Checker::checkTypeParameterDeferred(Node* node) { TSC_UNREACHABLE("checkTypeParameterDeferred — declchecks slice"); }
 void Checker::checkJsxSelfClosingElementDeferred(Node* node) { TSC_UNREACHABLE("checkJsxSelfClosingElementDeferred — jsx slice"); }
 void Checker::checkJsxElementDeferred(Node* node) { TSC_UNREACHABLE("checkJsxElementDeferred — jsx slice"); }
 void Checker::checkAssertionDeferred(Node* node) { TSC_UNREACHABLE("checkAssertionDeferred — expressions slice"); }
 void Checker::checkContextualDeprecations(Node* node) { TSC_UNREACHABLE("checkContextualDeprecations — expressions slice"); }
 
 // owner: walker per-node checks (wave-3)
-void Checker::checkTypeParameter(Node* node) { TSC_UNREACHABLE("checkTypeParameter — declchecks slice"); }
-void Checker::checkParameter(Node* node) { TSC_UNREACHABLE("checkParameter — declchecks slice"); }
-void Checker::checkPropertyDeclaration(Node* node) { TSC_UNREACHABLE("checkPropertyDeclaration — declchecks slice"); }
-void Checker::checkPropertySignature(Node* node) { TSC_UNREACHABLE("checkPropertySignature — declchecks slice"); }
-void Checker::checkSignatureDeclaration(Node* node) { TSC_UNREACHABLE("checkSignatureDeclaration — declchecks slice"); }
-void Checker::checkMethodDeclaration(Node* node) { TSC_UNREACHABLE("checkMethodDeclaration — declchecks slice"); }
-void Checker::checkClassStaticBlockDeclaration(Node* node) { TSC_UNREACHABLE("checkClassStaticBlockDeclaration — declchecks slice"); }
-void Checker::checkConstructorDeclaration(Node* node) { TSC_UNREACHABLE("checkConstructorDeclaration — declchecks slice"); }
-void Checker::checkAccessorDeclaration(Node* node) { TSC_UNREACHABLE("checkAccessorDeclaration — declchecks slice"); }
-void Checker::checkTypeReferenceNode(Node* node) { TSC_UNREACHABLE("checkTypeReferenceNode — declchecks slice"); }
-void Checker::checkTypePredicate(Node* node) { TSC_UNREACHABLE("checkTypePredicate — declchecks slice"); }
-void Checker::checkTypeQuery(Node* node) { TSC_UNREACHABLE("checkTypeQuery — declchecks slice"); }
-void Checker::checkTypeLiteral(Node* node) { TSC_UNREACHABLE("checkTypeLiteral — declchecks slice"); }
-void Checker::checkArrayType(Node* node) { TSC_UNREACHABLE("checkArrayType — declchecks slice"); }
-void Checker::checkTupleType(Node* node) { TSC_UNREACHABLE("checkTupleType — declchecks slice"); }
-void Checker::checkUnionOrIntersectionType(Node* node) { TSC_UNREACHABLE("checkUnionOrIntersectionType — declchecks slice"); }
-void Checker::checkThisType(Node* node) { TSC_UNREACHABLE("checkThisType — declchecks slice"); }
-void Checker::checkTypeOperator(Node* node) { TSC_UNREACHABLE("checkTypeOperator — declchecks slice"); }
-void Checker::checkConditionalType(Node* node) { TSC_UNREACHABLE("checkConditionalType — declchecks slice"); }
-void Checker::checkInferType(Node* node) { TSC_UNREACHABLE("checkInferType — declchecks slice"); }
-void Checker::checkTemplateLiteralType(Node* node) { TSC_UNREACHABLE("checkTemplateLiteralType — declchecks slice"); }
-void Checker::checkImportType(Node* node) { TSC_UNREACHABLE("checkImportType — declchecks slice"); }
-void Checker::checkNamedTupleMember(Node* node) { TSC_UNREACHABLE("checkNamedTupleMember — declchecks slice"); }
-void Checker::checkIndexedAccessType(Node* node) { TSC_UNREACHABLE("checkIndexedAccessType — declchecks slice"); }
-void Checker::checkMappedType(Node* node) { TSC_UNREACHABLE("checkMappedType — declchecks slice"); }
-void Checker::checkFunctionDeclaration(Node* node) { TSC_UNREACHABLE("checkFunctionDeclaration — declchecks slice"); }
-void Checker::checkBlock(Node* node) { TSC_UNREACHABLE("checkBlock — declchecks slice"); }
 void Checker::checkVariableStatement(Node* node) { TSC_UNREACHABLE("checkVariableStatement — declchecks slice"); }
 void Checker::checkExpressionStatement(Node* node) { TSC_UNREACHABLE("checkExpressionStatement — stmtchecks slice"); }
 void Checker::checkIfStatement(Node* node) { TSC_UNREACHABLE("checkIfStatement — stmtchecks slice"); }
@@ -1300,7 +1272,6 @@ void Checker::checkImportEqualsDeclaration(Node* node) { TSC_UNREACHABLE("checkI
 void Checker::checkExportDeclaration(Node* node) { TSC_UNREACHABLE("checkExportDeclaration — modulechecks slice"); }
 void Checker::checkExportAssignment(Node* node) { TSC_UNREACHABLE("checkExportAssignment — modulechecks slice"); }
 void Checker::checkMissingDeclaration(Node* node) { TSC_UNREACHABLE("checkMissingDeclaration — declchecks slice"); }
-void Checker::checkJSDocType(Node* node) { TSC_UNREACHABLE("checkJSDocType — declchecks slice"); }
 
 // owner: unused/export bookkeeping (wave-3)
 void Checker::checkUnusedIdentifiers(const std::vector<Node*>& potentiallyUnusedIdentifiers) { TSC_UNREACHABLE("checkUnusedIdentifiers — unusedcheck slice"); }

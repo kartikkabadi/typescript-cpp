@@ -1028,6 +1028,30 @@ struct LanguageFeatureMinimumTargetMap {
 	ScriptTarget RegularExpressionFlagsUnicodeSets;
 };
 
+// types.go:1471 — LanguageFeatureMinimumTarget
+inline const LanguageFeatureMinimumTargetMap LanguageFeatureMinimumTarget{
+	ScriptTarget::ES2016, // Exponentiation
+	ScriptTarget::ES2017, // AsyncFunctions
+	ScriptTarget::ES2018, // ForAwaitOf
+	ScriptTarget::ES2018, // AsyncGenerators
+	ScriptTarget::ES2018, // AsyncIteration
+	ScriptTarget::ES2018, // ObjectSpreadRest
+	ScriptTarget::ES2018, // RegularExpressionFlagsDotAll
+	ScriptTarget::ES2019, // BindinglessCatch
+	ScriptTarget::ES2020, // BigInt
+	ScriptTarget::ES2020, // NullishCoalesce
+	ScriptTarget::ES2020, // OptionalChaining
+	ScriptTarget::ES2021, // LogicalAssignment
+	ScriptTarget::ES2022, // TopLevelAwait
+	ScriptTarget::ES2022, // ClassFields
+	ScriptTarget::ES2022, // PrivateNamesAndClassStaticBlocks
+	ScriptTarget::ES2022, // RegularExpressionFlagsHasIndices
+	ScriptTarget::ESNext, // ShebangComments
+	ScriptTarget::ESNext, // UsingAndAwaitUsing
+	ScriptTarget::ESNext, // ClassAndClassElementDecorators
+	ScriptTarget::ESNext, // RegularExpressionFlagsUnicodeSets
+};
+
 // Type — mirrors Go's Type struct. `data` points to the containing TypeData
 // struct (whose first member is this Type).
 
