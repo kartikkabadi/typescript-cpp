@@ -1688,6 +1688,30 @@ const std::vector<compilerOptionFieldInfo>& compilerOptionFieldInfos() {
 	 [](CompilerOptions* o, const CompilerOptionsValue& v) { o->OutDir = std::get<std::string>(v.v); },
 	 [](const CompilerOptions* o) { return o->OutDir.empty(); },
 	 [](CompilerOptions* o) { o->OutDir.clear(); }},
+	// === slice: incremental ===
+	{"Paths", "paths",
+	 [](const CompilerOptions* o) -> CompilerOptionsValue {
+			auto m = std::make_shared<JsonObject>(o->Paths.size());
+			for (const auto& [key, subs] : o->Paths) {
+				m->Set(key, subs);
+			}
+			return CompilerOptionsValue{JsonObjectPtr(m)};
+		},
+	 [](CompilerOptions* o, const CompilerOptionsValue& v) {
+			o->Paths.clear();
+			if (auto* mp = std::get_if<JsonObjectPtr>(&v.v)) {
+				for (const auto& key : (*mp)->Keys()) {
+					auto [value, ok] = (*mp)->Get(key);
+					if (ok) {
+						o->Paths.emplace_back(
+						    key, ParseStringArray(*value));
+					}
+				}
+			}
+		},
+	 [](const CompilerOptions* o) { return o->Paths.empty(); },
+	 [](CompilerOptions* o) { o->Paths.clear(); }},
+	// === end slice: incremental ===
 	{"Plugins", "plugins",
 	 [](const CompilerOptions* o) -> CompilerOptionsValue {
 			JsonArray arr;

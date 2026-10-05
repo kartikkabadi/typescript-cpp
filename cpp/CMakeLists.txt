@@ -149,6 +149,18 @@ add_library(tsc STATIC
 	internal/tsoptions/showconfig.cpp
 	internal/tsoptions/tsconfigparsing.cpp
 	internal/tsoptions/wildcarddirectories.cpp
+	# === slice: incremental ===
+	internal/execute/incremental/affectedfileshandler.cpp
+	internal/execute/incremental/buildinfo.cpp
+	internal/execute/incremental/buildinfotosnapshot.cpp
+	internal/execute/incremental/emitfileshandler.cpp
+	internal/execute/incremental/host.cpp
+	internal/execute/incremental/incremental.cpp
+	internal/execute/incremental/program.cpp
+	internal/execute/incremental/programtosnapshot.cpp
+	internal/execute/incremental/referencemap.cpp
+	internal/execute/incremental/snapshot.cpp
+	internal/execute/incremental/snapshottobuildinfo.cpp
 )
 
 add_executable(tscpp cmd/tscpp/main.cpp)

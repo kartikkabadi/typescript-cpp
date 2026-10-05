@@ -447,6 +447,24 @@ struct Diagnostic {
 	}
 	RepopulateDiagnosticInfo* RepopulateInfo() const { return repopulateInfo; }
 	void SetRepopulateInfo(RepopulateDiagnosticInfo* info) { repopulateInfo = info; }
+
+	// === slice: incremental ===
+	// diagnostic.go — Clone/SetMessageChain/SetExternalData used by the
+	// execute/incremental diagnostic repopulation.
+	Diagnostic* Clone() const {
+		return new Diagnostic(*this);
+	}
+	Diagnostic* SetMessageChain(std::vector<Diagnostic*> chain) {
+		messageChain = std::move(chain);
+		return this;
+	}
+	Diagnostic* SetExternalData(std::string_view src,
+	                            std::string_view text) {
+		source = src;
+		messageText = text;
+		return this;
+	}
+	// === end slice: incremental ===
 };
 
 Diagnostic* newDiagnostic(SourceFile* file, TextRange loc,
@@ -458,6 +476,20 @@ Diagnostic* newDetachedDiagnostic(TextRange loc,
 Diagnostic* newDiagnosticFromText(SourceFile* file, TextRange loc,
                                   int32_t code, DiagnosticCategory category,
                                   std::string_view text);
+
+// === slice: incremental ===
+// diagnostic.go:190 NewDiagnosticFromSerialized — rebuilds a Diagnostic from
+// a .tsbuildinfo-serialized diagnostic. `messageKey` must point at storage
+// that outlives the Diagnostic (the build-info structs in
+// execute/incremental are heap-stable).
+Diagnostic* NewDiagnosticFromSerialized(
+    SourceFile* file, TextRange loc, int32_t code,
+    DiagnosticCategory category, const char* messageKey,
+    std::vector<std::string> messageArgs,
+    std::vector<Diagnostic*> messageChain,
+    std::vector<Diagnostic*> relatedInformation, bool reportsUnnecessary,
+    bool reportsDeprecated, bool skippedOnNoEmit);
+// === end slice: incremental ===
 
 // ---------------------------------------------------------------------------
 // NodeFactory

@@ -655,6 +655,17 @@ struct OptionPathSegment {
 	int Index = 0;
 	bool IsIndex = false;
 };
+// === slice: incremental ===
+// contentmapper.go Project — the host-side mapping process interface. No C++
+// host provides one yet, so the only concrete value is nullptr.
+class Project {
+public:
+	virtual ~Project() = default;
+	// Identities returns (identity strings, error message when failed).
+	virtual std::pair<std::vector<std::string>, std::optional<std::string>>
+	Identities() = 0;
+};
+// === end slice: incremental ===
 }  // namespace contentmapper
 
 struct ParsedOptions {
@@ -838,9 +849,9 @@ struct ParsedCommandLine : module::ResolvedProjectReference,
 // NewParsedCommandLine — parsedcommandline.go:77.
 ParsedCommandLine* NewParsedCommandLine(
     tsc::CompilerOptions* compilerOptions,
-    std::vector<std::string> rootFileNames,
-    std::vector<ProjectReference*> projectReferences,
-    tspath::ComparePathsOptions comparePathsOptions);
+    const std::vector<std::string>& rootFileNames,
+    const std::vector<ProjectReference*>& projectReferences,
+    const tspath::ComparePathsOptions& comparePathsOptions);
 
 struct ParsedBuildCommandLine {
 	BuildOptions* BuildOptions = nullptr;
