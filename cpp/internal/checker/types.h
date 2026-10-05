@@ -23,6 +23,7 @@ class Checker;
 struct Type;
 struct Signature;
 struct TypeMapper;
+struct NodeBuilderImpl;
 struct TypePredicate;
 struct IndexInfo;
 struct TypeAlias;
@@ -623,6 +624,9 @@ struct TypeAlias {
 
 	Symbol* SymbolOrNil() const { return symbol; }
 	const std::vector<Type*>& TypeArguments() const { return typeArguments; }
+
+	// === slice: nodebuilder ===
+	Node* toTypeReferenceNode(NodeBuilderImpl* b);
 };
 
 struct TypeBase;

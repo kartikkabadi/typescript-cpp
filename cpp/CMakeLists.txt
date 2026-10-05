@@ -30,6 +30,7 @@ add_library(tsc STATIC
 	internal/checker/checker_declchecks.cpp
 	internal/checker/checker_stmtclass.cpp
 	internal/checker/checker_markrefs.cpp
+	internal/checker/checker_nodebuilder.cpp
 	internal/checker/checker_nodecopy.cpp
 	internal/checker/checker_signatures.cpp
 	internal/checker/checker_typenodes.cpp
@@ -65,6 +66,7 @@ add_library(tsc STATIC
 	internal/module/resolver.cpp
 	internal/module/staticresolver.cpp
 	internal/packagejson/packagejson.cpp
+	internal/pseudochecker/pseudochecker.cpp
 )
 
 add_executable(tscpp cmd/tscpp/main.cpp)

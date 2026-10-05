@@ -142,54 +142,12 @@ Node* NodeBuilderImpl::newIdentifier(const std::string& text, Symbol* symbol) {
 	return id;
 }
 
-// --- Stubbed dependencies (owned by other slices) ---------------------------
-
-Type* NodeBuilderImpl::getTypeFromTypeNode(Node* node, bool noMappedTypes) {
-	TSC_UNREACHABLE("getTypeFromTypeNode — ported with the nodebuilderimpl slice");
-}
-
-Node* NodeBuilderImpl::typeToTypeNode(Type* t) {
-	TSC_UNREACHABLE("typeToTypeNode — ported with the nodebuilderimpl slice");
-}
-
-void NodeBuilderImpl::checkTypeExpandability(Type* t) {
-	TSC_UNREACHABLE("checkTypeExpandability — ported with the nodebuilderimpl slice");
-}
-
-std::function<void()> NodeBuilderImpl::enterNewScope(
-	Node* declaration, std::vector<Symbol*> expandedParams,
-	std::vector<Type*> typeParameters, std::vector<Symbol*> originalParameters,
-	TypeMapper* mapper) {
-	TSC_UNREACHABLE("enterNewScope — ported with the nodebuilderscopes slice");
-}
-
-Node* NodeBuilderImpl::serializeTypeName(Node* node, bool isTypeOf,
-                                       NodeList* typeArguments) {
-	TSC_UNREACHABLE("serializeTypeName — ported with the nodebuilderimpl slice");
-}
-
-bool NodeBuilderImpl::canReuseExistingJSTypeNode(Node* existing, Type* t) {
-	TSC_UNREACHABLE("canReuseExistingJSTypeNode — ported with the nodebuilderimpl slice");
-}
-
-Symbol* NodeBuilderImpl::tryGetResolvedSymbolFromTypeNode(Node* node) {
-	TSC_UNREACHABLE("tryGetResolvedSymbolFromTypeNode — ported with the nodebuilderimpl slice");
-}
-
-std::vector<Symbol*> NodeBuilderImpl::lookupSymbolChain(Symbol* symbol,
-                                                      SymbolFlags meaning,
-                                                      bool yieldModuleSymbol) {
-	TSC_UNREACHABLE("lookupSymbolChain — ported with the nodebuilderimpl slice");
-}
-
-moduleSpecifierResult NodeBuilderImpl::getSpecifierForModuleSymbol(
-	Symbol* symbol, ResolutionMode overrideImportMode) {
-	TSC_UNREACHABLE("getSpecifierForModuleSymbol — ported with the nodebuilderimpl slice");
-}
-
-Node* NodeBuilderImpl::typeParameterToName(Type* typeParameter) {
-	TSC_UNREACHABLE("typeParameterToName — ported with the nodebuilderimpl slice");
-}
+// --- Former dep stubs now ported for real in checker_nodebuilder.cpp -------
+// getTypeFromTypeNode, typeToTypeNode, checkTypeExpandability, enterNewScope,
+// serializeTypeName, canReuseExistingJSTypeNode,
+// tryGetResolvedSymbolFromTypeNode, lookupSymbolChain,
+// getSpecifierForModuleSymbol, typeParameterToName — dedup'd here to avoid
+// duplicate definitions.
 
 // --- reuseNode — nodecopy.go:11 ---------------------------------------------
 
