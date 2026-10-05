@@ -4,6 +4,7 @@
 // file once every type it needs is declared.
 #pragma once
 
+
 #include <cassert>
 #include <atomic>
 #include <cstdint>
@@ -32,7 +33,7 @@ namespace tsc {
 	std::abort();
 }
 #define TSC_UNREACHABLE(msg) ::tsc::tscUnreachable(msg)
-#define TSC_ASSERT(cond, msg) assert((cond) && (msg))
+#define TSC_ASSERT(cond, msg) assert(((void)(msg), (cond)))
 
 struct Node;
 struct NodeList;

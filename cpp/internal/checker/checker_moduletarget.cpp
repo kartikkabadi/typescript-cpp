@@ -348,8 +348,7 @@ Symbol* Checker::getTargetOfModuleDefault(Symbol* moduleSymbol, Node* node,
 
 // checker.go:14828 — reportNonDefaultExport
 void Checker::reportNonDefaultExport(Symbol* moduleSymbol, Node* node) {
-	if (moduleSymbol->exports.count(node->symbol()->name) &&
-		moduleSymbol->exports[node->symbol()->name] != nullptr) {
+	if (getSymbolFromTable(moduleSymbol->exports, node->symbol()->name) != nullptr) {
 		error(node,
 			  Module_0_has_no_default_export_Did_you_mean_to_use_import_1_from_0_instead,
 			  {symbolToString(moduleSymbol), symbolToString(node->symbol())});
@@ -371,10 +370,8 @@ void Checker::reportNonDefaultExport(Symbol* moduleSymbol, Node* node) {
 					decl, decl->moduleSpecifier(), false /*ignoreErrors*/,
 					getTypeFromImportAttributes(getImportAttributes(decl)));
 				return resolvedExternalModuleName != nullptr &&
-					   resolvedExternalModuleName->exports.count(
-						   InternalSymbolNameDefault) &&
-					   resolvedExternalModuleName->exports[InternalSymbolNameDefault] !=
-						   nullptr;
+					   getSymbolFromTable(resolvedExternalModuleName->exports,
+										  InternalSymbolNameDefault) != nullptr;
 			});
 			if (defaultExport != nullptr) {
 				diagnostic->AddRelatedInfo(createDiagnosticForNode(
@@ -501,8 +498,8 @@ Symbol* Checker::getExternalModuleMember(Node* node, Node* specifier,
 			// First check if module was specified with "export=". If so, get the
 			// member from the resolved type
 			if (moduleSymbol != nullptr &&
-				moduleSymbol->exports.count(InternalSymbolNameExportEquals) &&
-				moduleSymbol->exports[InternalSymbolNameExportEquals] != nullptr) {
+				getSymbolFromTable(moduleSymbol->exports,
+								   InternalSymbolNameExportEquals) != nullptr) {
 				symbolFromVariable = getPropertyOfTypeEx(
 					getTypeOfSymbol(targetSymbol), nameText,
 					true /*skipObjectFunctionPropertyAugment*/,
@@ -514,8 +511,8 @@ Symbol* Checker::getExternalModuleMember(Node* node, Node* specifier,
 			symbolFromVariable = resolveSymbolEx(symbolFromVariable, dontResolveAlias);
 			Symbol* exportContainer = targetSymbol;
 			if (moduleSymbol != nullptr &&
-				moduleSymbol->exports.count(InternalSymbolNameExportEquals) &&
-				moduleSymbol->exports[InternalSymbolNameExportEquals] != nullptr) {
+				getSymbolFromTable(moduleSymbol->exports,
+								   InternalSymbolNameExportEquals) != nullptr) {
 				// For `export =` modules, supplemental type/namespace exports live on
 				// the original module symbol.
 				exportContainer = moduleSymbol;
@@ -773,8 +770,8 @@ void Checker::errorNoModuleMemberSymbol(Symbol* moduleSymbol, Symbol* targetSymb
 				{suggestionName}));
 		}
 	} else {
-		if (moduleSymbol->exports.count(InternalSymbolNameDefault) &&
-			moduleSymbol->exports[InternalSymbolNameDefault] != nullptr) {
+		if (getSymbolFromTable(moduleSymbol->exports,
+								  InternalSymbolNameDefault) != nullptr) {
 			error(name,
 				  
 					  Module_0_has_no_exported_member_1_Did_you_mean_to_use_import_1_from_0_instead,

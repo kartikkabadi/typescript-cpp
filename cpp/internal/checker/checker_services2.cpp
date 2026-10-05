@@ -199,7 +199,7 @@ bool hasTypeArguments(Node* node) {
 bool isExportSpecifierAlias(Identifier* referenceLocation,
 							ExportSpecifier* exportSpecifier) {
 	TSC_ASSERT(exportSpecifier->PropertyName == static_cast<Node*>(referenceLocation) ||
-				   exportSpecifier->name() == static_cast<Node*>(referenceLocation),
+				   exportSpecifier->name == static_cast<Node*>(referenceLocation),
 			   "referenceLocation is not export specifier name or property name");
 	Node* propertyName = exportSpecifier->PropertyName;
 	if (propertyName != nullptr) {

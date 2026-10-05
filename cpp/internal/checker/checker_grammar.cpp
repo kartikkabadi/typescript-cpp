@@ -1087,7 +1087,8 @@ bool Checker::checkGrammarClassDeclarationHeritageClauses(Node* node /*ClassLike
 
 	auto classLikeData = node->classLikeData();
 
-	if (!checkGrammarModifiers(node) && classLikeData.heritageClauses != nullptr) {
+	if (!checkGrammarModifiers(node) && classLikeData.heritageClauses != nullptr &&
+	    *classLikeData.heritageClauses != nullptr) {
 		for (Node* heritageClauseNode : (*classLikeData.heritageClauses)->nodes) {
 			HeritageClause* heritageClause = heritageClauseNode->as<HeritageClause>();
 			if (heritageClause->Token == Kind::ExtendsKeyword) {

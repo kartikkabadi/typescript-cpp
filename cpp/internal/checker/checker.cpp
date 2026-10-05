@@ -4716,7 +4716,7 @@ void Checker::mergeModuleAugmentation(Node* moduleName) {
 						if (resolvedExports.find(key) != resolvedExports.end() &&
 						    mainModule->exports.find(key) ==
 						        mainModule->exports.end()) {
-							mergeSymbol(resolvedExports[key], value,
+							mergeSymbol(getSymbolFromTable(resolvedExports, key), value,
 							            false /*unidirectional*/);
 						}
 					}
@@ -6291,6 +6291,11 @@ void Checker::init(Program* p) {
 	initializeClosures();
 	initializeIterationResolvers();
 	initializeChecker();
+	// Go: c.globalThisSymbol.Exports = c.globals aliases the globals map, so
+	// merges done by initializeChecker remain visible through the symbol. Our
+	// Symbol::exports is a value member — refresh it now that globals is fully
+	// populated (no entries are inserted into globals after initialization).
+	globalThisSymbol->exports = globals;
 }
 
 Type* Checker::getGlobalStrictFunctionType(const std::string& name) {
@@ -7553,7 +7558,7 @@ bool Checker::markSymbolOfAliasDeclarationIfTypeOnly(
 
 const DiagnosticMessage* Checker::getCannotFindNameDiagnosticForName(
     Node* node) {
-	std::string_view text = node->text();
+	std::string text = node->text();
 	if (text == "document" || text == "console") {
 		return Cannot_find_name_0_Do_you_need_to_change_your_target_library_Try_changing_the_lib_compiler_option_to_include_dom;
 	}
@@ -7839,9 +7844,9 @@ Symbol* Checker::newSymbolEx(SymbolFlags flags, const std::string& name,
 Symbol* Checker::resolveExternalModuleSymbol(Symbol* moduleSymbol,
                                              bool dontResolveAlias) {
 	if (moduleSymbol != nullptr) {
-		Symbol* exportEquals =
-		    resolveSymbolEx(moduleSymbol->exports[InternalSymbolNameExportEquals],
-		                    dontResolveAlias);
+		Symbol* exportEquals = resolveSymbolEx(
+			getSymbolFromTable(moduleSymbol->exports, InternalSymbolNameExportEquals),
+			dontResolveAlias);
 		if (exportEquals != nullptr) {
 			return getMergedSymbol(exportEquals);
 		}

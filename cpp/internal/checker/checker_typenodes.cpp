@@ -32,6 +32,11 @@
 namespace tsc {
 namespace checker {
 
+// createSymbolTable — checker/utilities.go:350 (def at file end)
+SymbolTable createSymbolTable(const std::vector<Symbol*>& symbols);
+// IsTypeReferenceType — ast/utilities.go:3073 (def at file end)
+bool isTypeReferenceType(Node* node);
+
 // Declarations for checker-package free functions already defined (external
 // linkage) in checker.cpp — declared here so this TU can call them.
 bool someType(Type* t, const std::function<bool(Type*)>& f);
@@ -298,14 +303,6 @@ TupleType* targetTupleType(Type* t) {
 // isTypeAlias — checker/utilities.go:260
 bool isTypeAlias(Node* node) { return isTypeOrJSTypeAliasDeclaration(node); }
 
-// createSymbolTable — checker/utilities.go:350
-SymbolTable createSymbolTable(const std::vector<Symbol*>& symbols) {
-	SymbolTable result;
-	for (Symbol* symbol : symbols) {
-		result[symbol->name] = symbol;
-	}
-	return result;
-}
 
 // isNumericLiteralName — checker/utilities.go:941
 bool isNumericLiteralName(const std::string& name) {
@@ -349,11 +346,6 @@ bool isValidESSymbolDeclaration(Node* node) {
 	return isPropertySignatureDeclaration(node) && hasReadonlyModifier(node);
 }
 
-// IsTypeReferenceType — ast/utilities.go:3073
-bool isTypeReferenceType(Node* node) {
-	return node->kind == Kind::TypeReference ||
-		   node->kind == Kind::ExpressionWithTypeArguments;
-}
 
 
 // intrinsicTypeKinds — checker.go:360
@@ -1636,7 +1628,7 @@ Node* Checker::getArrayElementTypeNode(Node* node) {
 				return getArrayElementTypeNode(node->type());
 			}
 		}
-		[[fallthrough]];
+		break; // Go case auto-breaks: a TupleType with no single rest/named element is not an array type
 	case Kind::ArrayType:
 		return node->as<ArrayTypeNode>()->ElementType;
 	default:
@@ -2655,6 +2647,21 @@ Type* Checker::getImpliedConstraint(Type* t, Node* checkNode,
 // (deduped: getSubstitutionType defined in cpp/internal/checker/checker_instantiate.cpp)
 
 
+
+// createSymbolTable — checker/utilities.go:350
+SymbolTable createSymbolTable(const std::vector<Symbol*>& symbols) {
+	SymbolTable result;
+	for (Symbol* symbol : symbols) {
+		result[symbol->name] = symbol;
+	}
+	return result;
+}
+
+// IsTypeReferenceType — ast/utilities.go:3073
+bool isTypeReferenceType(Node* node) {
+	return node->kind == Kind::TypeReference ||
+		   node->kind == Kind::ExpressionWithTypeArguments;
+}
 
 }  // namespace checker
 }  // namespace tsc

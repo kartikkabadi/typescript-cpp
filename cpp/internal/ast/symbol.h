@@ -38,6 +38,14 @@ struct FlowNode;
 
 using SymbolTable = std::unordered_map<std::string, Symbol*>;
 
+// Go map-read semantics: returns the value or nullptr without inserting.
+// operator[] must never be used to READ a SymbolTable — it inserts a null
+// entry on miss, which later poisons table iteration (e.g. getExportsOfModule).
+inline Symbol* getSymbolFromTable(const SymbolTable& t, const std::string& k) {
+	auto it = t.find(k);
+	return it != t.end() ? it->second : nullptr;
+}
+
 inline constexpr char kInternalSymbolNamePrefix = '\xFE';
 inline const std::string InternalSymbolNameCall{"\xFE" "call"};
 inline const std::string InternalSymbolNameConstructor{"\xFE" "constructor"};

@@ -2630,7 +2630,7 @@ Type* Checker::discriminateContextualTypeByObjectMembers(Node* node,
 			getPropertiesOfType(contextualType),
 			[this, contextualType, node](Symbol* s) {
 				return (s->flags & SymbolFlagsOptional) != 0 &&
-					   node->symbol()->members[s->name] == nullptr &&
+					   getSymbolFromTable(node->symbol()->members, s->name) == nullptr &&
 					   isDiscriminantProperty(contextualType, s->name);
 			});
 		ObjectLiteralDiscriminator discriminator;
@@ -3111,7 +3111,7 @@ bool Checker::isFunctionObjectType(Type* t) {
 	// check. This gives us a quicker out in the common case where an object type is not a function.
 	StructuredType* resolved = resolveStructuredTypeMembers(t);
 	return !resolved->signatures.empty() ||
-		   (resolved->members["bind"] != nullptr &&
+		   (getSymbolFromTable(resolved->members, "bind") != nullptr &&
 			isTypeSubtypeOf(t, globalFunctionType));
 }
 

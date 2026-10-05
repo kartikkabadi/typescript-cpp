@@ -25,6 +25,9 @@ static std::vector<Node*> parseJSDocForNodeImpl(SourceFile* sourceFile,
 		} putBack{p};
 		p->initializeState(sourceFile->parseOptions, sourceFile->text,
 		                   sourceFile->ScriptKind);
+		// JSDoc nodes must outlive the pooled parser: parse into the
+		// source file's JSDoc arena (moved back out before putParser).
+		p->factory.arena() = std::move(sourceFile->jsdocArena);
 		std::vector<CommentRange> ranges =
 			getJSDocCommentRanges(nullptr, node, sourceFile->text);
 		if (!ranges.empty()) {
@@ -39,6 +42,7 @@ static std::vector<Node*> parseJSDocForNodeImpl(SourceFile* sourceFile,
 				}
 			}
 		}
+		sourceFile->jsdocArena = std::move(p->factory.arena());
 	}
 	return result;
 }
@@ -552,7 +556,7 @@ Node* Parser::parseTag(std::vector<Node*> tags, int margin) {
 	std::string indentText = skipWhitespaceOrAsterisk();
 
 	Node* tag = nullptr;
-	std::string_view name = tagName->text();
+	std::string name = tagName->text();
 	if (name == "implements") {
 		tag = parseImplementsTag(start, tagName, margin, indentText);
 	} else if (name == "augments" || name == "extends") {
@@ -1504,7 +1508,7 @@ Node* Parser::tryParseChildTag(PropertyLikeParse target, int indent) {
 	Node* tagName = parseJSDocIdentifierName(Identifier_expected);
 	std::string indentText = skipWhitespaceOrAsterisk();
 	PropertyLikeParse t;
-	std::string_view tagText = tagName->text();
+	std::string tagText = tagName->text();
 	if (tagText == "type") {
 		if (target == PropertyLikeParseProperty) {
 			return parseTypeTag({}, start, tagName, -1, "");

@@ -80,9 +80,9 @@ Symbol* Checker::getSymbolAtLocation(Node* node, bool ignoreErrors) {
 			// (See #44364 and #45031 for relevant implementation PRs)
 			if (metaProp->KeywordToken == Kind::ImportKeyword &&
 			    node->text() == "meta") {
-				return getGlobalImportMetaExpressionType()
-				    ->AsObjectType()
-				    ->members["meta"];
+				return getSymbolFromTable(
+					getGlobalImportMetaExpressionType()->AsObjectType()->members,
+					"meta");
 			}
 			// no other meta properties are valid syntax, thus no others should
 			// have symbols

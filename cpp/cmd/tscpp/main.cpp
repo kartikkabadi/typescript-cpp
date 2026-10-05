@@ -329,18 +329,27 @@ static std::string findBundledLibsRoot() {
 	return "";
 }
 
-static void checkFile(const char* path, const std::string& /*src*/) {
+static void checkFile(int argc, char** argv) {
 	compiler::CompilerHost host;
 	host.currentDirectory =
 	    tspath::normalizePath(std::filesystem::current_path().string());
 	host.bundledLibsRoot = findBundledLibsRoot();
 
-	// `tsc --noEmit <file>` — ParseCommandLine defaults for a bare file arg:
-	// NoEmit set, everything else at defaults (no config file).
+	// `tsc --noEmit <argv[1:]>` — checkdump passes every arg (the literal
+	// "check" included) through ParseCommandLine, so each becomes a root
+	// filename: a non-file arg like "check" resolves as a root file and
+	// produces the same G 6231 resolution diagnostic the oracle emits.
+	std::vector<std::string> rootFileNames;
+	for (int i = 1; i < argc; i++) {
+		rootFileNames.push_back(argv[i]);
+	}
+
+	// ParseCommandLine defaults for bare file args: NoEmit set, everything
+	// else at defaults (no config file).
 	CompilerOptions options;
 	options.NoEmit = Tristate::True;
 
-	compiler::SimpleProgram program(&host, options, {path});
+	compiler::SimpleProgram program(&host, options, rootFileNames);
 	program.BindSourceFiles();
 	auto diags = compiler::getDiagnosticsOfAnyProgram(&program, {}, false);
 
@@ -537,7 +546,7 @@ int main(int argc, char** argv) {
 	} else if (mode == "bind") {
 		bindFile(argv[2], src);
 	} else if (mode == "check") {
-		checkFile(argv[2], src);
+		checkFile(argc, argv);
 	} else if (mode == "bench-parse") {
 		int iters = argc > 3 ? std::atoi(argv[3]) : 5;
 		benchParse(argv[2], src, iters);

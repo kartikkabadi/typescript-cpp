@@ -1149,10 +1149,22 @@ inline UnionOrIntersectionType* Type::AsUnionOrIntersectionType() {
 		return static_cast<UnionOrIntersectionType*>(data);
 	}
 inline const std::vector<Type*>& Type::types() const {
-		return static_cast<const UnionOrIntersectionType*>(data)->types;
+		if (flags & TypeFlagsUnionOrIntersection) {
+			return static_cast<const UnionOrIntersectionType*>(data)->types;
+		}
+		if (flags & TypeFlagsTemplateLiteral) {
+			return static_cast<const TemplateLiteralType*>(data)->types;
+		}
+		TSC_UNREACHABLE("Unhandled case in Type::types");
 	}
 inline std::vector<Type*>& Type::types() {
-		return static_cast<UnionOrIntersectionType*>(data)->types;
+		if (flags & TypeFlagsUnionOrIntersection) {
+			return static_cast<UnionOrIntersectionType*>(data)->types;
+		}
+		if (flags & TypeFlagsTemplateLiteral) {
+			return static_cast<TemplateLiteralType*>(data)->types;
+		}
+		TSC_UNREACHABLE("Unhandled case in Type::types");
 	}
 
 // === slice: tracer === — types.go:752

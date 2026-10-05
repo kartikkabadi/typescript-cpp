@@ -1542,9 +1542,9 @@ void Checker::resolveAnonymousTypeMembers(Type* t) {
 		setStructuredTypeMembers(t, {}, {}, {}, {});
 		SymbolTable members = getMembersOfSymbol(symbol);
 		std::vector<Signature*> callSignatures =
-			getSignaturesOfSymbol(members[InternalSymbolNameCall]);
+			getSignaturesOfSymbol(getSymbolFromTable(members, InternalSymbolNameCall));
 		std::vector<Signature*> constructSignatures =
-			getSignaturesOfSymbol(members[InternalSymbolNameNew]);
+			getSignaturesOfSymbol(getSymbolFromTable(members, InternalSymbolNameNew));
 		std::vector<IndexInfo*> indexInfos = getIndexInfosOfSymbol(symbol);
 		setStructuredTypeMembers(t, members, callSignatures, constructSignatures, indexInfos);
 		return;
@@ -1579,7 +1579,7 @@ void Checker::resolveAnonymousTypeMembers(Type* t) {
 			baseConstructorIndexInfo = anyBaseTypeIndexInfo;
 		}
 	}
-	Symbol* indexSymbol = members[InternalSymbolNameIndex];
+	Symbol* indexSymbol = getSymbolFromTable(members, InternalSymbolNameIndex);
 	if (indexSymbol != nullptr) {
 		indexInfos = getIndexInfosOfIndexSymbol(indexSymbol, symbolTableValues(members));
 	} else {
@@ -1607,7 +1607,8 @@ void Checker::resolveAnonymousTypeMembers(Type* t) {
 	if (symbol->flags & SymbolFlagsClass) {
 		Type* classType = getDeclaredTypeOfClassOrInterface(symbol);
 		std::vector<Signature*> constructSignatures =
-			getSignaturesOfSymbol(symbol->members[InternalSymbolNameConstructor]);
+			getSignaturesOfSymbol(
+				getSymbolFromTable(symbol->members, InternalSymbolNameConstructor));
 		if (constructSignatures.empty()) {
 			constructSignatures = getDefaultConstructSignatures(classType);
 		}

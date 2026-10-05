@@ -624,6 +624,7 @@ def gen_nodes():
             "\tconst std::string& FileName() const { return fileName; }\n"
             "\tconst std::string& Path() const { return fileName; }\n"
             "\t::tsc::Arena nodeArena;\n"
+            "\t::tsc::Arena jsdocArena;\n"
             "\tvoid copyFrom(SourceFile* other);\n"
         ),
     }

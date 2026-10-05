@@ -31,6 +31,10 @@
 
 namespace tsc::checker {
 
+// ast/utilities.go:2998 — IsCallLikeExpression (def at file end)
+bool isCallLikeExpression(Node* node);
+
+
 // Free fns defined (non-static) in other checker TUs — forward declarations.
 Diagnostic* NewDiagnosticChainForNode(Diagnostic* chain, Node* node,
                                       const DiagnosticMessage* message,
@@ -359,24 +363,6 @@ Node* getNewTargetContainer(Node* node) {
 	return nullptr;
 }
 
-// ast/utilities.go:2998 — IsCallLikeExpression
-bool isCallLikeExpression(Node* node) {
-	switch (node->kind) {
-	case Kind::JsxOpeningElement:
-	case Kind::JsxSelfClosingElement:
-	case Kind::JsxOpeningFragment:
-	case Kind::CallExpression:
-	case Kind::NewExpression:
-	case Kind::TaggedTemplateExpression:
-	case Kind::Decorator:
-		return true;
-	case Kind::BinaryExpression:
-		return node->as<BinaryExpression>()->OperatorToken->kind ==
-		       Kind::InstanceOfKeyword;
-	default:
-		return false;
-	}
-}
 
 // ast/utilities.go:4058 — IsJSDocNameReferenceContext
 // (deduped: local replica of isJSDocNameReferenceContext removed)
@@ -2901,6 +2887,25 @@ Type* Checker::getFlowTypeOfProperty(Node* reference, Symbol* prop) {
 	}
 	return getFlowTypeOfReferenceEx(reference, autoType, initialType, nullptr,
 	                                nullptr);
+}
+
+// ast/utilities.go:2998 — IsCallLikeExpression
+bool isCallLikeExpression(Node* node) {
+	switch (node->kind) {
+	case Kind::JsxOpeningElement:
+	case Kind::JsxSelfClosingElement:
+	case Kind::JsxOpeningFragment:
+	case Kind::CallExpression:
+	case Kind::NewExpression:
+	case Kind::TaggedTemplateExpression:
+	case Kind::Decorator:
+		return true;
+	case Kind::BinaryExpression:
+		return node->as<BinaryExpression>()->OperatorToken->kind ==
+		       Kind::InstanceOfKeyword;
+	default:
+		return false;
+	}
 }
 
 }  // namespace tsc::checker

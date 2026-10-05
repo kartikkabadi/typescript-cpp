@@ -142,6 +142,7 @@ tools/gotestsum.exe.hash
 
 # C++ port build artifacts and Go oracle binaries
 /cpp/build/
+/cpp/build-*/
 /tsc/parsedump
 /tsc/lexdump
 /tsc/parsebench

@@ -70,6 +70,8 @@ public:
 	void clear() {
 		blocks_.clear();
 		offset_ = 0;
+		capacity_ = 0;
+		cur_ = nullptr;
 	}
 
 private:

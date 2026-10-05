@@ -1122,6 +1122,7 @@ struct SourceFile : Node {
 	const std::string& FileName() const { return fileName; }
 	const std::string& Path() const { return fileName; }
 	::tsc::Arena nodeArena;
+	::tsc::Arena jsdocArena;
 	void copyFrom(SourceFile* other);
 	::tsc::Symbol* Symbol{};
 	::tsc::SymbolTable Locals;

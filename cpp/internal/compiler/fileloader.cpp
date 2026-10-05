@@ -421,7 +421,7 @@ void filesLoader::resolveImportsAndModuleAugmentations(parseTask* t) {
 
 		for (size_t index = 0; index < moduleNames.size(); index++) {
 			Node* entry = moduleNames[index];
-			std::string_view moduleName = entry->text();
+			std::string moduleName = entry->text();
 			if (moduleName.empty()) {
 				continue;
 			}

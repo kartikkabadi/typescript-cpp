@@ -7982,6 +7982,17 @@ NodeBuilder* newNodeBuilderEx(
 	return b;
 }
 
+// NewNodeBuilder (nodebuilder.go:279).
+NodeBuilder* NewNodeBuilder(Checker* ch, printer::EmitContext* e) {
+	return newNodeBuilderEx(ch, e, nullptr /*idToSymbol*/);
+}
+
+// NewNodeBuilderEx (nodebuilder.go:283).
+NodeBuilder* NewNodeBuilderEx(Checker* ch, printer::EmitContext* e,
+                              std::unordered_map<Node*, Symbol*>* idToSymbol) {
+	return newNodeBuilderEx(ch, e, idToSymbol);
+}
+
 // getNodeBuilder (nodebuilder.go:291).
 std::pair<NodeBuilder*, std::function<void()>> Checker::getNodeBuilder() {
 	std::function<void()> releaseNodes = [this]() {

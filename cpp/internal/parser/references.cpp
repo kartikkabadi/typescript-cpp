@@ -38,7 +38,7 @@ static void collectModuleReferences(SourceFile* file, Node* node,
 		// external module names. Relative external module names are not
 		// permitted.
 		if (moduleNameExpr != nullptr && isStringLiteral(moduleNameExpr)) {
-			std::string_view moduleName = moduleNameExpr->text();
+			std::string moduleName = moduleNameExpr->text();
 			if (!moduleName.empty() &&
 			    (!inAmbientModule ||
 			     !tspath::isExternalModuleNameRelative(moduleName))) {

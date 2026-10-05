@@ -47,8 +47,8 @@ Node* NodeFactory::newGeneratedIdentifier(
 
 	Node* name = newIdentifier(text);
 	auto autoGenerate = AutoGenerateInfo{
-		.Id = id,
 		.Flags = kind | (options.Flags & ~GeneratedIdentifierFlagsKindMask),
+		.Id = id,
 		.Prefix = options.Prefix,
 		.Suffix = options.Suffix,
 		.Node = node,
@@ -113,8 +113,8 @@ Node* NodeFactory::newGeneratedPrivateIdentifier(
 
 	Node* name = newPrivateIdentifier(text);
 	auto autoGenerate = AutoGenerateInfo{
-		.Id = id,
 		.Flags = kind | (options.Flags & ~GeneratedIdentifierFlagsKindMask),
+		.Id = id,
 		.Prefix = options.Prefix,
 		.Suffix = options.Suffix,
 		.Node = node,
