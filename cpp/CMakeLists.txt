@@ -81,6 +81,10 @@ add_library(tsc STATIC
 	internal/printer/factory.cpp
 	internal/printer/printer.cpp
 	internal/printer/syntheticfile.cpp
+	# === slice: transformers ===
+	internal/transformers/transformer.cpp
+	internal/transformers/utilities.cpp
+	internal/transformers/destructuring.cpp
 	# === slice: module ===
 	internal/core/compileroptions.cpp
 	internal/module/util.cpp

@@ -247,10 +247,7 @@ bool isCallChain(Node* node) {
 	return isCallExpression(node) && (node->flags & NodeFlagsOptionalChain) != 0;
 }
 
-// utilities.go:1136 — isSuperCall
-bool isSuperCall(Node* n) {
-	return isCallExpression(n) && n->expression()->kind == Kind::SuperKeyword;
-}
+// isSuperCall (utilities.go:1136) — canonical in ast.cpp
 
 // (deduped: local replica of isTypeAny removed)
 

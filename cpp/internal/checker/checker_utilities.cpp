@@ -131,10 +131,7 @@ ModifierFlags getSelectedModifierFlags(Node* node, ModifierFlags flags) {
 // utilities.go: AssignmentKind (79)
 // (enum declared in checker.h)
 
-// utilities.go: isEmptyObjectLiteral (75)
-bool isEmptyObjectLiteral(Node* expression) {
-	return isObjectLiteralExpression(expression) && expression->properties().empty();
-}
+// isEmptyObjectLiteral (utilities.go:4038) — canonical in ast.cpp
 
 // utilities.go: getAssignmentTargetKind (89)
 AssignmentKind getAssignmentTargetKind(Node* node) {
@@ -294,10 +291,7 @@ bool isJSDocOptionalParameter(ParameterDeclaration* /*node*/) {
 	return false; // !!!
 }
 
-// utilities.go: isEmptyArrayLiteral (329)
-bool isEmptyArrayLiteral(Node* expression) {
-	return isArrayLiteralExpression(expression) && expression->elements().empty();
-}
+// isEmptyArrayLiteral (utilities.go:4042) — canonical in ast.cpp
 
 // utilities.go: declarationBelongsToPrivateAmbientMember (333)
 static bool isPrivateWithinAmbient(Node* node);

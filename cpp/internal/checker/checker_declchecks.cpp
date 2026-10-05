@@ -56,9 +56,7 @@ static bool hasDotDotDotToken(Node* node) {
 }
 
 // checker/utilities.go:1136 — isSuperCall
-static bool isSuperCall(Node* n) {
-	return isCallExpression(n) && n->expression()->kind == Kind::SuperKeyword;
-}
+// isSuperCall (utilities.go:1136) — canonical in ast.cpp
 
 // checker.go:2952 — isInstancePropertyWithInitializerOrPrivateIdentifierProperty
 static bool isInstancePropertyWithInitializerOrPrivateIdentifierProperty(Node* n) {

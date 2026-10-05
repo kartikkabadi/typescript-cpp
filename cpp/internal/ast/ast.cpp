@@ -815,7 +815,21 @@ bool isAssignmentPattern(const Node* node) {
 // containsObjectRestOrSpread — utilities.go:4014
 // ---------------------------------------------------------------------------
 
-static Node* getTargetOfBindingOrAssignmentElement(Node* element);
+Node* getTargetOfBindingOrAssignmentElement(Node* element);
+
+// GetElementsOfBindingOrAssignmentPattern — utilities.go:3866
+std::vector<Node*> getElementsOfBindingOrAssignmentPattern(Node* pattern) {
+	switch (pattern->kind) {
+	case Kind::ObjectBindingPattern:
+	case Kind::ArrayBindingPattern:
+	case Kind::ArrayLiteralExpression:
+		return pattern->elements();
+	case Kind::ObjectLiteralExpression:
+		return pattern->properties();
+	default:
+		return {};
+	}
+}
 
 bool containsObjectRestOrSpread(const Node* node) {
 	if (node->subtreeFacts() & SubtreeContainsObjectRestOrSpread) {
@@ -854,7 +868,8 @@ bool containsObjectRestOrSpread(const Node* node) {
 	return false;
 }
 
-static bool isDeclarationBindingElement(Node* element) {
+// IsDeclarationBindingElement — utilities.go:3879
+bool isDeclarationBindingElement(Node* element) {
 	switch (element->kind) {
 	case Kind::VariableDeclaration:
 	case Kind::Parameter:
@@ -879,7 +894,8 @@ static bool isObjectLiteralElement(Node* element) {
 	}
 }
 
-static Node* getTargetOfBindingOrAssignmentElement(Node* element) {
+// GetTargetOfBindingOrAssignmentElement — utilities.go:3891
+Node* getTargetOfBindingOrAssignmentElement(Node* element) {
 	if (isDeclarationBindingElement(element)) {
 		return element->name();
 	}
@@ -947,6 +963,42 @@ Node* tryGetPropertyNameOfBindingOrAssignmentElement(
 		}
 	}
 	return nullptr;
+}
+
+// IsLiteralExpression — utilities.go:319
+bool isLiteralExpression(Node* node) { return isLiteralKind(node->kind); }
+
+// IsSuperCall — utilities.go:2138
+bool isSuperCall(Node* node) {
+	return isCallExpression(node) &&
+	       node->expression()->kind == Kind::SuperKeyword;
+}
+
+// IsEmptyObjectLiteral — utilities.go:4038
+bool isEmptyObjectLiteral(Node* expression) {
+	return isObjectLiteralExpression(expression) &&
+	       expression->properties().empty();
+}
+
+// IsEmptyArrayLiteral — utilities.go:4042
+bool isEmptyArrayLiteral(Node* expression) {
+	return isArrayLiteralExpression(expression) &&
+	       expression->elements().empty();
+}
+
+// GetRestIndicatorOfBindingOrAssignmentElement — utilities.go:4046
+Node* getRestIndicatorOfBindingOrAssignmentElement(Node* bindingElement) {
+	switch (bindingElement->kind) {
+	case Kind::Parameter:
+		return bindingElement->as<ParameterDeclaration>()->DotDotDotToken;
+	case Kind::BindingElement:
+		return bindingElement->as<BindingElement>()->DotDotDotToken;
+	case Kind::SpreadElement:
+	case Kind::SpreadAssignment:
+		return bindingElement;
+	default:
+		return nullptr;
+	}
 }
 
 std::vector<Node*> (*parseJSDocForNode)(SourceFile*, Node*) = nullptr;

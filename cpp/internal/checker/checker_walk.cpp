@@ -55,10 +55,7 @@ static bool isInstanceOfExpression(Node* node) {
 
 // utilities.go:4065-4097 getJSDocRoot/getJSDocHost/getHostSignatureFromJSDoc — canonical in ast.cpp
 
-// ast utilities: literal kinds (IsLiteralKind/IsLiteralExpression — ast_generated.go:9818, utilities.go:319)
-static bool isLiteralExpression(Node* node) {
-	return isLiteralKind(node->kind);
-}
+// IsLiteralExpression (utilities.go:319) — canonical in ast.cpp
 
 static bool hasInferenceCandidates(InferenceInfo* info) {
 	return !info->candidates.empty() || !info->contraCandidates.empty();

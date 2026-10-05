@@ -649,6 +649,16 @@ Node* tryGetPropertyNameOfBindingOrAssignmentElement(
 	Node* bindingElement);
 Node* getAssignedName(Node* node);
 
+// utilities.go:3866,3879,3891,4046
+std::vector<Node*> getElementsOfBindingOrAssignmentPattern(Node* pattern);
+bool isLiteralExpression(Node* node);
+bool isSuperCall(Node* node);
+bool isEmptyObjectLiteral(Node* expression);
+bool isEmptyArrayLiteral(Node* expression);
+bool isDeclarationBindingElement(Node* bindingElement);
+Node* getTargetOfBindingOrAssignmentElement(Node* bindingElement);
+Node* getRestIndicatorOfBindingOrAssignmentElement(Node* bindingElement);
+
 template <class T>
 constexpr T ifElse(bool c, T a, T b) {
 	return c ? a : b;

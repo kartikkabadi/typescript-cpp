@@ -189,10 +189,7 @@ bool isOptionalDeclaration(Node* declaration) {
 	return hasQuestionToken(declaration);
 }
 
-// isEmptyArrayLiteral — utilities.go:329
-bool isEmptyArrayLiteral(Node* expression) {
-	return isArrayLiteralExpression(expression) && expression->elements().empty();
-}
+// isEmptyArrayLiteral (utilities.go:4042) — canonical in ast.cpp
 
 // isPrivateWithinAmbient — utilities.go:342
 bool isPrivateWithinAmbient(Node* node) {

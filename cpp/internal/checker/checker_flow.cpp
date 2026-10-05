@@ -251,10 +251,7 @@ bool hasDotDotDotToken(Node* node) {
 // IsTypeAny (utilities.go:286-288)
 bool IsTypeAny(Type* t) { return t != nullptr && (t->flags & TypeFlagsAny); }
 
-// isEmptyArrayLiteral (utilities.go:329-331)
-bool isEmptyArrayLiteral(Node* expression) {
-	return isArrayLiteralExpression(expression) && expression->elements().empty();
-}
+// isEmptyArrayLiteral (utilities.go:4042) — canonical in ast.cpp
 
 // isThisInTypeQuery — canonical def in ast.cpp
 // isFunctionOrSourceFile (ast/utilities.go:527)
