@@ -1190,11 +1190,7 @@ Type* Checker::checkConditionalExpression(Node* node, CheckMode checkMode) { TSC
 Type* Checker::checkSpreadExpression(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkSpreadExpression — expressions slice"); }
 Type* Checker::checkYieldExpression(Node* node) { TSC_UNREACHABLE("checkYieldExpression — expressions slice"); }
 Type* Checker::checkSyntheticExpression(Node* node) { TSC_UNREACHABLE("checkSyntheticExpression — expressions slice"); }
-Type* Checker::checkJsxExpression(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkJsxExpression — jsx slice"); }
-Type* Checker::checkJsxElement(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkJsxElement — jsx slice"); }
-Type* Checker::checkJsxSelfClosingElement(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkJsxSelfClosingElement — jsx slice"); }
-Type* Checker::checkJsxFragment(Node* node) { TSC_UNREACHABLE("checkJsxFragment — jsx slice"); }
-Type* Checker::checkJsxAttributes(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkJsxAttributes — jsx slice"); }
+// (jsx-owned checkers moved to checker_jsx.cpp — real defs there)
 // (deduped: checkNonNullExpression ported in checker_utilities.cpp)
 bool Checker::isSymbolOrSymbolForCall(Node* node) { TSC_UNREACHABLE("isSymbolOrSymbolForCall — expressions slice"); }
 
@@ -1202,8 +1198,7 @@ bool Checker::isSymbolOrSymbolForCall(Node* node) { TSC_UNREACHABLE("isSymbolOrS
 Signature* Checker::resolveUntypedCall(Node* node) { TSC_UNREACHABLE("resolveUntypedCall — call-resolution slice"); }
 void Checker::checkFunctionExpressionOrObjectLiteralMethodDeferred(Node* node) { TSC_UNREACHABLE("checkFunctionExpressionOrObjectLiteralMethodDeferred — expressions slice"); }
 void Checker::checkClassExpressionDeferred(Node* node) { TSC_UNREACHABLE("checkClassExpressionDeferred — expressions slice"); }
-void Checker::checkJsxSelfClosingElementDeferred(Node* node) { TSC_UNREACHABLE("checkJsxSelfClosingElementDeferred — jsx slice"); }
-void Checker::checkJsxElementDeferred(Node* node) { TSC_UNREACHABLE("checkJsxElementDeferred — jsx slice"); }
+// (jsx-owned deferred checkers moved to checker_jsx.cpp — real defs there)
 void Checker::checkAssertionDeferred(Node* node) { TSC_UNREACHABLE("checkAssertionDeferred — expressions slice"); }
 void Checker::checkContextualDeprecations(Node* node) { TSC_UNREACHABLE("checkContextualDeprecations — expressions slice"); }
 

@@ -2979,7 +2979,7 @@ namespace {
 Type* Checker::checkExpressionForMutableLocation(Node* node, CheckMode checkMode) { decltypesDepUnreachable("checkExpressionForMutableLocation — decltypes dep"); }
 // (deduped: checkIteratedTypeOrElementType defined in cpp/internal/checker/checker_contextual.cpp)
 
-Type* Checker::checkJsxAttribute(Node* node, CheckMode checkMode) { decltypesDepUnreachable("checkJsxAttribute — decltypes dep"); }
+// (checkJsxAttribute moved to checker_jsx.cpp — real def there)
 // (deduped: checkNonNullExpression defined in cpp/internal/checker/checker_walk.cpp)
 
 Type* Checker::checkObjectLiteralMethod(Node* node, CheckMode checkMode) { decltypesDepUnreachable("checkObjectLiteralMethod — decltypes dep"); }

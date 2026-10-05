@@ -974,12 +974,7 @@ bool Checker::isMethodAccessForCall(Node* node) { TSC_UNREACHABLE("isMethodAcces
 Symbol* Checker::getPrivateIdentifierPropertyOfType(Type* leftType, Symbol* lexicallyScopedIdentifier) {
 	TSC_UNREACHABLE("getPrivateIdentifierPropertyOfType — expressions slice");
 }
-// owner: jsx slice (jsx.go)
-Symbol* Checker::getJsxNamespaceContainerForImplicitImport(Node* location) {
-	TSC_UNREACHABLE("getJsxNamespaceContainerForImplicitImport — jsx slice");
-}
-std::string Checker::getJsxNamespace(Node* location) { TSC_UNREACHABLE("getJsxNamespace — jsx slice"); }
-Node* Checker::getJsxFactoryEntity(Node* location) { TSC_UNREACHABLE("getJsxFactoryEntity — jsx slice"); }
+// owner: jsx slice (jsx.go) — real defs in checker_jsx.cpp
 // owner: relater slice (relater.go)
 int Checker::getParameterCount(Signature* signature) { TSC_UNREACHABLE("getParameterCount — relater slice"); }
 // owner: signatures slice (checker.go:20143-20986)

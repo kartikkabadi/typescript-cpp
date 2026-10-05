@@ -3681,9 +3681,7 @@ Signature* Checker::getContextualSignature(Node* /*node*/) {
 	TSC_UNREACHABLE("getContextualSignature — checker.go:10461 slice");
 }
 
-Type* Checker::getTypeOfNode(Node* /*node*/) {
-	TSC_UNREACHABLE("getTypeOfNode — services tail (checker.go:32419)");
-}
+// (deduped: getTypeOfNode real def in checker_services.cpp)
 
 Type* Checker::getThisTypeOfSignature(Signature* /*signature*/) {
 	TSC_UNREACHABLE("getThisTypeOfSignature — relater slice (relater.go:1947)");
@@ -3736,29 +3734,6 @@ bool Checker::isConstTypeVariable(Type* /*t*/, int /*depth*/) {
 	TSC_UNREACHABLE("isConstTypeVariable — checker.go:13879 slice");
 }
 
-Type* Checker::discriminateContextualTypeByJSXAttributes(
-	Node* /*node*/, Type* /*contextualType*/) {
-	TSC_UNREACHABLE("discriminateContextualTypeByJSXAttributes — jsx slice (jsx.go:266)");
-}
-
-Type* Checker::getContextualJsxElementAttributesType(
-	Node* /*node*/, ContextFlags /*contextFlags*/) {
-	TSC_UNREACHABLE("getContextualJsxElementAttributesType — jsx slice (jsx.go:229)");
-}
-
-Type* Checker::getContextualTypeForJsxAttribute(
-	Node* /*attribute*/, ContextFlags /*contextFlags*/) {
-	TSC_UNREACHABLE("getContextualTypeForJsxAttribute — jsx slice (jsx.go:215)");
-}
-
-Type* Checker::getContextualTypeForJsxExpression(
-	Node* /*node*/, ContextFlags /*contextFlags*/) {
-	TSC_UNREACHABLE("getContextualTypeForJsxExpression — jsx slice (jsx.go:205)");
-}
-
-Type* Checker::getEffectiveFirstArgumentForJsxSignature(
-	Signature* /*signature*/, Node* /*node*/) {
-	TSC_UNREACHABLE("getEffectiveFirstArgumentForJsxSignature — jsx slice (jsx.go:925)");
-}
+// (jsx-owned dep stubs moved to checker_jsx.cpp — real defs there)
 
 } // namespace tsc::checker

@@ -739,5 +739,25 @@ EmitResolver* Checker::GetEmitResolver() {
 	return emitResolver;
 }
 
+// === dep stubs — removed when owner slice lands ===
+// Declared in the services decl block (checker.h ~3176) and called from this
+// TU, but never defined by any landed slice; stubbed here so the TU links.
+
+Type* Checker::getImportAttributesTypeForModuleSpecifier(Node* moduleSpecifier) {
+	TSC_UNREACHABLE("getImportAttributesTypeForModuleSpecifier — expressions slice");
+}
+Symbol* Checker::getSymbolOfPartOfRightHandSideOfImportEquals(Node* entityName) {
+	TSC_UNREACHABLE("getSymbolOfPartOfRightHandSideOfImportEquals — expressions slice");
+}
+Symbol* Checker::checkNewTargetMetaProperty(Node* node) {
+	TSC_UNREACHABLE("checkNewTargetMetaProperty — expressions slice");
+}
+Type* Checker::checkMetaPropertyKeyword(Node* node) {
+	TSC_UNREACHABLE("checkMetaPropertyKeyword — expressions slice");
+}
+Type* Checker::checkImportAttributesExpression(Node* node) {
+	TSC_UNREACHABLE("checkImportAttributesExpression — expressions slice");
+}
+
 }  // namespace checker
 }  // namespace tsc
