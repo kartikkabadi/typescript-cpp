@@ -104,6 +104,12 @@ add_library(tsc STATIC
 	internal/transformers/estransforms/forawait.cpp
 	internal/transformers/estransforms/using.cpp
 	internal/transformers/tstransforms/utilities.cpp
+	internal/transformers/tstransforms/importelision.cpp
+	internal/transformers/tstransforms/typeeraser.cpp
+	internal/transformers/tstransforms/typeserializer.cpp
+	internal/transformers/tstransforms/runtimesyntax.cpp
+	internal/transformers/tstransforms/metadata.cpp
+	internal/transformers/tstransforms/legacydecorators.cpp
 	internal/transformers/moduletransforms/utilities.cpp
 	internal/transformers/moduletransforms/externalmoduleinfo.cpp
 	internal/transformers/moduletransforms/esmodule.cpp
