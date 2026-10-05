@@ -38,6 +38,7 @@ add_library(tsc STATIC
 	internal/checker/checker_widen.cpp
 	internal/checker/checker_decltypes.cpp
 	internal/checker/checker_contextual.cpp
+	internal/checker/checker_expressions_b.cpp
 	internal/checker/checker_typeops.cpp
 	internal/checker/mapper.cpp
 	internal/compiler/fileloader.cpp

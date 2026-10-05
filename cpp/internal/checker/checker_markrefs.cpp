@@ -983,10 +983,6 @@ void Checker::markTypeNodeAsReferenced(Node* node /*TypeNode*/) {
 
 // owner: expressions slice (checker.go:8090-14185)
 Symbol* Checker::getResolvedSymbol(Node* node) { TSC_UNREACHABLE("getResolvedSymbol — expressions slice"); }
-bool Checker::isMethodAccessForCall(Node* node) { TSC_UNREACHABLE("isMethodAccessForCall — expressions slice"); }
-Symbol* Checker::getPrivateIdentifierPropertyOfType(Type* leftType, Symbol* lexicallyScopedIdentifier) {
-	TSC_UNREACHABLE("getPrivateIdentifierPropertyOfType — expressions slice");
-}
 // owner: jsx slice (jsx.go)
 Symbol* Checker::getJsxNamespaceContainerForImplicitImport(Node* location) {
 	TSC_UNREACHABLE("getJsxNamespaceContainerForImplicitImport — jsx slice");

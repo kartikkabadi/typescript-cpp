@@ -4168,11 +4168,6 @@ Type* Checker::getBuiltinIteratorReturnType() {
 	TSC_UNREACHABLE("getBuiltinIteratorReturnType — ported with checker.cpp:6570");
 }
 
-Type* Checker::checkExpressionWithTypeArguments(Node* node) {
-	TSC_UNREACHABLE(
-		"checkExpressionWithTypeArguments — ported with the type-node slice");
-}
-
 // ---------------------------------------------------------------------------
 // NewChecker bootstrap (checker.go:911-1500) — ported with the bootstrap slice
 // ---------------------------------------------------------------------------

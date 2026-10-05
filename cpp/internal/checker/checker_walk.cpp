@@ -1186,14 +1186,11 @@ void Checker::mergeInferences(std::vector<InferenceInfo*>& target, const std::ve
 // defined statically above until the inference slice lands its own copies.
 
 // owner: expression-check slices (wave-3)
-Type* Checker::checkIdentifier(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkIdentifier — expressions slice"); }
-Type* Checker::checkThisExpression(Node* node) { TSC_UNREACHABLE("checkThisExpression — expressions slice"); }
 Type* Checker::checkSuperExpression(Node* node) { TSC_UNREACHABLE("checkSuperExpression — expressions slice"); }
 Type* Checker::checkTemplateExpression(Node* node) { TSC_UNREACHABLE("checkTemplateExpression — expressions slice"); }
 Type* Checker::checkRegularExpressionLiteral(Node* node) { TSC_UNREACHABLE("checkRegularExpressionLiteral — expressions slice"); }
 Type* Checker::checkArrayLiteral(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkArrayLiteral — expressions slice"); }
 Type* Checker::checkObjectLiteral(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkObjectLiteral — expressions slice"); }
-Type* Checker::checkPropertyAccessExpression(Node* node, CheckMode checkMode, bool writeOnly) { TSC_UNREACHABLE("checkPropertyAccessExpression — expressions slice"); }
 Type* Checker::checkQualifiedName(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkQualifiedName — expressions slice"); }
 Type* Checker::checkIndexedAccess(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkIndexedAccess — expressions slice"); }
 Type* Checker::checkCallExpression(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkCallExpression — expressions slice"); }
@@ -1203,20 +1200,7 @@ Type* Checker::checkParenthesizedExpression(Node* node, CheckMode checkMode) { T
 Type* Checker::checkClassExpression(Node* node) { TSC_UNREACHABLE("checkClassExpression — expressions slice"); }
 Type* Checker::checkFunctionExpressionOrObjectLiteralMethod(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkFunctionExpressionOrObjectLiteralMethod — expressions slice"); }
 Type* Checker::checkAssertion(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkAssertion — expressions slice"); }
-Type* Checker::checkTypeOfExpression(Node* node) { TSC_UNREACHABLE("checkTypeOfExpression — expressions slice"); }
-Type* Checker::checkNonNullAssertion(Node* node) { TSC_UNREACHABLE("checkNonNullAssertion — expressions slice"); }
-Type* Checker::checkSatisfiesExpression(Node* node) { TSC_UNREACHABLE("checkSatisfiesExpression — expressions slice"); }
-Type* Checker::checkMetaProperty(Node* node) { TSC_UNREACHABLE("checkMetaProperty — expressions slice"); }
-Type* Checker::checkDeleteExpression(Node* node) { TSC_UNREACHABLE("checkDeleteExpression — expressions slice"); }
-Type* Checker::checkVoidExpression(Node* node) { TSC_UNREACHABLE("checkVoidExpression — expressions slice"); }
-Type* Checker::checkAwaitExpression(Node* node) { TSC_UNREACHABLE("checkAwaitExpression — expressions slice"); }
-Type* Checker::checkPrefixUnaryExpression(Node* node) { TSC_UNREACHABLE("checkPrefixUnaryExpression — expressions slice"); }
-Type* Checker::checkPostfixUnaryExpression(Node* node) { TSC_UNREACHABLE("checkPostfixUnaryExpression — expressions slice"); }
 Type* Checker::checkBinaryExpression(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkBinaryExpression — expressions slice"); }
-Type* Checker::checkConditionalExpression(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkConditionalExpression — expressions slice"); }
-Type* Checker::checkSpreadExpression(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkSpreadExpression — expressions slice"); }
-Type* Checker::checkYieldExpression(Node* node) { TSC_UNREACHABLE("checkYieldExpression — expressions slice"); }
-Type* Checker::checkSyntheticExpression(Node* node) { TSC_UNREACHABLE("checkSyntheticExpression — expressions slice"); }
 Type* Checker::checkJsxExpression(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkJsxExpression — jsx slice"); }
 Type* Checker::checkJsxElement(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkJsxElement — jsx slice"); }
 Type* Checker::checkJsxSelfClosingElement(Node* node, CheckMode checkMode) { TSC_UNREACHABLE("checkJsxSelfClosingElement — jsx slice"); }

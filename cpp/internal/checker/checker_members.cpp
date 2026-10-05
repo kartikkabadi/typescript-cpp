@@ -3011,10 +3011,6 @@ std::vector<Signature*> Checker::findMatchingSignatures(
 	int listIndex) {
 	TSC_UNREACHABLE("findMatchingSignatures — owned by relater.go slice");
 }
-Signature* Checker::createUnionSignature(Signature* sig,
-	const std::vector<Signature*>& unionSignatures) {
-	TSC_UNREACHABLE("createUnionSignature — owned by checker.go:10492 slice");
-}
 bool Checker::compareTypeParametersIdentical(
 	const std::vector<Type*>& sourceParams, const std::vector<Type*>& targetParams) {
 	TSC_UNREACHABLE("compareTypeParametersIdentical — owned by relater.go slice");

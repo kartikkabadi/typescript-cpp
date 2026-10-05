@@ -3012,7 +3012,6 @@ Type* Checker::checkShorthandPropertyAssignment(Node* node, bool inDestructuring
 
 // (deduped: getConditionalTypeInstantiation defined in cpp/internal/checker/checker_instantiate.cpp)
 
-Type* Checker::getContextualThisParameterType(Node* fn) { decltypesDepUnreachable("getContextualThisParameterType — decltypes dep"); }
 // (deduped: getContextuallyTypedParameterType defined in cpp/internal/checker/checker_contextual.cpp)
 
 std::pair<std::string, bool> Checker::getDestructuringPropertyName(Node* node) { decltypesDepUnreachable("getDestructuringPropertyName — decltypes dep"); }
@@ -3057,7 +3056,6 @@ Symbol* Checker::getSpreadSymbol(Symbol* prop, bool readonly) { decltypesDepUnre
 Type* Checker::getTypeOfInitializer(Node* node) { decltypesDepUnreachable("getTypeOfInitializer — decltypes dep"); }
 // (deduped: getTypeOfMappedSymbol defined in cpp/internal/checker/checker_members.cpp)
 
-Type* Checker::getTypeOfPropertyInBaseClass(Symbol* symbol) { decltypesDepUnreachable("getTypeOfPropertyInBaseClass — decltypes dep"); }
 Type* Checker::getTypeOfReverseMappedSymbol(Symbol* symbol) { decltypesDepUnreachable("getTypeOfReverseMappedSymbol — decltypes dep"); }
 // (deduped: getTypeReferenceArity defined in cpp/internal/checker/checker_typenodes.cpp)
 

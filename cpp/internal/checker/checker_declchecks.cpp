@@ -1714,10 +1714,6 @@ void Checker::checkIndexedAccessIndexType(Type* t, Node* node) {
 Type* Checker::createMarkerType(Symbol* symbol, Type* source, Type* target) {
 	TSC_UNREACHABLE("createMarkerType — relater slice");
 }
-// owner: checker.go:10502 slice (contextual-call machinery)
-Signature* Checker::getContextualCallSignature(Type* t, Node* node) {
-	TSC_UNREACHABLE("getContextualCallSignature — contextual slice");
-}
 // owner: relater.go (whole file)
 bool Checker::checkTypeAssignableToEx(Type* source, Type* target, Node* errorNode,
                                       const DiagnosticMessage* headMessage,
@@ -1732,12 +1728,6 @@ TypePredicate* Checker::getTypePredicateOfSignature(Signature* sig) {
 	TSC_UNREACHABLE("getTypePredicateOfSignature — relater slice");
 }
 // owner: expressions slice (checker.go:8090-14185)
-void Checker::checkCollisionsForDeclarationName(Node* node, Node* name) {
-	TSC_UNREACHABLE("checkCollisionsForDeclarationName — expressions slice");
-}
-void Checker::setNodeLinksForPrivateIdentifierScope(Node* node) {
-	TSC_UNREACHABLE("setNodeLinksForPrivateIdentifierScope — expressions slice");
-}
 bool Checker::classDeclarationExtendsNull(Node* classDecl) {
 	TSC_UNREACHABLE("classDeclarationExtendsNull — expressions slice");
 }

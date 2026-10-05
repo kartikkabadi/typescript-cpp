@@ -275,13 +275,6 @@ Symbol* Checker::getSymbolForPrivateIdentifierExpression(Node* node) {
 	return links->resolvedSymbol;
 }
 
-// checker.go: lookupSymbolForPrivateIdentifierDeclaration — needs
-// getContainingClassExcludingClassDecorators and binder.GetSymbolNameForPrivateIdentifier,
-// which are not ported yet.
-Symbol* Checker::lookupSymbolForPrivateIdentifierDeclaration(const std::string& propName, Node* location) {
-	TSC_UNREACHABLE("lookupSymbolForPrivateIdentifierDeclaration — ported with the private-identifier resolution slice");
-}
-
 bool Checker::checkGrammarMappedType(MappedTypeNode* node) {
 	if (!node->Members->nodes.empty()) {
 		return grammarErrorOnNode(node->Members->nodes[0], A_mapped_type_may_not_declare_properties_or_methods);

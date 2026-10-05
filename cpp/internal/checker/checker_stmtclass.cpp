@@ -1801,9 +1801,6 @@ bool Checker::isPropertyWithoutInitializer(Node* node) {
 // ---------------------------------------------------------------------------
 
 // owner: expressions slice (checker.go:8090-14185)
-Type* Checker::checkTruthinessExpression(Node* node, CheckMode checkMode) {
-	TSC_UNREACHABLE("checkTruthinessExpression — expressions slice");
-}
 void Checker::checkReferenceExpression(Node* node,
                                        const DiagnosticMessage* invalidReferenceType,
                                        const DiagnosticMessage* constantName) {
