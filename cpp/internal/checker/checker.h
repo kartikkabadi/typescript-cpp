@@ -1433,6 +1433,27 @@ public:
 	// hide diagnostics that a pooled Go checker would have orphaned on a
 	// different checker instance.
 	SourceFile* activeCheckFile = nullptr;
+	// Go checker-pool emulation for shared link caches and once-flags
+	// (extends the aliasTargetCheckFile convention in types.h). Go runs one
+	// checker per file, each with a private LinkStore, so a resolution or a
+	// once-only declaration check first performed while checking a different
+	// file re-runs under the file being checked and re-fires the diagnostics
+	// it raises on declarations owned by this file. Entries therefore record
+	// the context that produced them: nullptr = seeded before any check or
+	// written by code that never re-resolves (valid everywhere); a real
+	// SourceFile = produced during that file's check; the sentinel =
+	// resolved while no file check was active — file checks treat it as a
+	// foreign context since a Go checker's own store would be cold there.
+	static SourceFile* outsideCheckFileSentinel() {
+		static char sentinel;
+		return reinterpret_cast<SourceFile*>(&sentinel);
+	}
+	SourceFile* checkFileTag() const {
+		return activeCheckFile != nullptr ? activeCheckFile : outsideCheckFileSentinel();
+	}
+	bool checkFileTagStale(SourceFile* tag) const {
+		return tag != nullptr && activeCheckFile != nullptr && tag != activeCheckFile;
+	}
 	Arena symbolArena;
 	Arena signatureArena;
 	Arena indexInfoArena;

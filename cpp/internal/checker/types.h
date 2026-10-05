@@ -169,6 +169,12 @@ struct ValueSymbolLinks {
 	Type* nameType{};
 	Type* containingType{}; // Mapped type for mapped type property, containing union or intersection type for synthetic property
 	bool functionOrConstructorChecked{};
+	// Go checker-pool emulation (see aliasTargetCheckFile below): context the
+	// entry was produced under. nullptr = seeded/outside-check write, valid
+	// everywhere; a foreign tag is treated as absent so the owning file's
+	// check re-runs the resolution and re-fires its diagnostics.
+	SourceFile* resolvedTypeCheckFile{};
+	SourceFile* functionOrConstructorCheckedFor{};
 };
 
 // Additional links for mapped symbols
@@ -210,6 +216,7 @@ struct ModuleSymbolLinks {
 	SymbolTable resolvedExports;                            // Resolved exports of module or combined early- and late-bound static members of a class.
 	std::unordered_map<std::string, Node*> typeOnlyExportStarMap; // Set on a module symbol when some of its exports were resolved through a 'export type * from "mod"' declaration
 	bool exportsChecked{};
+	SourceFile* exportsCheckedFor{}; // see ValueSymbolLinks::resolvedTypeCheckFile
 };
 
 struct ReverseMappedSymbolLinks {
@@ -272,6 +279,13 @@ struct DeclaredTypeLinks {
 	bool indexSignaturesChecked{};
 	bool typeParametersChecked{};
 	bool enumChecked{};
+	// See ValueSymbolLinks::resolvedTypeCheckFile — once-flags re-run under
+	// each distinct check file because the checks they gate report errors on
+	// declarations that may live in other files (merged symbols).
+	SourceFile* interfaceCheckedFor{};
+	SourceFile* indexSignaturesCheckedFor{};
+	SourceFile* typeParametersCheckedFor{};
+	SourceFile* enumCheckedFor{};
 };
 
 // Links for switch clauses
@@ -396,10 +410,12 @@ struct NodeLinks {
 
 struct SymbolNodeLinks {
 	Symbol* resolvedSymbol{}; // Resolved symbol associated with node
+	SourceFile* resolvedSymbolCheckFile{}; // see ValueSymbolLinks::resolvedTypeCheckFile
 };
 
 struct TypeNodeLinks {
 	Type* resolvedType{};             // Resolved type associated with node
+	SourceFile* resolvedTypeCheckFile{};   // see ValueSymbolLinks::resolvedTypeCheckFile
 	std::vector<Type*> outerTypeParameters; // Outer type parameters of anonymous object type
 };
 

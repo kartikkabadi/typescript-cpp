@@ -767,6 +767,16 @@ Type* Checker::getWriteTypeOfInstantiatedSymbol(Symbol* symbol) {
 // getTypeOfVariableOrParameterOrProperty — checker.go:16863
 Type* Checker::getTypeOfVariableOrParameterOrProperty(Symbol* symbol) {
 	auto* links = valueSymbolLinks.Get(symbol);
+	// Go's per-checker link store means a type resolved while a different
+	// file was being checked (or outside any check) must not short-circuit
+	// this file's own resolution: drop the foreign-context entry so the
+	// worker re-runs and its diagnostics (e.g. reportImplicitAny) re-fire,
+	// attributed here via Diagnostic::producedDuringCheckOf. The entry must
+	// be cleared during re-resolution — typeResolutionHasProperty reads
+	// resolvedType != nullptr to detect cycles.
+	if (links->resolvedType != nullptr && checkFileTagStale(links->resolvedTypeCheckFile)) {
+		links->resolvedType = nullptr;
+	}
 	if (links->resolvedType == nullptr) {
 		Type* t = getTypeOfVariableOrParameterOrPropertyWorker(symbol);
 		if (t == nullptr) {
@@ -780,6 +790,7 @@ Type* Checker::getTypeOfVariableOrParameterOrProperty(Symbol* symbol) {
 		if (links->resolvedType == nullptr && !isParameterOfContextSensitiveSignature(symbol)) {
 			links->resolvedType = t;
 		}
+		links->resolvedTypeCheckFile = checkFileTag();
 		return t;
 	}
 	return links->resolvedType;

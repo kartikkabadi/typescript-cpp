@@ -691,6 +691,13 @@ Type* Checker::getESSymbolLikeTypeForNode(Node* node) {
 
 Type* Checker::getTypeFromTypeReference(Node* node) {
 	auto* links = typeNodeLinks.Get(node);
+	// checker.go:23424 — Go's per-checker link store means a reference
+	// resolved while a different file was being checked must not
+	// short-circuit this file's own resolution: drop the foreign-context
+	// entry so resolveTypeReferenceName's diagnostics re-fire here.
+	if (links->resolvedType != nullptr && checkFileTagStale(links->resolvedTypeCheckFile)) {
+		links->resolvedType = nullptr;
+	}
 	if (links->resolvedType == nullptr) {
 		// Cache both the resolved symbol and the resolved type. The resolved
 		// symbol is needed when we check the type reference in
@@ -707,6 +714,7 @@ Type* Checker::getTypeFromTypeReference(Node* node) {
 				node,
 				getTypeReferenceType(node, getSymbolFromTypeReference(node)));
 		}
+		links->resolvedTypeCheckFile = checkFileTag();
 	}
 	return links->resolvedType;
 }
@@ -815,12 +823,20 @@ Type* Checker::getIntendedTypeFromJSDocTypeReference(Node* node) {
 
 Symbol* Checker::getSymbolFromTypeReference(Node* node) {
 	auto* links = symbolNodeLinks.Get(node);
+	// checker.go:23538 — Go's per-checker link store means a symbol resolved
+	// while a different file was being checked must not short-circuit this
+	// file's own resolution: drop the foreign-context entry so
+	// resolveTypeReferenceName's diagnostics re-fire here.
+	if (links->resolvedSymbol != nullptr && checkFileTagStale(links->resolvedSymbolCheckFile)) {
+		links->resolvedSymbol = nullptr;
+	}
 	if (links->resolvedSymbol == nullptr) {
 		// The `const` in a `const` assertion resolves to nothing; resolveName
 		// knows not to report an error for it, so no special-casing is needed
 		// here.
 		links->resolvedSymbol = resolveTypeReferenceName(
 			node, SymbolFlagsType, /*ignoreErrors*/ false);
+		links->resolvedSymbolCheckFile = checkFileTag();
 	}
 	return links->resolvedSymbol;
 }

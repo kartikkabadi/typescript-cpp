@@ -476,9 +476,13 @@ void Checker::checkInterfaceDeclaration(Node* node) {
 	checkExportsOnMergedDeclarations(node);
 	Symbol* symbol = getSymbolOfDeclaration(node);
 	checkTypeParameterListsIdentical(symbol);
-	// Only check this symbol once
-	if (DeclaredTypeLinks* links = declaredTypeLinks.Get(symbol); !links->interfaceChecked) {
+	// Only check this symbol once (per check file — see checkFileTagStale:
+	// the checks below report errors on declarations that may live in other
+	// files when the symbol is merged, so each file's check must re-run them).
+	if (DeclaredTypeLinks* links = declaredTypeLinks.Get(symbol);
+		!links->interfaceChecked || checkFileTagStale(links->interfaceCheckedFor)) {
 		links->interfaceChecked = true;
+		links->interfaceCheckedFor = checkFileTag();
 		Type* t = getDeclaredTypeOfSymbol(symbol);
 		Type* typeWithThis = getTypeWithThisArgument(t, nullptr, false);
 		// run subsequent checks only if first set succeeded
@@ -573,8 +577,10 @@ void Checker::checkEnumDeclaration(Node* node) {
 	//
 	// Only perform this check once per symbol
 	Symbol* enumSymbol = getSymbolOfDeclaration(node);
-	if (DeclaredTypeLinks* links = declaredTypeLinks.Get(enumSymbol); !links->enumChecked) {
+	if (DeclaredTypeLinks* links = declaredTypeLinks.Get(enumSymbol);
+		!links->enumChecked || checkFileTagStale(links->enumCheckedFor)) {
 		links->enumChecked = true;
+		links->enumCheckedFor = checkFileTag();
 		if (enumSymbol->declarations.size() > 1) {
 			bool enumIsConst = isEnumConst(node);
 			// check that const is placed\omitted on all enum declarations
@@ -1300,7 +1306,10 @@ void Checker::checkExportAssignment(Node* node) {
 void Checker::checkExternalModuleExports(Node* node) {
 	Symbol* moduleSymbol = getSymbolOfDeclaration(node);
 	ModuleSymbolLinks* links = moduleSymbolLinks.Get(moduleSymbol);
-	if (!links->exportsChecked) {
+	// Per-checker once-flag: re-run under each distinct check file (see
+	// checkFileTagStale).
+	if (!links->exportsChecked || checkFileTagStale(links->exportsCheckedFor)) {
+		links->exportsCheckedFor = checkFileTag();
 		Symbol* exportEqualsSymbol = nullptr;
 		if (auto it = moduleSymbol->exports.find(InternalSymbolNameExportEquals); it != moduleSymbol->exports.end()) {
 			exportEqualsSymbol = it->second;
