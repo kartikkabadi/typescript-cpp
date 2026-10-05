@@ -4559,6 +4559,17 @@ bool Node::forEachChild(F&& v) const {
 			return visitChild(v, n->TagName) ||
 				visitChildList(v, n->Comment);
 		}
+		case Kind::JSDocParameterTag:
+		case Kind::JSDocPropertyTag:
+		{
+			auto* n = static_cast<const JSDocParameterOrPropertyTag*>(this);
+			return visitChild(v, n->TagName) ||
+		(n->IsNameFirst &&
+			(visitChild(v, n->name) || visitChild(v, n->TypeExpression))) ||
+		(!n->IsNameFirst &&
+			(visitChild(v, n->TypeExpression) || visitChild(v, n->name))) ||
+		visitChildList(v, n->Comment);
+		}
 		case Kind::JSDocPrivateTag:
 		{
 			auto* n = static_cast<const JSDocPrivateTag*>(this);

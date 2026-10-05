@@ -407,6 +407,11 @@ public:
 	std::unordered_map<tspath::Path, jsxRuntimeImportSpecifier>
 	    jsxRuntimeImportSpecifiers;
 	std::unordered_map<tspath::Path, Node*> importHelpersImportSpecifiers;
+	// Arena owning the synthetic import specifier nodes created by the
+	// fileLoader's factory (Go: the loader's ast.NodeFactory keeps them
+	// alive for the program's lifetime via GC). Moved in from
+	// filesParser::factory after file loading completes.
+	Arena syntheticImportArena;
 	std::unordered_set<tspath::Path> sourceFilesFoundSearchingNodeModules;
 	std::unordered_map<tspath::Path, LibFile*> libFiles;
 	std::vector<std::string> missingFiles;
