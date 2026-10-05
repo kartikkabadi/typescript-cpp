@@ -3550,30 +3550,5 @@ Node* injectClassThisAssignmentIfMissing(printer::EmitContext* ec,
 	return updatedNode;
 }
 
-// === dep stubs — removed when owner slice lands ===
-
-// classfields.go:3423 — classHasClassThisAssignment (owned by classfields)
-bool classHasClassThisAssignment(printer::EmitContext* /*emitContext*/,
-                                 Node* /*node*/) {
-	TSC_UNREACHABLE("classHasClassThisAssignment — owned by classfields slice");
-}
-
-// classfields.go:3564 — findComputedPropertyNameCacheAssignment (owned by
-// classfields)
-BinaryExpression* findComputedPropertyNameCacheAssignment(
-	printer::EmitContext* /*emitContext*/, Node* /*name*/) {
-	TSC_UNREACHABLE(
-		"findComputedPropertyNameCacheAssignment — owned by classfields slice");
-}
-
-// classfields.go:3580 — expandPreOrPostfixIncrementOrDecrementExpression
-// (owned by classfields)
-Node* expandPreOrPostfixIncrementOrDecrementExpression(
-	printer::NodeFactory* /*f*/, printer::EmitContext* /*emitContext*/,
-	Node* /*node*/, Node* /*expression*/, Node* /*resultVariable*/) {
-	TSC_UNREACHABLE("expandPreOrPostfixIncrementOrDecrementExpression — owned "
-	                "by classfields slice");
-}
-
 }  // namespace tsc::transformers::estransforms
 

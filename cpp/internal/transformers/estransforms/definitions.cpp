@@ -65,10 +65,6 @@ Transformer* GetESTransformer(TransformOptions* opts) {
 
 // === dep stubs — removed when owner slice lands ===
 
-Transformer* newClassFieldsTransformer(TransformOptions* opt) {
-	TSC_UNREACHABLE("newClassFieldsTransformer — owned by classfields slice");
-}
-
 Transformer* newUsingDeclarationTransformer(TransformOptions* opt) {
 	TSC_UNREACHABLE("newUsingDeclarationTransformer — owned by using slice");
 }
