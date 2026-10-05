@@ -28,6 +28,7 @@ add_library(tsc STATIC
 	internal/checker/checker_tracer.cpp
 	internal/checker/checker_grammar.cpp
 	internal/checker/checker_declchecks.cpp
+	internal/checker/checker_stmtclass.cpp
 	internal/checker/checker_nodecopy.cpp
 	internal/checker/mapper.cpp
 	internal/evaluator/evaluator.cpp

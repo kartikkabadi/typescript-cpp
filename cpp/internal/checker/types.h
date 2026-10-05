@@ -984,6 +984,12 @@ struct TypePredicate {
 
 // IndexInfo
 
+// checker.go:8829
+struct ConstructorAccessibilityError {
+	ModifierFlags kind{};
+	Type* declaringClass{};
+};
+
 struct IndexInfo {
 	Type* keyType{};
 	Type* valueType{};

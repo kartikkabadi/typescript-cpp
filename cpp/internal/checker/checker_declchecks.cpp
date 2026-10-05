@@ -1677,13 +1677,6 @@ void Checker::checkVariableLikeDeclaration(Node* node) {
 void Checker::checkDecorators(Node* node) {
 	TSC_UNREACHABLE("checkDecorators — varchecks slice");
 }
-// owner: declchecks class-machinery range (checker.go:4500-5081)
-void Checker::checkIndexConstraints(Type* t, Symbol* symbol, bool isStaticIndex) {
-	TSC_UNREACHABLE("checkIndexConstraints — classmachinery slice");
-}
-void Checker::checkTypeForDuplicateIndexSignatures(Node* node) {
-	TSC_UNREACHABLE("checkTypeForDuplicateIndexSignatures — classmachinery slice");
-}
 // owner: declchecks alias/type-params/unused range (checker.go:6906-7500)
 void Checker::checkTypeNameIsReserved(Node* name, const DiagnosticMessage* message) {
 	TSC_UNREACHABLE("checkTypeNameIsReserved — aliasunused slice");
@@ -1841,11 +1834,6 @@ Diagnostic* Checker::addDeprecatedSuggestion(Node* location,
 // owner: checker.go ~7509-8090 (statement/expression checks outside this slice)
 void Checker::checkImportAttributes(Node* node) {
 	TSC_UNREACHABLE("checkImportAttributes — modulechecks slice");
-}
-bool Checker::areTypeParametersIdentical(
-    const std::vector<Node*>& declarations, const std::vector<Type*>& targetParameters,
-    const std::function<std::vector<Node*>(Node*)>& getTypeParameterDeclarations) {
-	TSC_UNREACHABLE("areTypeParametersIdentical — declchecks2 slice");
 }
 ModifierFlags Checker::getTypeParameterModifiers(Type* typeParameter) {
 	TSC_UNREACHABLE("getTypeParameterModifiers — decltypes slice");

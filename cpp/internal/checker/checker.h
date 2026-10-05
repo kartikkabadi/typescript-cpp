@@ -2095,8 +2095,6 @@ public:
 	// bottom for the single TSC_UNREACHABLE body each)
 	void checkVariableLikeDeclaration(Node* node);
 	void checkDecorators(Node* node);
-	void checkIndexConstraints(Type* t, Symbol* symbol, bool isStaticIndex);
-	void checkTypeForDuplicateIndexSignatures(Node* node);
 	void checkTypeNameIsReserved(Node* name, const DiagnosticMessage* message);
 	void checkTypeParameters(const std::vector<Node*>& typeParameterDeclarations);
 	bool isReferenceToType(Type* t, Type* target);
@@ -2148,11 +2146,106 @@ public:
 	Diagnostic* addDeprecatedSuggestion(Node* location, std::vector<Node*> declarations,
 	                                  const std::string& deprecatedEntity);
 	void checkImportAttributes(Node* node);
+	ModifierFlags getTypeParameterModifiers(Type* typeParameter);
+
+	// === slice: stmtclass === (checker_stmtclass.cpp)
+	// checker.go:3830-5081 — statement checks + class-like declaration
+	// machinery + member-override checks + index constraints.
+	void checkCatchClause(Node* node);
+	void checkClassLikeDeclaration(Node* node);
+	void checkTestingKnownTruthyCallableOrAwaitableOrEnumMemberType(Node* condExpr,
+	                                                              Type* condType,
+	                                                              Node* body);
+	void checkTestingKnownTruthyTypes(Node* condExpr, Type* condType, Node* body);
+	void checkTestingKnownTruthyType(Node* condExpr, Type* condType, Node* body);
+	bool isSymbolUsedInBinaryExpressionChain(Node* node, Symbol* testedSymbol);
+	bool isSymbolUsedInConditionBody(Node* expr, Node* body, Node* testedNode,
+	                                 Symbol* testedSymbol);
+	Type* getIndexTypeOrString(Type* t);
+	void checkReturnExpression(Node* container, Type* unwrappedReturnType, Node* node,
+	                           Node* expr, Type* exprType, bool inConditionalExpression);
+	void checkJSDocAugmentsTagMatchesExtends(Node* node,
+	                                         ExpressionWithTypeArguments* baseTypeNode,
+	                                         Type* baseType);
+	void checkClassForStaticPropertyNameConflicts(Node* node);
+	void checkTypeParameterListsIdentical(Symbol* symbol);
+	std::vector<Node*> getClassOrInterfaceDeclarationsOfSymbol(Symbol* symbol);
 	bool areTypeParametersIdentical(
 	    const std::vector<Node*>& declarations, const std::vector<Type*>& targetParameters,
 	    const std::function<std::vector<Node*>(Node*)>& getTypeParameterDeclarations);
-	ModifierFlags getTypeParameterModifiers(Type* typeParameter);
+	void checkBaseTypeAccessibility(Type* t, Node* node);
+	void issueMemberSpecificError(Node* node, Type* typeWithThis, Type* baseWithThis,
+	                              const DiagnosticMessage* broadDiag);
+	Type* getTypeWithoutSignatures(Type* t);
+	void checkKindsOfPropertyMemberOverrides(Type* t, Type* baseType);
+	bool arePropertiesAbstractOrInterface(Symbol* base,
+	                                      ModifierFlags baseDeclarationFlags);
+	bool isPropertyAbstractOrInterface(Node* declaration,
+	                                   ModifierFlags baseDeclarationFlags);
+	void checkMembersForOverrideModifier(Node* node, Type* t, Type* typeWithThis,
+	                                     Type* staticType);
+	void checkMemberForOverrideModifier(Node* node, Type* staticType,
+	                                    Type* baseStaticType, Type* baseWithThis,
+	                                    Type* t, Type* typeWithThis, Node* member);
+	MemberOverrideStatus getMemberOverrideModifierStatus(Node* node, Node* member,
+	                                                     Symbol* memberSymbol);
+	MemberOverrideStatus checkMemberForOverrideModifierWorker(
+	    Node* node, Type* staticType, Type* baseStaticType, Type* baseWithThis,
+	    Type* t, Type* typeWithThis, bool memberHasOverrideModifier,
+	    bool memberHasAbstractModifier, bool memberIsStatic,
+	    bool memberIsParameterProperty, Symbol* member, Node* errorNode);
+	Symbol* getSuggestedSymbolForNonexistentClassMember(std::string name,
+	                                                  Type* baseType);
+	void checkIndexConstraints(Type* t, Symbol* symbol, bool isStaticIndex);
+	void checkIndexConstraintForProperty(Type* t, Symbol* prop, Type* propNameType,
+	                                     Type* propType);
+	void checkIndexConstraintForIndexSignature(Type* t, IndexInfo* checkInfo);
+	void checkClassOrInterfaceForDuplicateIndexSignatures(Node* node);
+	void checkTypeForDuplicateIndexSignatures(Node* node);
+	void checkPropertyInitialization(Node* node);
+	bool isPropertyWithoutInitializer(Node* node);
 
+	// stmtclass dep stubs — owned by other slices
+	Type* checkTruthinessExpression(Node* node, CheckMode checkMode);
+	void checkReferenceExpression(Node* node, const DiagnosticMessage* invalidReferenceType,
+	                              const DiagnosticMessage* constantName);
+	void checkDestructuringAssignment(Node* node, Type* sourceType, CheckMode checkMode,
+	                                  bool checkResolvedType);
+	bool isTypeEqualityComparableTo(Type* source, Type* target);
+	Node* getEffectiveCheckNode(Node* node);
+	std::string getTypeNameForErrorDisplay(Type* t);
+	void checkVariableDeclarationList(Node* node);
+	Type* checkRightHandSideOfForOf(Node* node);
+	bool checkTypeAssignableToAndOptionallyElaborate(
+	    Type* source, Type* target, Node* errorNode, Node* expr,
+	    const DiagnosticMessage* headMessage, std::vector<Diagnostic*>* diagnosticOutput);
+	bool checkTypeComparableTo(Type* source, Type* target, Node* errorNode,
+	                           const DiagnosticMessage* headMessage);
+	bool isTypeAssignableToKind(Type* source, TypeFlags kind);
+	std::vector<Symbol*> getPropertiesOfObjectType(Type* t);
+	Symbol* getPropertyOfObjectType(Type* t, const std::string& name);
+	std::vector<Signature*> getConstructorsForTypeArguments(
+	    Type* t, const std::vector<Node*>& typeArgumentNodes, Node* location);
+	std::vector<Signature*> getInstantiatedConstructorsForTypeArguments(
+	    Type* t, const std::vector<Node*>& typeArgumentNodes, Node* location);
+	bool isValidBaseType(Type* t);
+	Type* getIndexTypeOfType(Type* t, Type* keyType);
+	IndexInfo* getIndexInfoOfType(Type* t, Type* keyType);
+	Symbol* getIndexSymbol(Symbol* symbol);
+	Symbol* getTargetSymbol(Symbol* s);
+	ConstructorAccessibilityError* getConstructorAccessibilityError(
+	    Node* node, const std::vector<Signature*>& signatures, ModifierFlags modifiers);
+	size_t getMinTypeArgumentCount(const std::vector<Type*>& typeParameters);
+	Type* getNonMissingTypeOfSymbol(Symbol* symbol);
+	Type* getNonNullableTypeIfNeeded(Type* t);
+	bool isMixinConstructorType(Type* t);
+	Type* getExtractStringType(Type* t);
+	Type* getAwaitedTypeOfPromise(Type* t);
+	Symbol* getSymbolAtLocation(Node* node, bool ignoreErrors);
+	std::vector<IndexInfo*> getApplicableIndexInfos(Type* t, Type* keyType);
+	void checkExportsOnMergedDeclarations(Node* node);
+	Type* getBaseConstructorTypeOfClass(Type* t);
+	bool hasTypeFacts(Type* t, TypeFacts mask);
 	// === slice: nodecopy ===
 	printer::SymbolAccessibilityResult isSymbolAccessible(
 		Symbol* symbol, Node* enclosingDeclaration, SymbolFlags meaning,
