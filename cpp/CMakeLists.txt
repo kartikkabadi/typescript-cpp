@@ -41,6 +41,7 @@ add_library(tsc STATIC
 	internal/checker/checker_typeops.cpp
 	internal/checker/checker_utilities.cpp
 	internal/checker/checker_services.cpp
+	internal/checker/checker_flow.cpp
 	internal/checker/mapper.cpp
 	internal/compiler/fileloader.cpp
 	internal/compiler/host.cpp

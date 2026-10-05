@@ -1102,7 +1102,8 @@ void Checker::skippedGenericFunction(Node* node, CheckMode checkMode) {
 
 // (grammar dep-stubs removed — grammarchecks slice landed the real definitions.)
 
-// owner: flow slice (flow.go)
+// owner: flow slice (flow.go) — isReachableFlowNode defined in checker_flow.cpp
+
 
 // owner: contextual slice
 

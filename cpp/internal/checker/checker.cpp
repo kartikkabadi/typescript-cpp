@@ -4151,12 +4151,8 @@ bool Checker::checkTypeAssignableTo(Type* source, Type* target, Node* errorNode,
 	TSC_UNREACHABLE("checkTypeAssignableTo — ported with relater.go");
 }
 
-Type* Checker::getFlowTypeOfReferenceEx(Node* reference, Type* declaredType,
-										Type* initialType, Node* flowContainer,
-										FlowNode* flowNode) {
-	TSC_UNREACHABLE("getFlowTypeOfReferenceEx — ported with flow.go");
-}
-
+// getFlowTypeOfReferenceEx defined in checker_flow.cpp (flow slice).
+// getOptionalType defined in checker_decltypes.cpp.
 
 // containsUndefinedType is defined in checker_typeops.cpp.
 // getOptionalType stub above (kept).
@@ -6355,11 +6351,6 @@ Type* Checker::getRestrictiveTypeParameter(Type* t) {
 // isStringIndexSignatureOnlyTypeWorker — ported in checker_typeops.cpp
 // (typeops slice, checker.go:27831).
 
-bool Checker::markNodeAssignmentsWorker(Node* node) {
-	TSC_UNREACHABLE(
-		"markNodeAssignmentsWorker — ported with flow.go:2700 slice");
-}
-
 Ternary Checker::compareTypesAssignableWorker(Type* source, Type* target,
                                               bool reportErrors) {
 	TSC_UNREACHABLE(
@@ -7842,6 +7833,22 @@ size_t Checker::StringMappingKeyHash::operator()(const StringMappingKey& k) cons
 	uint64_t h = 1469598103934665603ull;
 	h = checkerHashStep(h, reinterpret_cast<uintptr_t>(k.s));
 	h = checkerHashStep(h, reinterpret_cast<uintptr_t>(k.t));
+	return static_cast<size_t>(h);
+}
+
+size_t Checker::AssignmentReducedKeyHash::operator()(const AssignmentReducedKey& k) const noexcept {
+	uint64_t h = 1469598103934665603ull;
+	h = checkerHashStep(h, static_cast<uint64_t>(k.id1));
+	h = checkerHashStep(h, static_cast<uint64_t>(k.id2));
+	return static_cast<size_t>(h);
+}
+
+size_t Checker::NarrowedTypeKeyHash::operator()(const NarrowedTypeKey& k) const noexcept {
+	uint64_t h = 1469598103934665603ull;
+	h = checkerHashStep(h, reinterpret_cast<uintptr_t>(k.t));
+	h = checkerHashStep(h, reinterpret_cast<uintptr_t>(k.candidate));
+	h = checkerHashStep(h, static_cast<uint64_t>(k.assumeTrue));
+	h = checkerHashStep(h, static_cast<uint64_t>(k.checkDerived));
 	return static_cast<size_t>(h);
 }
 

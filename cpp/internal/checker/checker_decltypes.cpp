@@ -2994,7 +2994,7 @@ Type* Checker::checkShorthandPropertyAssignment(Node* node, bool inDestructuring
 Type* Checker::getContextualThisParameterType(Node* fn) { decltypesDepUnreachable("getContextualThisParameterType — decltypes dep"); }
 // (deduped: getContextuallyTypedParameterType defined in cpp/internal/checker/checker_contextual.cpp)
 
-std::pair<std::string, bool> Checker::getDestructuringPropertyName(Node* node) { decltypesDepUnreachable("getDestructuringPropertyName — decltypes dep"); }
+// (deduped: getDestructuringPropertyName defined in checker_flow.cpp)
 // (deduped: getElementTypeOfArrayType defined in cpp/internal/checker/checker_typenodes.cpp)
 
 // (deduped: getElementTypes defined in cpp/internal/checker/checker_typenodes.cpp)
@@ -3005,9 +3005,9 @@ std::pair<std::string, bool> Checker::getDestructuringPropertyName(Node* node) {
 
 // (deduped: getFalseTypeFromConditionalType defined in cpp/internal/checker/checker_typenodes.cpp)
 
-Type* Checker::getFlowTypeInConstructor(Symbol* symbol, Node* constructor) { decltypesDepUnreachable("getFlowTypeInConstructor — decltypes dep"); }
-Type* Checker::getFlowTypeInStaticBlocks(Symbol* symbol, const std::vector<Node*>& staticBlocks) { decltypesDepUnreachable("getFlowTypeInStaticBlocks — decltypes dep"); }
-Type* Checker::getFlowTypeOfReference(Node* reference, Type* declaredType) { decltypesDepUnreachable("getFlowTypeOfReference — decltypes dep"); }
+// (deduped: getFlowTypeInConstructor defined in checker_flow.cpp)
+// (deduped: getFlowTypeInStaticBlocks defined in checker_flow.cpp)
+// (deduped: getFlowTypeOfReference defined in checker_flow.cpp)
 // (deduped: getInferredTrueTypeFromConditionalType defined in cpp/internal/checker/checker_typenodes.cpp)
 
 // (deduped: getNonUndefinedType defined in cpp/internal/checker/checker_contextual.cpp)
@@ -3033,7 +3033,7 @@ Symbol* Checker::getSpreadSymbol(Symbol* prop, bool readonly) { decltypesDepUnre
 
 // (deduped: getTypeOfFirstParameterOfSignature defined in cpp/internal/checker/checker_contextual.cpp)
 
-Type* Checker::getTypeOfInitializer(Node* node) { decltypesDepUnreachable("getTypeOfInitializer — decltypes dep"); }
+// (deduped: getTypeOfInitializer defined in checker_flow.cpp)
 // (deduped: getTypeOfMappedSymbol defined in cpp/internal/checker/checker_members.cpp)
 
 Type* Checker::getTypeOfPropertyInBaseClass(Symbol* symbol) { decltypesDepUnreachable("getTypeOfPropertyInBaseClass — decltypes dep"); }
@@ -3059,7 +3059,7 @@ bool Checker::hasDefaultValue(Node* node) { decltypesDepUnreachable("hasDefaultV
 
 // (deduped: isMappedTypeGenericIndexedAccess defined in cpp/internal/checker/checker_members.cpp)
 
-bool Checker::isMatchingReference(Node* source, Node* target) { decltypesDepUnreachable("isMatchingReference — decltypes dep"); }
+// (deduped: isMatchingReference defined in checker_flow.cpp)
 bool Checker::isSpreadableProperty(Symbol* prop) { decltypesDepUnreachable("isSpreadableProperty — decltypes dep"); }
 Type* Checker::sliceTupleType(Type* t, int index, int endSkipCount) { decltypesDepUnreachable("sliceTupleType — decltypes dep"); }
 bool Checker::isValidSpreadType(Type* t) { decltypesDepUnreachable("isValidSpreadType — decltypes dep"); }
@@ -3073,7 +3073,7 @@ bool Checker::isValidSpreadType(Type* t) { decltypesDepUnreachable("isValidSprea
 
 // (deduped: tryGetTypeFromTypeNode defined in cpp/internal/checker/checker_typenodes.cpp)
 
-std::string Checker::TypeToString(Type* t) { decltypesDepUnreachable("TypeToString — decltypes dep"); }
+// (deduped: TypeToString stub kept in checker_tracer.cpp)
 
 } // namespace checker
 } // namespace tsc
