@@ -101,6 +101,9 @@ add_library(tsc STATIC
 	internal/transformers/estransforms/namedevaluation.cpp
 	internal/transformers/estransforms/esdecorator.cpp
 	internal/transformers/estransforms/classfields.cpp
+	internal/transformers/estransforms/async.cpp
+	internal/transformers/estransforms/forawait.cpp
+	internal/transformers/estransforms/using.cpp
 	internal/transformers/tstransforms/utilities.cpp
 	internal/transformers/moduletransforms/utilities.cpp
 	internal/transformers/moduletransforms/externalmoduleinfo.cpp

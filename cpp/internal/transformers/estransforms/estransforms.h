@@ -153,4 +153,19 @@ Node* expandPreOrPostfixIncrementOrDecrementExpression(
     Node* expression, Node* resultVariable);
 
 
+// === slice: async family ===
+
+// newAsyncTransformer — async.go:37
+Transformer* newAsyncTransformer(TransformOptions* opts);
+
+// isSimpleParameterList — async.go:951. Shared by async.cpp and forawait.cpp.
+bool isSimpleParameterList(const std::vector<Node*>& params);
+
+// newforawaitTransformer — forawait.go:58
+Transformer* newforawaitTransformer(TransformOptions* opts);
+
+// newUsingDeclarationTransformer — using.go:19
+Transformer* newUsingDeclarationTransformer(TransformOptions* opts);
+
+
 }  // namespace tsc::transformers::estransforms

@@ -63,18 +63,5 @@ Transformer* GetESTransformer(TransformOptions* opts) {
 	}
 }
 
-// === dep stubs — removed when owner slice lands ===
-
-Transformer* newUsingDeclarationTransformer(TransformOptions* opt) {
-	TSC_UNREACHABLE("newUsingDeclarationTransformer — owned by using slice");
-}
-
-Transformer* newforawaitTransformer(TransformOptions* opt) {
-	TSC_UNREACHABLE("newforawaitTransformer — owned by forawait slice");
-}
-
-Transformer* newAsyncTransformer(TransformOptions* opt) {
-	TSC_UNREACHABLE("newAsyncTransformer — owned by async slice");
-}
 
 }  // namespace tsc::transformers::estransforms
