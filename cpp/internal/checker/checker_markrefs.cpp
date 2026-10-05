@@ -981,7 +981,6 @@ Symbol* Checker::getJsxNamespaceContainerForImplicitImport(Node* location) {
 std::string Checker::getJsxNamespace(Node* location) { TSC_UNREACHABLE("getJsxNamespace — jsx slice"); }
 Node* Checker::getJsxFactoryEntity(Node* location) { TSC_UNREACHABLE("getJsxFactoryEntity — jsx slice"); }
 // owner: relater slice (relater.go)
-int Checker::getParameterCount(Signature* signature) { TSC_UNREACHABLE("getParameterCount — relater slice"); }
 // owner: signatures slice (checker.go:20143-20986)
 // owner: declchecks slice (checker.go:5081-5929 module-declaration checks)
 bool Checker::checkExternalImportOrExportDeclaration(Node* node) {

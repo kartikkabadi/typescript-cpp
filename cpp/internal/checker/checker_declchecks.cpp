@@ -1711,26 +1711,11 @@ void Checker::checkIndexedAccessIndexType(Type* t, Node* node) {
 }
 // markrefs slice landed in checker_markrefs.cpp — checkExternalEmitHelpers moved there.
 // owner: relater slice (relater.go)
-Type* Checker::createMarkerType(Symbol* symbol, Type* source, Type* target) {
-	TSC_UNREACHABLE("createMarkerType — relater slice");
-}
 // owner: checker.go:10502 slice (contextual-call machinery)
 Signature* Checker::getContextualCallSignature(Type* t, Node* node) {
 	TSC_UNREACHABLE("getContextualCallSignature — contextual slice");
 }
 // owner: relater.go (whole file)
-bool Checker::checkTypeAssignableToEx(Type* source, Type* target, Node* errorNode,
-                                      const DiagnosticMessage* headMessage,
-                                      std::vector<Diagnostic*>* diagnosticOutput) {
-	TSC_UNREACHABLE("checkTypeAssignableToEx — relater slice");
-}
-bool Checker::isSignatureAssignableTo(Signature* source, Signature* target,
-                                    bool ignoreReturnTypes) {
-	TSC_UNREACHABLE("isSignatureAssignableTo — relater slice");
-}
-TypePredicate* Checker::getTypePredicateOfSignature(Signature* sig) {
-	TSC_UNREACHABLE("getTypePredicateOfSignature — relater slice");
-}
 // owner: expressions slice (checker.go:8090-14185)
 void Checker::checkCollisionsForDeclarationName(Node* node, Node* name) {
 	TSC_UNREACHABLE("checkCollisionsForDeclarationName — expressions slice");
@@ -1756,9 +1741,6 @@ Diagnostic* Checker::addDeprecatedSuggestion(Node* location,
 // owner: checker.go ~7509-8090 (statement/expression checks outside this slice)
 void Checker::checkImportAttributes(Node* node) {
 	TSC_UNREACHABLE("checkImportAttributes — modulechecks slice");
-}
-ModifierFlags Checker::getTypeParameterModifiers(Type* typeParameter) {
-	TSC_UNREACHABLE("getTypeParameterModifiers — decltypes slice");
 }
 
 }  // namespace tsc::checker

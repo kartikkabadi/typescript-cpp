@@ -4,6 +4,7 @@
 #include "internal/evaluator/evaluator.h"
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -314,7 +315,9 @@ inline constexpr VarianceFlags VarianceFlagsAllowsStructuralFallback =
 	VarianceFlagsUnmeasurable | VarianceFlagsUnreliable;
 
 struct VarianceLinks {
-	std::vector<VarianceFlags> variances;
+	// nullopt = not yet computed; empty vector = "can't compute" sentinel (Go
+	// distinguishes nil from an empty slice in getVariancesWorker).
+	std::optional<std::vector<VarianceFlags>> variances;
 };
 
 struct MarkedAssignmentSymbolLinks {

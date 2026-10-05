@@ -2436,32 +2436,6 @@ size_t Checker::ReverseMappedTypeKeyHash::operator()(
 // ---------------------------------------------------------------------------
 // === dep stubs — removed when owner slice lands ===
 // ---------------------------------------------------------------------------
-
-std::vector<Type*> Checker::inferTypesFromTemplateLiteralType(
-	Type* source, TemplateLiteralType* target, TypeComparer compareTypes) {
-	TSC_UNREACHABLE("inferTypesFromTemplateLiteralType — relater slice");
-}
-
-std::vector<VarianceFlags> Checker::getVariances(Type* t) {
-	TSC_UNREACHABLE("getVariances — relater slice");
-}
-std::vector<VarianceFlags> Checker::getAliasVariances(Symbol* symbol) {
-	TSC_UNREACHABLE("getAliasVariances — relater slice");
-}
-bool Checker::isDeeplyNestedType(Type* t, const std::vector<Type*>& stack, int maxDepth) {
-	TSC_UNREACHABLE("isDeeplyNestedType — relater slice");
-}
-Symbol* Checker::getUnmatchedProperty(Type* source, Type* target,
-									bool requireOptionalProperties,
-									bool matchDiscriminantProperties) {
-	TSC_UNREACHABLE("getUnmatchedProperty — relater slice");
-}
-bool Checker::typePredicateKindsMatch(TypePredicate* a, TypePredicate* b) {
-	TSC_UNREACHABLE("typePredicateKindsMatch — relater slice");
-}
-bool Checker::isObjectTypeWithInferableIndex(Type* t) {
-	TSC_UNREACHABLE("isObjectTypeWithInferableIndex — relater slice");
-}
 bool Checker::isNonGenericObjectType(Type* t) {
 	TSC_UNREACHABLE("isNonGenericObjectType — checker.go:13743 slice");
 }

@@ -4146,11 +4146,6 @@ Type* Checker::checkExpression(Node* node) {
 	TSC_UNREACHABLE("checkExpression — ported with the expression-checking slice");
 }
 
-bool Checker::checkTypeAssignableTo(Type* source, Type* target, Node* errorNode,
-									const DiagnosticMessage* headMessage) {
-	TSC_UNREACHABLE("checkTypeAssignableTo — ported with relater.go");
-}
-
 // getFlowTypeOfReferenceEx defined in checker_flow.cpp (flow slice).
 // getOptionalType defined in checker_decltypes.cpp.
 
@@ -6171,6 +6166,11 @@ void Checker::init(Program* p) {
 		}
 		typeofType = getUnionType(typeofTypes);
 	}
+	subtypeRelation = new Relation();
+	strictSubtypeRelation = new Relation();
+	assignableRelation = new Relation();
+	comparableRelation = new Relation();
+	identityRelation = new Relation();
 	getGlobalESSymbolType = getGlobalTypeResolver("Symbol", 0, false);
 	getGlobalBigIntType = getGlobalTypeResolver("BigInt", 0, false);
 	getGlobalImportMetaType = getGlobalTypeResolver("ImportMeta", 0, true);
@@ -6350,12 +6350,6 @@ Type* Checker::getRestrictiveTypeParameter(Type* t) {
 
 // isStringIndexSignatureOnlyTypeWorker — ported in checker_typeops.cpp
 // (typeops slice, checker.go:27831).
-
-Ternary Checker::compareTypesAssignableWorker(Type* source, Type* target,
-                                              bool reportErrors) {
-	TSC_UNREACHABLE(
-		"compareTypesAssignableWorker — ported with relater.go:135 slice");
-}
 
 
 // ---------------------------------------------------------------------------
@@ -7706,30 +7700,6 @@ bool Checker::isGenericMappedType(Type* t) {
 	return false;
 }
 
-bool Checker::isMemberOfStringMapping(Type* source, Type* target) {
-	TSC_UNREACHABLE(
-	    "isMemberOfStringMapping — ported with the type-predicate slice");
-}
-
-bool Checker::isTypeAssignableTo(Type* source, Type* target) {
-	TSC_UNREACHABLE("isTypeAssignableTo — ported with relater.go");
-}
-
-bool Checker::isTypeIdenticalTo(Type* source, Type* target) {
-	TSC_UNREACHABLE("isTypeIdenticalTo — ported with relater.go");
-}
-
-bool Checker::isTypeMatchedByTemplateLiteralType(
-    Type* t, TemplateLiteralType* templateType,
-    TypeComparer compareTypesAssignable) {
-	TSC_UNREACHABLE(
-	    "isTypeMatchedByTemplateLiteralType — ported with the type-predicate slice");
-}
-
-bool Checker::isTypeStrictSubtypeOf(Type* source, Type* target) {
-	TSC_UNREACHABLE("isTypeStrictSubtypeOf — ported with relater.go");
-}
-
 // checker.go:14304 newSymbol
 Symbol* Checker::newSymbol(SymbolFlags flags, const std::string& name) {
 	SymbolCount++;
@@ -7886,15 +7856,6 @@ Type* Checker::instantiateType(Type* t, TypeMapper* mapper) {
 }
 std::vector<Type*> Checker::instantiateTypes(const std::vector<Type*>& types, TypeMapper* mapper) {
 	TSC_UNREACHABLE("instantiateTypes — ported with the <slice> slice");
-}
-bool Checker::isTypeDerivedFrom(Type* source, Type* target) {
-	TSC_UNREACHABLE("isTypeDerivedFrom — ported with the <slice> slice");
-}
-bool Checker::isTypeRelatedTo(Type* source, Type* target, Relation* relation) {
-	TSC_UNREACHABLE("isTypeRelatedTo — ported with the <slice> slice");
-}
-bool Checker::isTypeSubtypeOf(Type* source, Type* target) {
-	TSC_UNREACHABLE("isTypeSubtypeOf — ported with the <slice> slice");
 }
 
 // (deduped: inferFromIntraExpressionSites, getInferredType — inference slice,

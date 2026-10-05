@@ -3062,7 +3062,7 @@ bool Checker::hasDefaultValue(Node* node) { decltypesDepUnreachable("hasDefaultV
 
 // (deduped: isMatchingReference defined in checker_flow.cpp)
 bool Checker::isSpreadableProperty(Symbol* prop) { decltypesDepUnreachable("isSpreadableProperty — decltypes dep"); }
-Type* Checker::sliceTupleType(Type* t, int index, int endSkipCount) { decltypesDepUnreachable("sliceTupleType — decltypes dep"); }
+// (deduped: sliceTupleType defined in cpp/internal/checker/checker_relater.cpp)
 bool Checker::isValidSpreadType(Type* t) { decltypesDepUnreachable("isValidSpreadType — decltypes dep"); }
 // (deduped: removeMissingType defined in cpp/internal/checker/checker_contextual.cpp)
 

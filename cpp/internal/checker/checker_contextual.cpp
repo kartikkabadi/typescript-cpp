@@ -3685,10 +3685,6 @@ Type* Checker::getTypeOfNode(Node* /*node*/) {
 	TSC_UNREACHABLE("getTypeOfNode — services tail (checker.go:32419)");
 }
 
-Type* Checker::getThisTypeOfSignature(Signature* /*signature*/) {
-	TSC_UNREACHABLE("getThisTypeOfSignature — relater slice (relater.go:1947)");
-}
-
 // (deduped: getTypeFromBindingPattern defined in cpp/internal/checker/checker_decltypes.cpp)
 
 
@@ -3713,23 +3709,6 @@ Type* Checker::checkIteratedTypeOrElementType(IterationUse /*use*/,
 IterationTypes Checker::getIterationTypesOfGeneratorFunctionReturnType(
 	Type* /*t*/, bool /*isAsyncGenerator*/) {
 	TSC_UNREACHABLE("getIterationTypesOfGeneratorFunctionReturnType — iteration slice (checker.go:6394)");
-}
-
-std::string Checker::getKeyPropertyName(Type* /*t*/) {
-	TSC_UNREACHABLE("getKeyPropertyName — relater slice (relater.go:1111)");
-}
-
-Type* Checker::getConstituentTypeForKeyType(Type* /*t*/, Type* /*keyType*/) {
-	TSC_UNREACHABLE("getConstituentTypeForKeyType — relater slice (relater.go:1124)");
-}
-
-bool Checker::isDiscriminantProperty(Type* /*t*/, const std::string& /*name*/) {
-	TSC_UNREACHABLE("isDiscriminantProperty — relater slice (relater.go:1080)");
-}
-
-Type* Checker::discriminateTypeByDiscriminableItems(
-	Type* /*target*/, Discriminator& /*discriminator*/) {
-	TSC_UNREACHABLE("discriminateTypeByDiscriminableItems — relater slice (relater.go:1205)");
 }
 
 bool Checker::isConstTypeVariable(Type* /*t*/, int /*depth*/) {

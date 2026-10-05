@@ -1809,9 +1809,6 @@ bool Checker::isTypeEqualityComparableTo(Type* source, Type* target) {
 Node* Checker::getEffectiveCheckNode(Node* node) {
 	TSC_UNREACHABLE("getEffectiveCheckNode — expressions slice");
 }
-std::string Checker::getTypeNameForErrorDisplay(Type* t) {
-	TSC_UNREACHABLE("getTypeNameForErrorDisplay — expressions slice");
-}
 
 // owner: varchecks slice (checker.go:5929-6264)
 void Checker::checkVariableDeclarationList(Node* node) {
@@ -1824,16 +1821,6 @@ Type* Checker::checkRightHandSideOfForOf(Node* node) {
 }
 
 // owner: relater.go
-bool Checker::checkTypeAssignableToAndOptionallyElaborate(
-    Type* source, Type* target, Node* errorNode, Node* expr,
-    const DiagnosticMessage* headMessage, std::vector<Diagnostic*>* diagnosticOutput) {
-	TSC_UNREACHABLE(
-	    "checkTypeAssignableToAndOptionallyElaborate — relater slice");
-}
-bool Checker::checkTypeComparableTo(Type* source, Type* target, Node* errorNode,
-                                    const DiagnosticMessage* headMessage) {
-	TSC_UNREACHABLE("checkTypeComparableTo — relater slice");
-}
 
 // owner: members slice (checker.go:19186-20143 + 20987-22284)
 ConstructorAccessibilityError* Checker::getConstructorAccessibilityError(
