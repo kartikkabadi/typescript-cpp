@@ -462,6 +462,49 @@ static void emitFile(int argc, char** argv) {
 	dumpDiagnostics(diags);
 }
 
+// emitdumpFile — emitdump (Go) twin. Same pipeline as emitFile but captures
+// every WriteFile and appends `W <fileName>` + verbatim content sections.
+static void emitdumpFile(int argc, char** argv) {
+	compiler::CompilerHost host;
+	host.currentDirectory =
+	    tspath::normalizePath(std::filesystem::current_path().string());
+	host.bundledLibsRoot = findBundledLibsRoot();
+
+	std::vector<std::string> rootFileNames;
+	for (int i = 2; i < argc; i++) {
+		rootFileNames.push_back(argv[i]);
+	}
+
+	// `tsc <argv[2:]>` — no NoEmit; defaults like a bare file-args
+	// command line (execute/tsc.go).
+	CompilerOptions options;
+
+	compiler::SimpleProgram program(&host, options, rootFileNames);
+	program.BindSourceFiles();
+	auto diags = compiler::getDiagnosticsOfAnyProgram(&program, {}, false);
+
+	std::vector<std::pair<std::string, std::string>> written;
+	compiler::EmitOptions emitOptions;
+	emitOptions.WriteFile =
+	    [&](const std::string& fileName, const std::string& text,
+	        compiler::WriteFileData* /*data*/) -> std::optional<std::string> {
+		    written.emplace_back(fileName, text);
+		    return std::nullopt;
+	    };
+	compiler::EmitResult* emitResult = program.Emit(&emitOptions);
+	if (emitResult != nullptr) {
+		diags.insert(diags.end(), emitResult->Diagnostics.begin(),
+		             emitResult->Diagnostics.end());
+	}
+	dumpDiagnostics(diags);
+	std::sort(written.begin(), written.end(),
+	          [](auto& a, auto& b) { return a.first < b.first; });
+	for (auto& [name, text] : written) {
+		std::string out = "W " + name + "\n" + text;
+		std::fwrite(out.data(), 1, out.size(), stdout);
+	}
+}
+
 static void parseFile(const char* path, const std::string& src) {
 	SourceFileParseOptions opts;
 	opts.FileName = path;
@@ -581,13 +624,14 @@ int main(int argc, char** argv) {
 	if (argc < 3) {
 		std::fprintf(
 			stderr,
-			"usage: tscpp <lex|lex-json|bench|parse|bench-parse|parse-all|bind|check|emit> <file|dir> [iters|workers]\n");
+			"usage: tscpp <lex|lex-json|bench|parse|bench-parse|parse-all|bind|check|emit|emitdump> <file|dir> [iters|workers]\n");
 		return 2;
 	}
 	std::string mode = argv[1];
 	if (mode != "lex" && mode != "lex-json" && mode != "bench" &&
 	    mode != "parse" && mode != "bench-parse" && mode != "parse-all" &&
-	    mode != "bind" && mode != "check" && mode != "emit") {
+	    mode != "bind" && mode != "check" && mode != "emit" &&
+	    mode != "emitdump") {
 		std::fprintf(stderr, "tscpp: unknown mode %s\n", mode.c_str());
 		return 2;
 	}
@@ -612,6 +656,8 @@ int main(int argc, char** argv) {
 		checkFile(argc, argv);
 	} else if (mode == "emit") {
 		emitFile(argc, argv);
+	} else if (mode == "emitdump") {
+		emitdumpFile(argc, argv);
 	} else if (mode == "bench-parse") {
 		int iters = argc > 3 ? std::atoi(argv[3]) : 5;
 		benchParse(argv[2], src, iters);
