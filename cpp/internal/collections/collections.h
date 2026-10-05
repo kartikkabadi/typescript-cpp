@@ -224,4 +224,50 @@ public:
 	}
 };
 
+// === slice: moduletransforms ===
+
+// MultiMap — mirrors tsc/internal/collections/multimap.go: a map from a key
+// to a slice of values. `Get` on a missing key returns an empty vector (Go
+// nil slice); presence is tested with `Has` (a key is never stored with an
+// empty slice — `Remove`/`RemoveAll` erase it).
+template <typename K, typename V>
+struct MultiMap {
+	std::unordered_map<K, std::vector<V>> M;
+
+	bool Has(const K& key) const { return M.find(key) != M.end(); }
+
+	std::vector<V> Get(const K& key) const {
+		auto it = M.find(key);
+		if (it == M.end()) {
+			return {};
+		}
+		return it->second;
+	}
+
+	void Add(const K& key, const V& value) { M[key].push_back(value); }
+
+	void Remove(const K& key, const V& value) {
+		auto it = M.find(key);
+		if (it == M.end()) {
+			return;
+		}
+		auto& values = it->second;
+		auto i = std::find(values.begin(), values.end(), value);
+		if (i != values.end()) {
+			if (values.size() == 1) {
+				M.erase(it);
+			} else {
+				values.erase(i);
+			}
+		}
+	}
+
+	void RemoveAll(const K& key) { M.erase(key); }
+
+	size_t Len() const { return M.size(); }
+
+	void Clear() { M.clear(); }
+};
+// === end slice: moduletransforms ===
+
 }  // namespace tsc::collections

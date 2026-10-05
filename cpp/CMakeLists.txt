@@ -88,6 +88,10 @@ add_library(tsc STATIC
 	internal/transformers/estransforms/utilities.cpp
 	internal/transformers/tstransforms/utilities.cpp
 	internal/transformers/moduletransforms/utilities.cpp
+	internal/transformers/moduletransforms/externalmoduleinfo.cpp
+	internal/transformers/moduletransforms/esmodule.cpp
+	internal/transformers/moduletransforms/impliedmodule.cpp
+	internal/transformers/moduletransforms/commonjsmodule.cpp
 	internal/transformers/inliners/constenum.cpp
 	# === slice: module ===
 	internal/core/compileroptions.cpp
