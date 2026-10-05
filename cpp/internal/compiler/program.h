@@ -105,7 +105,7 @@ public:
 	// === slice: incremental ===
 	// host.go ContentMapperProject — no content mappers in this port;
 	// always nullptr.
-	tsoptions::contentmapper::Project* ContentMapperProject() const { return nullptr; }
+	contentmapper::Project* ContentMapperProject() const { return nullptr; }
 	// === end slice: incremental ===
 };
 
@@ -674,7 +674,7 @@ public:
 	        tspath::Path,
 	        const std::shared_ptr<packagejson::InfoCacheEntry>&)>& f);
 	// host.go:115 — no content mappers in this port; always nullptr.
-	tsoptions::contentmapper::Project* ContentMapperProject() { return nullptr; }
+	contentmapper::Project* ContentMapperProject() { return nullptr; }
 	// program.go SingleThreaded — options.SingleThreaded == TS true.
 	bool SingleThreaded() { return options.SingleThreaded == Tristate::True; }
 	// program.go:804 GetSemanticDiagnosticsForIncremental — per-file

@@ -418,7 +418,7 @@ struct BuildInfoRootInfoReader {
 
 // buildInfo.go:741 ContentMapperIdentities.
 std::pair<std::vector<std::string>, std::optional<std::string>>
-ContentMapperIdentities(tsoptions::contentmapper::Project* project);
+ContentMapperIdentities(contentmapper::Project* project);
 
 // buildInfo.go:747 IsBuildInfoFileNameDefaultLibrary.
 inline bool IsBuildInfoFileNameDefaultLibrary(

@@ -1555,11 +1555,15 @@ bool BuildInfo::IsValidVersion() const { return Version == version(); }
 
 // buildInfo.go:603 — free fn.
 std::pair<std::vector<std::string>, std::optional<std::string>>
-ContentMapperIdentities(tsoptions::contentmapper::Project* project) {
+ContentMapperIdentities(contentmapper::Project* project) {
 	if (project == nullptr) {
 		return {{}, std::nullopt};
 	}
-	return project->Identities();
+	auto [ids, err] = project->Identities();
+	if (err != nullptr) {
+		return {ids, err->Error()};
+	}
+	return {ids, std::nullopt};
 }
 
 // buildInfo.go:611 ContentMapperIdentitiesMatch — slices.Equal.
