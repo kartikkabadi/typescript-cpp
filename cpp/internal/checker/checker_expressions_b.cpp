@@ -2886,9 +2886,7 @@ Type* Checker::tryGetThisTypeAtEx(Node* node, bool includeGlobalThis,
 
 // (deduped: resolveAliasWithDeprecationCheck defined in owning slice file)
 
-std::string Checker::SymbolToString(Symbol* s) {
-	TSC_UNREACHABLE("SymbolToString — printer slice");
-}
+// (deduped: SymbolToString defined in cpp/internal/checker/checker_printer.cpp)
 
 // checker.go:11644 getFlowTypeOfProperty
 Type* Checker::getFlowTypeOfProperty(Node* reference, Symbol* prop) {

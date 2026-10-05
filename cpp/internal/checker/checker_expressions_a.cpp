@@ -3509,10 +3509,7 @@ Type* Checker::getNonArrayRestType(Signature* signature) {
 // (deduped: getTypeWithSyntheticDefaultImportType defined in owning slice file)
 // (deduped: addDeprecatedSuggestionWorker defined in owning slice file)
 
-// owner: printer slice (printer.go:179)
-std::string Checker::signatureToString(Signature* signature) {
-	TSC_UNREACHABLE("signatureToString — printer slice dep");
-}
+// (deduped: signatureToString defined in cpp/internal/checker/checker_printer.cpp)
 
 // owner: jsx slice (jsx.go:198,545,591)
 // (deduped: resolveJsxOpeningLikeElement defined in checker_jsx.cpp)
