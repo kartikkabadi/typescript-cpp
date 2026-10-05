@@ -184,13 +184,13 @@ bool maybeTypeOfKind(Type* t, TypeFlags flags) {
 
 bool containsType(const std::vector<Type*>& types, Type* t) {
 	return std::binary_search(types.begin(), types.end(), t,
-		[](Type* a, Type* b) { return compareTypeIds(a, b) < 0; });
+		[](Type* a, Type* b) { return CompareTypes(a, b) < 0; });
 }
 
 static bool insertType(std::vector<Type*>& types, Type* t) {
 	auto it = std::lower_bound(types.begin(), types.end(), t,
-		[](Type* a, Type* b) { return compareTypeIds(a, b) < 0; });
-	if (it == types.end() || *it != t) {
+		[](Type* a, Type* b) { return CompareTypes(a, b) < 0; });
+	if (it == types.end() || CompareTypes(*it, t) != 0) {
 		types.insert(it, t);
 		return true;
 	}
@@ -1050,7 +1050,7 @@ std::pair<std::vector<Type*>, TypeFlags> Checker::addTypesToUnion(
 	if (types.size() >= 2) {
 		// Sort and deduplicate types
 		std::stable_sort(types.begin(), types.end(),
-			[](Type* a, Type* b) { return compareTypeIds(a, b) < 0; });
+			[](Type* a, Type* b) { return CompareTypes(a, b) < 0; });
 		size_t unique = 1;
 		for (size_t i = 1; i < types.size(); i++) {
 			if (types[i] != types[unique - 1]) {
