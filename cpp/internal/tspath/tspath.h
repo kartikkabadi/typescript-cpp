@@ -6,6 +6,8 @@
 #include <string_view>
 #include <vector>
 
+#include "internal/stringutil/stringutil.h"
+
 namespace tsc::tspath {
 
 inline std::string_view getBaseFileName(std::string_view path) {
@@ -256,15 +258,10 @@ inline std::string_view removeExtension(std::string_view path,
 	return path.substr(0, path.size() - extension.size());
 }
 
+// equateStringCaseInsensitive — stringutil.EquateStringCaseInsensitive
+// (strings.EqualFold, full Unicode case folding).
 inline bool equateStringCaseInsensitive(std::string_view a, std::string_view b) {
-	if (a.size() != b.size()) return false;
-	for (size_t i = 0; i < a.size(); i++) {
-		auto lower = [](char c) -> char {
-			return (c >= 'A' && c <= 'Z') ? c + 32 : c;
-		};
-		if (lower(a[i]) != lower(b[i])) return false;
-	}
-	return true;
+	return stringutil::EquateStringCaseInsensitive(a, b);
 }
 
 inline std::function<bool(std::string_view, std::string_view)>
@@ -387,18 +384,21 @@ inline std::vector<std::string_view> pathComponents(std::string_view path,
 	return rest;
 }
 
-inline std::vector<std::string_view> getPathComponents(
+// getPathComponents — Go returns substrings of the combined path; copy
+// them since `combined` is a local temporary.
+inline std::vector<std::string> getPathComponents(
     std::string_view path, std::string_view currentDirectory) {
 	auto combined = combinePaths(currentDirectory, {path});
-	return pathComponents(combined, getRootLength(combined));
+	auto views = pathComponents(combined, getRootLength(combined));
+	return {views.begin(), views.end()};
 }
 
-inline std::vector<std::string_view> reducePathComponents(
-    const std::vector<std::string_view>& components) {
+inline std::vector<std::string> reducePathComponents(
+    const std::vector<std::string>& components) {
 	if (components.empty()) return {};
-	std::vector<std::string_view> reduced{components[0]};
+	std::vector<std::string> reduced{components[0]};
 	for (size_t i = 1; i < components.size(); i++) {
-		auto component = components[i];
+		auto& component = components[i];
 		if (component.empty() || component == ".") continue;
 		if (component == "..") {
 			if (reduced.size() > 1) {
@@ -798,6 +798,328 @@ inline std::string getRelativePathFromFile(std::string_view from,
                                            const ComparePathsOptions& options) {
 	return ensurePathIsNonModuleName(getRelativePathFromDirectory(
 	    getDirectoryPath(from), to, options));
+}
+
+// === slice: module — additional helpers the resolver needs ===
+
+// extension.go — additional extension tables.
+inline const std::vector<std::string_view> supportedDeclarationExtensions = {
+	extensionDts, extensionDcts, extensionDmts};
+inline const std::vector<std::string_view> supportedTSImplementationExtensions = {
+	extensionTs, extensionTsx, extensionMts, extensionCts};
+inline const std::vector<std::string_view> supportedJSExtensionsFlat = {
+	extensionJs, extensionJsx, extensionMjs, extensionCjs};
+inline const std::vector<std::string_view> supportedTSExtensionsWithJsonFlat = {
+	extensionTs, extensionTsx, extensionDts, extensionCts, extensionDcts,
+	extensionMts, extensionDmts, extensionJson};
+inline const std::vector<std::string_view>
+    extensionsNotSupportingExtensionlessResolution = {
+	extensionMts, extensionDmts, extensionMjs, extensionCts,
+	extensionDcts, extensionCjs};
+
+// RemoveFileExtension — removes any known extension even with multiple dots.
+inline std::string_view removeFileExtension(std::string_view path) {
+	for (auto ext : extensionsToRemove) {
+		if (path.size() >= ext.size() && endsWith(path, ext)) {
+			return path.substr(0, path.size() - ext.size());
+		}
+	}
+	return path;
+}
+
+// RemoveAnyFileExtension — removeFileExtension then any other extension.
+inline std::string_view removeAnyFileExtension(std::string_view path) {
+	if (auto withoutExtension = removeFileExtension(path);
+	    withoutExtension != path) {
+		return withoutExtension;
+	}
+	if (auto extension = getAnyExtensionFromPath(path, nullptr, false);
+	    !extension.empty()) {
+		return removeExtension(path, extension);
+	}
+	return path;
+}
+
+inline bool hasImplementationTSFileExtension(std::string_view path) {
+	return fileExtensionIsOneOf(path, supportedTSImplementationExtensions) &&
+	       !isDeclarationFileName(path);
+}
+
+inline bool hasJSFileExtension(std::string_view path) {
+	return fileExtensionIsOneOf(path, supportedJSExtensionsFlat);
+}
+
+inline bool hasJSONFileExtension(std::string_view path) {
+	return fileExtensionIs(path, extensionJson);
+}
+
+inline bool extensionIsOneOf(std::string_view ext,
+                             const std::vector<std::string_view>& extensions) {
+	for (auto e : extensions) {
+		if (e == ext) return true;
+	}
+	return false;
+}
+
+// ChangeAnyExtension — change extension to `ext` if path has one of
+// `extensions`.
+inline std::string changeAnyExtension(
+    std::string_view path, std::string_view ext,
+    const std::vector<std::string_view>& extensions, bool ignoreCase) {
+	auto pathext = getAnyExtensionFromPath(path, &extensions, ignoreCase);
+	if (!pathext.empty()) {
+		std::string result{path.substr(0, path.size() - pathext.size())};
+		if (ext.empty()) return result;
+		if (ext[0] != '.') result += '.';
+		result += ext;
+		return result;
+	}
+	return std::string{path};
+}
+
+inline std::string changeExtension(std::string_view path,
+                                   std::string_view newExtension) {
+	return changeAnyExtension(path, newExtension, extensionsToRemove, false);
+}
+
+// ChangeFullExtension — like changeAnyExtension, but declaration file
+// extensions are recognized and replaced starting from the `.d`.
+inline std::string changeFullExtension(std::string_view path,
+                                       std::string_view newExtension) {
+	auto declarationExtension = getDeclarationFileExtension(path);
+	if (!declarationExtension.empty()) {
+		std::string ext{newExtension};
+		if (ext.empty() || ext[0] != '.') ext = "." + ext;
+		return std::string{path.substr(
+			       0, path.size() - declarationExtension.size())} +
+		       ext;
+	}
+	return changeExtension(path, newExtension);
+}
+
+// GetPossibleOriginalInputExtensionForExtension — declaration/JS extensions
+// to the TS input extensions that may have produced them.
+inline std::vector<std::string_view>
+getPossibleOriginalInputExtensionForExtension(std::string_view path) {
+	if (fileExtensionIsOneOf(
+		path, {extensionDmts, extensionMjs, extensionMts})) {
+		return {extensionMts, extensionMjs};
+	}
+	if (fileExtensionIsOneOf(
+		path, {extensionDcts, extensionCjs, extensionCts})) {
+		return {extensionCts, extensionCjs};
+	}
+	// Handle any custom .d.x.ts extension (e.g., .d.json.ts -> .json,
+	// .d.css.ts -> .css)
+	if (auto ext = getDeclarationFileExtension(path);
+	    !ext.empty() && ext != extensionDts) {
+		auto inner = ext.substr(3, ext.size() - 3 - 3);  // ".d." .. ".ts"
+		return {std::string{"." + std::string{inner}}};
+	}
+	return {extensionTsx, extensionTs, extensionJsx, extensionJs};
+}
+
+// GetLongestExtensionFromPath — longest matching extension from `extensions`.
+inline std::string_view getLongestExtensionFromPath(
+    std::string_view path, const std::vector<std::string_view>& extensions,
+    bool ignoreCase) {
+	path = removeTrailingDirectorySeparator(path);
+	auto comparer = getStringEqualityComparer(ignoreCase);
+	std::string_view longest;
+	for (auto extension : extensions) {
+		if (extension.size() > longest.size()) {
+			if (auto matched = tryGetExtensionFromPathWorker(path, extension,
+			                                                   comparer);
+			    !matched.empty()) {
+				longest = matched;
+			}
+		}
+	}
+	return longest;
+}
+
+// path.go — GetNormalizedPathComponents: path components relative to
+// currentDirectory, with the root component at index 0.
+inline std::vector<std::string> getNormalizedPathComponentsFromCombined(
+    std::string_view path);  // fwd
+
+inline std::vector<std::string> getNormalizedPathComponents(
+    std::string_view path, std::string_view currentDirectory) {
+	auto combined = combinePaths(currentDirectory, {path});
+	return getNormalizedPathComponentsFromCombined(combined);
+}
+
+inline std::vector<std::string> getNormalizedPathComponentsFromCombined(
+    std::string_view path) {
+	auto rootLength = getRootLength(path);
+	// Always include the root component (empty string for relative paths).
+	std::vector<std::string> components;
+	components.emplace_back(path.substr(0, rootLength));
+
+	for (size_t i = rootLength; i < path.size();) {
+		// Skip directory separators (handles consecutive separators and
+		// trailing '/').
+		while (i < path.size() && path[i] == '/') i++;
+		if (i >= path.size()) break;
+
+		size_t start = i;
+		while (i < path.size() && path[i] != '/') i++;
+		auto component = path.substr(start, i - start);
+
+		if (component.empty() || component == ".") continue;
+		if (component == "..") {
+			if (components.size() > 1) {
+				if (components.back() != "..") {
+					components.pop_back();
+					continue;
+				}
+			} else if (!components[0].empty()) {
+				// If this is an absolute path, we can't go above the root.
+				continue;
+			}
+		}
+
+		components.emplace_back(component);
+	}
+
+	return components;
+}
+
+// ResolvePath — combines and resolves paths; `.` and `..` are resolved;
+// trailing directory separators preserved.
+inline std::string resolvePath(std::string_view path,
+                               const std::vector<std::string_view>& paths) {
+	std::string combinedPath;
+	if (!paths.empty()) {
+		combinedPath = combinePaths(path, paths);
+	} else {
+		combinedPath = normalizeSlashes(path);
+	}
+	return normalizePath(combinedPath);
+}
+
+// GetCanonicalFileName — canonicalizes a file name per
+// useCaseSensitiveFileNames.
+inline std::string getCanonicalFileName(std::string_view fileName,
+                                        bool useCaseSensitiveFileNames) {
+	if (useCaseSensitiveFileNames) {
+		return std::string{fileName};
+	}
+	return toFileNameLowerCase(fileName);
+}
+
+// comparePaths — path.go ComparePaths.
+inline int comparePaths(std::string_view a, std::string_view b,
+                        const ComparePathsOptions& options) {
+	auto as = combinePaths(options.currentDirectory, {a});
+	auto bs = combinePaths(options.currentDirectory, {b});
+	a = as;
+	b = bs;
+
+	if (a == b) return 0;
+	if (a.empty()) return -1;
+	if (b.empty()) return 1;
+
+	// Shortcut if the root segments differ: no need for path reduction.
+	auto aRoot = a.substr(0, getRootLength(a));
+	auto bRoot = b.substr(0, getRootLength(b));
+	auto result = stringutil::CompareStringsCaseInsensitive(aRoot, bRoot);
+	if (result != 0) return result;
+
+	// Shortcut if there are no relative path segments in the non-root
+	// portion.
+	auto aRest = a.substr(aRoot.size());
+	auto bRest = b.substr(bRoot.size());
+	auto comparer = stringutil::GetStringComparer(
+	    !options.useCaseSensitiveFileNames);
+	if (!hasRelativePathSegment(aRest) && !hasRelativePathSegment(bRest)) {
+		return comparer(aRest, bRest);
+	}
+
+	// The path contains a relative path segment. Normalize the paths and
+	// perform a slower component-by-component comparison.
+	auto aComponents = reducePathComponents(getPathComponents(a, ""));
+	auto bComponents = reducePathComponents(getPathComponents(b, ""));
+	size_t sharedLength = std::min(aComponents.size(), bComponents.size());
+	for (size_t i = 1; i < sharedLength; i++) {
+		result = comparer(aComponents[i], bComponents[i]);
+		if (result != 0) return result;
+	}
+	return aComponents.size() < bComponents.size()   ? -1
+	       : aComponents.size() > bComponents.size() ? 1
+	                                                : 0;
+}
+
+// containsPath — whether child is contained within (or equal to) parent.
+inline bool containsPath(std::string_view parent, std::string_view child,
+                         const ComparePathsOptions& options) {
+	auto ps = combinePaths(options.currentDirectory, {parent});
+	auto cs = combinePaths(options.currentDirectory, {child});
+	parent = ps;
+	child = cs;
+	if (parent.empty() || child.empty()) return false;
+	if (parent == child) return true;
+	auto parentComponents =
+	    reducePathComponents(getPathComponents(parent, ""));
+	auto childComponents =
+	    reducePathComponents(getPathComponents(child, ""));
+	(void)ps;
+	(void)cs;
+	if (childComponents.size() < parentComponents.size()) return false;
+
+	auto componentComparer = options.equalityComparer();
+	for (size_t i = 0; i < parentComponents.size(); i++) {
+		bool equal;
+		if (i == 0) {
+			equal = equateStringCaseInsensitive(parentComponents[i],
+			                                    childComponents[i]);
+		} else {
+			equal = componentComparer(parentComponents[i],
+			                          childComponents[i]);
+		}
+		if (!equal) return false;
+	}
+
+	return true;
+}
+
+// ForEachAncestorDirectory — calls `callback` on `directory` and each
+// ancestor; returns the first (result, true) outcome.
+template <typename T>
+inline std::pair<T, bool> forEachAncestorDirectory(
+    std::string_view directory,
+    const std::function<std::pair<T, bool>(std::string_view)>& callback) {
+	std::string dir{directory};
+	while (true) {
+		auto [result, stop] = callback(dir);
+		if (stop) {
+			return {std::move(result), true};
+		}
+
+		auto parentPath = getDirectoryPath(dir);
+		if (parentPath == dir) {
+			return {T{}, false};
+		}
+
+		dir = std::string{parentPath};
+	}
+}
+
+// ForEachAncestorDirectoryStoppingAtGlobalCache — stops at the global cache
+// location.
+template <typename T>
+inline T forEachAncestorDirectoryStoppingAtGlobalCache(
+    std::string_view globalCacheLocation, std::string_view directory,
+    const std::function<std::pair<T, bool>(std::string_view)>& callback) {
+	auto [result, _] = forEachAncestorDirectory<T>(
+	    directory, [&](std::string_view ancestorDirectory) {
+		    auto [result, stop] = callback(ancestorDirectory);
+		    if (stop || ancestorDirectory == globalCacheLocation) {
+			    return std::pair{std::move(result), true};
+		    }
+		    return std::pair{std::move(result), false};
+	    });
+	return std::move(result);
 }
 
 }  // namespace tsc::tspath

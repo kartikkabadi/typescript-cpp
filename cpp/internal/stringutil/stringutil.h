@@ -3,6 +3,8 @@
 #pragma once
 
 #include <cstdint>
+#include <cstring>
+#include <functional>
 #include <string>
 #include <string_view>
 
@@ -448,6 +450,174 @@ inline std::string ToUpperJS(std::string_view str) {
 		i += size;
 	}
 	return builder;
+}
+
+// ==== compare.go — case-insensitive comparison helpers ====
+
+// toLowerRune — Go's unicode.ToLower: the simple (1:1) lowercase mapping of a
+// rune. Multi-code-point special-casing mappings are left unchanged, matching
+// Go's simple case mapping semantics.
+inline char32_t toLowerRune(char32_t r) {
+	if (auto it = specialCasingMappings.find(r); it != specialCasingMappings.end()) {
+		const char* lower = it->second.lower;
+		if (lower != nullptr) {
+			int w = 0;
+			char32_t lr = decodeUtf8Rune(std::string_view(lower), &w);
+			if (static_cast<size_t>(w) == std::char_traits<char>::length(lower)) {
+				return lr;
+			}
+		}
+	}
+	return r;
+}
+
+// toUpperRune — Go's unicode.ToUpper: simple uppercase mapping.
+inline char32_t toUpperRune(char32_t r) {
+	if (auto it = specialCasingMappings.find(r); it != specialCasingMappings.end()) {
+		const char* upper = it->second.upper;
+		if (upper != nullptr) {
+			int w = 0;
+			char32_t ur = decodeUtf8Rune(std::string_view(upper), &w);
+			if (static_cast<size_t>(w) == std::char_traits<char>::length(upper)) {
+				return ur;
+			}
+		}
+	}
+	return r;
+}
+
+// simpleFold — Go's unicode.SimpleFold: the next rune in the case-folding
+// orbit of r. Implemented via the alternating upper/lower orbit, which is
+// equivalent for all orbits whose members are simple (1:1) mappings.
+inline char32_t simpleFold(char32_t r) {
+	// Orbit through alternating upper/lower mappings: for fold orbits of
+	// size >= 3 ({Σ, σ, ς}, {K, k, KELVIN}, {ſ, S, s}, ...) starting at any
+	// member reaches every member. For size 2 it ping-pongs. Return the
+	// smallest rune in the orbit as the canonical fold key — comparing fold
+	// keys is equivalent to comparing orbits.
+	char32_t best = r;
+	char32_t cur = r;
+	for (int i = 0; i < 8; i++) {
+		cur = (i % 2 == 0) ? toUpperRune(cur) : toLowerRune(cur);
+		if (cur < best) best = cur;
+		if (cur == r && i > 0) break;
+	}
+	return best;
+}
+
+// EquateStringCaseInsensitive — Go's strings.EqualFold.
+inline bool EquateStringCaseInsensitive(std::string_view a, std::string_view b) {
+	if (a == b) return true;
+	while (true) {
+		int sa = 0, sb = 0;
+		char32_t ca = decodeUtf8Rune(a, &sa);
+		char32_t cb = decodeUtf8Rune(b, &sb);
+		if (sa == 0 && sb == 0) return true;
+		if (sa == 0) return false;
+		if (sb == 0) return false;
+		a = a.substr(sa);
+		b = b.substr(sb);
+		if (ca != cb && simpleFold(ca) != simpleFold(cb)) return false;
+	}
+}
+
+inline bool EquateStringCaseSensitive(std::string_view a, std::string_view b) {
+	return a == b;
+}
+
+inline std::function<bool(std::string_view, std::string_view)>
+GetStringEqualityComparer(bool ignoreCase) {
+	if (ignoreCase) {
+		return [](std::string_view a, std::string_view b) {
+			return EquateStringCaseInsensitive(a, b);
+		};
+	}
+	return [](std::string_view a, std::string_view b) {
+		return EquateStringCaseSensitive(a, b);
+	};
+}
+
+using Comparison = int;
+inline constexpr Comparison ComparisonLessThan = -1;
+inline constexpr Comparison ComparisonEqual = 0;
+inline constexpr Comparison ComparisonGreaterThan = 1;
+
+// CompareStringsCaseInsensitive — Go's per-rune unicode.ToLower comparison.
+inline Comparison CompareStringsCaseInsensitive(std::string_view a,
+                                                std::string_view b) {
+	if (a == b) return ComparisonEqual;
+	while (true) {
+		int sa = 0, sb = 0;
+		char32_t ca = decodeUtf8Rune(a, &sa);
+		char32_t cb = decodeUtf8Rune(b, &sb);
+		if (sa == 0) {
+			if (sb == 0) return ComparisonEqual;
+			return ComparisonLessThan;
+		}
+		if (sb == 0) return ComparisonGreaterThan;
+		char32_t lca = toLowerRune(ca);
+		char32_t lcb = toLowerRune(cb);
+		if (lca != lcb) {
+			if (lca < lcb) return ComparisonLessThan;
+			return ComparisonGreaterThan;
+		}
+		a = a.substr(sa);
+		b = b.substr(sb);
+	}
+}
+
+inline Comparison CompareStringsCaseSensitive(std::string_view a,
+                                              std::string_view b) {
+	if (a < b) return ComparisonLessThan;
+	if (a > b) return ComparisonGreaterThan;
+	return ComparisonEqual;
+}
+
+inline std::function<Comparison(std::string_view, std::string_view)>
+GetStringComparer(bool ignoreCase) {
+	if (ignoreCase) {
+		return [](std::string_view a, std::string_view b) {
+			return CompareStringsCaseInsensitive(a, b);
+		};
+	}
+	return [](std::string_view a, std::string_view b) {
+		return CompareStringsCaseSensitive(a, b);
+	};
+}
+
+inline bool HasPrefix(std::string_view s, std::string_view prefix,
+                      bool caseSensitive) {
+	if (caseSensitive) {
+		return s.starts_with(prefix);
+	}
+	if (prefix.size() > s.size()) return false;
+	return EquateStringCaseInsensitive(s.substr(0, prefix.size()), prefix);
+}
+
+inline bool HasSuffix(std::string_view s, std::string_view suffix,
+                      bool caseSensitive) {
+	if (caseSensitive) {
+		return s.ends_with(suffix);
+	}
+	if (suffix.size() > s.size()) return false;
+	return EquateStringCaseInsensitive(s.substr(s.size() - suffix.size()),
+	                                   suffix);
+}
+
+inline bool HasPrefixAndSuffixWithoutOverlap(std::string_view s,
+                                             std::string_view prefix,
+                                             std::string_view suffix,
+                                             bool caseSensitive) {
+	if (prefix.size() + suffix.size() > s.size()) return false;
+	return HasPrefix(s, prefix, caseSensitive) &&
+	       HasSuffix(s, suffix, caseSensitive);
+}
+
+inline Comparison CompareStringsCaseInsensitiveThenSensitive(
+    std::string_view a, std::string_view b) {
+	int cmp = CompareStringsCaseInsensitive(a, b);
+	if (cmp != ComparisonEqual) return cmp;
+	return CompareStringsCaseSensitive(a, b);
 }
 
 }  // namespace tsc::stringutil
