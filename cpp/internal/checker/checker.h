@@ -752,12 +752,13 @@ enum class RelationKind : int32_t {
 
 enum class RelationComparisonResult : int32_t {
 	None = 0,
-	Failed = 1,
-	Reported = 2,
-	ReportsUnmeasurable = 4,
-	ReportsUnreliable = 8,
-	ReportsMask = Reported | ReportsUnmeasurable | ReportsUnreliable,
-	Succeeded = 16, // Marker to distinguish success from failure (mask with this before checking)
+	Succeeded = 1 << 0, // Marker to distinguish success from failure (mask with this before checking)
+	Failed = 1 << 1,
+	ReportsUnmeasurable = 1 << 3,
+	ReportsUnreliable = 1 << 4,
+	ComplexityOverflow = 1 << 5,
+	ReportsMask = ReportsUnmeasurable | ReportsUnreliable,
+	Overflow = ComplexityOverflow, // Shortcut for checking if a comparison failed due to exceeding the maximum work limit
 };
 
 inline constexpr RelationComparisonResult operator|(RelationComparisonResult a,
@@ -776,10 +777,52 @@ inline constexpr RelationComparisonResult operator&=(RelationComparisonResult& a
 													 RelationComparisonResult b) {
 	return a = a & b;
 }
+inline constexpr RelationComparisonResult operator~(RelationComparisonResult a) {
+	return static_cast<RelationComparisonResult>(~static_cast<int32_t>(a));
+}
 
-// Relation
+// SignatureCheckMode — relater.go:16
 
-struct Relation;
+using SignatureCheckMode = uint32_t;
+inline constexpr SignatureCheckMode SignatureCheckModeNone = 0;
+inline constexpr SignatureCheckMode SignatureCheckModeBivariantCallback = 1 << 0;
+inline constexpr SignatureCheckMode SignatureCheckModeStrictCallback = 1 << 1;
+inline constexpr SignatureCheckMode SignatureCheckModeIgnoreReturnTypes = 1 << 2;
+inline constexpr SignatureCheckMode SignatureCheckModeStrictArity = 1 << 3;
+inline constexpr SignatureCheckMode SignatureCheckModeStrictTopSignature = 1 << 4;
+inline constexpr SignatureCheckMode SignatureCheckModeCallback =
+	SignatureCheckModeBivariantCallback | SignatureCheckModeStrictCallback;
+
+// MinArgumentCountFlags — relater.go:29
+
+using MinArgumentCountFlags = uint32_t;
+inline constexpr MinArgumentCountFlags MinArgumentCountFlagsNone = 0;
+inline constexpr MinArgumentCountFlags MinArgumentCountFlagsStrongArityForUntypedJS = 1 << 0;
+inline constexpr MinArgumentCountFlags MinArgumentCountFlagsVoidIsNonOptional = 1 << 1;
+
+// ErrorReporter — relater.go:85. Callback that receives a diagnostic message
+// plus its already-stringified arguments.
+using ErrorReporter =
+	std::function<void(const DiagnosticMessage*, const std::vector<std::string>&)>;
+
+// Relation — relater.go:98. Cache of relation results keyed by the relation
+// key (content-keyed — see keyBuilder).
+
+struct Relation {
+	CacheMap<RelationComparisonResult> results;
+
+	RelationComparisonResult get(const CacheKey& key) const {
+		auto it = results.find(key);
+		if (it != results.end()) {
+			return it->second;
+		}
+		return RelationComparisonResult::None;
+	}
+	void set(const CacheKey& key, RelationComparisonResult result) {
+		results[key] = result;
+	}
+	int size() const { return static_cast<int>(results.size()); }
+};
 
 // Evaluator — full port in internal/evaluator/evaluator.h.
 
@@ -908,6 +951,11 @@ public:
 															 Node* usageLocation) = 0;
 	virtual ModuleKind GetImpliedNodeFormatForEmit(SourceFile* sourceFile) = 0;
 	virtual bool SourceFileMayBeEmitted(SourceFile* sourceFile, bool forceDtsEmit) = 0;
+	// program.go IsSourceFileDefaultLibrary (relater.go uses it to suppress
+	// elaboration diagnostics on library files).
+	virtual bool IsSourceFileDefaultLibrary(const std::string& /*path*/) {
+		return false;
+	}
 	virtual std::string CommonSourceDirectory() = 0;
 	// Module resolution (checker.go resolveExternalModule). A program without
 	// a module resolver returns nullopt / ResolutionModeNone.
@@ -2933,6 +2981,119 @@ public:
 		Symbol* lexicallyScopedIdentifier);
 	// (jsx-owned decls moved to the === slice: jsx === block below)
 	// owner: relater slice (relater.go)
+	// === slice: relater === (checker_relater.cpp — tsc/internal/checker/relater.go:
+	// relation machinery, isRelatedTo driver, structured/union/intersection
+	// relation, signature/predicate/mapped-type relation, variances, marker types)
+	// Declared elsewhere: isTypeIdenticalTo, isTypeSubtypeOf,
+	// isTypeStrictSubtypeOf, isTypeAssignableTo, isTypeDerivedFrom,
+	// isTypeRelatedTo, areTypesComparable, compareTypesIdentical,
+	// compareTypesAssignableWorker, checkTypeAssignableTo, checkTypeAssignableToEx,
+	// checkTypeComparableTo, getVariances, getAliasVariances, isDeeplyNestedType,
+	// getUnmatchedProperty, typePredicateKindsMatch, isObjectTypeWithInferableIndex,
+	// getThisTypeOfSignature, getKeyPropertyName, getConstituentTypeForKeyType,
+	// isDiscriminantProperty, discriminateTypeByDiscriminableItems,
+	// createMarkerType, isSignatureAssignableTo, getTypePredicateOfSignature,
+	// isTypeSubsetOf, inferTypesFromTemplateLiteralType,
+	// inferFromLiteralPartsToTemplateLiteral, isMemberOfStringMapping,
+	// applyTargetStringMappingToSource, isTypeMatchedByTemplateLiteralType,
+	// getRestTypeAtPosition, newTypePredicate, isResolvingReturnTypeOfSignature,
+	// getParameterCount, hasEffectiveRestParameter, tryGetTypeAtPosition,
+	// getMinArgumentCount, getParameterNameAtPosition, getEffectiveRestType,
+	// getKnownKeysOfTupleType, getTypeAtPosition, findMatchingSignature,
+	// findMatchingSignatures, compareTypeParametersIdentical,
+	// compareSignaturesIdentical, getTupleElementLabel.
+	Ternary compareTypesAssignableSimple(Type* source, Type* target);
+	Ternary compareTypesSubtypeOf(Type* source, Type* target);
+	bool isSimpleTypeRelatedTo(Type* source, Type* target, Relation* relation,
+	                         ErrorReporter errorReporter);
+	bool isEnumTypeRelatedTo(Symbol* source, Symbol* target, ErrorReporter errorReporter);
+	bool isOrHasGenericConditional(Type* t);
+	bool elaborateDidYouMeanToCallOrConstruct(
+		Node* node, Type* source, Type* target, Relation* relation, SignatureKind kind,
+		const DiagnosticMessage* headMessage,
+		std::vector<Diagnostic*>* diagnosticOutput);
+	bool elaborateObjectLiteral(Node* node, Type* source, Type* target, Relation* relation,
+	                            std::vector<Diagnostic*>* diagnosticOutput);
+	bool elaborateArrayLiteral(Node* node, Type* source, Type* target, Relation* relation,
+	                           std::vector<Diagnostic*>* diagnosticOutput);
+	bool elaborateArrowFunction(Node* node, Type* source, Type* target, Relation* relation,
+	                            std::vector<Diagnostic*>* diagnosticOutput);
+	bool isWeakType(Type* t);
+	bool hasCommonProperties(Type* source, Type* target, bool isComparingJsxAttributes);
+	bool isKnownProperty(Type* targetType, const std::string& name,
+	                     bool isComparingJsxAttributes);
+	Type* getBestMatchingType(Type* source, Type* target,
+	                          const std::function<Ternary(Type*, Type*)>& isRelatedTo);
+	Type* findMatchingTypeReferenceOrTypeAliasReference(Type* source, Type* unionTarget);
+	Type* findBestTypeForInvokable(Type* source, Type* unionTarget, SignatureKind kind);
+	Type* findMostOverlappyType(Type* source, Type* unionTarget);
+	Type* findBestTypeForObjectLiteral(Type* source, Type* unionTarget);
+	bool shouldReportUnmatchedPropertyError(Type* source, Type* target);
+	std::vector<Symbol*> getUnmatchedProperties(Type* source, Type* target,
+	                                            bool requireOptionalProperties,
+	                                            bool matchDiscriminantProperties);
+	Symbol* getUnmatchedPropertiesWorker(Type* source, Type* target,
+	                                     bool requireOptionalProperties,
+	                                     bool matchDiscriminantProperties,
+	                                     std::vector<Symbol*>* propsOut);
+	Type* findMatchingDiscriminantType(
+		Type* source, Type* target,
+		const std::function<Ternary(Type*, Type*)>& isRelatedTo);
+	std::vector<Symbol*> findDiscriminantProperties(
+		const std::vector<Symbol*>& sourceProperties, Type* target);
+	Type* getMatchingUnionConstituentForType(Type* unionType, Type* t);
+	std::pair<std::string, std::unordered_map<Type*, Type*>> computeKeyPropertyNameAndMap(
+		Type* t);
+	std::string getKeyPropertyCandidateName(const std::vector<Type*>& types);
+	std::optional<std::unordered_map<Type*, Type*>> mapTypesByKeyProperty(
+		const std::vector<Type*>& types, const std::string& keyPropertyName);
+	Type* filterPrimitivesIfContainsNonPrimitive(Type* unionType);
+	bool symbolValueDeclarationIsContextSensitive(Symbol* symbol);
+	bool typeCouldHaveTopLevelSingletonTypes(Type* t);
+	std::vector<VarianceFlags> getVariancesWorker(
+		Symbol* symbol, const std::vector<Type*>& typeParameters);
+	int getVarianceStackIndex(Symbol* symbol);
+	bool isMarkerType(Type* t);
+	bool hasCovariantVoidArgument(const std::vector<Type*>& typeArguments,
+	                              const std::vector<VarianceFlags>& variances);
+	Ternary compareSignaturesRelated(Signature* source, Signature* target,
+	                                 SignatureCheckMode checkMode, bool reportErrors,
+	                                 ErrorReporter errorReporter, TypeComparer compareTypes,
+	                                 TypeMapper* reportUnreliableMarkers);
+	Ternary compareTypePredicateRelatedTo(TypePredicate* source, TypePredicate* target,
+	                                      bool reportErrors, ErrorReporter errorReporter,
+	                                      TypeComparer compareTypes);
+	bool isTopSignature(Signature* s);
+	int getMinArgumentCountEx(Signature* signature, MinArgumentCountFlags flags);
+	Type* getRestOrAnyTypeAtPosition(Signature* source, int pos);
+	Node* getNameableDeclarationAtPosition(Signature* signature, int pos);
+	bool isValidDeclarationForTupleLabel(Node* d);
+	Type* getRestArrayTypeOfTupleType(Type* t);
+	bool isInstantiatedGenericParameter(Signature* signature, int pos);
+	std::string getTupleElementLabelFromBindingElement(Node* node, int index,
+	                                                   ElementFlags elementFlags);
+	TypePredicate* getUnionOrIntersectionTypePredicate(
+		const std::vector<Signature*>& signatures, bool isUnion);
+	TypePredicate* createTypePredicateFromTypePredicateNode(Node* node, Signature* signature);
+	TypePredicate* instantiateTypePredicate(TypePredicate* predicate, TypeMapper* mapper);
+	bool isMatchingSignature(Signature* source, Signature* target, bool partialMatch);
+	Ternary compareTypePredicatesIdentical(
+		TypePredicate* source, TypePredicate* target,
+		const std::function<Ternary(Type*, Type*)>& compareTypes);
+	Type* getEffectiveConstraintOfIntersection(const std::vector<Type*>& types,
+	                                           bool targetIsUnion);
+	bool templateLiteralTypesDefinitelyUnrelated(TemplateLiteralType* source,
+	                                             TemplateLiteralType* target);
+	Relater* getRelater();
+	void putRelater(Relater* r);
+	Type* getTypeOfPropertyInTypes(const std::vector<Type*>& types, const std::string& name);
+	Type* getTypeOfPropertyInType(Type* t, const std::string& name);
+	bool isTypeSubsetOfUnion(Type* source, Type* target);
+	bool isDistributionDependent(ConditionalRoot* root);
+	// === end slice: relater ===
+
+	// relater dep decls — owned by other slices; bodies stubbed in
+	// checker_relater.cpp under "dep stubs".
 	// owner: signatures slice (checker.go:20143-20986)
 	// owner: declchecks slice (checker.go:5081-5929)
 	bool checkExternalImportOrExportDeclaration(Node* node);

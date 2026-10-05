@@ -2393,10 +2393,6 @@ SymbolTable Checker::transformTypeOfMembers(Type* t,
 // owner: members slice
 
 // owner: relater slice
-std::string Checker::getTupleElementLabel(const TupleElementInfo& elementInfo,
-										Symbol* restSymbol, int index) {
-	TSC_UNREACHABLE("getTupleElementLabel — relater slice");
-}
 
 // owner: contextual slice
 

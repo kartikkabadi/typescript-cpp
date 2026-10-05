@@ -2968,65 +2968,10 @@ std::vector<Symbol*> Checker::getPropertiesOfType(Type* t) {
 	}
 	return getPropertiesOfObjectType(t);
 }
-
-// === dep stubs — removed when owner slice lands ===
-// ---------------------------------------------------------------------------
-
-// (deduped: getBaseConstructorTypeOfClass defined in cpp/internal/checker/checker_decltypes.cpp)
-
-// (deduped: newInferenceContext, getInferredTypes, inferTypes,
-// applyToParameterTypes, applyToReturnTypes — inference slice, defined in
-// cpp/internal/checker/checker_inference.cpp)
-
-Type* Checker::getEffectiveRestType(Signature* signature) {
-	TSC_UNREACHABLE("getEffectiveRestType — owned by relater.go slice");
-}
-Type* Checker::getKnownKeysOfTupleType(Type* t) {
-	TSC_UNREACHABLE("getKnownKeysOfTupleType — owned by relater.go slice");
-}
-// (deduped: isReadonlySymbol defined in cpp/internal/checker/checker_expressions_c.cpp)
-// (deduped: getUnionIndexInfos defined in cpp/internal/checker/checker_expressions_c.cpp)
-// (deduped: resolveReverseMappedTypeMembers — inference slice, defined in
-// cpp/internal/checker/checker_inference.cpp)
-Signature* Checker::findMatchingSignature(const std::vector<Signature*>& signatureList,
-	Signature* signature, bool partialMatch, bool ignoreThisTypes,
-	bool ignoreReturnTypes) {
-	TSC_UNREACHABLE("findMatchingSignature — owned by relater.go slice");
-}
-std::vector<Signature*> Checker::findMatchingSignatures(
-	const std::vector<std::vector<Signature*>>& signatureLists, Signature* signature,
-	int listIndex) {
-	TSC_UNREACHABLE("findMatchingSignatures — owned by relater.go slice");
-}
-bool Checker::compareTypeParametersIdentical(
-	const std::vector<Type*>& sourceParams, const std::vector<Type*>& targetParams) {
-	TSC_UNREACHABLE("compareTypeParametersIdentical — owned by relater.go slice");
-}
-Ternary Checker::compareSignaturesIdentical(Signature* source, Signature* target,
-	bool partialMatch, bool ignoreThisTypes, bool ignoreReturnTypes,
-	const std::function<Ternary(Type*, Type*)>& compareTypes) {
-	TSC_UNREACHABLE("compareSignaturesIdentical — owned by relater.go slice");
-}
-Ternary Checker::compareTypesIdentical(Type* source, Type* target) {
-	TSC_UNREACHABLE("compareTypesIdentical — owned by relater.go slice");
-}
+// (deduped: findMatchingSignature defined in checker_relater.cpp)
+// (deduped: findMatchingSignatures defined in cpp/internal/checker/checker_relater.cpp)
+// (deduped: compareSignaturesIdentical defined in checker_relater.cpp)
 // (deduped: isMixinConstructorType defined in cpp/internal/checker/checker_decltypes.cpp)
-
-bool Checker::hasEffectiveRestParameter(Signature* signature) {
-	TSC_UNREACHABLE("hasEffectiveRestParameter — owned by relater.go slice");
-}
-Type* Checker::tryGetTypeAtPosition(Signature* signature, int pos) {
-	TSC_UNREACHABLE("tryGetTypeAtPosition — owned by relater.go slice");
-}
-Type* Checker::getTypeAtPosition(Signature* signature, int pos) {
-	TSC_UNREACHABLE("getTypeAtPosition — owned by relater.go slice");
-}
-int Checker::getMinArgumentCount(Signature* signature) {
-	TSC_UNREACHABLE("getMinArgumentCount — owned by relater.go slice");
-}
-std::string Checker::getParameterNameAtPosition(Signature* signature, int pos) {
-	TSC_UNREACHABLE("getParameterNameAtPosition — owned by relater.go slice");
-}
 
 // Free-function dep stubs (checker package / utilities.go).
 

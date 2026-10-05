@@ -3063,8 +3063,9 @@ namespace {
 
 // (deduped: isMatchingReference defined in checker_flow.cpp)
 // (deduped: isSpreadableProperty defined in cpp/internal/checker/checker_expressions_c.cpp)
-Type* Checker::sliceTupleType(Type* t, int index, int endSkipCount) { decltypesDepUnreachable("sliceTupleType — decltypes dep"); }
+// (deduped: sliceTupleType defined in cpp/internal/checker/checker_relater.cpp)
 // (deduped: isValidSpreadType defined in cpp/internal/checker/checker_expressions_c.cpp)
+// (deduped: isSpreadableProperty defined in cpp/internal/checker/checker_expressions_c.cpp)
 // (deduped: removeMissingType defined in cpp/internal/checker/checker_contextual.cpp)
 
 // (deduped: removeOptionalTypeMarker defined in cpp/internal/checker/checker_contextual.cpp)

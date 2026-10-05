@@ -39,7 +39,6 @@ bool everyType(Type* t, const std::function<bool(Type*)>& f);              // ch
 MappedTypeModifiers getMappedTypeModifiers(Type* t);                       // checker_contextual.cpp
 bool isTupleType(Type* t);                                                 // checker_contextual.cpp
 bool isObjectLiteralType(Type* t);                                         // checker_decltypes.cpp
-int getEndElementCount(TupleType* t, ElementFlags flags);                  // checker_typenodes.cpp
 
 // inference.go file-local helpers used before their definitions below.
 static int compareTypesAndDepth(Type* t1, Type* t2);
@@ -51,6 +50,17 @@ static bool tupleTypesDefinitelyUnrelated(Type* source, Type* target);
 
 // TupleElementInfo equality for sameMap (declared early: two-phase lookup).
 namespace {
+
+// typenodes — getEndElementCount: count of ending consecutive tuple elements of
+// the given kind(s) (file-local replica; also file-local in checker_typenodes.cpp)
+int getEndElementCount(TupleType* t, ElementFlags flags) {
+	for (size_t i = t->elementInfos.size(); i > 0; i--) {
+		if (!(t->elementInfos[i - 1].flags & flags)) {
+			return static_cast<int>(t->elementInfos.size() - i);
+		}
+	}
+	return static_cast<int>(t->elementInfos.size());
+}
 bool operator==(const TupleElementInfo& a, const TupleElementInfo& b) {
 	return a.flags == b.flags && a.labeledDeclaration == b.labeledDeclaration;
 }
@@ -2437,32 +2447,23 @@ size_t Checker::ReverseMappedTypeKeyHash::operator()(
 // === dep stubs — removed when owner slice lands ===
 // ---------------------------------------------------------------------------
 
-std::vector<Type*> Checker::inferTypesFromTemplateLiteralType(
-	Type* source, TemplateLiteralType* target, TypeComparer compareTypes) {
-	TSC_UNREACHABLE("inferTypesFromTemplateLiteralType — relater slice");
-}
-
-std::vector<VarianceFlags> Checker::getVariances(Type* t) {
-	TSC_UNREACHABLE("getVariances — relater slice");
-}
-std::vector<VarianceFlags> Checker::getAliasVariances(Symbol* symbol) {
-	TSC_UNREACHABLE("getAliasVariances — relater slice");
-}
-bool Checker::isDeeplyNestedType(Type* t, const std::vector<Type*>& stack, int maxDepth) {
-	TSC_UNREACHABLE("isDeeplyNestedType — relater slice");
-}
-Symbol* Checker::getUnmatchedProperty(Type* source, Type* target,
-									bool requireOptionalProperties,
-									bool matchDiscriminantProperties) {
-	TSC_UNREACHABLE("getUnmatchedProperty — relater slice");
-}
-bool Checker::typePredicateKindsMatch(TypePredicate* a, TypePredicate* b) {
-	TSC_UNREACHABLE("typePredicateKindsMatch — relater slice");
-}
-bool Checker::isObjectTypeWithInferableIndex(Type* t) {
-	TSC_UNREACHABLE("isObjectTypeWithInferableIndex — relater slice");
-}
+// (deduped: inferTypesFromTemplateLiteralType defined in cpp/internal/checker/checker_relater.cpp)
+// (deduped: getVariances defined in cpp/internal/checker/checker_relater.cpp)
+// (deduped: getAliasVariances defined in cpp/internal/checker/checker_relater.cpp)
+// (deduped: isDeeplyNestedType defined in cpp/internal/checker/checker_relater.cpp)
+// (deduped: getUnmatchedProperty defined in cpp/internal/checker/checker_relater.cpp)
+// (deduped: typePredicateKindsMatch defined in cpp/internal/checker/checker_relater.cpp)
+// (deduped: isObjectTypeWithInferableIndex defined in cpp/internal/checker/checker_relater.cpp)
 // (deduped: isNonGenericObjectType defined in checker_expressions_c.cpp)
+
+// (deduped: inferTypesFromTemplateLiteralType defined in cpp/internal/checker/checker_relater.cpp)
+// (deduped: getVariances defined in cpp/internal/checker/checker_relater.cpp)
+// (deduped: getAliasVariances defined in cpp/internal/checker/checker_relater.cpp)
+// (deduped: isDeeplyNestedType defined in cpp/internal/checker/checker_relater.cpp)
+// (deduped: getUnmatchedProperty defined in cpp/internal/checker/checker_relater.cpp)
+// (deduped: typePredicateKindsMatch defined in cpp/internal/checker/checker_relater.cpp)
+// (deduped: isObjectTypeWithInferableIndex defined in cpp/internal/checker/checker_relater.cpp)
+// (deduped: isNonGenericObjectType defined in cpp/internal/checker/checker_relater.cpp)
 
 }  // namespace checker
 }  // namespace tsc

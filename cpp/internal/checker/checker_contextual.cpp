@@ -3676,10 +3676,6 @@ Type* Checker::getActualTypeVariable(Type* t) {
 
 // (deduped: getTypeOfNode real def in checker_services.cpp)
 
-Type* Checker::getThisTypeOfSignature(Signature* /*signature*/) {
-	TSC_UNREACHABLE("getThisTypeOfSignature — relater slice (relater.go:1947)");
-}
-
 // (deduped: getTypeFromBindingPattern defined in cpp/internal/checker/checker_decltypes.cpp)
 
 
@@ -3688,24 +3684,17 @@ Type* Checker::getThisTypeOfSignature(Signature* /*signature*/) {
 
 // (deduped: getIteratedTypeOrElementType, checkIteratedTypeOrElementType, getIterationTypesOfGeneratorFunctionReturnType defined in cpp/internal/checker/checker_declchecks2.cpp)
 
-std::string Checker::getKeyPropertyName(Type* /*t*/) {
-	TSC_UNREACHABLE("getKeyPropertyName — relater slice (relater.go:1111)");
-}
-
-Type* Checker::getConstituentTypeForKeyType(Type* /*t*/, Type* /*keyType*/) {
-	TSC_UNREACHABLE("getConstituentTypeForKeyType — relater slice (relater.go:1124)");
-}
-
-bool Checker::isDiscriminantProperty(Type* /*t*/, const std::string& /*name*/) {
-	TSC_UNREACHABLE("isDiscriminantProperty — relater slice (relater.go:1080)");
-}
-
-Type* Checker::discriminateTypeByDiscriminableItems(
-	Type* /*target*/, Discriminator& /*discriminator*/) {
-	TSC_UNREACHABLE("discriminateTypeByDiscriminableItems — relater slice (relater.go:1205)");
-}
+// (deduped: getKeyPropertyName defined in its owning slice file)
+// (deduped: getConstituentTypeForKeyType defined in cpp/internal/checker/checker_relater.cpp)
+// (deduped: isDiscriminantProperty defined in cpp/internal/checker/checker_relater.cpp)
+// (deduped: discriminateTypeByDiscriminableItems defined in cpp/internal/checker/checker_relater.cpp)
 
 // (deduped: isConstTypeVariable defined in cpp/internal/checker/checker_expressions_c.cpp)
+// (deduped: getKeyPropertyName defined in cpp/internal/checker/checker_relater.cpp)
+// (deduped: getConstituentTypeForKeyType defined in cpp/internal/checker/checker_relater.cpp)
+// (deduped: isDiscriminantProperty defined in cpp/internal/checker/checker_relater.cpp)
+// (deduped: discriminateTypeByDiscriminableItems defined in cpp/internal/checker/checker_relater.cpp)
+// (deduped: isConstTypeVariable defined in cpp/internal/checker/checker_relater.cpp)
 
 // (jsx-owned dep stubs moved to checker_jsx.cpp — real defs there)
 

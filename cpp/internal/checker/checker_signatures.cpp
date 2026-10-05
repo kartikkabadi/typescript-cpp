@@ -979,13 +979,16 @@ IndexInfo* Checker::instantiateIndexInfo(IndexInfo* info, TypeMapper* m) {
 	}
 	return newIndexInfo(info->keyType, newValueType, info->isReadonly, info->declaration, info->components);
 }
-
-// === dep stubs — removed when owner slice lands ===
-Type* Checker::getRestTypeAtPosition(Signature* /*source*/, int /*pos*/, bool /*readonly*/) { TSC_UNREACHABLE("getRestTypeAtPosition — owned by typeops/relater"); }
-TypePredicate* Checker::newTypePredicate(TypePredicateKind /*kind*/, const std::string& /*parameterName*/, int32_t /*parameterIndex*/, Type* /*t*/) { TSC_UNREACHABLE("newTypePredicate — owned by typeops/relater"); }
-bool Checker::isResolvingReturnTypeOfSignature(Signature* /*signature*/) { TSC_UNREACHABLE("isResolvingReturnTypeOfSignature — owned by typeops/relater"); }
+// (deduped: getRestTypeAtPosition defined in checker_relater.cpp)
+// (deduped: newTypePredicate defined in cpp/internal/checker/checker_relater.cpp)
+// (deduped: isResolvingReturnTypeOfSignature defined in cpp/internal/checker/checker_relater.cpp)
 // (deduped: getYieldedTypeOfYieldExpression defined in the owning slice file)
 // (deduped: isConstContext defined in cpp/internal/checker/checker_expressions_c.cpp)
+// (deduped: getRestTypeAtPosition defined in cpp/internal/checker/checker_relater.cpp)
+// (deduped: newTypePredicate defined in cpp/internal/checker/checker_relater.cpp)
+// (deduped: isResolvingReturnTypeOfSignature defined in cpp/internal/checker/checker_relater.cpp)
+// (deduped: getYieldedTypeOfYieldExpression defined in cpp/internal/checker/checker_relater.cpp)
+// (deduped: isConstContext defined in cpp/internal/checker/checker_relater.cpp)
 
 // (deduped: isConstContext defined in the owning slice file)
 

@@ -3722,10 +3722,6 @@ int32_t Checker::extendAssignmentPosition(Node* node, Node* declaration) {
 
 // (deduped: allTypesAssignableToKind defined in the owning slice file)
 
-bool Checker::areTypesComparable(Type* left, Type* right) {
-	TSC_UNREACHABLE("areTypesComparable — utilities.go slice");
-}
-
 // (deduped: checkIteratedTypeOrElementType defined in the owning slice file)
 
 // (deduped: checkNonNullType defined in the owning slice file)
@@ -3763,10 +3759,6 @@ bool Checker::areTypesComparable(Type* left, Type* right) {
 // (deduped: isFunctionType defined in the owning slice file)
 
 // (deduped: isSomeSymbolAssigned defined in the owning slice file)
-
-bool Checker::isTypeSubsetOf(Type* source, Type* target) {
-	TSC_UNREACHABLE("isTypeSubsetOf — relater.go slice");
-}
 
 // isUniformUnionType defined in checker_typeops.cpp; recombineUnknownType
 // defined in checker_contextual.cpp.

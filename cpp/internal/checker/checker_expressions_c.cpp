@@ -2295,33 +2295,9 @@ Symbol* Checker::getReferencedValueOrAliasSymbol(Node* reference) {
 	}
 	return resolveName(reference, reference->text(), SymbolFlagsValue | SymbolFlagsExportValue | SymbolFlagsAlias, nullptr, false /*isUse*/, false /*excludeGlobals*/);
 }
+// (deduped: isTypeComparableTo defined in checker_relater.cpp)
 
-// === dep stubs — removed when owner slice lands ============================
-
-// checker.go:7581 — expressions slice
-// (deduped: checkNonNullType defined in checker_utilities.cpp)
-
-// checker.go:11730 — expressions slice
-// (deduped: reportNonexistentProperty defined in checker_expressions_b.cpp)
-
-// checker.go:11954 — expressions slice
-// (deduped: checkPropertyAccessibility defined in checker_expressions_b.cpp)
-
-// flow.go:2604 — flow slice
-// (deduped: isPostSuperFlowNode defined in checker_flow.cpp)
-
-// relater.go:161 — relater slice
-bool Checker::isTypeComparableTo(Type* source, Type* target) {
-	TSC_UNREACHABLE("isTypeComparableTo — owned by relater slice");
-}
-
-// relater.go:165 — relater slice
-// (deduped: areTypesComparable stub kept in checker_flow.cpp)
-
-// relater.go:1270 — relater slice
-std::pair<std::string, std::string> Checker::getTypeNamesForErrorDisplay(Type* left, Type* right) {
-	TSC_UNREACHABLE("getTypeNamesForErrorDisplay — owned by relater slice");
-}
+// (deduped: getTypeNamesForErrorDisplay defined in checker_relater.cpp)
 
 // inference.go:1285 — inference slice
 // (deduped: addIntraExpressionInferenceSite defined in checker_inference.cpp)

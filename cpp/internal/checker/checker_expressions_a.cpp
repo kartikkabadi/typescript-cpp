@@ -3484,23 +3484,9 @@ Signature* Checker::getContextualSignature(Node* node) {
 bool Checker::isNodeWithinClass(Node* node, Node* classDeclaration) {
 	return forEachEnclosingClass(node, [&](Node* n) { return n == classDeclaration; });
 }
-
-// owner: relater slice (relater.go:358,428,1891)
-bool Checker::checkTypeRelatedToEx(Type* source, Type* target,
-								   Relation* relation, Node* errorNode,
-								   const DiagnosticMessage* headMessage,
-								   std::vector<Diagnostic*>* diagnosticOutput) {
-	TSC_UNREACHABLE("checkTypeRelatedToEx — relater slice dep");
-}
-bool Checker::checkTypeRelatedToAndOptionallyElaborate(
-	Type* source, Type* target, Relation* relation, Node* errorNode, Node* expr,
-	const DiagnosticMessage* headMessage,
-	std::vector<Diagnostic*>* diagnosticOutput) {
-	TSC_UNREACHABLE("checkTypeRelatedToAndOptionallyElaborate — relater slice dep");
-}
-Type* Checker::getNonArrayRestType(Signature* signature) {
-	TSC_UNREACHABLE("getNonArrayRestType — relater slice dep");
-}
+// (deduped: checkTypeRelatedToEx defined in checker_relater.cpp)
+// (deduped: checkTypeRelatedToAndOptionallyElaborate defined in checker_relater.cpp)
+// (deduped: getNonArrayRestType defined in checker_relater.cpp)
 
 // (deduped: getTypeOfDottedName defined in owning slice file)
 

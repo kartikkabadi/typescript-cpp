@@ -3208,41 +3208,7 @@ void Checker::checkUnusedRenamedBindingElements() {
 		}
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Dependency stubs — real implementations live in sibling slices (checker.go
-// ranges owned elsewhere). Each is declared in checker.h with an owner note.
-// Replace each stub with the real definition when that slice lands.
-
-// checker.go:7609 — checker.go:7501-8090 slice
-// (deduped: checkNonNullNonVoidType defined in owning slice file)
-
-// checker.go:8538 — expressions slice
-// (deduped: checkDeprecatedSignature defined in owning slice file)
-
-// (deduped: getFirstTransformableStaticClassElement defined in owning slice file)
-
-// (deduped: checkPropertyAccessibility defined in owning slice file)
-
-// checker.go:15042 — module resolution slice
-// (deduped: isOnlyImportableAsDefault defined in owning slice file)
-
-// checker.go:15119 — module resolution slice
-// (deduped: getEmitSyntaxForModuleSpecifierExpression defined in owning slice file)
-
-// checker.go:16630 — decltypes slice
-// (deduped: resolveAliasWithDeprecationCheck defined in owning slice file)
-
-// flow.go:2107 — flow slice
-// (deduped: getPropertyNameForKnownSymbolName defined in owning slice file)
-
-// flow.go:2339 — flow slice
-// (deduped: includeUndefinedInIndexSignature defined in owning slice file)
-
-// relater.go:414 — relater slice
-void Checker::reportDiagnostic(Diagnostic* diagnostic, std::vector<Diagnostic*>* diagnosticOutput) {
-	TSC_UNREACHABLE("reportDiagnostic — relater slice");
-}
+// (deduped: reportDiagnostic defined in checker_relater.cpp)
 // IterationTypesKeyHash — declared on Checker at checker.h; defined with the
 // iterationTypesCache owner (checker.go IterationTypesKey).
 size_t Checker::IterationTypesKeyHash::operator()(const IterationTypesKey& k) const noexcept {

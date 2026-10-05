@@ -977,7 +977,6 @@ void Checker::markTypeNodeAsReferenced(Node* node /*TypeNode*/) {
 // owner: jsx slice (jsx.go) — real defs in checker_jsx.cpp
 // owner: expressions slice — real defs in checker_expressions_b/c.cpp
 // owner: relater slice (relater.go)
-int Checker::getParameterCount(Signature* signature) { TSC_UNREACHABLE("getParameterCount — relater slice"); }
 // owner: signatures slice (checker.go:20143-20986)
 // (deduped: checkExternalImportOrExportDeclaration defined in cpp/internal/checker/checker_declchecks2.cpp)
 // owner: instantiate slice (checker.go:22285-23219)

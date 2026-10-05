@@ -1664,51 +1664,11 @@ void Checker::checkBlock(Node* node) {
 		registerForUnusedIdentifiersCheck(node);
 	}
 }
-
-// ---------------------------------------------------------------------------
-// === dep stubs — owned by other slices; deleted when the owner's real
-// definition lands. ===
-// ---------------------------------------------------------------------------
-
-// (deduped: checkVariableLikeDeclaration, checkDecorators, checkTypeNameIsReserved, checkTypeParameters, isReferenceToType defined in cpp/internal/checker/checker_declchecks2.cpp)
-
-// owner: decltypes slice (checker.go:16720-19097)
-// (deduped: getConstraintOfTypeParameter defined in cpp/internal/checker/checker_decltypes.cpp)
-
-// (deduped: getTypeParametersForTypeReferenceOrImport defined in cpp/internal/checker/checker_decltypes.cpp)
-
-// (deduped: getTypeOfAccessors defined in cpp/internal/checker/checker_decltypes.cpp)
-
-// (deduped: reportImplicitAny defined in cpp/internal/checker/checker_decltypes.cpp)
-
-// owner: signatures slice (checker.go:20143-20986)
-// owner: members slice (checker.go:19186-20143, 20987-22284)
-// (deduped: getCombinedModifierFlagsCached defined in cpp/internal/checker/checker_decltypes.cpp)
-
-// owner: instantiate slice (checker.go:22285-23219)
-// owner: typenodes slice (checker.go:23220-25738)
-// (deduped: getNullableType defined in cpp/internal/checker/checker_decltypes.cpp)
-
-// owner: expr_a slice (checker.go:8392) — real definition in
-// checker_expressions_a.cpp; header decl fixed to Type*.
-// markrefs slice landed in checker_markrefs.cpp — checkExternalEmitHelpers moved there.
-// owner: relater slice (relater.go)
-Type* Checker::createMarkerType(Symbol* symbol, Type* source, Type* target) {
-	TSC_UNREACHABLE("createMarkerType — relater slice");
-}
+// (deduped: createMarkerType defined in checker_relater.cpp)
+// (deduped: createMarkerType defined in cpp/internal/checker/checker_relater.cpp)
+// owner: checker.go:10502 slice (contextual-call machinery)
+// (deduped: getContextualCallSignature defined in cpp/internal/checker/checker_relater.cpp)
 // owner: relater.go (whole file)
-bool Checker::checkTypeAssignableToEx(Type* source, Type* target, Node* errorNode,
-                                      const DiagnosticMessage* headMessage,
-                                      std::vector<Diagnostic*>* diagnosticOutput) {
-	TSC_UNREACHABLE("checkTypeAssignableToEx — relater slice");
-}
-bool Checker::isSignatureAssignableTo(Signature* source, Signature* target,
-                                    bool ignoreReturnTypes) {
-	TSC_UNREACHABLE("isSignatureAssignableTo — relater slice");
-}
-TypePredicate* Checker::getTypePredicateOfSignature(Signature* sig) {
-	TSC_UNREACHABLE("getTypePredicateOfSignature — relater slice");
-}
 // owner: expressions slice (checker.go:8090-14185)
 // (deduped: checkCollisionsForDeclarationName defined in the owning slice file)
 // (deduped: setNodeLinksForPrivateIdentifierScope defined in the owning slice file)
@@ -1759,11 +1719,7 @@ Diagnostic* Checker::addDeprecatedSuggestion(Node* location,
 	    location, X_0_is_deprecated, {deprecatedEntity});
 	return addDeprecatedSuggestionWorker(declarations, diagnostic);
 }
-// owner: checker.go ~7509-8090 (statement/expression checks outside this slice)
-// (deduped: checkImportAttributes defined in cpp/internal/checker/checker_declchecks2.cpp)
-
-ModifierFlags Checker::getTypeParameterModifiers(Type* typeParameter) {
-	TSC_UNREACHABLE("getTypeParameterModifiers — decltypes slice");
-}
+// (deduped: checkImportAttributes defined in checker_declchecks2.cpp)
+// (deduped: getTypeParameterModifiers defined in cpp/internal/checker/checker_relater.cpp)
 
 }  // namespace tsc::checker

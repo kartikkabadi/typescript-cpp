@@ -1795,10 +1795,13 @@ bool Checker::isPropertyWithoutInitializer(Node* node) {
 // (deduped: checkReferenceExpression defined in cpp/internal/checker/checker_expressions_c.cpp)
 // (deduped: checkDestructuringAssignment defined in cpp/internal/checker/checker_expressions_c.cpp)
 // (deduped: isTypeEqualityComparableTo defined in cpp/internal/checker/checker_expressions_c.cpp)
-
-std::string Checker::getTypeNameForErrorDisplay(Type* t) {
-	TSC_UNREACHABLE("getTypeNameForErrorDisplay — expressions slice");
-}
+// (deduped: getTypeNameForErrorDisplay defined in cpp/internal/checker/checker_relater.cpp)
+// (deduped: checkTruthinessExpression defined in cpp/internal/checker/checker_relater.cpp)
+// (deduped: checkReferenceExpression defined in cpp/internal/checker/checker_relater.cpp)
+// (deduped: checkDestructuringAssignment defined in cpp/internal/checker/checker_relater.cpp)
+// (deduped: isTypeEqualityComparableTo defined in cpp/internal/checker/checker_relater.cpp)
+// (deduped: getEffectiveCheckNode defined in cpp/internal/checker/checker_relater.cpp)
+// (deduped: getTypeNameForErrorDisplay defined in cpp/internal/checker/checker_relater.cpp)
 
 // (deduped: checkVariableDeclarationList defined in cpp/internal/checker/checker_declchecks2.cpp)
 
@@ -1813,16 +1816,6 @@ Type* Checker::checkRightHandSideOfForOf(Node* node) {
 }
 
 // owner: relater.go
-bool Checker::checkTypeAssignableToAndOptionallyElaborate(
-    Type* source, Type* target, Node* errorNode, Node* expr,
-    const DiagnosticMessage* headMessage, std::vector<Diagnostic*>* diagnosticOutput) {
-	TSC_UNREACHABLE(
-	    "checkTypeAssignableToAndOptionallyElaborate — relater slice");
-}
-bool Checker::checkTypeComparableTo(Type* source, Type* target, Node* errorNode,
-                                    const DiagnosticMessage* headMessage) {
-	TSC_UNREACHABLE("checkTypeComparableTo — relater slice");
-}
 
 // (deduped: getConstructorAccessibilityError defined in owning slice file)
 
