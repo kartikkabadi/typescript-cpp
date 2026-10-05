@@ -4381,10 +4381,6 @@ bool Checker::isContextSensitive(Node* node) {
 	TSC_UNREACHABLE("isContextSensitive — ported with checker.cpp:31382 slice");
 }
 
-Type* Checker::getTypeFromTypeNode(Node* node) {
-	TSC_UNREACHABLE("getTypeFromTypeNode — ported with the type-node slice");
-}
-
 Type* Checker::checkExpression(Node* node) {
 	TSC_UNREACHABLE("checkExpression — ported with the expression-checking slice");
 }
@@ -4415,16 +4411,6 @@ Type* Checker::getTypeWithThisArgument(Type* t, Type* thisArgument,
 
 std::vector<Type*> Checker::getBaseTypes(Type* t) {
 	TSC_UNREACHABLE("getBaseTypes — ported with checker.cpp:19504 slice");
-}
-
-bool Checker::isDeferredTypeReferenceNode(Node* node,
-										  bool hasDefaultTypeArguments) {
-	TSC_UNREACHABLE(
-		"isDeferredTypeReferenceNode — ported with checker.cpp:23693 slice");
-}
-
-Type* Checker::getArrayOrTupleTargetType(Node* node) {
-	TSC_UNREACHABLE("getArrayOrTupleTargetType — ported with checker.cpp:24614");
 }
 
 Type* Checker::getBuiltinIteratorReturnType() {
@@ -6612,11 +6598,6 @@ bool Checker::allTypesAssignableToKindEx(Type* source, TypeFlags kind,
                                          bool strict) {
 	TSC_UNREACHABLE(
 		"allTypesAssignableToKindEx — ported with checker.go:28098 slice");
-}
-
-Type* Checker::getRestrictiveTypeParameter(Type* t) {
-	TSC_UNREACHABLE(
-		"getRestrictiveTypeParameter — ported with checker.go:24977 slice");
 }
 
 Type* Checker::getApparentType(Type* t) {

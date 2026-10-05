@@ -1683,7 +1683,7 @@ public:
 	Type* getLiteralTypeFromProperty(Symbol* prop, TypeFlags include, bool includeNonPublic);
 	Type* getLiteralTypeFromPropertyName(Node* name);
 	Type* getTypeAliasInstantiation(Symbol* typeAlias, const std::vector<Type*>& typeArguments,
-		Symbol* aliasSymbol);
+		TypeAlias* alias);
 	std::vector<Symbol*> getNamedMembers(const SymbolTable& members, Symbol* typeSymbol);
 	std::vector<Type*> instantiateTypes(const std::vector<Type*>& types, TypeMapper* mapper);
 	TypeAlias* getAliasForTypeNode(Node* node);
@@ -1745,6 +1745,156 @@ public:
 	Type* instantiateType(Type* t, TypeMapper* mapper);
 	void inferFromIntraExpressionSites(InferenceContext* context);
 	Type* getInferredType(InferenceContext* context, size_t index);
+
+	// === slice: typenodes ===
+	// Type-node -> Type resolution (checker_typenodes.cpp —
+	// checker.go:23220-25738)
+	Type* tryGetTypeFromTypeNode(Node* node);
+	Type* getTypeFromTypeNodeWorker(Node* node);
+	Type* getTypeFromThisTypeNode(Node* node);
+	Type* getThisType(Node* node);
+	Type* getTypeFromLiteralTypeNode(Node* node);
+	Type* getTypeFromTypeLiteralOrFunctionOrConstructorTypeNode(Node* node);
+	Type* getTypeFromIndexedAccessTypeNode(Node* node);
+	Type* getTypeFromTypeOperatorNode(Node* node);
+	Type* getESSymbolLikeTypeForNode(Node* node);
+	Type* getTypeFromTypeReference(Node* node);
+	Type* getDistributedTypeParameter(Node* node, Type* t);
+	Type* getDistributedTypeFromTypeParameter(Type* t);
+	Type* getIntendedTypeFromJSDocTypeReference(Node* node);
+	Symbol* getSymbolFromTypeReference(Node* node);
+	Symbol* resolveTypeReferenceName(Node* typeReference, SymbolFlags meaning,
+								   bool ignoreErrors);
+	Symbol* getUnresolvedSymbolForEntityName(Node* name);
+	Type* getTypeReferenceType(Node* node, Symbol* symbol);
+	Type* getTypeFromClassOrInterfaceReference(Node* node, Symbol* symbol);
+	std::vector<Type*> getTypeArgumentsFromNode(Node* node);
+	bool checkNoTypeArguments(Node* node, Symbol* symbol);
+	bool isResolvedByTypeAlias(Node* node);
+	bool mayResolveTypeAlias(Node* node);
+	Type* createNormalizedTypeReference(
+		Type* target, const std::vector<Type*>& typeArguments);
+	Type* createNormalizedTupleTypeEx(Type* target,
+									  const std::vector<Type*>& elementTypes,
+									  ObjectFlags objectFlags);
+	Type* createNormalizedTupleType(Type* target,
+									const std::vector<Type*>& elementTypes);
+	std::vector<Type*> getElementTypes(Type* t);
+	int getTypeReferenceArity(Type* t);
+	bool isArrayType(Type* t);
+	bool isReadonlyArrayType(Type* t);
+	bool isArrayOrTupleType(Type* t);
+	bool isMutableArrayOrTuple(Type* t);
+	Type* getElementTypeOfArrayType(Type* t);
+	bool isArrayLikeType(Type* t);
+	bool isMutableArrayLikeType(Type* t);
+	bool isEmptyArrayLiteralType(Type* t);
+	bool isEmptyLiteralType(Type* t);
+	bool isTupleLikeType(Type* t);
+	bool isArrayOrTupleLikeType(Type* t);
+	bool isArrayOrTupleOrIntersection(Type* t);
+	Type* getTupleElementType(Type* t, int index);
+	Type* getTypeFromTypeAliasReference(Node* node, Symbol* symbol);
+	Type* getTypeFromTypeQueryNode(Node* node);
+	Type* getTypeFromArrayOrTupleTypeNode(Node* node);
+	bool isVariadicTupleElement(Node* node);
+	bool isReadonlyTypeOperator(Node* node);
+	Type* getTypeFromNamedTupleTypeNode(Node* node);
+	Type* getTypeFromRestTypeNode(Node* node);
+	Node* getArrayElementTypeNode(Node* node);
+	Type* getTypeFromOptionalTypeNode(Node* node);
+	Type* getTypeFromUnionTypeNode(Node* node);
+	Type* getTypeFromIntersectionTypeNode(Node* node);
+	Type* getTypeFromTemplateTypeNode(Node* node);
+	Type* getTypeFromMappedTypeNode(Node* node);
+	Type* getTypeFromConditionalTypeNode(Node* node);
+	Type* getConditionalType(ConditionalRoot* root, TypeMapper* mapper,
+							 bool forConstraint, TypeAlias* alias);
+	std::pair<ConditionalRoot*, TypeMapper*> getTailRecursionRoot(
+		Type* newType, TypeMapper* newMapper);
+	bool isSimpleTupleType(Node* node);
+	bool isDeferredType(Type* t, bool checkTuples);
+	Type* getPermissiveInstantiation(Type* t);
+	Type* getRestrictiveInstantiation(Type* t);
+	Type* getTrueTypeFromConditionalType(Type* t);
+	Type* getFalseTypeFromConditionalType(Type* t);
+	Type* getInferredTrueTypeFromConditionalType(Type* t);
+	Type* getTypeFromInferTypeNode(Node* node);
+	Type* getTypeFromImportTypeNode(Node* node);
+	std::vector<Node*> getIdentifierChain(Node* node);
+	Type* resolveImportSymbolType(Node* node, Symbol* symbol,
+								  SymbolFlags meaning);
+	Type* getGlobalImportMetaExpressionType();
+	Type* createIterableType(Type* iteratedType);
+	ElementFlags getTupleElementFlags(Node* node);
+	TupleElementInfo getTupleElementInfo(Node* node);
+	Type* createTupleType(const std::vector<Type*>& elementTypes);
+	Type* createTupleTypeEx(const std::vector<Type*>& elementTypes,
+							const std::vector<TupleElementInfo>& elementInfos,
+							bool readonly);
+	Type* getTupleTargetType(
+		const std::vector<TupleElementInfo>& elementInfos, bool readonly);
+	Type* createTupleTargetType(
+		const std::vector<TupleElementInfo>& elementInfos, bool readonly);
+	Type* getElementTypeOfSliceOfTupleType(Type* t, int index,
+										   int endSkipCount, bool writing,
+										   bool noReductions);
+	Type* getRestTypeOfTupleType(Type* t);
+	Type* getTupleElementTypeOutOfStartCount(Type* t, Number index,
+											 Type* undefinedLikeType);
+	bool isGenericType(Type* t);
+	bool isGenericObjectType(Type* t);
+	ObjectFlags getGenericObjectFlags(Type* t);
+	bool isGenericTupleType(Type* t);
+	bool isGenericReducibleType(Type* t);
+	bool isReducibleIntersection(Type* t);
+	Type* getConditionalFlowTypeOfType(Type* t, Node* node);
+	Type* getImpliedConstraint(Type* t, Node* checkNode, Node* extendsNode);
+
+	// typenodes dep stubs — removed when owner slice lands
+	Type* getNullableType(Type* t, TypeFlags flags);
+	Type* addOptionality(Type* t);
+	Type* addOptionalityEx(Type* t, bool isProperty, bool isOptional);
+	Type* getIndexedAccessType(Type* objectType, Type* indexType);
+	Type* getIndexedAccessTypeEx(Type* objectType, Type* indexType,
+								 AccessFlags accessFlags, Node* accessNode,
+								 TypeAlias* alias);
+	Type* getIndexType(Type* t);
+	Type* getIndexTypeOfType(Type* t, Type* keyType);
+	std::vector<Type*> getTypeArguments(Type* t);
+	int getMinTypeArgumentCount(const std::vector<Type*>& typeParameters);
+	std::vector<Type*> fillMissingTypeArguments(
+		const std::vector<Type*>& typeArguments,
+		const std::vector<Type*>& typeParameters, int minTypeArgumentCount,
+		bool isJs);
+	std::string TypeToStringEx(Type* t, Node* enclosingDeclaration,
+							   TypeFormatFlags flags, void* verbosityContext);
+	Type* createPromiseType(Type* type);
+	bool isValidIndexKeyType(Type* type);
+	Symbol* getPropertyOfTypeEx(Type* type, const std::string& name,
+								bool skipObjectFunctionPropertyAugment,
+								bool includeTypeOnlyMembers);
+	Type* instantiateTypeWithAlias(Type* t, TypeMapper* mapper,
+								   TypeAlias* alias);
+	TypeAlias* instantiateTypeAlias(TypeAlias* alias, TypeMapper* mapper);
+	InferenceContext* newInferenceContext(
+		const std::vector<Type*>& typeParameters, Signature* signature,
+		InferenceFlags flags,
+		std::function<Ternary(Type*, Type*, bool)> compareTypes);
+	void inferTypes(std::vector<InferenceInfo*>& inferences,
+					Type* originalSource, Type* originalTarget,
+					InferencePriority priority, bool contravariant);
+	Type* getActualTypeVariable(Type* t);
+	Node* getConstraintDeclaration(Type* type);
+	bool isTypeParameterPossiblyReferenced(Type* tp, Node* node);
+	Type* getHomomorphicTypeVariable(Type* type);
+	Type* getTypeParameterFromMappedType(Type* type);
+	Type* getConstraintTypeFromMappedType(Type* type);
+	Type* getNameTypeFromMappedType(Type* type);
+	Type* getConstraintOfTypeParameter(Type* typeParameter);
+	Type* getSubstitutionType(Type* baseType, Type* constraint);
+	Type* getInstantiationExpressionType(Type* exprType, Node* node);
+	// === end slice: typenodes ===
 };
 
 // Free helpers used across checker translation units.
