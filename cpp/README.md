@@ -22,8 +22,9 @@ oracle.
 | JSDoc parser | `parser/jsdoc.go` | `cpp/internal/parser/jsdoc.cpp` | complete |
 | Reparser (JSDoc→declarations) | `parser/reparser.go` | `cpp/internal/parser/reparser.cpp` | complete |
 | Binder | `binder/` | `cpp/internal/binder` | complete |
-| Checker | `checker/` | `cpp/internal/checker` | near-complete — every Go checker file ported function-by-function: bootstrap, mapper/link store, JSDoc, tracer, grammar checks, node copy, module resolution, statements/class machinery, signatures, members, typenodes, declared types, widening, type ops, contextual typing, control-flow narrowing, inference, expression checks, JSX, module/alias resolution, relater (assignability), nodebuilder (type→TypeNode), emit resolver, services, exports, symbol accessibility (~2,220 `Checker::`/`EmitResolver::`/etc. defs across ~30 files, ~81k lines; remaining `TSC_UNREACHABLE` sites are dep-stubs owned by the in-flight `printer` package, `astnav`, and `modulespecifiers` slices). `tscpp check` runs end-to-end and matches the Go `checkdump` oracle byte-for-byte on all files that complete |
-| Emitter | `printer/`, `transformers/` | `cpp/internal/printer` | in progress — printer package port underway (diagnostic type-name formatting is the last checker blocker) |
+| Checker | `checker/` | `cpp/internal/checker` | complete — every Go checker file ported function-by-function: bootstrap, mapper/link store, JSDoc, tracer, grammar checks, node copy, module resolution, statements/class machinery, signatures, members, typenodes, declared types, widening, type ops, contextual typing, control-flow narrowing, inference, expression checks, JSX, module/alias resolution, relater (assignability), nodebuilder (type→TypeNode), emit resolver, services, exports, symbol accessibility (~2,220 `Checker::`/`EmitResolver::`/etc. defs across ~30 files, ~87k lines) |
+| Transformers | `transformers/` | `cpp/internal/transformers` | complete — root package (transformer/chain/modifiervisitor/utilities/destructuring) + all sub-packages: estransforms (17 files incl. classfields 4k, esdecorator, namedevaluation, classthis, async family), jsxtransforms, moduletransforms, inliners, tstransforms (6 files), declarations (transform/diagnostics/tracker/supplementalreferences/util) |
+| Emitter | `printer/`, `compiler/emitter.go`, `compiler/emitHost.go` | `cpp/internal/printer`, `cpp/internal/compiler/emitter.cpp` | emitter + emitHost + `Program::Emit` ported; `tscpp emit`/`tscpp emitdump` wired and byte-identical to the Go `emitdump` oracle on exercised files; sourcemap/spanmap slices in flight |
 
 ## Conformance
 
@@ -47,6 +48,17 @@ matching Go oracle.
 
 **Result: 26,002 / 26,002 files produce byte-identical bind output.**
 
+`tscpp check` runs the full program pipeline (parse → bind → check) and emits
+the canonical `G <code>` / `F <file>` / `T <code> <pos> <end>` diagnostic
+dump — `tsc/cmd/checkdump` is the matching Go oracle (`tsc --noEmit`).
+
+**Result: 12,715 / 12,734 files (99.9%) produce byte-identical check output**
+(19 divergent files remain — MISSING-DIAG/POSDIFF, fixes in flight).
+
+`tscpp emitdump` runs the emit path and appends `W <file>` + verbatim content
+sections for every emitted file — `tsc/cmd/emitdump` is the matching Go
+oracle (`tsc`).
+
 ```sh
 # single file
 ./cpp/tools/conformance_parse.sh tsc/testdata/tests/cases/compiler/abstractClasses.ts
@@ -68,15 +80,25 @@ performs no per-node refcount/GC work.
 ```
 cpp/
   CMakeLists.txt          cmake+ninja build (Apple clang / GCC / MSVC)
-  cmd/tscpp/main.cpp      lex|lex-json|bench|parse|bench-parse|parse-all|bind|check driver
+  cmd/tscpp/main.cpp      lex|lex-json|bench|parse|bench-parse|parse-all|bind|check|emit|emitdump driver
   internal/
     ast/                  Node model; nodes_generated.h is generated
+    binder/               binder + referenceresolver + exports
+    checker/              ~30 checker_*.cpp slices + checker.h
+    compiler/             program, host, outputpaths, emitter
     core/                 arena allocator, text/span types
     diagnostics/          messages_generated.h (generated catalog)
     jsnum/                numeric literal parsing
+    module/               module specifier + name resolution
+    modulespecifiers/     module specifier generation
+    nodebuilder/          type→TypeNode serializer
     parser/               parser.cpp + jsdoc.cpp + reparser.cpp + references.cpp
+    printer/              textwriter, emitcontext, namegenerator, printer
     scanner/              scanner.cpp + regexp.cpp
+    spanmap/              span maps (source maps + edits)
     stringutil/           unicode tables (generated)
+    transformers/         transformer chain + all transform packages
+    tsoptions/            tsconfig/CLI option parsing
     tspath/               path helpers
   tools/
     gencpp.py             reads tsc/internal Go sources, regenerates
@@ -86,6 +108,9 @@ cpp/
     conformance_corpus.sh corpus runner
 tsc/cmd/parsedump/        Go-side oracle driver (same dump format)
 tsc/cmd/lexdump/          Go-side oracle token dumper
+tsc/cmd/bindump/          Go-side oracle bind dumper
+tsc/cmd/checkdump/        Go-side oracle check dumper (tsc --noEmit)
+tsc/cmd/emitdump/         Go-side oracle emit dumper (tsc)
 ```
 
 ## Build
