@@ -1041,15 +1041,6 @@ std::vector<Type*> Checker::getTypeArguments(Type* /*t*/) { TSC_UNREACHABLE("get
 Type* Checker::cloneTypeParameter(Type* /*tp*/) { TSC_UNREACHABLE("cloneTypeParameter — owned by instantiate"); }
 bool Checker::isArrayOrTupleType(Type* /*t*/) { TSC_UNREACHABLE("isArrayOrTupleType — owned by typeops"); }
 bool Checker::isGenericType(Type* /*t*/) { TSC_UNREACHABLE("isGenericType — owned by typeops"); }
-Type* Checker::GetPromisedTypeOfPromise(Type* /*t*/) { TSC_UNREACHABLE("GetPromisedTypeOfPromise — owned by typeops"); }
-Type* Checker::getContextualType(Node* /*node*/, ContextFlags /*contextFlags*/) { TSC_UNREACHABLE("getContextualType — owned by contextual"); }
-Type* Checker::getContextualIterationType(IterationTypeKind /*kind*/, Node* /*functionDecl*/) { TSC_UNREACHABLE("getContextualIterationType — owned by contextual"); }
-Type* Checker::getContextualReturnType(Node* /*functionDecl*/, ContextFlags /*contextFlags*/) { TSC_UNREACHABLE("getContextualReturnType — owned by contextual"); }
-Signature* Checker::getContextualSignatureForFunctionLikeDeclaration(Node* /*node*/) { TSC_UNREACHABLE("getContextualSignatureForFunctionLikeDeclaration — owned by contextual"); }
-Type* Checker::instantiateContextualType(Type* /*contextualType*/, Node* /*node*/, ContextFlags /*contextFlags*/) { TSC_UNREACHABLE("instantiateContextualType — owned by contextual"); }
-Type* Checker::checkAwaitedType(Type* /*t*/, bool /*withAlias*/, Node* /*errorNode*/, const DiagnosticMessage* /*diagnosticMessage*/) { TSC_UNREACHABLE("checkAwaitedType — owned by async/awaited"); }
-Type* Checker::getAwaitedTypeNoAlias(Type* /*t*/) { TSC_UNREACHABLE("getAwaitedTypeNoAlias — owned by async/awaited"); }
-Type* Checker::unwrapAwaitedType(Type* /*t*/) { TSC_UNREACHABLE("unwrapAwaitedType — owned by async/awaited"); }
 IterationTypes Checker::getIterationTypesOfIterable(Type* /*t*/, IterationUse /*use*/, Node* /*errorNode*/) { TSC_UNREACHABLE("getIterationTypesOfIterable — owned by iteration"); }
 Type* Checker::getIterationTypeOfGeneratorFunctionReturnType(IterationTypeKind /*typeKind*/, Type* /*returnType*/, bool /*isAsyncGenerator*/) { TSC_UNREACHABLE("getIterationTypeOfGeneratorFunctionReturnType — owned by iteration"); }
 bool Checker::isConstantReference(Node* /*node*/) { TSC_UNREACHABLE("isConstantReference — owned by flow"); }

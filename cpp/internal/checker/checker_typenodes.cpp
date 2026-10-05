@@ -2771,14 +2771,6 @@ void Checker::inferTypes(std::vector<InferenceInfo*>& inferences,
 	TSC_UNREACHABLE("inferTypes — typenodes dep");
 }
 
-Type* Checker::getActualTypeVariable(Type* t) {
-	TSC_UNREACHABLE("getActualTypeVariable — typenodes dep");
-}
-
-Node* Checker::getConstraintDeclaration(Type* type) {
-	TSC_UNREACHABLE("getConstraintDeclaration — typenodes dep");
-}
-
 bool Checker::isTypeParameterPossiblyReferenced(Type* tp, Node* node) {
 	TSC_UNREACHABLE("isTypeParameterPossiblyReferenced — typenodes dep");
 }

@@ -1152,4 +1152,27 @@ inline Type* Type::Target() {
 	TSC_UNREACHABLE("Unhandled case in Type.Target");
 }
 
+// === slice: contextual (checker.go:29385-32069) ===
+// relater.go:1199 — Discriminator interface used by
+// Checker::discriminateTypeByDiscriminableItems.
+
+struct Discriminator {
+	virtual ~Discriminator() = default;
+	virtual int len() = 0;                              // Number of discriminant properties
+	virtual std::string name(int index) = 0;            // Property name of index-th discriminator
+	virtual bool matches(int index, Type* t) = 0;       // True if index-th discriminator matches the given type
+};
+
+struct ObjectLiteralDiscriminator : Discriminator {
+	Checker* c{};
+	std::vector<Node*> props;
+	std::vector<Symbol*> members;
+
+	int len() override;
+	std::string name(int index) override;
+	bool matches(int index, Type* t) override;
+};
+
+// === end slice: contextual ===
+
 } // namespace tsc::checker

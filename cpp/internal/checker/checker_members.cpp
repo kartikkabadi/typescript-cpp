@@ -3183,9 +3183,6 @@ void Checker::forEachMappedTypePropertyKeyTypeAndIndexSignatureKeyType(
 bool Checker::isReadonlySymbol(Symbol* symbol) {
 	TSC_UNREACHABLE("isReadonlySymbol — owned by checker.go:14083 slice");
 }
-Type* Checker::removeMissingOrUndefinedType(Type* t) {
-	TSC_UNREACHABLE("removeMissingOrUndefinedType — owned by checker.go:29565 slice");
-}
 std::vector<IndexInfo*> Checker::getUnionIndexInfos(const std::vector<Type*>& types) {
 	TSC_UNREACHABLE("getUnionIndexInfos — owned by checker.go:13727 slice");
 }
@@ -3284,9 +3281,6 @@ ModifierFlags getDeclarationModifierFlagsFromSymbol(Symbol* s) {
 ModifierFlags getDeclarationModifierFlagsFromSymbolEx(Symbol* s, bool isWrite) {
 	TSC_UNREACHABLE(
 		"getDeclarationModifierFlagsFromSymbolEx — owned by utilities.go slice");
-}
-MappedTypeModifiers getMappedTypeModifiers(Type* t) {
-	TSC_UNREACHABLE("getMappedTypeModifiers — owned by checker.go:29478 slice");
 }
 Ternary compareTypesEqual(Type* s, Type* t) {
 	TSC_UNREACHABLE("compareTypesEqual — owned by checker.go:28165 slice");

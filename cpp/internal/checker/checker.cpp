@@ -4375,10 +4375,6 @@ Type* Checker::getWidenedType(Type* t) {
 
 // getSignaturesOfType is defined in checker_members.cpp (members slice).
 
-bool Checker::isContextSensitive(Node* node) {
-	TSC_UNREACHABLE("isContextSensitive — ported with checker.cpp:31382 slice");
-}
-
 Type* Checker::checkExpression(Node* node) {
 	TSC_UNREACHABLE("checkExpression — ported with the expression-checking slice");
 }
@@ -6562,11 +6558,6 @@ Type* Checker::getTypeOfModuleDeclarationImportAttributes(Node* attributes) {
 // ---------------------------------------------------------------------------
 // Interim stubs — filled by their owning slices
 // ---------------------------------------------------------------------------
-
-Type* Checker::getAwaitedTypeEx(Type* type, Node* errorNode,
-                                const DiagnosticMessage* diagnostic) {
-	TSC_UNREACHABLE("getAwaitedTypeEx — ported with checker.go:31742 slice");
-}
 
 Symbol* Checker::resolveExternalModuleNameWorker(
 	Node* location, Node* moduleReferenceExpression,

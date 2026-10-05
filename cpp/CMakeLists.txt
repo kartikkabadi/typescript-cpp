@@ -33,6 +33,7 @@ add_library(tsc STATIC
 	internal/checker/checker_signatures.cpp
 	internal/checker/checker_typenodes.cpp
 	internal/checker/checker_members.cpp
+	internal/checker/checker_contextual.cpp
 	internal/checker/mapper.cpp
 	internal/evaluator/evaluator.cpp
 	internal/jsnum/jsnum.cpp

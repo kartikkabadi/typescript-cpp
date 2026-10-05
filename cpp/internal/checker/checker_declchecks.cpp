@@ -1778,18 +1778,7 @@ void Checker::checkExternalEmitHelpers(Node* location, ExternalEmitHelpers helpe
 Type* Checker::createMarkerType(Symbol* symbol, Type* source, Type* target) {
 	TSC_UNREACHABLE("createMarkerType — markrefs slice");
 }
-// owner: contextual slice (checker.go:29385-32069)
-bool Checker::checkGeneratorInstantiationAssignabilityToReturnType(
-    Type* returnType, FunctionFlags functionFlags, Node* errorNode) {
-	TSC_UNREACHABLE("checkGeneratorInstantiationAssignabilityToReturnType — contextual slice");
-}
-Type* Checker::checkAwaitedType(Type* t, bool withAlias, Node* errorNode,
-                                const DiagnosticMessage* diagnosticMessage) {
-	TSC_UNREACHABLE("checkAwaitedType — contextual slice");
-}
-Type* Checker::getAwaitedTypeNoAlias(Type* t) {
-	TSC_UNREACHABLE("getAwaitedTypeNoAlias — contextual slice");
-}
+// owner: checker.go:10502 slice (contextual-call machinery)
 Signature* Checker::getContextualCallSignature(Type* t, Node* node) {
 	TSC_UNREACHABLE("getContextualCallSignature — contextual slice");
 }
