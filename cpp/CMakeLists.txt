@@ -143,6 +143,8 @@ add_library(tsc STATIC
 	internal/modulespecifiers/preferences.cpp
 	internal/packagejson/packagejson.cpp
 	internal/pseudochecker/pseudochecker.cpp
+	# === slice: spanmap ===
+	internal/spanmap/spanmap.cpp
 	# === slice: tsoptions ===
 	internal/tsoptions/commandlineoption.cpp
 	internal/tsoptions/commandlineparser.cpp

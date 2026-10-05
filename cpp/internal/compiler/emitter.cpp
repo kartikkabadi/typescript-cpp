@@ -364,7 +364,7 @@ void emitter::emitDeclarationFile(SourceFile* sourceFile,
 				return {source, pos, true};
 			}
 			auto [mapped, ok] =
-			    spanMap->VirtualToOriginalPositionExact(TextPos(pos));
+			    spanmap::VirtualToOriginalPositionExact(spanMap, TextPos(pos));
 			if (!ok) {
 				return {nullptr, TextPos(0), false};
 			}
