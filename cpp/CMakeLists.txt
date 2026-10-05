@@ -78,6 +78,10 @@ add_library(tsc STATIC
 	internal/module/cache.cpp
 	internal/module/resolver.cpp
 	internal/module/staticresolver.cpp
+	# === slice: modulespecifiers ===
+	internal/modulespecifiers/specifiers.cpp
+	internal/modulespecifiers/util.cpp
+	internal/modulespecifiers/preferences.cpp
 	internal/packagejson/packagejson.cpp
 	internal/pseudochecker/pseudochecker.cpp
 )

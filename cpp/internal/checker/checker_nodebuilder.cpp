@@ -8005,19 +8005,7 @@ NodeBuilder* Checker::getNodeBuilderEx(
 }
 
 // (deduped: all dep-stubs here — real defs landed in symbolaccess.cpp,
-// services2.cpp, checker_relater.cpp, checker_utilities.cpp)
+// services2.cpp, checker_relater.cpp, checker_utilities.cpp,
+// modulespecifiers/specifiers.cpp)
 
 } // namespace tsc::checker
-
-namespace tsc::modulespecifiers {
-
-// --- modulespecifiers slice dep stub -----------------------------------------
-ModuleSpecifiersResult GetModuleSpecifiers(
-	Symbol* moduleSymbol, checker::Checker* checker,
-	const CompilerOptions* compilerOptions, SourceFile* importingSourceFile,
-	checker::Program* host, const UserPreferences& userPreferences,
-	const ModuleSpecifierOptions& options, bool forAutoImports) {
-	TSC_UNREACHABLE("GetModuleSpecifiers — modulespecifiers slice");
-}
-
-} // namespace tsc::modulespecifiers
