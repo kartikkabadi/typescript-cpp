@@ -71,4 +71,27 @@ Node* createAccessorPropertyBackingField(printer::NodeFactory* f, Node* node,
                                          ModifierList* modifiers,
                                          Node* initializer);
 
+// === slice: async family ===
+
+// newAsyncTransformer — async.go:37
+Transformer* newAsyncTransformer(TransformOptions* opts);
+
+// isSimpleParameterList — async.go:951. Shared by async.cpp and forawait.cpp.
+bool isSimpleParameterList(const std::vector<Node*>& params);
+
+// newforawaitTransformer — forawait.go:58
+Transformer* newforawaitTransformer(TransformOptions* opts);
+
+// newUsingDeclarationTransformer — using.go:19
+Transformer* newUsingDeclarationTransformer(TransformOptions* opts);
+
+// Dep-stubs — owned by the namedevaluation slice (esdecorator-cluster);
+// stubbed in using.cpp until namedevaluation.cpp lands.
+// isNamedEvaluation — namedevaluation.go:85
+bool isNamedEvaluation(printer::EmitContext* emitContext, Node* node);
+// transformNamedEvaluation — namedevaluation.go:513
+Node* transformNamedEvaluation(printer::EmitContext* context, Node* node,
+                               bool ignoreEmptyStringLiteral,
+                               std::string assignedName);
+
 }  // namespace tsc::transformers::estransforms
