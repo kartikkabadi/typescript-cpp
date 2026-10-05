@@ -1178,9 +1178,8 @@ Type* Checker::getReturnTypeOfSignature(Signature* sig) { TSC_UNREACHABLE("getRe
 Type* Checker::getTypeOfSymbol(Symbol* symbol) { TSC_UNREACHABLE("getTypeOfSymbol — decltypes slice"); }
 Type* Checker::getDeclaredTypeOfSymbol(Symbol* symbol) { TSC_UNREACHABLE("getDeclaredTypeOfSymbol — decltypes slice"); }
 
-// owner: typeops slice
-bool Checker::maybeTypeOfKind(Type* type, TypeFlags flags) { TSC_UNREACHABLE("maybeTypeOfKind — typeops slice"); }
-void Checker::markPropertyAsReferenced(Symbol* symbol, Node* nodeForCheckWriteOnly, bool isSelfTypeAccess) { TSC_UNREACHABLE("markPropertyAsReferenced — typeops slice"); }
+// maybeTypeOfKind / markPropertyAsReferenced — ported in checker_typeops.cpp
+// (typeops slice).
 
 // owner: inference slice (inference.go)
 bool Checker::isSkipDirectInferenceNode(Node* node) { TSC_UNREACHABLE("isSkipDirectInferenceNode — inference slice"); }

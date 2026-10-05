@@ -20,11 +20,7 @@ namespace tsc::checker {
 //   typeFlagNames / FormatTypeFlags      — types.go:520-568
 // ---------------------------------------------------------------------------
 
-// relater.go:89 — type RecursionId struct{ value any }. The value is only ever
-// *ast.Node, *ast.Symbol or *Type, so a void* carries it faithfully.
-struct RecursionId {
-	void* value{};
-};
+// RecursionId is declared in checker.h (shared with checker_typeops.cpp).
 
 static RecursionId asRecursionId(Node* value) { return {value}; }
 static RecursionId asRecursionId(Symbol* value) { return {value}; }
@@ -548,9 +544,7 @@ std::string Checker::TypeToString(Type* t) {
 	TSC_UNREACHABLE("TypeToString — ported with the printer slice");
 }
 
-// checker.go:28593
-Type* Checker::getModifiersTypeFromMappedType(Type* t) {
-	TSC_UNREACHABLE("getModifiersTypeFromMappedType — ported with the mapped-type slice");
-}
+// getModifiersTypeFromMappedType — checker.go:28593 — ported in
+// checker_typeops.cpp (typeops slice).
 
 } // namespace tsc::checker

@@ -4404,9 +4404,8 @@ Type* Checker::getOptionalType(Type* t, bool isProperty) {
 	TSC_UNREACHABLE("getOptionalType — ported with checker.cpp:18980 slice");
 }
 
-bool Checker::containsUndefinedType(Type* t) {
-	TSC_UNREACHABLE("containsUndefinedType — ported with checker.cpp:28320 slice");
-}
+// containsUndefinedType — ported in checker_typeops.cpp (typeops slice,
+// checker.go:28320).
 
 Type* Checker::getTypeWithThisArgument(Type* t, Type* thisArgument,
 									   bool needApparentType) {
@@ -6608,11 +6607,8 @@ Symbol* Checker::getPropertyOfType(Type* type, const std::string& name) {
 	TSC_UNREACHABLE("getPropertyOfType — ported with the member-resolution slice");
 }
 
-bool Checker::allTypesAssignableToKindEx(Type* source, TypeFlags kind,
-                                         bool strict) {
-	TSC_UNREACHABLE(
-		"allTypesAssignableToKindEx — ported with checker.go:28098 slice");
-}
+// allTypesAssignableToKindEx — ported in checker_typeops.cpp (typeops slice,
+// checker.go:28098).
 
 Type* Checker::getRestrictiveTypeParameter(Type* t) {
 	TSC_UNREACHABLE(
@@ -6628,10 +6624,8 @@ bool Checker::couldContainTypeVariablesWorker(Type* t) {
 		"couldContainTypeVariablesWorker — ported with checker.go:22605 slice");
 }
 
-bool Checker::isStringIndexSignatureOnlyTypeWorker(Type* t) {
-	TSC_UNREACHABLE(
-		"isStringIndexSignatureOnlyTypeWorker — ported with checker.go:27831 slice");
-}
+// isStringIndexSignatureOnlyTypeWorker — ported in checker_typeops.cpp
+// (typeops slice, checker.go:27831).
 
 bool Checker::markNodeAssignmentsWorker(Node* node) {
 	TSC_UNREACHABLE(
