@@ -482,7 +482,7 @@ public:
 	std::vector<Diagnostic*> GetDeclarationDiagnostics(SourceFile* sourceFile);
 	bool SkipTypeChecking(SourceFile* sourceFile, bool ignoreNoCheck);
 	bool canIncludeBindAndCheckDiagnostics(SourceFile* sourceFile);
-	bool IsSourceFileDefaultLibrary(const tspath::Path& path) const;
+	bool IsSourceFileDefaultLibrary(const tspath::Path& path) const override;
 	bool IsLibFile(SourceFile* file) const;
 	bool IsSourceFileFromExternalLibrary(SourceFile* file) const;
 	const SourceFileMetaData& GetSourceFileMetaData(

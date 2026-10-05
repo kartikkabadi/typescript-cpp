@@ -1105,6 +1105,11 @@ public:
 	    const std::string& /*path*/) {
 		return {"", nullptr};
 	}
+	// program.go IsSourceFileDefaultLibrary — whether the file is a bundled
+	// lib.d.ts (services.go IsLibSymbolForHoverVerbosity).
+	virtual bool IsSourceFileDefaultLibrary(const std::string& /*path*/) const {
+		return false;
+	}
 };
 
 // nodeLinkStore / symbolArenaLinkStore (links.go)
@@ -4406,13 +4411,198 @@ public:
 	NodeBuilder* typeToStringNodebuilder = nullptr; // checker.go:905
 	// === end slice: symbolaccess ===
 
-	// === slice: emitresolver === (checker_emitresolver.cpp — dep-stub decls for
-	// callees emitresolver.go needs that belong to other slices; bodies are
-	// TSC_UNREACHABLE defs at the bottom of checker_emitresolver.cpp)
-	ModifierFlags GetEffectiveDeclarationFlags(Node* n, ModifierFlags flagsToCheck); // exports.go:207 — exports slice
-	bool isOptionalParameter(Node* node);                                          // utilities.go:302 — utilities slice
-	LiteralValue GetConstantValue(Node* node);                                     // services.go:870 — services slice
-	// === end slice: emitresolver ===
+	// emitresolver dep-stub: utilities.go:302 — utilities slice (stub body in
+	// checker_emitresolver.cpp until the utilities slice's missing defs land)
+	bool isOptionalParameter(Node* node);
+
+	// === slice: services2 === (services.go)
+	std::vector<Symbol*> GetSymbolsInScope(Node* location, SymbolFlags meaning);
+	std::vector<Symbol*> getSymbolsInScope(Node* location, SymbolFlags meaning);
+	std::vector<Symbol*> GetExportsOfModule(Symbol* symbol);
+	void ForEachExportAndPropertyOfModule(
+		Symbol* moduleSymbol,
+		const std::function<void(Symbol*, const std::string&)>& cb);
+	bool IsValidPropertyAccess(Node* node, const std::string& propertyName);
+	bool isValidPropertyAccess(Node* node, const std::string& propertyName);
+	bool isValidPropertyAccessWithType(Node* node, bool isSuper,
+									 const std::string& propertyName, Type* t);
+	bool IsValidPropertyAccessForCompletions(Node* node, Type* t, Symbol* property);
+	std::vector<Symbol*> GetAllPossiblePropertiesOfTypes(std::vector<Type*> types);
+	bool IsUnknownSymbol(Symbol* symbol);
+	bool IsUndefinedSymbol(Symbol* symbol);
+	// IsArgumentsSymbol — already ported (checker_jsdoc.cpp).
+	Type* GetNonOptionalType(Type* t);
+	Type* GetStringIndexType(Type* t);
+	Type* GetNumberIndexType(Type* t);
+	Type* GetElementTypeOfArrayType(Type* t);
+	std::vector<Signature*> GetCallSignatures(Type* t);
+	std::vector<Signature*> GetConstructSignatures(Type* t);
+	std::vector<Symbol*> GetApparentProperties(Type* t);
+	std::vector<Symbol*> getAugmentedPropertiesOfType(Type* t);
+	Symbol* TryGetMemberInModuleExportsAndProperties(const std::string& memberName,
+												   Symbol* moduleSymbol);
+	Symbol* TryGetMemberInModuleExports(const std::string& memberName,
+									  Symbol* moduleSymbol);
+	bool shouldTreatPropertiesOfExternalModuleAsExports(
+		Type* resolvedExternalModuleType);
+	Type* GetContextualType(Node* node, ContextFlags contextFlags);
+	template <typename T>
+	T runWithInferenceBlockedFromSourceNode(Node* node,
+										  const std::function<T()>& fn);
+	std::pair<Signature*, std::vector<Signature*>> getResolvedSignatureWorker(
+		Node* node, CheckMode checkMode, int argumentCount);
+	template <typename T>
+	T runWithoutResolvedSignatureCaching(Node* node,
+										 const std::function<T()>& fn);
+	Symbol* SkipAlias(Symbol* symbol);
+	std::vector<Symbol*> GetRootSymbols(Symbol* symbol);
+	Symbol* GetMappedTypeSymbolOfProperty(Symbol* symbol);
+	std::vector<Symbol*> getImmediateRootSymbols(Symbol* symbol);
+	Symbol* tryGetTarget(Symbol* symbol);
+	Symbol* GetExportSymbolOfSymbol(Symbol* symbol);
+	Symbol* GetExportSpecifierLocalTargetSymbol(Node* node);
+	Symbol* GetShorthandAssignmentValueSymbol(Node* location);
+	std::pair<Symbol*, Symbol*> GetSymbolsOfParameterPropertyDeclaration(
+		Node* parameter, const std::string& parameterName);
+	bool IsDeclarationUsed(SourceFile* sourceFile, Identifier* identifier,
+						   bool jsxElementsPresent,
+						   bool jsxModeNeedsExplicitImport);
+	bool IsSymbolReferencedInFile(SourceFile* sourceFile, Identifier* definition,
+								  Symbol* symbol);
+	std::vector<Node*> GetReferencesToSymbolInFile(SourceFile* sourceFile,
+											 Symbol* symbol);
+	Symbol* getLocalSymbolForExportSpecifier(Identifier* referenceLocation,
+											Symbol* referenceSymbol,
+											ExportSpecifier* exportSpecifier);
+	Type* GetTypeArgumentConstraint(Node* node);
+	std::vector<Signature*> getUninstantiatedSignatures(Node* node);
+	Type* getTypeParameterConstraintForPositionAcrossSignatures(
+		std::vector<Signature*> signatures, int position);
+	Type* getTypeArgumentConstraint(Node* node);
+	bool IsTypeInvalidDueToUnionDiscriminant(Type* contextualType, Node* obj);
+	std::vector<Symbol*> GetExportsAndPropertiesOfModule(Symbol* moduleSymbol);
+	std::vector<Symbol*> getExportsOfModuleAsArray(Symbol* moduleSymbol);
+	std::vector<Symbol*> GetJsxIntrinsicTagNamesAt(Node* location);
+	Type* GetContextualTypeForJsxAttribute(Node* attribute);
+	LiteralValue GetConstantValue(Node* node);
+	std::vector<Signature*> GetCandidateSignaturesForStringLiteralCompletions(
+		Node* call, Node* editingArgument);
+	Type* GetTypeAtPosition(Signature* s, int pos);
+	Type* GetTypeParameterAtPosition(Signature* s, int pos);
+	Type* GetContextualTypeForArrayLiteralAtPosition(Type* contextualArrayType,
+												   Node* arrayLiteral,
+												   int position);
+	Type* GetFirstTypeArgumentFromKnownType(Type* t);
+	std::vector<Symbol*> GetPropertySymbolsFromContextualType(
+		Node* node, Type* contextualType, bool unionSymbolOk);
+	Symbol* GetPropertySymbolOfDestructuringAssignment(Node* location);
+	Type* getTypeOfAssignmentPattern(Node* expr);
+	Signature* GetSignatureFromDeclaration(Node* node);
+	bool IsLibSymbolForHoverVerbosity(Symbol* symbol);
+	bool IsLibTypeForHoverVerbosity(Type* t);
+	// dep-stub callees owned by other slices (bodies in checker_services2.cpp):
+	std::vector<std::vector<Symbol*>> getExpandedParameters(
+		Signature* sig, bool skipUnionExpanding);                                  // nodebuilderimpl.go:1984 — nodebuilder slice
+	// === end slice: services2 ===
+
+	// === slice: exports === (exports.go — services API surface wrappers)
+	Type* GetStringType();
+	Type* GetNumberType();
+	Type* GetBooleanType();
+	Type* GetVoidType();
+	Type* GetUndefinedType();
+	Type* GetNullType();
+	Type* GetAnyType();
+	Type* GetErrorType();
+	Type* GetNeverType();
+	Type* GetUnknownType();
+	Type* GetBigIntType();
+	Type* GetESSymbolType();
+	Type* GetNonPrimitiveType();
+	Type* GetBaseTypeOfLiteralType(Type* t);
+	Symbol* GetUnknownSymbol();
+	Symbol* GetUndefinedSymbol();
+	Symbol* GetArgumentsSymbol();
+	Signature* GetUnknownSignature();
+	Type* GetUnionType(std::vector<Type*> types);
+	Type* GetNameTypeOfSymbol(Symbol* symbol);
+	Symbol* GetGlobalSymbol(const std::string& name, SymbolFlags meaning,
+							const DiagnosticMessage* diagnostic);
+	Symbol* GetMergedSymbol(Symbol* symbol);
+	Symbol* TryFindAmbientModule(const std::string& moduleName);
+	Symbol* GetImmediateAliasedSymbol(Symbol* symbol);
+	Symbol* GetTargetSymbol(Symbol* symbol);
+	Node* GetTypeOnlyAliasDeclaration(Symbol* symbol);
+	Symbol* ResolveExternalModuleName(Node* moduleSpecifier,
+									  Type* importAttributesType);
+	Symbol* ResolveExternalModuleSymbol(Symbol* moduleSymbol);
+	Type* GetTypeFromTypeNode(Node* node);
+	bool IsArrayLikeType(Type* t);
+	std::vector<Symbol*> GetPropertiesOfType(Type* t);
+	Symbol* GetPropertyOfType(Type* t, const std::string& name);
+	bool TypeHasCallOrConstructSignatures(Type* t);
+	bool IsPropertyAccessible(Node* node, bool isSuper, bool isWrite,
+							  Type* containingType, Symbol* property);
+	Type* GetTypeOfPropertyOfContextualType(Type* t, const std::string& name);
+	bool WasCanceled();
+	std::vector<Signature*> GetSignaturesOfType(Type* t, SignatureKind kind);
+	Type* GetDeclaredTypeOfSymbol(Symbol* symbol);
+	Type* GetTypeOfSymbol(Symbol* symbol);
+	Type* GetNonMissingTypeOfSymbol(Symbol* symbol);
+	Type* GetConstraintOfTypeParameter(Type* typeParameter);
+	Type* GetTrueTypeOfConditionalType(Type* t);
+	Type* GetFalseTypeOfConditionalType(Type* t);
+	Type* GetDefaultFromTypeParameter(Type* typeParameter);
+	ModifierFlags GetEffectiveDeclarationFlags(Node* n, ModifierFlags flagsToCheck);
+	Type* GetBaseConstraintOfType(Type* t);
+	TypePredicate* GetTypePredicateOfSignature(Signature* sig);
+	bool IsArrayType(Type* t);
+	bool IsReadonlySymbol(Symbol* symbol);
+	Type* GetReturnTypeOfSignature(Signature* sig);
+	bool HasEffectiveRestParameter(Signature* signature);
+	std::vector<Type*> GetLocalTypeParametersOfClassOrInterfaceOrTypeAlias(
+		Symbol* symbol);
+	Type* GetContextualTypeForObjectLiteralElement(Node* element,
+												 ContextFlags contextFlags);
+	std::string TypePredicateToString(TypePredicate* t);
+	std::vector<std::vector<Symbol*>> GetExpandedParameters(
+		Signature* signature, bool skipUnionExpanding);
+	Signature* GetResolvedSignature(Node* node);
+	Type* GetTypeOfPropertyOfType(Type* t, const std::string& name);
+	Type* GetContextualTypeForArgumentAtIndex(Node* node, int argIndex);
+	Type* GetAwaitedType(Type* t);
+	std::vector<Node*> GetIndexSignaturesAtLocation(Node* node);
+	Symbol* GetResolvedSymbol(Node* node);
+	std::string GetJsxNamespace(Node* location);
+	std::string GetJsxFragmentFactory(Node* location);
+	Symbol* ResolveName(const std::string& name, Node* location,
+						SymbolFlags meaning, bool excludeGlobals);
+	SymbolFlags GetSymbolFlags(Symbol* symbol);
+	std::vector<Type*> GetBaseTypes(Type* t);
+	Type* GetApparentType(Type* t);
+	Type* GetReducedType(Type* t);
+	std::string GetFullyQualifiedName(Symbol* symbol);
+	Type* GetBaseConstructorTypeOfClass(Type* t);
+	MemberOverrideStatus GetMemberOverrideModifierStatus(Node* node, Node* member,
+														 Symbol* memberSymbol);
+	Type* GetRestTypeOfSignature(Signature* sig);
+	std::vector<Type*> GetTypeArguments(Type* t);
+	IndexInfo* GetIndexInfoOfType(Type* t, Type* keyType);
+	Type* GetIndexTypeOfType(Type* t, Type* keyType);
+	std::vector<IndexInfo*> GetIndexInfosOfType(Type* t);
+	bool IsContextSensitive(Node* node);
+	std::vector<Type*> FillMissingTypeArguments(
+		std::vector<Type*> typeArguments, std::vector<Type*> typeParameters,
+		int minTypeArgumentCount, bool isJavaScriptImplicitAny);
+	int GetMinTypeArgumentCount(std::vector<Type*> typeParameters);
+	Type* GetWidenedLiteralType(Type* t);
+	bool IsTypeAssignableTo(Type* source, Type* target);
+	Type* GetUnionTypeEx(std::vector<Type*> types, UnionReduction unionReduction);
+	bool RequiresAddingImplicitUndefined(Node* node);
+	Type* RemoveMissingOrUndefinedType(Type* t);
+	Type* GetWidenedType(Type* t);
+	int CompareSymbols(Symbol* s1, Symbol* s2);
+	// === end slice: exports ===
 };  // class Checker
 
 // moduletarget-slice file-local callees hoisted for the dep graph (defs in
@@ -4420,6 +4610,20 @@ public:
 Node* getExternalModuleRequireArgument(Node* node);              // utilities.go:233
 bool isSyntacticDefault(Node* node);                             // utilities.go:249
 bool hasExportAssignmentSymbol(Symbol* moduleSymbol);            // utilities.go:256
+
+// === slice: services2 === (services.go) — package-level free functions
+std::pair<Signature*, std::vector<Signature*>>
+GetResolvedSignatureForSignatureHelp(Node* node, int argumentCount, Checker* c);
+// === end slice: services2 ===
+
+// === slice: exports === (exports.go) — package-level free functions
+bool IsTypeUsableAsPropertyName(Type* t);
+std::string GetPropertyNameFromType(Type* t);
+ModifierFlags GetDeclarationModifierFlagsFromSymbol(Symbol* s);
+bool IsTupleType(Type* t);
+bool IsTupleTypeTarget(Type* t);
+bool IsDistributedTypeParameter(Type* t);
+// === end slice: exports ===
 
 // Free helpers used across checker translation units.
 Diagnostic* NewDiagnosticForNode(Node* node, const DiagnosticMessage* message,

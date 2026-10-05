@@ -300,6 +300,12 @@ struct EmitContext {
 		return it != original_.end() ? it->second : nullptr;
 	}
 
+	// emitcontext.go:501 ParseNode — resolves to the parse-tree original, or
+	// nullptr when the node is synthesized. Declared early for the services
+	// slice; dep-stub body is in checker_services2.cpp until the printer
+	// slice lands it.
+	Node* ParseNode(Node* node);
+
 	// Gets the most original node associated with this node by walking
 	// Original pointers (strada: getOriginalNode).
 	Node* mostOriginal(Node* node) const {

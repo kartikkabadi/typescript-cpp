@@ -1510,18 +1510,11 @@ bool EmitResolver::IsThisPropertyAssignmentDeclarationRedundant(Node* node) {
 
 // (deduped: getJsxFragmentFactoryEntity defined in checker_jsx.cpp)
 
-ModifierFlags Checker::GetEffectiveDeclarationFlags(Node* /*n*/,
-												  ModifierFlags /*flagsToCheck*/) {
-	TSC_UNREACHABLE("GetEffectiveDeclarationFlags — exports slice");
-}
 
 bool Checker::isOptionalParameter(Node* /*node*/) {
 	TSC_UNREACHABLE("isOptionalParameter — utilities slice");
 }
 
-LiteralValue Checker::GetConstantValue(Node* /*node*/) {
-	TSC_UNREACHABLE("GetConstantValue — services slice");
-}
 
 bool isLateVisibilityPaintedStatement(Node* /*node*/) {
 	TSC_UNREACHABLE("isLateVisibilityPaintedStatement — utilities.go slice");
