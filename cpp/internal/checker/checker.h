@@ -1745,6 +1745,92 @@ public:
 	Type* instantiateType(Type* t, TypeMapper* mapper);
 	void inferFromIntraExpressionSites(InferenceContext* context);
 	Type* getInferredType(InferenceContext* context, size_t index);
+
+	// === slice: signatures ===
+	// Ported from checker.go:20143-20986 (bodies in checker_signatures.cpp).
+
+	// CheckMode — checker.go:36-48
+	using CheckMode = uint32_t;
+	static constexpr CheckMode CheckModeNormal = 0;       // Normal type checking
+	static constexpr CheckMode CheckModeContextual = 1 << 0; // Explicitly assigned contextual type, therefore not cacheable
+	static constexpr CheckMode CheckModeInferential = 1 << 1; // Inferential typing
+	static constexpr CheckMode CheckModeSkipContextSensitive = 1 << 2; // Skip context sensitive function expressions
+	static constexpr CheckMode CheckModeSkipGenericFunctions = 1 << 3;   // Skip single signature generic functions
+	static constexpr CheckMode CheckModeIsForSignatureHelp = 1 << 4;     // Call resolution for purposes of signature help
+	static constexpr CheckMode CheckModeRestBindingElement = 1 << 5;     // Checking a type that is going to be used to determine the type of a rest binding element
+	static constexpr CheckMode CheckModeTypeOnly = 1 << 6;   // Called from getTypeOfExpression, diagnostics may be omitted
+	static constexpr CheckMode CheckModeForceTuple = 1 << 7;
+
+	std::vector<Signature*> getSignaturesOfSymbol(Symbol* symbol);
+	Signature* getSignatureFromDeclaration(Node* declaration);
+	std::vector<Type*> getTypeParametersFromDeclaration(Node* declaration);
+	Symbol* getAnnotatedAccessorThisParameter(Node* accessor);
+	Node* getAccessorThisParameter(Node* accessor);
+	bool hasBindableName(Node* node);
+	Type* getReturnTypeOfSignature(Signature* sig);
+	Type* getNonCircularReturnTypeOfSignature(Signature* sig);
+	Type* getReturnTypeFromAnnotation(Node* declaration);
+	Signature* getSignatureOfFullSignatureType(Node* node);
+	Type* getParameterTypeOfFullSignature(Node* node, Node* parameter);
+	Type* getReturnTypeOfFullSignature(Node* node);
+	Type* getAnnotatedAccessorType(Node* accessor);
+	Node* getAnnotatedAccessorTypeNode(Node* accessor);
+	Type* getReturnTypeFromBody(Node* fn, CheckMode checkMode);
+	std::pair<std::vector<Type*>, bool> checkAndAggregateReturnExpressionTypes(Node* fn, CheckMode checkMode);
+	bool functionHasImplicitReturn(Node* fn);
+	std::pair<std::vector<Type*>, std::vector<Type*>> checkAndAggregateYieldOperandTypes(Node* fn, CheckMode checkMode);
+	Type* createPromiseType(Type* promisedType);
+	Type* createPromiseLikeType(Type* promisedType);
+	Type* createPromiseReturnType(Node* fn, Type* promisedType);
+	Type* unwrapReturnType(Type* returnType, FunctionFlags functionFlags);
+	Type* getWidenedLiteralLikeTypeForContextualReturnTypeIfNeeded(Type* t, Type* contextualSignatureReturnType, bool isAsync);
+	Type* getWidenedLiteralLikeTypeForContextualIterationTypeIfNeeded(Type* t, Type* contextualSignatureReturnType, IterationTypeKind kind, bool isAsyncGenerator);
+	Type* createGeneratorType(Type* yieldType, Type* returnType, Type* nextType, bool isAsyncGenerator);
+	void reportErrorsFromWidening(Node* declaration, Type* t, WideningKind wideningKind);
+	bool shouldReportErrorsFromWideningWithContextualSignature(Node* declaration, WideningKind wideningKind);
+	bool reportWideningErrorsInType(Type* t);
+	TypePredicate* getTypePredicateFromBody(Node* fn);
+	TypePredicate* checkIfExpressionRefinesAnyParameter(Node* fn, Node* expr);
+	Type* checkIfExpressionRefinesParameter(Node* fn, Node* expr, Node* param, Type* initType);
+	Type* addOptionalTypeMarker(Type* t);
+	Signature* instantiateSignature(Signature* sig, TypeMapper* m);
+	Signature* instantiateSignatureEx(Signature* sig, TypeMapper* m, bool eraseTypeParameters);
+	IndexInfo* instantiateIndexInfo(IndexInfo* info, TypeMapper* m);
+
+	// dep stubs (bodies at bottom of checker_signatures.cpp)
+	Signature* getSingleCallSignature(Type* t);
+	Type* getTypeAtPosition(Signature* signature, int pos);
+	Type* getRestTypeAtPosition(Signature* source, int pos, bool readonly);
+	TypePredicate* newTypePredicate(TypePredicateKind kind, const std::string& parameterName, int32_t parameterIndex, Type* t);
+	bool isResolvingReturnTypeOfSignature(Signature* signature);
+	Type* checkExpressionCachedEx(Node* node, CheckMode checkMode);
+	Type* checkExpressionEx(Node* node, CheckMode checkMode);
+	Type* getYieldedTypeOfYieldExpression(Node* node, Type* expressionType, Type* sentType, bool isAsync);
+	bool isConstContext(Node* node);
+	void reportImplicitAny(Node* declaration, Type* t, WideningKind wideningKind);
+	std::vector<Symbol*> getPropertiesOfObjectType(Type* t);
+	Symbol* instantiateSymbol(Symbol* symbol, TypeMapper* m);
+	std::vector<Symbol*> instantiateSymbols(std::vector<Symbol*> symbols, TypeMapper* m);
+	std::vector<Type*> getTypeArguments(Type* t);
+	Type* cloneTypeParameter(Type* tp);
+	bool isArrayOrTupleType(Type* t);
+	bool isGenericType(Type* t);
+	Type* GetPromisedTypeOfPromise(Type* t);
+	Type* getContextualType(Node* node, ContextFlags contextFlags);
+	Type* getContextualIterationType(IterationTypeKind kind, Node* functionDecl);
+	Type* getContextualReturnType(Node* functionDecl, ContextFlags contextFlags);
+	Signature* getContextualSignatureForFunctionLikeDeclaration(Node* node);
+	Type* instantiateContextualType(Type* contextualType, Node* node, ContextFlags contextFlags);
+	Type* checkAwaitedType(Type* t, bool withAlias, Node* errorNode, const DiagnosticMessage* diagnosticMessage);
+	Type* getAwaitedTypeNoAlias(Type* t);
+	Type* unwrapAwaitedType(Type* t);
+	IterationTypes getIterationTypesOfIterable(Type* t, IterationUse use, Node* errorNode);
+	Type* getIterationTypeOfGeneratorFunctionReturnType(IterationTypeKind typeKind, Type* returnType, bool isAsyncGenerator);
+	bool isConstantReference(Node* node);
+	bool isReachableFlowNode(FlowNode* flow);
+	bool isSymbolAssigned(Symbol* symbol);
+	std::string TypeToString(Type* t);
+	// === end slice: signatures ===
 };
 
 // Free helpers used across checker translation units.
