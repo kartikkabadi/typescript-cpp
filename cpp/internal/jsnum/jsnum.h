@@ -40,7 +40,7 @@ struct Number {
 
 	Number signedRightShift(Number y) const { return Number(toInt32() >> y.toShiftCount()); }
 	Number unsignedRightShift(Number y) const {
-		return Number(static_cast<int32_t>(toUint32() >> y.toShiftCount()));
+		return Number(toUint32() >> y.toShiftCount());
 	}
 	Number leftShift(Number y) const { return Number(toInt32() << y.toShiftCount()); }
 	Number bitwiseNOT() const { return Number(~toInt32()); }
