@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cstring>
 #include <bit>
+#include <limits>
 #include <mutex>
 
 #include "internal/binder/binder.h"
@@ -1813,14 +1814,21 @@ bool Checker::checkCrossProductUnion(const std::vector<Type*>& types) {
 	return ok;
 }
 
-int Checker::getCrossProductUnionSize(const std::vector<Type*>& types) {
-	size_t size = 1;
+int64_t Checker::getCrossProductUnionSize(const std::vector<Type*>& types) {
+	int64_t size = 1;
 	for (Type* t : types) {
 		if (t->flags & TypeFlagsUnion) {
-			size *= t->types().size();
+			int64_t n = static_cast<int64_t>(t->types().size());
+			// Cap the result to avoid integer overflow when computing the cross product of many large unions.
+			if (n > 0 && size > std::numeric_limits<int64_t>::max() / n) {
+				return std::numeric_limits<int64_t>::max();
+			}
+			size *= n;
+		} else if (t->flags & TypeFlagsNever) {
+			return 0;
 		}
 	}
-	return static_cast<int>(size);
+	return size;
 }
 
 // ---------------------------------------------------------------------------
