@@ -29,7 +29,7 @@ struct RuneResult {
 
 RuneResult readRangeRune(std::string_view input) {
     int sz = 0;
-    char32_t r = decodeUtf8Rune(input, &sz);
+    char32_t r = decodeUtf8RuneStrict(input, &sz);
     std::string err;
     if (r == kRuneError) {
         // See the documentation for DecodeRuneInString.
@@ -291,7 +291,7 @@ bool match(std::span<const Element> elems, std::string_view input) {
             }
             const CharRange& r = std::get<CharRange>(elem);
             int sz = 0;
-            char32_t c = decodeUtf8Rune(input, &sz);
+            char32_t c = decodeUtf8RuneStrict(input, &sz);
             if (c < r.low || c > r.high) {
                 return false;
             }

@@ -59,7 +59,7 @@ std::string format(std::string_view text, const std::vector<std::string>& args) 
 		std::string_view rest(arg);
 		while (!rest.empty()) {
 			int width;
-			char32_t ch = decodeUtf8Rune(rest, &width);
+			char32_t ch = decodeUtf8RuneStrict(rest, &width);
 			if (ch == kRuneError && width <= 1) {
 				cleaned += "\xEF\xBF\xBD"; // U+FFFD
 				rest.remove_prefix(1);

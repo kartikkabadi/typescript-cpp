@@ -79,12 +79,13 @@ char32_t decodeHexEscape(std::string_view raw, size_t i, size_t* len) {
     return r;
 }
 
+// utf8.Valid — strict RFC 3629 check.
 bool validUtf8(std::string_view s) {
     size_t i = 0;
     while (i < s.size()) {
         int w;
-        char32_t r = decodeUtf8Rune(s.substr(i), &w);
-        if (r == kRuneError && w == 1) {
+        char32_t r = decodeUtf8RuneStrict(s.substr(i), &w);
+        if (r == kRuneError && w <= 1) {
             return false;
         }
         i += static_cast<size_t>(w);
@@ -614,9 +615,13 @@ std::pair<Token, std::string> Decoder::readTokenRaw(bool isName) {
         t.k = '"';
         t.raw = std::string(data_.substr(start, i - start));
         pos_ = i;
-        if (!opts_.allowInvalidUTF8) {
+        {
+            // Escape syntax is validated at scan time regardless of
+            // AllowInvalidUTF8 (which only relaxes the UTF-8 check inside
+            // unquote).
             std::string dummy;
-            if (!detail::unquote(t.raw, &dummy, false).empty()) {
+            if (!detail::unquote(t.raw, &dummy, opts_.allowInvalidUTF8)
+                     .empty()) {
                 return {{}, "jsontext: invalid UTF-8 or escape in string"};
             }
         }
