@@ -161,6 +161,13 @@ add_library(tsc STATIC
 	internal/tsoptions/showconfig.cpp
 	internal/tsoptions/tsconfigparsing.cpp
 	internal/tsoptions/wildcarddirectories.cpp
+	# === slice: vfs ===
+	internal/vfs/vfs.cpp
+	internal/vfs/internal/internal.cpp
+	internal/vfs/iovfs/iovfs.cpp
+	internal/vfs/osvfs/osvfs.cpp
+	internal/vfs/vfsmatch/vfsmatch.cpp
+	internal/vfs/vfstest/vfstest.cpp
 )
 
 add_executable(tscpp cmd/tscpp/main.cpp)

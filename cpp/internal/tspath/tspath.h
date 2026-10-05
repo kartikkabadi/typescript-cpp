@@ -157,6 +157,12 @@ inline bool isRootedDiskPath(std::string_view path) {
 	return getEncodedRootLength(path) > 0;
 }
 
+// === slice: vfs ===
+// isUrl — path.go IsUrl: path starts with a URL scheme (e.g. http://).
+inline bool isUrl(std::string_view path) {
+	return getEncodedRootLength(path) < 0;
+}
+
 inline bool pathIsRelative(std::string_view path) {
 	// True if path is ".", "..", or starts with "./", "../", ".\", or "..\".
 	if (path == "." || path == "..") {
