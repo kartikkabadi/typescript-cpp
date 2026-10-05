@@ -85,6 +85,8 @@ add_library(tsc STATIC
 	internal/transformers/transformer.cpp
 	internal/transformers/utilities.cpp
 	internal/transformers/destructuring.cpp
+	# === slice: jsxtransforms ===
+	internal/transformers/jsxtransforms/jsxtransforms.cpp
 	# === slice: module ===
 	internal/core/compileroptions.cpp
 	internal/module/util.cpp

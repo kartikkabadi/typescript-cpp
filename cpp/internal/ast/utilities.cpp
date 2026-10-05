@@ -2535,6 +2535,28 @@ std::string getJSXRuntimeImport(std::string_view base,
 	                                             : "jsx-runtime");
 }
 
+// utilities.go: GetSemanticJsxChildren
+std::vector<Node*> getSemanticJsxChildren(const std::vector<Node*>& children) {
+	std::vector<Node*> result;
+	for (Node* i : children) {
+		switch (i->kind) {
+		case Kind::JsxExpression:
+			if (i->expression() != nullptr) {
+				result.push_back(i);
+			}
+			break;
+		case Kind::JsxText:
+			if (!i->as<JsxText>()->ContainsOnlyTriviaWhiteSpaces) {
+				result.push_back(i);
+			}
+			break;
+		default:
+			result.push_back(i);
+		}
+	}
+	return result;
+}
+
 // ast.go: collectIdentifiersForSourceFile — every Identifier /
 // PrivateIdentifier / literal Text() in the file.
 static std::unordered_set<std::string> collectIdentifiersForSourceFile(

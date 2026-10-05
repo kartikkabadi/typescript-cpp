@@ -63,28 +63,6 @@ bool markAsSynthetic(Node* node) {
 	return false;
 }
 
-// ast/utilities.go:3834 — GetSemanticJsxChildren.
-std::vector<Node*> getSemanticJsxChildren(const std::vector<Node*>& children) {
-	std::vector<Node*> result;
-	for (Node* i : children) {
-		switch (i->kind) {
-		case Kind::JsxExpression:
-			if (i->expression() != nullptr) {
-				result.push_back(i);
-			}
-			break;
-		case Kind::JsxText:
-			if (!i->as<JsxText>()->ContainsOnlyTriviaWhiteSpaces) {
-				result.push_back(i);
-			}
-			break;
-		default:
-			result.push_back(i);
-		}
-	}
-	return result;
-}
-
 // relater.go:743 — isHyphenatedJsxName.
 bool isHyphenatedJsxName(const std::string& name) {
 	return name.find('-') != std::string::npos;
