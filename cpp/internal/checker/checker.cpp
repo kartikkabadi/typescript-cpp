@@ -2067,7 +2067,7 @@ Diagnostic* Checker::error(Node* location, const DiagnosticMessage* message,
 }
 
 Diagnostic* Checker::error(Node* location, const DiagnosticMessage* message, std::string arg) {
-	return error(location, message, {std::move(arg)});
+	return error(location, message, std::vector<std::string>{std::move(arg)});
 }
 
 Diagnostic* Checker::errorSkippedOnNoEmit(Node* location, const DiagnosticMessage* message,
