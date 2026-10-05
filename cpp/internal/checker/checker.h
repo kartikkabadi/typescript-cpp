@@ -3469,6 +3469,48 @@ public:
 	bool isReadonlyAssignmentDeclaration(Node* node);
 	Symbol* getReferencedValueOrAliasSymbol(Node* reference);
 
+	// === slice: moduletarget === (checker.go:14277/14667-15302/15855-16053/16574/16630 — checker_moduletarget.cpp)
+	Diagnostic* addDeprecatedSuggestionWorker(const std::vector<Node*>& declarations,
+											Diagnostic* diagnostic);
+	Symbol* getTargetOfImportEqualsDeclaration(Node* node);
+	Type* resolveExternalModuleTypeByLiteral(Node* name);
+	void checkAndReportErrorForResolvingImportAliasToTypeOnlySymbol(Node* node, Symbol* resolved);
+	Node* getTypeOnlyDeclarationOfEntityName(Node* name);
+	Symbol* getTargetOfImportClause(Node* node);
+	Symbol* getTargetOfModuleDefault(Symbol* moduleSymbol, Node* node, bool dontResolveAlias);
+	void reportNonDefaultExport(Symbol* moduleSymbol, Node* node);
+	Symbol* resolveExportByName(Symbol* moduleSymbol, const std::string& name, Node* sourceNode, bool dontResolveAlias);
+	Symbol* getTargetOfNamespaceImport(Node* node);
+	Symbol* getTargetOfNamespaceExport(Node* node);
+	Symbol* getTargetOfImportSpecifier(Node* node);
+	Symbol* getExternalModuleMember(Node* node, Node* specifier, bool dontResolveAlias);
+	Symbol* getPropertyOfVariable(Symbol* symbol, const std::string& name);
+	Symbol* combineValueAndTypeSymbols(Symbol* valueSymbol, Symbol* typeSymbol);
+	Symbol* getExportOfModule(Symbol* symbol, const std::string& nameText, Node* specifier, bool dontResolveAlias);
+	bool isOnlyImportableAsDefault(Node* usage, Symbol* resolvedModule, Type* importAttributesType);
+	bool canHaveSyntheticDefault(Node* file, Symbol* moduleSymbol, bool dontResolveAlias, Node* usage);
+	ResolutionMode getEmitSyntaxForModuleSpecifierExpression(Node* usage);
+	void errorNoModuleMemberSymbol(Symbol* moduleSymbol, Symbol* targetSymbol, Node* node, Node* name);
+	void reportNonExportedMember(Node* name, const std::string& declarationName, Symbol* moduleSymbol, const std::string& moduleName);
+	void reportInvalidImportEqualsExportMember(Node* name, const std::string& declarationName, const std::string& moduleName);
+	Symbol* getTargetOfExportSpecifier(Node* node, SymbolFlags meaning, bool dontResolveAlias);
+	Symbol* getTargetOfExportAssignment(Node* node);
+	Symbol* getTargetOfBinaryExpression(Node* node);
+	Symbol* getTargetOfAliasLikeExpression(Node* expression);
+	Symbol* getTargetOfNamespaceExportDeclaration(Node* node);
+	Symbol* getTargetOfAccessExpression(Node* node);
+	Node* getModuleSpecifierForImportOrExport(Node* node);
+	std::vector<Symbol*> GetAmbientModules();
+	Symbol* resolveESModuleSymbol(Symbol* moduleSymbol, Node* node, Node* moduleSpecifier);
+	bool hasSignatures(Type* t);
+	Type* getTypeWithSyntheticDefaultOnly(Type* t, Symbol* symbol, Symbol* originalSymbol, Node* moduleSpecifier, Type* importAttributesType);
+	Type* getTypeWithSyntheticDefaultImportType(Type* t, Symbol* symbol, Symbol* originalSymbol, Node* moduleSpecifier);
+	Type* createDefaultPropertyWrapperForModule(Symbol* symbol, Symbol* originalSymbol, Symbol* anonymousSymbol);
+	Symbol* cloneTypeAsModuleType(Symbol* symbol, Type* moduleType, Node* referenceParent);
+	std::pair<Symbol*, bool> ResolveAlias(Symbol* symbol);
+	Symbol* resolveAliasWithDeprecationCheck(Symbol* symbol, Node* location);
+	// === end slice: moduletarget ===
+
 	// expr_c dep stubs — owned by other slices; bodies stubbed in
 	// checker_expressions_c.cpp under "dep stubs".
 	void reportNonexistentProperty(Node* propNode, Type* containingType, bool isUncheckedJS); // expressions slice
@@ -3477,6 +3519,12 @@ public:
 	bool areTypesComparable(Type* type1, Type* type2);                      // relater slice
 	std::pair<std::string, std::string> getTypeNamesForErrorDisplay(Type* left, Type* right); // relater slice
 };  // class Checker
+
+// moduletarget-slice file-local callees hoisted for the dep graph (defs in
+// checker_utilities.cpp).
+Node* getExternalModuleRequireArgument(Node* node);              // utilities.go:233
+bool isSyntacticDefault(Node* node);                             // utilities.go:249
+bool hasExportAssignmentSymbol(Symbol* moduleSymbol);            // utilities.go:256
 
 // Free helpers used across checker translation units.
 Diagnostic* NewDiagnosticForNode(Node* node, const DiagnosticMessage* message,
