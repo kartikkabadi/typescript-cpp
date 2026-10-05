@@ -30,7 +30,12 @@ namespace tsc {
 
 [[noreturn]] inline void tscUnreachable(const char* msg) {
 	std::fprintf(stderr, "tsc internal error: %s\n", msg);
-	std::abort();
+	// Go panics (debug.Assert, "unreachable") terminate the process with
+	// exit code 2; match that contract instead of dying by signal. Flush
+	// stdio first — Go's os.Stdout is unbuffered, so anything already
+	// written there must be visible here too.
+	std::fflush(nullptr);
+	std::_Exit(2);
 }
 #define TSC_UNREACHABLE(msg) ::tsc::tscUnreachable(msg)
 #define TSC_ASSERT(cond, msg) assert(((void)(msg), (cond)))

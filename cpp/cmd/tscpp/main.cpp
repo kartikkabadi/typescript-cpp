@@ -23,6 +23,9 @@
 
 #include <algorithm>
 
+#include <csignal>
+#include <unistd.h>
+
 #include "internal/ast/ast.h"
 #include "internal/ast/flow.h"
 #include "internal/binder/binder.h"
@@ -633,7 +636,35 @@ static void parseAll(const char* path, int workers) {
 		files.size(), mb, workers, ms, mb * 1000.0 / ms);
 }
 
+// Go's runtime converts panics and fatal faults (including stack
+// exhaustion) into exit code 2. Mirror that contract for crash paths so
+// conformance runs see the same status the Go oracle reports rather than
+// a signal death. The alternate stack keeps the handler runnable when the
+// fault is itself stack overflow.
+static void crashExit(int sig) {
+	(void)sig;
+	::_exit(2);
+}
+
+static void installCrashExitHandlers() {
+	static stack_t altstack;
+	altstack.ss_sp = std::malloc(SIGSTKSZ);
+	altstack.ss_size = SIGSTKSZ;
+	altstack.ss_flags = 0;
+	sigaltstack(&altstack, nullptr);
+	struct sigaction sa {};
+	sa.sa_handler = crashExit;
+	sigemptyset(&sa.sa_mask);
+	// RESETHAND: a fault inside the handler falls back to the real signal
+	// instead of looping.
+	sa.sa_flags = SA_ONSTACK | SA_RESETHAND;
+	for (int sig : {SIGSEGV, SIGBUS, SIGFPE, SIGILL, SIGABRT}) {
+		sigaction(sig, &sa, nullptr);
+	}
+}
+
 int main(int argc, char** argv) {
+	installCrashExitHandlers();
 	if (argc < 3) {
 		std::fprintf(
 			stderr,
