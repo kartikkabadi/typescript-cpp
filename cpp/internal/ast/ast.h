@@ -133,6 +133,16 @@ struct Node {
 	}
 	template <class F>
 	static bool visitChildList(F&& v, const NodeList* l);
+	// Go visitNodes over a []*Node field (SyntaxList::Children,
+	// JSDocTypeLiteral::JSDocPropertyTags).
+	template <class F>
+	static bool visitChildList(F&& v, const std::vector<Node*>& l) {
+		for (Node* c : l) {
+			if (v(c))
+				return true;
+		}
+		return false;
+	}
 	template <class F>
 	static bool visitChildModifiers(F&& v, const ModifierList* l);
 	template <class F>

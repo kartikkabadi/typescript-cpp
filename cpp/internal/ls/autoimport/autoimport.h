@@ -855,6 +855,7 @@ Node* TypeToAutoImportableTypeNode(checker::Checker* c, ImportAdder* adder,
                                    NodeFactory* factory);
 
 // TypeNodeToAutoImportableTypeNode — import_adder.go:398
+// C++: `factory` supplies the arena the rebuilt nodes are allocated in.
 Node* TypeNodeToAutoImportableTypeNode(
     Node* typeNode, ImportAdder* adder,
     std::unordered_map<Node*, Symbol*>* idToSymbol,
@@ -864,6 +865,8 @@ Node* TypeNodeToAutoImportableTypeNode(
 void importSymbols(ImportAdder* adder, const std::vector<Symbol*>& symbols);
 
 // TryGetAutoImportableReferenceFromTypeNode — import_adder.go:427
+// C++: `factory` supplies the arena the rebuilt nodes are allocated in —
+// it must outlive the returned node (Go: GC heap).
 std::pair<Node*, std::vector<Symbol*>> TryGetAutoImportableReferenceFromTypeNode(
     Node* importTypeNode, std::unordered_map<Node*, Symbol*>* idToSymbol,
     NodeFactory* factory);

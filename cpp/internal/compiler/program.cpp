@@ -880,16 +880,15 @@ SimpleProgram::getBindAndCheckDiagnosticsWithChecker(
 				kept.push_back(d);
 			}
 		}
-		diags = std::move(kept);
-	} else {
-		bool isJS = sourceFile->ScriptKind == ScriptKind::JS ||
-		            sourceFile->ScriptKind == ScriptKind::JSX;
-		bool isCheckJS =
-		    isJS && isCheckJSEnabledForFile(sourceFile, &options);
-		if (isCheckJS) {
-			diags.insert(diags.end(), sourceFile->jsdocDiagnostics.begin(),
-			             sourceFile->jsdocDiagnostics.end());
-		}
+		return kept;
+	}
+	bool isJS = sourceFile->ScriptKind == ScriptKind::JS ||
+	            sourceFile->ScriptKind == ScriptKind::JSX;
+	bool isCheckJS =
+	    isJS && isCheckJSEnabledForFile(sourceFile, &options);
+	if (isCheckJS) {
+		diags.insert(diags.end(), sourceFile->jsdocDiagnostics.begin(),
+		             sourceFile->jsdocDiagnostics.end());
 	}
 
 	auto [filtered, directivesByLine] =

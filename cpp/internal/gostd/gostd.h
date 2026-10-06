@@ -140,17 +140,19 @@ inline T errorAs(const Error& err) {
 struct fmtArg {
 	std::string text;
 	Error err;
+	long long num = 0;
+	bool isInt = false;
 	fmtArg(const char* s) : text(s == nullptr ? "<nil>" : s) {}
 	fmtArg(std::string_view s) : text(s) {}
 	fmtArg(const std::string& s) : text(s) {}
 	fmtArg(const Error& e) : text(e == nullptr ? "<nil>" : e->Error()), err(e) {}
 	fmtArg(const ErrObj& e) : text(e.Error()) {}
-	fmtArg(int v) : text(std::to_string(v)) {}
-	fmtArg(uint32_t v) : text(std::to_string(v)) {}
-	fmtArg(short v) : text(std::to_string(v)) {}
-	fmtArg(unsigned short v) : text(std::to_string(v)) {}
-	fmtArg(int64_t v) : text(std::to_string(v)) {}
-	fmtArg(uint64_t v) : text(std::to_string(v)) {}
+	fmtArg(int v) : text(std::to_string(v)), num(v), isInt(true) {}
+	fmtArg(uint32_t v) : text(std::to_string(v)), num((long long)v), isInt(true) {}
+	fmtArg(short v) : text(std::to_string(v)), num(v), isInt(true) {}
+	fmtArg(unsigned short v) : text(std::to_string(v)), num(v), isInt(true) {}
+	fmtArg(int64_t v) : text(std::to_string(v)), num((long long)v), isInt(true) {}
+	fmtArg(uint64_t v) : text(std::to_string(v)), num((long long)v), isInt(true) {}
 	fmtArg(double v) : text(std::to_string(v)) {}
 	fmtArg(bool v) : text(v ? "true" : "false") {}
 	fmtArg(char c) : text(1, c) {}
@@ -223,11 +225,26 @@ inline std::string sprintfImpl(std::string_view fmt,
 		const fmtArg& a = args[arg++];
 		switch (verb) {
 		case 'q': out += quoteGo(a.text); break;
-		case 'x': {
-			for (unsigned char b : a.text) {
-				char buf[4];
-				std::snprintf(buf, sizeof buf, "%02x", b);
+		case 'x':
+		case 'X': {
+			if (a.isInt) {
+				// Go %x/%X on an integer: hex of the value (sign preserved).
+				unsigned long long u =
+				    a.num < 0 ? 0ULL - (unsigned long long)a.num
+				              : (unsigned long long)a.num;
+				if (a.num < 0) out += '-';
+				char buf[32];
+				std::snprintf(buf, sizeof buf,
+				              verb == 'X' ? "%llX" : "%llx", u);
 				out += buf;
+			} else {
+				// Go %x/%X on a string/[]byte: hex of each byte.
+				for (unsigned char b : a.text) {
+					char buf[4];
+					std::snprintf(buf, sizeof buf,
+					              verb == 'X' ? "%02X" : "%02x", b);
+					out += buf;
+				}
 			}
 			break;
 		}

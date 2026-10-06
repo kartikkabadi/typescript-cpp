@@ -605,8 +605,7 @@ std::string LanguageService::getNewFileNameForModuleRename(
 											   nullptr /*extensions*/,
 											   ignoreCase)) {
 		newPath = tspath::changeAnyExtension(newPath, oldExt,
-											 tspath::extensionsToRemove,
-											 ignoreCase);
+											 {} /*extensions*/, ignoreCase);
 	}
 	return newPath;
 }

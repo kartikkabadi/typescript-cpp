@@ -1041,24 +1041,28 @@ inline std::string changeFullExtension(std::string_view path,
 
 // GetPossibleOriginalInputExtensionForExtension — declaration/JS extensions
 // to the TS input extensions that may have produced them.
-inline std::vector<std::string_view>
+// C++: returns owned strings — the `.d.x.ts` branch synthesizes an extension
+// that cannot be a view into `path` (Go returns a []string that escapes
+// safely into the GC heap).
+inline std::vector<std::string>
 getPossibleOriginalInputExtensionForExtension(std::string_view path) {
 	if (fileExtensionIsOneOf(
 		path, {extensionDmts, extensionMjs, extensionMts})) {
-		return {extensionMts, extensionMjs};
+		return {std::string{extensionMts}, std::string{extensionMjs}};
 	}
 	if (fileExtensionIsOneOf(
 		path, {extensionDcts, extensionCjs, extensionCts})) {
-		return {extensionCts, extensionCjs};
+		return {std::string{extensionCts}, std::string{extensionCjs}};
 	}
 	// Handle any custom .d.x.ts extension (e.g., .d.json.ts -> .json,
 	// .d.css.ts -> .css)
 	if (auto ext = getDeclarationFileExtension(path);
 	    !ext.empty() && ext != extensionDts) {
 		auto inner = ext.substr(3, ext.size() - 3 - 3);  // ".d." .. ".ts"
-		return {std::string{"." + std::string{inner}}};
+		return {"." + std::string{inner}};
 	}
-	return {extensionTsx, extensionTs, extensionJsx, extensionJs};
+	return {std::string{extensionTsx}, std::string{extensionTs},
+	        std::string{extensionJsx}, std::string{extensionJs}};
 }
 
 // GetLongestExtensionFromPath — longest matching extension from `extensions`.

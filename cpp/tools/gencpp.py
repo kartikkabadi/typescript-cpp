@@ -842,7 +842,7 @@ def gen_nodes():
             r"func \(node \*(\w+)\) ForEachChild\(v Visitor\) bool \{\n(.*?)\n\}",
             src_all, re.S):
         sname, body = m.group(1), m.group(2)
-        calls = re.findall(r"(visitModifiers|visitNodeList|visit)\(v, node\.(\w+)\)", body)
+        calls = re.findall(r"(visitModifiers|visitNodeList|visitNodes|visit)\(v, node\.(\w+)\)", body)
         foreach[sname] = calls
 
     # forEachChild_<Struct> helpers a ForEachChild method may delegate to
@@ -1192,6 +1192,8 @@ def gen_nodes():
                           lambda m: f"visitChildModifiers(v, n->{sanitize(m.group(1))})", expr)
             expr = re.sub(r"visitNodeList\(v, node\.(\w+)\)",
                           lambda m: f"visitChildList(v, n->{sanitize(m.group(1))})", expr)
+            expr = re.sub(r"visitNodes\(v, node\.(\w+)\)",
+                          lambda m: f"visitChildList(v, n->{sanitize(m.group(1))})", expr)
             expr = re.sub(r"visit\(v, node\.(\w+)\)",
                           lambda m: f"visitChild(v, n->{sanitize(m.group(1))})", expr)
             expr = re.sub(r"node\.(\w+)",
@@ -1203,7 +1205,7 @@ def gen_nodes():
             cf = sanitize(field)
             if fn == "visit":
                 parts.append(f"visitChild(v, n->{cf})")
-            elif fn == "visitNodeList":
+            elif fn in ("visitNodeList", "visitNodes"):
                 parts.append(f"visitChildList(v, n->{cf})")
             elif fn == "visitModifiers":
                 parts.append(f"visitChildModifiers(v, n->{cf})")
@@ -1226,6 +1228,12 @@ def gen_nodes():
     out.append("inline ModifierList* deepCloneModifierList(NodeFactory& f,\n"
                "                                           const ModifierList* m,\n"
                "                                           bool syntheticLocation = true);\n\n")
+    out.append("inline std::vector<Node*> deepCloneNodeVec(\n"
+               "    NodeFactory& f, const std::vector<Node*>& l,\n"
+               "    bool syntheticLocation) {\n"
+               "\tstd::vector<Node*> c = l;\n"
+               "\tfor (auto& n : c) n = deepCloneNode(f, n, syntheticLocation);\n"
+               "\treturn c;\n}\n\n")
     out.append("inline NodeList* deepCloneNodeList(NodeFactory& f,\n"
                "                                   const NodeList* l,\n"
                "                                   bool syntheticLocation) {\n"
@@ -1276,6 +1284,7 @@ def gen_nodes():
             cf = sanitize(field)
             tgt = {"visit": "deepCloneNode",
                    "visitNodeList": "deepCloneNodeList",
+                   "visitNodes": "deepCloneNodeVec",
                    "visitModifiers": "deepCloneModifierList"}[fn]
             out.append(f"\t\t\tc->{cf} = {tgt}(f, n->{cf}, syntheticLocation);\n")
         out.append("\t\t\tif (syntheticLocation) c->loc = TextRange{-1, -1};\n"

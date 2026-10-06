@@ -2150,7 +2150,9 @@ void Checker::addErrorOrSuggestion(bool isError, Diagnostic* diagnostic) {
 	if (isError) {
 		addDiagnostic(diagnostic);
 	} else {
-		addSuggestionDiagnostic(diagnostic);
+		auto* suggestion = diagnostic->Clone();
+		suggestion->SetCategory(DiagnosticCategory::Suggestion);
+		addSuggestionDiagnostic(suggestion);
 	}
 }
 
