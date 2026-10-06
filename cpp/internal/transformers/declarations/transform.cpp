@@ -4101,7 +4101,13 @@ Node* DeclarationTransformerImpl::createFullExpandoBlock(NodeId id) {
 			transformExpandoAssignment(assignment->as<BinaryExpression>());
 		}
 	}
-	Node* n = expandoHosts[id];
+	// Go map-read semantics: no operator[] — a miss must not insert a null
+	// entry (it would poison transformExpandoHost's `count(id)` guard on a
+	// later pass, leaving the host untransformed).
+	Node* n = nullptr;
+	if (auto it = expandoHosts.find(id); it != expandoHosts.end()) {
+		n = it->second;
+	}
 	auto addOnsIt = expandoMembers.find(id);
 	if (addOnsIt != expandoMembers.end()) {
 		std::vector<Node*>& addOns = addOnsIt->second;

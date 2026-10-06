@@ -795,36 +795,50 @@ Type* Checker::filterType(Type* t, const std::function<bool(Type*)>& f) {
 	if (t->flags & TypeFlagsUnion) {
 		UnionType* u = t->AsUnionType();
 		const std::vector<Type*>& types = u->types;
-		if (u->origin != nullptr && (u->origin->flags & TypeFlagsUnion)) {
-			// Fast path: origin is also a union and isn't modified by the filter,
-			// so the result is this same union type.
-			bool kept = true;
-			for (Type* s : u->origin->types()) {
-				if (s->flags & TypeFlagsUnion) {
-					for (Type* s2 : s->types()) {
-						if (!f(s2)) {
-							kept = false;
-							break;
-						}
-					}
-				} else if (!f(s)) {
-					kept = false;
-				}
-				if (!kept) {
-					break;
-				}
-			}
-			if (kept) {
-				return t;
-			}
-		}
 		std::vector<Type*> filtered;
+		filtered.reserve(types.size());
 		for (Type* s : types) {
 			if (f(s)) {
 				filtered.push_back(s);
 			}
 		}
-		return getUnionType(std::move(filtered));
+		if (filtered.size() == types.size()) {
+			return t;
+		}
+		Type* origin = u->origin;
+		Type* newOrigin = nullptr;
+		if (origin != nullptr && (origin->flags & TypeFlagsUnion)) {
+			// If the origin type is a (denormalized) union type, filter its non-union
+			// constituents. If that ends up removing a smaller number of types than
+			// in the normalized constituent set (meaning some of the filtered types
+			// are within nested unions in the origin), then we can't construct a
+			// new origin type. Otherwise, if we have exactly one type left in the
+			// origin set, return that as the filtered type. Otherwise, construct a
+			// new filtered origin type.
+			const std::vector<Type*>& originTypes = origin->types();
+			std::vector<Type*> originFiltered;
+			originFiltered.reserve(originTypes.size());
+			for (Type* ot : originTypes) {
+				if ((ot->flags & TypeFlagsUnion) || f(ot)) {
+					originFiltered.push_back(ot);
+				}
+			}
+			if (originTypes.size() - originFiltered.size() ==
+			    types.size() - filtered.size()) {
+				if (originFiltered.size() == 1) {
+					return originFiltered[0];
+				}
+				newOrigin = newUnionType(ObjectFlagsNone, originFiltered);
+			}
+		}
+		// filtering could remove intersections so `ContainsIntersections` might be
+		// forwarded "incorrectly" - it is purely an optimization hint so there is
+		// no harm in accidentally forwarding it
+		return getUnionTypeFromSortedList(
+			std::move(filtered),
+			t->objectFlags &
+			    (ObjectFlagsPrimitiveUnion | ObjectFlagsContainsIntersections),
+			nullptr /*alias*/, newOrigin);
 	}
 	return f(t) ? t : neverType;
 }

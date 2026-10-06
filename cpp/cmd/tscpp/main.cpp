@@ -484,6 +484,9 @@ static void emitFile(int argc, char** argv) {
 // emitdumpFile — emitdump (Go) twin. Same pipeline as emitFile but captures
 // every WriteFile and appends `W <fileName>` + verbatim content sections.
 static void emitdumpFile(int argc, char** argv) {
+	// The Go oracle harness records `EXIT <code>` for a crashing emitdump
+	// run; emit that line ourselves so merged-capture diffs see it.
+	tsc::tscEmitdumpPanicExit = true;
 	compiler::CompilerHost host;
 	host.currentDirectory =
 	    tspath::normalizePath(std::filesystem::current_path().string());
@@ -645,6 +648,11 @@ static void parseAll(const char* path, int workers) {
 // fault is itself stack overflow.
 static void crashExit(int sig) {
 	(void)sig;
+	if (tsc::tscEmitdumpPanicExit) {
+		// write() is async-signal-safe; mirror the panic path's `EXIT 2`.
+		const char msg[] = "EXIT 2\n";
+		(void)!write(STDOUT_FILENO, msg, sizeof(msg) - 1);
+	}
 	::_exit(2);
 }
 

@@ -90,7 +90,7 @@ void emitter::emit() {
 	emitJSFile(sourceFile, paths->JsFilePath(), paths->SourceMapFilePath());
 	emitDeclarationFile(sourceFile, paths->DeclarationFilePath(),
 	                    paths->DeclarationMapPath());
-	emitResult.Diagnostics = emitterDiagnostics;
+	emitResult.Diagnostics = emitterDiagnostics.GetDiagnostics();
 }
 
 // emitter.go:60 getDeclarationTransformers
@@ -319,7 +319,7 @@ void emitter::emitDeclarationFile(SourceFile* sourceFile,
 
 	for (auto* elem : diags) {
 		// Add declaration transform diagnostics to emit diagnostics
-		emitterDiagnostics.push_back(elem);
+		emitterDiagnostics.Add(elem);
 	}
 
 	if (!forceEmit && emitOnly != EmitOnly::EmitOnlyBuilderSignature &&
@@ -446,7 +446,7 @@ void emitter::printSourceFile(const std::string& jsFilePath,
 			mapData.SourceFile = this->sourceFile;
 			auto err = writeText(sourceMapFilePath, sourceMap, &mapData);
 			if (err.has_value()) {
-				emitterDiagnostics.push_back(tsoptions::newCompilerDiagnostic(
+				emitterDiagnostics.Add(tsoptions::newCompilerDiagnostic(
 				    Could_not_write_file_0_Colon_1, {jsFilePath, *err}));
 			} else {
 				emitResult.EmittedFiles.push_back(sourceMapFilePath);
@@ -463,12 +463,12 @@ void emitter::printSourceFile(const std::string& jsFilePath,
 	}
 	WriteFileData data;
 	data.SourceMapUrlPos = sourceMapUrlPos;
-	data.Diagnostics = emitterDiagnostics;
+	data.Diagnostics = emitterDiagnostics.GetDiagnostics();
 	data.SourceFile = this->sourceFile;
 	auto err = writeText(jsFilePath, text, &data);
 	bool skippedDtsWrite = data.SkippedDtsWrite;
 	if (err.has_value()) {
-		emitterDiagnostics.push_back(tsoptions::newCompilerDiagnostic(
+		emitterDiagnostics.Add(tsoptions::newCompilerDiagnostic(
 		    Could_not_write_file_0_Colon_1, {jsFilePath, *err}));
 	} else if (!skippedDtsWrite) {
 		emitResult.EmittedFiles.push_back(jsFilePath);

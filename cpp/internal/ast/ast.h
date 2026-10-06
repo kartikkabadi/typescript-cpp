@@ -28,8 +28,19 @@
 
 namespace tsc {
 
+// emitdump conformance mode: the Go oracle harness records `EXIT <code>`
+// when the emitdump binary dies (panic → exit 2), with stderr discarded.
+// tscpp emitdump sets this so the panic path emits the same `EXIT 2` line on
+// stdout instead of the internal-error text the merged-capture harness would
+// otherwise record.
+inline bool tscEmitdumpPanicExit = false;
+
 [[noreturn]] inline void tscUnreachable(const char* msg) {
-	std::fprintf(stderr, "tsc internal error: %s\n", msg);
+	if (tscEmitdumpPanicExit) {
+		std::fprintf(stdout, "EXIT 2\n");
+	} else {
+		std::fprintf(stderr, "tsc internal error: %s\n", msg);
+	}
 	// Go panics (debug.Assert, "unreachable") terminate the process with
 	// exit code 2; match that contract instead of dying by signal. Flush
 	// stdio first — Go's os.Stdout is unbuffered, so anything already

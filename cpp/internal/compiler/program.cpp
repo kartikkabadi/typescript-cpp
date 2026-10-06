@@ -1207,8 +1207,13 @@ bool SimpleProgram::SourceFileMayBeEmitted(SourceFile* sourceFile,
 EmitResult* SimpleProgram::Emit(EmitOptions* options) {
 	if (!options->ForceEmit &&
 	    options->EmitOnly != EmitOnly::EmitOnlyBuilderSignature) {
+		// Go passes options.TargetSourceFiles (nil when unset); an empty
+		// vector is our nil, so map empty back to nullptr here.
 		auto* result = HandleNoEmitOptions(
-		    this, &options->TargetSourceFiles, nullptr);
+		    this,
+		    options->TargetSourceFiles.empty() ? nullptr
+		                                       : &options->TargetSourceFiles,
+		    nullptr);
 		if (result != nullptr) {
 			return result;
 		}
