@@ -636,6 +636,7 @@ static void parseAll(const char* path, int workers) {
 		const std::vector<std::string>* files;
 		std::atomic<size_t>* next;
 		std::atomic<size_t>* totalBytes;
+		std::atomic<size_t>* arenaBytes;
 	};
 	auto workerMain = [](void* ctx) -> void* {
 		auto* work = static_cast<Work*>(ctx);
@@ -652,10 +653,12 @@ static void parseAll(const char* path, int workers) {
 				opts, src, scriptKindFromFileName(path));
 			(void)f;
 			*work->totalBytes += src.size();
+			*work->arenaBytes += f->nodeArena.blockBytes();
 		}
 		return nullptr;
 	};
-	Work work{&files, &next, &totalBytes};
+	std::atomic<size_t> arenaBytes{0};
+	Work work{&files, &next, &totalBytes, &arenaBytes};
 	std::vector<pthread_t> pool(static_cast<size_t>(workers));
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
@@ -673,8 +676,9 @@ static void parseAll(const char* path, int workers) {
 			.count();
 	double mb = static_cast<double>(totalBytes) / (1024.0 * 1024.0);
 	std::printf(
-		"tscpp parse-all: %zu files, %.1f MB, %d workers: %.1f ms, %.1f MB/s\n",
-		files.size(), mb, workers, ms, mb * 1000.0 / ms);
+		"tscpp parse-all: %zu files, %.1f MB, %d workers: %.1f ms, %.1f MB/s (arena %.1f MB)\n",
+		files.size(), mb, workers, ms, mb * 1000.0 / ms,
+		arenaBytes.load() / (1024.0 * 1024.0));
 }
 
 // Go's runtime converts panics and fatal faults (including stack

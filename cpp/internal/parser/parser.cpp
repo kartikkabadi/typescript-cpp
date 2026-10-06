@@ -335,6 +335,13 @@ void Parser::initializeState(SourceFileParseOptions opts_,
 	opts = opts_;
 	sourceText = sourceText_;
 	scriptKind = scriptKind_;
+	// Size the node arena's first block to the file instead of grabbing a
+	// fixed 1MB (over mmap_threshold) up front. AST bytes run roughly 8x
+	// source bytes; the arena doubles geometrically to 1MB if we undershoot.
+	size_t hint = sourceText_.size() * 8;
+	constexpr size_t kArenaFloor = 64 << 10, kArenaCap = 1 << 20;
+	factory.arena().setBlockSize(
+		hint < kArenaFloor ? kArenaFloor : hint > kArenaCap ? kArenaCap : hint);
 	languageVariant = getLanguageVariant(scriptKind);
 	switch (scriptKind) {
 	case ScriptKind::JS:

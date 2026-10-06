@@ -8,6 +8,13 @@
 
 namespace tsc::printer {
 
+// GC pacing for releaseArenas(): sweep once the bytes allocated across ALL
+// tracked arenas since the last sweep exceed clamp(live/4, floor, cap) —
+// Go's GOGC-style proportional trigger. The floor keeps tiny heaps from
+// sweeping per call; the cap bounds garbage absolute RSS when live is huge.
+constexpr size_t kTrackedArenaSweepFloor = 32 << 20;
+constexpr size_t kTrackedArenaSweepCap = 64 << 20;
+
 // NewNodeFactory (factory.go) — wires the emit-aware hooks (synthesized flag
 // on create, original-node tracking on update/clone).
 // printer::NodeFactory ctor lives in factory.cpp (NewNodeFactory,
@@ -55,6 +62,16 @@ void EmitContext::releaseArenas() {
 	Arena& a = factory.arena();
 	if (!a.isTracked()) {
 		return; // bump arena: per-context lifetime, freed on reset()
+	}
+	// Go's ReleaseArenas is O(1) — it drops the arena slice headers and lets
+	// the GC reclaim garbage on its own schedule. Our mark+sweep is O(live
+	// heap) per call, so callers that release after every typeToString made
+	// check quadratic in serialized nodes: only sweep once the garbage since
+	// the last sweep outgrows the surviving heap (and a floor for small
+	// heaps). Amortized O(1) per released byte, same bound Go pays in GC CPU.
+	if (!Arena::globalShouldSweep(kTrackedArenaSweepFloor,
+	                              kTrackedArenaSweepCap)) {
+		return;
 	}
 	a.beginMark();
 	for (auto& [key, value] : emitNodes.entries) {
