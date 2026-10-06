@@ -55,4 +55,11 @@ std::unique_ptr<VfsParseConfigHost> NewVFSParseConfigHostWithSymlinks(
     const std::unordered_map<std::string, std::string>& symlinks,
     const std::string& currentDirectory, bool useCaseSensitiveFileNames);
 
+// GetParsedCommandLine — parsedcommandline.go:9. Go takes an
+// assert.TestingT purely as an assertion context; the C++ helper drops it.
+tsoptions::ParsedCommandLine* GetParsedCommandLine(
+    std::string_view jsonText,
+    const std::unordered_map<std::string, std::string>& files,
+    const std::string& currentDirectory, bool useCaseSensitiveFileNames);
+
 }  // namespace tsc::tsoptions::tsoptionstest

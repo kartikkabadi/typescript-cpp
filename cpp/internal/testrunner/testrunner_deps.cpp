@@ -68,4 +68,23 @@ std::unique_ptr<VfsParseConfigHost> NewVFSParseConfigHostWithSymlinks(
 	return std::unique_ptr<VfsParseConfigHost>(host);
 }
 
+// GetParsedCommandLine — parsedcommandline.go:9.
+tsoptions::ParsedCommandLine* GetParsedCommandLine(
+    std::string_view jsonText,
+    const std::unordered_map<std::string, std::string>& files,
+    const std::string& currentDirectory, bool useCaseSensitiveFileNames) {
+	auto host = NewVFSParseConfigHost(files, currentDirectory,
+	                                  useCaseSensitiveFileNames);
+	std::string configFileName =
+	    tspath::combinePaths(currentDirectory, "tsconfig.json");
+	auto* tsconfigSourceFile = tsoptions::NewTsconfigSourceFileFromFilePath(
+	    configFileName,
+	    tspath::toPath(configFileName, currentDirectory,
+	                   useCaseSensitiveFileNames),
+	    jsonText);
+	return tsoptions::ParseJsonSourceFileConfigFileContent(
+	    tsconfigSourceFile, host.get(), currentDirectory, nullptr, {},
+	    configFileName, {}, nullptr);
+}
+
 }  // namespace tsc::tsoptions::tsoptionstest

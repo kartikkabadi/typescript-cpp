@@ -37,8 +37,11 @@
 // sys.cpp — tsc/cmd/tsc/sys.go
 tsc::execute::tsc::System* newSystem();
 #include "internal/diagnostics/diagnostics.h"
+#include "internal/diagnosticwriter/diagnosticwriter.h"
+#include "internal/locale/locale.h"
 #include "internal/parser/parser.h"
 #include "internal/scanner/scanner.h"
+#include "internal/transpile/transpile.h"
 #include "internal/tsoptions/tsoptions.h"
 #include "internal/bundled/bundled.h"
 #include "internal/vfs/osvfs/osvfs.h"
@@ -482,6 +485,38 @@ static void emitFile(int argc, char** argv) {
 	dumpDiagnostics(diags);
 }
 
+// transpiledumpFile — tsc/cmd/transpiledump/main.go. stdin = TS source;
+// stdout = transpile output + `diags:%d` + one `code String()` line per
+// diagnostic. `transpiledump [-decl] < file.ts`.
+static void transpiledumpFile(int argc, char** argv) {
+	bool decl = argc > 2 && std::string(argv[2]) == "-decl";
+	// os.ReadFile("/dev/stdin") — slurp fd 0.
+	std::string src;
+	char buf[8192];
+	for (;;) {
+		ssize_t n = ::read(STDIN_FILENO, buf, sizeof(buf));
+		if (n <= 0) {
+			break;
+		}
+		src.append(buf, n);
+	}
+	transpile::Options opts;
+	opts.CompilerOptions = new CompilerOptions{};
+	transpile::Output* out = decl
+	    ? transpile::TranspileDeclaration(src, opts)
+	    : transpile::TranspileModule(src, opts);
+	if (out == nullptr) {
+		return;
+	}
+	std::printf("%s\ndiags:%d", out->OutputText.c_str(),
+	            int(out->Diagnostics.size()));
+	for (auto* d : out->Diagnostics) {
+		diagnosticwriter::ASTDiagnostic ad(d);
+		std::printf("\n%d %s", d->Code(),
+		            ad.localize(locale::Default).c_str());
+	}
+}
+
 // emitdumpFile — emitdump (Go) twin. Same pipeline as emitFile but captures
 // every WriteFile and appends `W <fileName>` + verbatim content sections.
 static void emitdumpFile(int argc, char** argv) {
@@ -687,11 +722,13 @@ int main(int argc, char** argv) {
 		"       tscpp tsc <args...>  the real tsc CLI\n");
 		return 2;
 	}
-	if (argc < 3 && std::string(argv[1]) != "tsc") {
+	if (argc < 3 && std::string(argv[1]) != "tsc" &&
+	    std::string(argv[1]) != "transpiledump") {
 		std::fprintf(
 			stderr,
 			"usage: tscpp <lex|lex-json|bench|parse|bench-parse|parse-all|bind|check|emit|emitdump> <file|dir> [iters|workers]\n"
-			"       tscpp tsc <args...>  the real tsc CLI\n");
+			"       tscpp tsc <args...>  the real tsc CLI\n"
+			"       tscpp transpiledump [-decl] < file.ts\n");
 		return 2;
 	}
 	std::string mode = argv[1];
@@ -720,13 +757,18 @@ int main(int argc, char** argv) {
 	if (mode != "lex" && mode != "lex-json" && mode != "bench" &&
 	    mode != "parse" && mode != "bench-parse" && mode != "parse-all" &&
 	    mode != "bind" && mode != "check" && mode != "emit" &&
-	    mode != "emitdump") {
+	    mode != "emitdump" && mode != "transpiledump") {
 		std::fprintf(stderr, "tscpp: unknown mode %s\n", mode.c_str());
 		return 2;
 	}
 	if (mode == "parse-all") {
 		int workers = argc > 3 ? std::atoi(argv[3]) : 0;
 		parseAll(argv[2], workers);
+		return 0;
+	}
+	if (mode == "transpiledump") {
+		// stdin-driven — no file arg.
+		transpiledumpFile(argc, argv);
 		return 0;
 	}
 	std::string src = readFile(argv[2]);
