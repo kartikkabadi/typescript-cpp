@@ -35,6 +35,17 @@ std::string GetErrorBaseline(
                               diagnosticwriter::ASTDiagnostic*),
     bool pretty);
 
+// GetErrorBaseline — error_baseline.go:61. Diagnostic* instantiation
+// (used by fourslash).
+std::string GetErrorBaseline(
+    gostd::testing::T* t,
+    const std::vector<harnessutil::TestFile*>& inputFiles,
+    const std::vector<diagnosticwriter::Diagnostic*>& diagnostics,
+    const std::function<int(diagnosticwriter::Diagnostic*,
+                            diagnosticwriter::Diagnostic*)>&
+        compareDiagnostics,
+    bool pretty);
+
 // DoContentMapperBaseline — contentmapper_baseline.go:26.
 void DoContentMapperBaseline(gostd::testing::T* t,
                              const std::string& baselinePath,

@@ -146,6 +146,9 @@ struct fmtArg {
 	fmtArg(const Error& e) : text(e == nullptr ? "<nil>" : e->Error()), err(e) {}
 	fmtArg(const ErrObj& e) : text(e.Error()) {}
 	fmtArg(int v) : text(std::to_string(v)) {}
+	fmtArg(uint32_t v) : text(std::to_string(v)) {}
+	fmtArg(short v) : text(std::to_string(v)) {}
+	fmtArg(unsigned short v) : text(std::to_string(v)) {}
 	fmtArg(int64_t v) : text(std::to_string(v)) {}
 	fmtArg(uint64_t v) : text(std::to_string(v)) {}
 	fmtArg(double v) : text(std::to_string(v)) {}
