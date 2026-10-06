@@ -33,12 +33,6 @@ TextRange Converters::FromLSPRangeToOriginal(SourceFile* script,
 	TSC_UNREACHABLE("Converters::FromLSPRangeToOriginal — lsconv slice");
 }
 
-Converters* NewConverters(
-    lsproto::PositionEncodingKind positionEncoding,
-    std::function<LSPLineMap*(const std::string&)> getLineMap) {
-	return new Converters(std::move(positionEncoding), std::move(getLineMap));
-}
-
 // Templated member dep-stubs.
 template <Script T>
 std::pair<lsproto::Range, spanmap::Fidelity> Converters::ToLSPRange(
@@ -113,15 +107,6 @@ missingMemberFixer* newMissingMemberFixer(
 	    "newMissingMemberFixer — ls/codeactions_missingmemberfixer slice");
 }
 
-std::tuple<std::string, std::string, std::string,
-           std::vector<lsproto::VSClassifiedTextRun*>>
-LanguageService::getQuickInfoAndDocumentationForSymbol(
-    checker::Checker* c, Symbol* symbol, Node* node,
-    lsproto::MarkupKind contentFormat, checker::VerbosityContext* vc,
-    bool vsCapability) {
-	TSC_UNREACHABLE(
-	    "getQuickInfoAndDocumentationForSymbol — ls/hover slice");
-}
 
 } // namespace tsc::ls
 

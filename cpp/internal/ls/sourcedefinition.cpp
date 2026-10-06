@@ -1,6 +1,7 @@
 // === slice: ls-coreC ===
 // sourcedefinition.cpp — sourcedefinition.go: resolve .d.ts declarations back
 // to implementation files via the NoDts resolver.
+#include "internal/astnav/tokens.h"
 #include "internal/ls/ls.h"
 
 #include "internal/modulespecifiers/types.h"
@@ -841,7 +842,7 @@ lsp::lsproto::DefinitionResponse LanguageService::ProvideSourceDefinition(
 		}
 	}
 	return combineDefinitionResponses(
-		results, lsp::lsproto::GetClientCapabilities(ctx)
+		results, lsp::lsproto::getClientCapabilities(ctx)
 					 ->TextDocument.Definition.LinkSupport);
 }
 
@@ -850,8 +851,7 @@ std::pair<lsp::lsproto::DefinitionResponse, gostd::Error>
 LanguageService::provideSourceDefinitionAtPosition(
 	gostd::Context ctx, compiler::SimpleProgram* program, SourceFile* file,
 	TextPos textPos) {
-	const lsp::lsproto::ResolvedClientCapabilities* caps =
-		lsp::lsproto::GetClientCapabilities(ctx);
+	auto caps = lsp::lsproto::getClientCapabilities(ctx);
 	bool clientSupportsLink = caps->TextDocument.Definition.LinkSupport;
 
 	int pos = int(textPos);

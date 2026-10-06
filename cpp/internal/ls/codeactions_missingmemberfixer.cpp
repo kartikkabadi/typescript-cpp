@@ -218,7 +218,7 @@ std::pair<checker::NodeBuilder*, std::unordered_map<Node*, Symbol*>>
 missingMemberFixer::createNodeBuilder() {
 	auto idToSymbol = std::unordered_map<Node*, Symbol*>();
 	auto* nodeBuilder = checker::NewNodeBuilderEx(
-	    typeChecker, changeTracker->EmitContext, &idToSymbol);
+	    typeChecker, changeTracker->emitContext, &idToSymbol);
 	return {nodeBuilder, idToSymbol};
 }
 
@@ -239,7 +239,7 @@ std::vector<Node*> missingMemberFixer::createMemberFromSymbol(
 		kind = declaration->kind;
 	}
 	auto* declarationName = createDeclarationName(
-	    changeTracker->NodeFactory, typeChecker, symbol, declaration);
+	    changeTracker->nodeFactory, typeChecker, symbol, declaration);
 	auto* modifiers = createModifiers(symbol, declaration);
 
 	nodebuilder::Flags flags = nodebuilder::FlagsNoTruncation;
@@ -262,11 +262,11 @@ std::vector<Node*> missingMemberFixer::createMemberFromSymbol(
 		if (optional &&
 		    (preserveOptional & preserveOptionalFlagsProperty) != 0) {
 			questionToken =
-			    changeTracker->NodeFactory->newToken(Kind::QuestionToken);
+			    changeTracker->nodeFactory->newToken(Kind::QuestionToken);
 		}
-		nodes.push_back(changeTracker->NodeFactory->newPropertyDeclaration(
+		nodes.push_back(changeTracker->nodeFactory->newPropertyDeclaration(
 		    modifiers,
-		    createPropertyName(changeTracker->NodeFactory, declarationName,
+		    createPropertyName(changeTracker->nodeFactory, declarationName,
 		                       quotePreference),
 		    questionToken, typeNode, nullptr /*initializer*/));
 		return nodes;
@@ -288,9 +288,9 @@ std::vector<Node*> missingMemberFixer::createMemberFromSymbol(
 		for (auto* accessor : orderedAccessors) {
 			if (isGetAccessorDeclaration(accessor)) {
 				nodes.push_back(
-				    changeTracker->NodeFactory->newGetAccessorDeclaration(
+				    changeTracker->nodeFactory->newGetAccessorDeclaration(
 				        modifiers,
-				        createPropertyName(changeTracker->NodeFactory,
+				        createPropertyName(changeTracker->nodeFactory,
 				                           declarationName,
 				                           quotePreference),
 				        nullptr /*typeParameters*/,
@@ -309,14 +309,14 @@ std::vector<Node*> missingMemberFixer::createMemberFromSymbol(
 				}
 
 				nodes.push_back(
-				    changeTracker->NodeFactory->newSetAccessorDeclaration(
+				    changeTracker->nodeFactory->newSetAccessorDeclaration(
 				        modifiers,
-				        createPropertyName(changeTracker->NodeFactory,
+				        createPropertyName(changeTracker->nodeFactory,
 				                           declarationName,
 				                           quotePreference),
 				        nullptr /*typeParameters*/,
 				        createDummyParameters(
-				            changeTracker->NodeFactory, 1,
+				            changeTracker->nodeFactory, 1,
 				            {parameter->name()->text()},
 				            {createTypeNode(t, enclosingDeclaration, flags,
 				                            nodeBuilder, &idToSymbol)},
@@ -447,9 +447,9 @@ ModifierList* missingMemberFixer::createModifiers(Symbol* symbol,
 	if (modifierFlags == ModifierFlagsNone) {
 		return nullptr;
 	}
-	return changeTracker->NodeFactory->newModifierList(
+	return changeTracker->nodeFactory->newModifierList(
 	    createModifiersFromModifierFlags(modifierFlags,
-	                                     *changeTracker->NodeFactory));
+	                                     *changeTracker->nodeFactory));
 }
 
 // shouldAddOverrideKeyword — codeactions_missingmemberfixer.go:204.
@@ -516,7 +516,7 @@ Node* missingMemberFixer::createSignatureDeclarationFromSignature(
 				}
 
 				nodes.push_back(
-				    changeTracker->NodeFactory
+				    changeTracker->nodeFactory
 				        ->updateTypeParameterDeclaration(
 				            typeParameter,
 				            typeParameter->Node::modifiers(),
@@ -526,7 +526,7 @@ Node* missingMemberFixer::createSignatureDeclarationFromSignature(
 				nodes.push_back(tp);
 			}
 		}
-		typeParameters = changeTracker->NodeFactory->newNodeList(nodes);
+		typeParameters = changeTracker->nodeFactory->newNodeList(nodes);
 	}
 
 	if (parameters != nullptr) {
@@ -545,14 +545,14 @@ Node* missingMemberFixer::createSignatureDeclarationFromSignature(
 			}
 
 			nodes.push_back(
-			    changeTracker->NodeFactory->updateParameterDeclaration(
+			    changeTracker->nodeFactory->updateParameterDeclaration(
 			        parameter, parameter->Node::modifiers(),
 			        parameter->DotDotDotToken, parameter->Node::name(),
 			        ifElse(isJS, (Node*)nullptr,
 			               parameter->QuestionToken),
 			        parameterTypeNode, parameter->Initializer));
 		}
-		parameters = changeTracker->NodeFactory->newNodeList(nodes);
+		parameters = changeTracker->nodeFactory->newNodeList(nodes);
 	}
 
 	if (typeNode != nullptr) {
@@ -562,13 +562,13 @@ Node* missingMemberFixer::createSignatureDeclarationFromSignature(
 	Node* questionToken = nullptr;
 	if (optional) {
 		questionToken =
-		    changeTracker->NodeFactory->newToken(Kind::QuestionToken);
+		    changeTracker->nodeFactory->newToken(Kind::QuestionToken);
 	}
 
 	switch (kind) {
 	case Kind::FunctionExpression: {
 		auto* fn = signatureDeclaration->as<FunctionExpression>();
-		return changeTracker->NodeFactory->updateFunctionExpression(
+		return changeTracker->nodeFactory->updateFunctionExpression(
 		    fn, modifiers, fn->AsteriskToken,
 		    ifElse(name != nullptr && isIdentifier(name), name,
 		           (Node*)nullptr),
@@ -578,7 +578,7 @@ Node* missingMemberFixer::createSignatureDeclarationFromSignature(
 
 	case Kind::ArrowFunction: {
 		auto* fn = signatureDeclaration->as<ArrowFunction>();
-		return changeTracker->NodeFactory->updateArrowFunction(
+		return changeTracker->nodeFactory->updateArrowFunction(
 		    fn, modifiers, typeParameters, parameters, typeNode,
 		    fn->FullSignature, fn->EqualsGreaterThanToken,
 		    orElse(body, fn->Body));
@@ -588,10 +588,10 @@ Node* missingMemberFixer::createSignatureDeclarationFromSignature(
 		auto* method = signatureDeclaration->as<MethodDeclaration>();
 		auto* methodName = ifElse(
 		    name == nullptr,
-		    changeTracker->NodeFactory->newIdentifier(""),
-		    createPropertyName(changeTracker->NodeFactory, name,
+		    changeTracker->nodeFactory->newIdentifier(""),
+		    createPropertyName(changeTracker->nodeFactory, name,
 		                       quotePreference));
-		return changeTracker->NodeFactory->updateMethodDeclaration(
+		return changeTracker->nodeFactory->updateMethodDeclaration(
 		    method, modifiers, method->AsteriskToken, methodName,
 		    questionToken, typeParameters, parameters, typeNode,
 		    method->FullSignature, body);
@@ -599,7 +599,7 @@ Node* missingMemberFixer::createSignatureDeclarationFromSignature(
 
 	case Kind::FunctionDeclaration: {
 		auto* fn = signatureDeclaration->as<FunctionDeclaration>();
-		return changeTracker->NodeFactory->updateFunctionDeclaration(
+		return changeTracker->nodeFactory->updateFunctionDeclaration(
 		    fn, modifiers, fn->AsteriskToken,
 		    ifElse(name != nullptr && isIdentifier(name), name,
 		           (Node*)nullptr),
@@ -655,7 +655,7 @@ Node* missingMemberFixer::createSignatureDeclarationFromSignatures(
 		parameterNames.push_back(symbol->name);
 	}
 	auto* parameters = createDummyParameters(
-	    changeTracker->NodeFactory, maxNonRestArgs, parameterNames,
+	    changeTracker->nodeFactory, maxNonRestArgs, parameterNames,
 	    {} /*types*/, minArgumentCount, isInJSFile(enclosingDeclaration));
 
 	if (hasRestParameter) {
@@ -668,32 +668,32 @@ Node* missingMemberFixer::createSignatureDeclarationFromSignatures(
 		Node* questionToken = nullptr;
 		if (maxNonRestArgs >= minArgumentCount) {
 			questionToken =
-			    changeTracker->NodeFactory->newToken(Kind::QuestionToken);
+			    changeTracker->nodeFactory->newToken(Kind::QuestionToken);
 		}
 
 		parameters->nodes.push_back(
-		    changeTracker->NodeFactory->newParameterDeclaration(
+		    changeTracker->nodeFactory->newParameterDeclaration(
 		        nullptr /*modifiers*/,
-		        changeTracker->NodeFactory->newToken(
+		        changeTracker->nodeFactory->newToken(
 		            Kind::DotDotDotToken),
-		        changeTracker->NodeFactory->newIdentifier(
+		        changeTracker->nodeFactory->newIdentifier(
 		            restParameterName),
 		        questionToken,
-		        changeTracker->NodeFactory->newArrayTypeNode(
-		            changeTracker->NodeFactory->newKeywordTypeNode(
+		        changeTracker->nodeFactory->newArrayTypeNode(
+		            changeTracker->nodeFactory->newKeywordTypeNode(
 		                Kind::UnknownKeyword)),
 		        nullptr /*initializer*/));
 	}
 
 	auto* methodName = ifElse(
-	    name == nullptr, changeTracker->NodeFactory->newIdentifier(""),
-	    createPropertyName(changeTracker->NodeFactory, name,
+	    name == nullptr, changeTracker->nodeFactory->newIdentifier(""),
+	    createPropertyName(changeTracker->nodeFactory, name,
 	                       quotePreference));
 
-	return changeTracker->NodeFactory->newMethodDeclaration(
+	return changeTracker->nodeFactory->newMethodDeclaration(
 	    modifiers, nullptr /*asteriskToken*/, methodName,
 	    ifElse(optional,
-	           changeTracker->NodeFactory->newToken(Kind::QuestionToken),
+	           changeTracker->nodeFactory->newToken(Kind::QuestionToken),
 	           (Node*)nullptr),
 	    nullptr /*typeParameters*/, parameters,
 	    getReturnTypeFromSignatures(signatures, enclosingDeclaration,
@@ -737,7 +737,7 @@ Node* missingMemberFixer::importTypeNode(
 
 	auto [importedTypeNode, symbols] =
 	    autoimport::TryGetAutoImportableReferenceFromTypeNode(typeNode,
-	                                                        *idToSymbol);
+	                                                        idToSymbol);
 	if (importedTypeNode != nullptr) {
 		for (auto* symbol : symbols) {
 			auto* exportSymbol = getExportedSymbol(symbol);
@@ -787,7 +787,7 @@ Node* missingMemberFixer::createIndexSignatureDeclarationFromType(
 	}
 
 	auto* builder =
-	    checker::NewNodeBuilder(typeChecker, changeTracker->EmitContext);
+	    checker::NewNodeBuilder(typeChecker, changeTracker->emitContext);
 	return builder->IndexInfoToIndexSignatureDeclaration(
 	    indexInfo, classDeclaration, nodebuilder::FlagsNone,
 	    nodebuilder::InternalFlagsNone, nullptr);
@@ -799,7 +799,7 @@ Node* missingMemberFixer::createBody(
 	if (signatureOnly) {
 		return nullptr;
 	}
-	body = deepCloneNode(*changeTracker->NodeFactory, body);
+	body = deepCloneNode(*changeTracker->nodeFactory, body);
 	if (body == nullptr) {
 		return createStubbedMethodBody(quotePreference);
 	}
@@ -814,14 +814,14 @@ Node* missingMemberFixer::createStubbedMethodBody(
 		tokenFlags = TokenFlagsSingleQuote;
 	}
 
-	return changeTracker->NodeFactory->newBlock(
-	    changeTracker->NodeFactory->newNodeList(
-	        {changeTracker->NodeFactory->newThrowStatement(
-	            changeTracker->NodeFactory->newNewExpression(
-	                changeTracker->NodeFactory->newIdentifier("Error"),
+	return changeTracker->nodeFactory->newBlock(
+	    changeTracker->nodeFactory->newNodeList(
+	        {changeTracker->nodeFactory->newThrowStatement(
+	            changeTracker->nodeFactory->newNewExpression(
+	                changeTracker->nodeFactory->newIdentifier("Error"),
 	                nullptr /*typeArguments*/,
-	                changeTracker->NodeFactory->newNodeList(
-	                    {changeTracker->NodeFactory->newStringLiteral(
+	                changeTracker->nodeFactory->newNodeList(
+	                    {changeTracker->nodeFactory->newStringLiteral(
 	                        ::tsc::localize(loc, Method_not_implemented, "",
 	                                        {}),
 	                        tokenFlags)})))}),

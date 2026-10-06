@@ -19,12 +19,13 @@ int CodeAction::Compare(const CodeAction* b) const {
 	if (int c = Description.compare(b->Description); c != 0) {
 		return c < 0 ? -1 : 1;
 	}
-	if (Changes.size() != b->Changes.size()) {
-		return Changes.size() < b->Changes.size() ? -1 : 1;
+	size_t aSize = Changes.has_value() ? Changes->size() : 0;
+	size_t bSize = b->Changes.has_value() ? b->Changes->size() : 0;
+	if (aSize != bSize) {
+		return aSize < bSize ? -1 : 1;
 	}
-	for (size_t i = 0; i < Changes.size(); i++) {
-		if (int c =
-		        lsproto::CompareTextEdits(*Changes[i], *b->Changes[i]);
+	for (size_t i = 0; i < aSize; i++) {
+		if (int c = (*Changes)[i]->Compare((*b->Changes)[i].get());
 		    c != 0) {
 			return c;
 		}
@@ -50,7 +51,7 @@ LanguageService::ProvideCodeActions(const gostd::Context& ctx,
 	std::vector<lsproto::CommandOrCodeAction> actions;
 
 	if (params->Context != nullptr && params->Context->Only != nullptr) {
-		for (auto& kind : *params->Context->Only) {
+		for (auto& kind : **params->Context->Only) {
 			auto matchingKinds = getOrganizeImportsActionsForKind(kind);
 			for (auto& matchingKind : matchingKinds) {
 				auto* organizeAction = createOrganizeImportsAction(
@@ -81,8 +82,9 @@ LanguageService::ProvideCodeActions(const gostd::Context& ctx,
 		          // diagnostics and providers so if multiple diags
 		          // produce the same codefix, only one is returned
 
-		for (auto* diag : params->Context->Diagnostics) {
-			if (diag->Code == nullptr || diag->Code->Integer == nullptr) {
+		for (auto& diag : *params->Context->Diagnostics) {
+			if (diag->Code == nullptr ||
+			    diag->Code->Integer == nullptr) {
 				continue;
 			}
 
@@ -90,7 +92,7 @@ LanguageService::ProvideCodeActions(const gostd::Context& ctx,
 
 			for (auto* provider : codeFixProviders) {
 				if (!codeFixProviderMatchesLSPDiagnostic(provider,
-				                                       diag)) {
+				                                         diag.get())) {
 					continue;
 				}
 
@@ -104,7 +106,7 @@ LanguageService::ProvideCodeActions(const gostd::Context& ctx,
 					    .ErrorCode = errorCode,
 					    .Program = program,
 					    .LS = this,
-					    .Diagnostic = diag,
+					    .Diagnostic = diag.get(),
 					    .Params = params,
 					};
 
@@ -150,8 +152,9 @@ LanguageService::ProvideCodeActions(const gostd::Context& ctx,
 
 	return {lsproto::CommandOrCodeActionArrayOrNull{
 	            .CommandOrCodeActionArray =
-	                new std::vector<lsproto::CommandOrCodeAction>(
-	                    actions)},
+	                std::make_shared<
+	                    lsproto::Slice<lsproto::CommandOrCodeAction>>(
+	                    std::move(actions))},
 	        nullptr};
 }
 
@@ -192,20 +195,23 @@ LanguageService::getFixAllQuickFixes(
 		if (err != nullptr) {
 			return {{}, err};
 		}
-		if (combined != nullptr && combined->Changes.size() > 0) {
+		if (combined != nullptr && combined->Changes.has_value() &&
+		    !combined->Changes->empty()) {
 			auto kind = lsproto::CodeActionKindQuickFix;
-			auto* changes =
-			    new std::unordered_map<
-			        lsproto::DocumentUri, std::vector<lsproto::TextEdit*>,
-			        lsproto::DocumentUriHash>();
+			auto changes = std::make_shared<
+			    lsproto::Map<lsproto::DocumentUri,
+			                 lsproto::Slice<
+			                     std::shared_ptr<lsproto::TextEdit>>>>();
 			(*changes)[uri] = combined->Changes;
 			actions.push_back(lsproto::CommandOrCodeAction{
-			    .CodeAction = new lsproto::CodeAction{
-			        .Title = combined->Description,
-			        .Kind = new lsproto::CodeActionKind(kind),
-			        .Edit = new lsproto::WorkspaceEdit{
-			            .Changes = changes},
-			    },
+			    .CodeAction = std::make_shared<lsproto::CodeAction>(
+			        lsproto::CodeAction{
+			            .Title = combined->Description,
+			            .Kind = std::make_shared<lsproto::CodeActionKind>(
+			                kind),
+			            .Edit = std::make_shared<lsproto::WorkspaceEdit>(
+			                lsproto::WorkspaceEdit{.Changes = changes}),
+			        }),
 			});
 		}
 	}
@@ -236,7 +242,7 @@ bool hasMultipleFixableDiagnostics(
 // codeFixProviderMatchesLSPDiagnostic — codeactions.go:232.
 bool codeFixProviderMatchesLSPDiagnostic(
     CodeFixProvider* provider, lsproto::Diagnostic* diagnostic) {
-	if (diagnostic->Source != nullptr &&
+	if (diagnostic->Source.has_value() &&
 	    *diagnostic->Source != "ts") {
 		return false;
 	}
@@ -263,11 +269,12 @@ bool isFixAllKind(lsproto::CodeActionKind kind) {
 // wantsQuickFixes — codeactions.go:250. Returns true if the Only filter is
 // nil/empty (meaning all kinds are wanted) or explicitly includes the
 // quickfix kind.
-bool wantsQuickFixes(std::vector<lsproto::CodeActionKind>* only) {
-	if (only == nullptr || only->empty()) {
+bool wantsQuickFixes(
+    const std::shared_ptr<lsproto::Slice<lsproto::CodeActionKind>>& only) {
+	if (only == nullptr || !only->has_value() || (*only)->empty()) {
 		return true;
 	}
-	for (auto& kind : *only) {
+	for (auto& kind : **only) {
 		if (lsproto::codeActionKindContains(
 		        kind, lsproto::CodeActionKindQuickFix)) {
 			return true;
@@ -284,10 +291,9 @@ LanguageService::createFixAllAction(const gostd::Context& ctx,
                                     SourceFile* file,
                                     lsproto::DocumentUri uri) {
 	auto kind = lsproto::CodeActionKindSourceFixAllTs;
-	auto* lspChanges =
-	    new std::unordered_map<lsproto::DocumentUri,
-	                           std::vector<lsproto::TextEdit*>,
-	                           lsproto::DocumentUriHash>();
+	auto lspChanges = std::make_shared<
+	    lsproto::Map<lsproto::DocumentUri,
+	                 lsproto::Slice<std::shared_ptr<lsproto::TextEdit>>>>();
 
 	for (auto* provider : codeFixProviders) {
 		if (provider->GetAllCodeActions == nullptr) {
@@ -305,10 +311,14 @@ LanguageService::createFixAllAction(const gostd::Context& ctx,
 		if (err != nullptr) {
 			return {nullptr, err};
 		}
-		if (combined != nullptr && combined->Changes.size() > 0) {
+		if (combined != nullptr && combined->Changes.has_value() &&
+		    !combined->Changes->empty()) {
 			auto& dest = (*lspChanges)[uri];
-			dest.insert(dest.end(), combined->Changes.begin(),
-			            combined->Changes.end());
+			if (!dest.has_value()) {
+				dest = std::vector<std::shared_ptr<lsproto::TextEdit>>{};
+			}
+			dest->insert(dest->end(), combined->Changes->begin(),
+			             combined->Changes->end());
 		}
 	}
 
@@ -317,13 +327,15 @@ LanguageService::createFixAllAction(const gostd::Context& ctx,
 	}
 
 	return {new lsproto::CommandOrCodeAction{
-	            .CodeAction = new lsproto::CodeAction{
-	                .Title = ::tsc::localize(locale::fromContext(ctx),
-	                                         Fix_All, "", {}),
-	                .Kind = new lsproto::CodeActionKind(kind),
-	                .Edit = new lsproto::WorkspaceEdit{
-	                    .Changes = lspChanges},
-	            }},
+	            .CodeAction = std::make_shared<lsproto::CodeAction>(
+	                lsproto::CodeAction{
+	                    .Title = ::tsc::localize(locale::fromContext(ctx),
+	                                             Fix_All, "", {}),
+	                    .Kind = std::make_shared<lsproto::CodeActionKind>(
+	                        kind),
+	                    .Edit = std::make_shared<lsproto::WorkspaceEdit>(
+	                        lsproto::WorkspaceEdit{.Changes = lspChanges}),
+	                })},
 	        nullptr};
 }
 
@@ -375,33 +387,36 @@ lsproto::CommandOrCodeAction* LanguageService::createOrganizeImportsAction(
 	auto changes = OrganizeImports(ctx, file, program, kind);
 	if (changes.empty()) {
 		return new lsproto::CommandOrCodeAction{
-		    .CodeAction = new lsproto::CodeAction{
-		        .Title = title,
-		        .Kind = new lsproto::CodeActionKind(kind),
-		        .Edit = new lsproto::WorkspaceEdit{
-		            .Changes = new std::unordered_map<
-		                lsproto::DocumentUri,
-		                std::vector<lsproto::TextEdit*>,
-		                lsproto::DocumentUriHash>()},
-		    },
+		    .CodeAction = std::make_shared<lsproto::CodeAction>(
+		        lsproto::CodeAction{
+		            .Title = title,
+		            .Kind = std::make_shared<lsproto::CodeActionKind>(kind),
+		            .Edit = std::make_shared<lsproto::WorkspaceEdit>(
+		                lsproto::WorkspaceEdit{
+		                    .Changes = std::make_shared<lsproto::Map<
+		                        lsproto::DocumentUri,
+		                        lsproto::Slice<std::shared_ptr<
+		                            lsproto::TextEdit>>>>()}),
+		        }),
 		};
 	}
 
-	auto* lspChanges =
-	    new std::unordered_map<lsproto::DocumentUri,
-	                           std::vector<lsproto::TextEdit*>,
-	                           lsproto::DocumentUriHash>();
+	auto lspChanges = std::make_shared<
+	    lsproto::Map<lsproto::DocumentUri,
+	                 lsproto::Slice<std::shared_ptr<lsproto::TextEdit>>>>();
 	for (auto& [fileName, edits] : changes) {
 		auto fileURI = lsconv::FileNameToDocumentURI(fileName);
 		(*lspChanges)[fileURI] = edits;
 	}
 
 	return new lsproto::CommandOrCodeAction{
-	    .CodeAction = new lsproto::CodeAction{
-	        .Title = title,
-	        .Kind = new lsproto::CodeActionKind(kind),
-	        .Edit = new lsproto::WorkspaceEdit{.Changes = lspChanges},
-	    },
+	    .CodeAction = std::make_shared<lsproto::CodeAction>(
+	        lsproto::CodeAction{
+	            .Title = title,
+	            .Kind = std::make_shared<lsproto::CodeActionKind>(kind),
+	            .Edit = std::make_shared<lsproto::WorkspaceEdit>(
+	                lsproto::WorkspaceEdit{.Changes = lspChanges}),
+	        }),
 	};
 }
 
@@ -412,24 +427,26 @@ bool containsErrorCode(const std::vector<int32_t>& codes, int32_t code) {
 
 // convertToLSPCodeAction — codeactions.go:387.
 lsproto::CommandOrCodeAction convertToLSPCodeAction(
-    CodeAction* action, lsproto::Diagnostic* diag,
+    CodeAction* action, const std::shared_ptr<lsproto::Diagnostic>& diag,
     lsproto::DocumentUri uri) {
 	auto kind = lsproto::CodeActionKindQuickFix;
-	auto* changes =
-	    new std::unordered_map<lsproto::DocumentUri,
-	                           std::vector<lsproto::TextEdit*>,
-	                           lsproto::DocumentUriHash>();
+	auto changes = std::make_shared<
+	    lsproto::Map<lsproto::DocumentUri,
+	                 lsproto::Slice<std::shared_ptr<lsproto::TextEdit>>>>();
 	(*changes)[uri] = action->Changes;
-	auto* diagnostics =
-	    new std::vector<lsproto::Diagnostic*>{diag};
+	auto diagnostics = std::vector<std::shared_ptr<lsproto::Diagnostic>>{
+	    diag};
 
 	return lsproto::CommandOrCodeAction{
-	    .CodeAction = new lsproto::CodeAction{
-	        .Title = action->Description,
-	        .Kind = new lsproto::CodeActionKind(kind),
-	        .Edit = new lsproto::WorkspaceEdit{.Changes = changes},
-	        .Diagnostics = diagnostics,
-	    },
+	    .CodeAction = std::make_shared<lsproto::CodeAction>(
+	        lsproto::CodeAction{
+	            .Title = action->Description,
+	            .Kind = std::make_shared<lsproto::CodeActionKind>(kind),
+	            .Edit = std::make_shared<lsproto::WorkspaceEdit>(
+	                lsproto::WorkspaceEdit{.Changes = changes}),
+	            .Diagnostics = std::make_shared<lsproto::Slice<
+	                std::shared_ptr<lsproto::Diagnostic>>>(diagnostics),
+	        }),
 	};
 }
 

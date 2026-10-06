@@ -18,7 +18,7 @@ struct callSite {
 };
 
 // callhierarchy.go:593 — incomingEntry (ns-scope: used in ls.h signatures)
-struct incomingEntry : lsp::lsproto::HasTextDocumentPosition {
+struct incomingEntry {
 	LanguageService* ls = nullptr;
 	::tsc::Node* node = nullptr;
 
@@ -35,7 +35,7 @@ struct incomingEntry : lsp::lsproto::HasTextDocumentPosition {
 		return sourceFile_;
 	}
 
-	lsp::lsproto::DocumentUri TextDocumentURI() const override {
+	lsp::lsproto::DocumentUri TextDocumentURI() const {
 		if (!documentUriComputed) {
 			documentUri_ = lsconv::FileNameToDocumentURI(
 				getSourceFile()->OriginalFileName());
@@ -44,7 +44,7 @@ struct incomingEntry : lsp::lsproto::HasTextDocumentPosition {
 		return documentUri_;
 	}
 
-	lsp::lsproto::Position TextDocumentPosition() const override {
+	lsp::lsproto::Position TextDocumentPosition() const {
 		if (!positionComputed) {
 			int start = tsc::getTokenPosOfNode(node, getSourceFile(),
 												 false /*includeJsDoc*/);
@@ -1056,13 +1056,6 @@ std::vector<callSite*> collectCallSites(compiler::SimpleProgram* program,
 	return collector.callSites;
 }
 
-// crossproject.go:423 — combineIncomingCalls (dep stub — ls-coreB)
-lsp::lsproto::CallHierarchyIncomingCallsResponse combineIncomingCalls(
-	std::function<void(
-		std::function<bool(lsp::lsproto::CallHierarchyIncomingCallsResponse)>)>
-		results) {
-	TSC_UNREACHABLE("combineIncomingCalls — owned by ls-coreB slice");
-}
 
 } // namespace
 
@@ -1072,7 +1065,8 @@ lsp::lsproto::CallHierarchyIncomingCallsResponse combineIncomingCalls(
 // ============================================================================
 // callhierarchy.go:493 — createCallHierarchyItem
 // ============================================================================
-lsp::lsproto::CallHierarchyItem* LanguageService::createCallHierarchyItem(
+std::shared_ptr<lsp::lsproto::CallHierarchyItem>
+LanguageService::createCallHierarchyItem(
 	compiler::SimpleProgram* program, ::tsc::Node* node) {
 	SourceFile* sourceFile = getSourceFileOfNode(node);
 	callHierarchyItemName itemName =
@@ -1105,7 +1099,7 @@ lsp::lsproto::CallHierarchyItem* LanguageService::createCallHierarchyItem(
 		span = selectionSpan;
 	}
 
-	auto* item = new lsp::lsproto::CallHierarchyItem;
+	auto item = std::make_shared<lsp::lsproto::CallHierarchyItem>();
 	item->Name = itemName.text;
 	item->Kind = kind;
 	item->Uri =
@@ -1114,7 +1108,7 @@ lsp::lsproto::CallHierarchyItem* LanguageService::createCallHierarchyItem(
 	item->SelectionRange = selectionSpan;
 
 	if (!containerName.empty()) {
-		item->Detail = new std::string(containerName);
+		item->Detail = containerName;
 	}
 
 	return item;
@@ -1123,7 +1117,7 @@ lsp::lsproto::CallHierarchyItem* LanguageService::createCallHierarchyItem(
 // ============================================================================
 // callhierarchy.go:570 — convertCallSiteGroupToIncomingCall
 // ============================================================================
-lsp::lsproto::CallHierarchyIncomingCall*
+std::shared_ptr<lsp::lsproto::CallHierarchyIncomingCall>
 LanguageService::convertCallSiteGroupToIncomingCall(
 	compiler::SimpleProgram* program, std::vector<callSite*> entries) {
 	std::vector<lsp::lsproto::Range> fromRanges;
@@ -1136,7 +1130,7 @@ LanguageService::convertCallSiteGroupToIncomingCall(
 			fromRanges.push_back(lspRange);
 		}
 	}
-	lsp::lsproto::CallHierarchyItem* from =
+	auto from =
 		createCallHierarchyItem(program, entries[0]->declaration);
 	if (from == nullptr || fromRanges.empty()) {
 		return nullptr;
@@ -1145,7 +1139,7 @@ LanguageService::convertCallSiteGroupToIncomingCall(
 	std::sort(fromRanges.begin(), fromRanges.end(),
 			  lsp::lsproto::CompareRanges);
 
-	auto* call = new lsp::lsproto::CallHierarchyIncomingCall;
+	auto call = std::make_shared<lsp::lsproto::CallHierarchyIncomingCall>();
 	call->From = from;
 	call->FromRanges = std::move(fromRanges);
 	return call;
@@ -1186,7 +1180,7 @@ LanguageService::getIncomingCalls(gostd::Context ctx,
 	incomingEntryP->node = location;
 
 	auto [result, err] =
-		handleCrossProject<incomingEntry*,
+		handleCrossProject<incomingEntry,
 						   lsp::lsproto::CallHierarchyIncomingCallsResponse>(
 			ctx, incomingEntryP, orchestrator,
 			[](LanguageService* ls, gostd::Context ctx,
@@ -1202,18 +1196,18 @@ LanguageService::getIncomingCalls(gostd::Context ctx,
 			nullptr /*defaultProjectData*/);
 	if (result.CallHierarchyIncomingCalls != nullptr) {
 		std::sort(
-			result.CallHierarchyIncomingCalls->begin(),
-			result.CallHierarchyIncomingCalls->end(),
-			[](lsp::lsproto::CallHierarchyIncomingCall* a,
-			   lsp::lsproto::CallHierarchyIncomingCall* b) {
+			(*result.CallHierarchyIncomingCalls)->begin(),
+			(*result.CallHierarchyIncomingCalls)->end(),
+			[](const std::shared_ptr<lsp::lsproto::CallHierarchyIncomingCall>& a,
+			   const std::shared_ptr<lsp::lsproto::CallHierarchyIncomingCall>& b) {
 				if (a->From->Uri != b->From->Uri) {
 					return a->From->Uri < b->From->Uri;
 				}
-				if (a->FromRanges.empty() || b->FromRanges.empty()) {
+				if (a->FromRanges->empty() || b->FromRanges->empty()) {
 					return false;
 				}
-				return lsp::lsproto::CompareRanges(a->FromRanges[0],
-												 b->FromRanges[0]) < 0;
+				return lsp::lsproto::CompareRanges((*a->FromRanges)[0],
+												 (*b->FromRanges)[0]) < 0;
 			});
 	}
 	return {result, err};
@@ -1251,24 +1245,25 @@ LanguageService::symbolAndEntriesToIncomingCalls(
 		grouped[key].push_back(site);
 	}
 
-	std::vector<lsp::lsproto::CallHierarchyIncomingCall*> result;
+	std::vector<std::shared_ptr<lsp::lsproto::CallHierarchyIncomingCall>> result;
 	for (auto& [key, sites] : grouped) {
-		if (auto* incomingCall =
+		if (auto incomingCall =
 				convertCallSiteGroupToIncomingCall(program, sites)) {
 			result.push_back(incomingCall);
 		}
 	}
 	lsp::lsproto::CallHierarchyIncomingCallsOrNull resp;
 	resp.CallHierarchyIncomingCalls =
-		new std::vector<lsp::lsproto::CallHierarchyIncomingCall*>(
-			std::move(result));
+		std::make_shared<lsp::lsproto::Slice<
+		    std::shared_ptr<lsp::lsproto::CallHierarchyIncomingCall>>>(
+		    std::move(result));
 	return {resp, {}};
 }
 
 // ============================================================================
 // callhierarchy.go:944 — convertCallSiteGroupToOutgoingCall
 // ============================================================================
-lsp::lsproto::CallHierarchyOutgoingCall*
+std::shared_ptr<lsp::lsproto::CallHierarchyOutgoingCall>
 LanguageService::convertCallSiteGroupToOutgoingCall(
 	compiler::SimpleProgram* program, std::vector<callSite*> entries) {
 	std::vector<lsp::lsproto::Range> fromRanges;
@@ -1281,7 +1276,7 @@ LanguageService::convertCallSiteGroupToOutgoingCall(
 			fromRanges.push_back(lspRange);
 		}
 	}
-	lsp::lsproto::CallHierarchyItem* to =
+	auto to =
 		createCallHierarchyItem(program, entries[0]->declaration);
 	if (to == nullptr || fromRanges.empty()) {
 		return nullptr;
@@ -1290,7 +1285,7 @@ LanguageService::convertCallSiteGroupToOutgoingCall(
 	std::sort(fromRanges.begin(), fromRanges.end(),
 			  lsp::lsproto::CompareRanges);
 
-	auto* call = new lsp::lsproto::CallHierarchyOutgoingCall;
+	auto call = std::make_shared<lsp::lsproto::CallHierarchyOutgoingCall>();
 	call->To = to;
 	call->FromRanges = std::move(fromRanges);
 	return call;
@@ -1300,7 +1295,7 @@ LanguageService::convertCallSiteGroupToOutgoingCall(
 // callhierarchy.go:969 — getOutgoingCalls. Gets the call sites that call out of
 // the provided call hierarchy declaration.
 // ============================================================================
-std::vector<lsp::lsproto::CallHierarchyOutgoingCall*>
+std::vector<std::shared_ptr<lsp::lsproto::CallHierarchyOutgoingCall>>
 LanguageService::getOutgoingCalls(compiler::SimpleProgram* program,
 								  ::tsc::Node* declaration) {
 	if ((declaration->flags & NodeFlagsAmbient) != 0 ||
@@ -1327,25 +1322,25 @@ LanguageService::getOutgoingCalls(compiler::SimpleProgram* program,
 		grouped[key].push_back(site);
 	}
 
-	std::vector<lsp::lsproto::CallHierarchyOutgoingCall*> result;
+	std::vector<std::shared_ptr<lsp::lsproto::CallHierarchyOutgoingCall>> result;
 	for (auto& [key, sites] : grouped) {
-		if (auto* outgoingCall =
+		if (auto outgoingCall =
 				convertCallSiteGroupToOutgoingCall(program, sites)) {
 			result.push_back(outgoingCall);
 		}
 	}
 
 	std::sort(result.begin(), result.end(),
-			  [](lsp::lsproto::CallHierarchyOutgoingCall* a,
-				 lsp::lsproto::CallHierarchyOutgoingCall* b) {
+			  [](const std::shared_ptr<lsp::lsproto::CallHierarchyOutgoingCall>& a,
+				 const std::shared_ptr<lsp::lsproto::CallHierarchyOutgoingCall>& b) {
 				  if (a->To->Uri != b->To->Uri) {
 					  return a->To->Uri < b->To->Uri;
 				  }
-				  if (a->FromRanges.empty() || b->FromRanges.empty()) {
+				  if (a->FromRanges->empty() || b->FromRanges->empty()) {
 					  return false;
 				  }
-				  return lsp::lsproto::CompareRanges(a->FromRanges[0],
-												   b->FromRanges[0]) < 0;
+				  return lsp::lsproto::CompareRanges((*a->FromRanges)[0],
+												   (*b->FromRanges)[0]) < 0;
 			  });
 
 	return result;
@@ -1362,10 +1357,10 @@ LanguageService::ProvidePrepareCallHierarchy(
 	std::vector<::tsc::Node*> declarations =
 		callHierarchyDeclarations(file, position, program,
 								  false /*allowSourceFile*/);
-	std::vector<lsp::lsproto::CallHierarchyItem*> items;
+	std::vector<std::shared_ptr<lsp::lsproto::CallHierarchyItem>> items;
 	collections::Set<lsp::lsproto::Location> seen;
 	for (auto* declaration : declarations) {
-		if (lsp::lsproto::CallHierarchyItem* item =
+		if (std::shared_ptr<lsp::lsproto::CallHierarchyItem> item =
 				createCallHierarchyItem(program, declaration)) {
 			lsp::lsproto::Location location;
 			location.Uri = item->Uri;
@@ -1379,8 +1374,9 @@ LanguageService::ProvidePrepareCallHierarchy(
 	lsp::lsproto::CallHierarchyItemsOrNull resp;
 	if (!items.empty()) {
 		resp.CallHierarchyItems =
-			new std::vector<lsp::lsproto::CallHierarchyItem*>(
-				std::move(items));
+			std::make_shared<lsp::lsproto::Slice<
+			    std::shared_ptr<lsp::lsproto::CallHierarchyItem>>>(
+			    std::move(items));
 	}
 	return resp;
 }
@@ -1393,7 +1389,7 @@ LanguageService::ProvideCallHierarchyIncomingCalls(
 	gostd::Context ctx, lsp::lsproto::CallHierarchyItem* item,
 	CrossProjectOrchestrator* orchestrator) {
 	compiler::SimpleProgram* program = GetProgram();
-	std::string fileName = item->Uri.FileName();
+	std::string fileName = item->Uri;
 	SourceFile* file = program->GetSourceFile(fileName);
 	if (file == nullptr) {
 		return lsp::lsproto::CallHierarchyIncomingCallsOrNull{};
@@ -1402,9 +1398,9 @@ LanguageService::ProvideCallHierarchyIncomingCalls(
 	std::vector<::tsc::Node*> declarations = callHierarchyDeclarations(
 		file, item->SelectionRange.Start, program,
 		true /*allowSourceFile*/);
-	std::vector<lsp::lsproto::CallHierarchyIncomingCall*> calls;
+	std::vector<std::shared_ptr<lsp::lsproto::CallHierarchyIncomingCall>> calls;
 	std::unordered_map<lsp::lsproto::Location,
-					   lsp::lsproto::CallHierarchyIncomingCall*>
+					   std::shared_ptr<lsp::lsproto::CallHierarchyIncomingCall>>
 		seen;
 	for (auto* declaration : declarations) {
 		auto [response, err] =
@@ -1413,19 +1409,19 @@ LanguageService::ProvideCallHierarchyIncomingCalls(
 			return lsp::lsproto::CallHierarchyIncomingCallsOrNull{};
 		}
 		if (response.CallHierarchyIncomingCalls != nullptr) {
-			for (auto* call : *response.CallHierarchyIncomingCalls) {
+			for (auto& call : **response.CallHierarchyIncomingCalls) {
 				lsp::lsproto::Location location;
 				location.Uri = call->From->Uri;
 				location.Range = call->From->SelectionRange;
 				auto it = seen.find(location);
 				if (it != seen.end()) {
-					auto* existing = it->second;
-					for (auto& fromRange : call->FromRanges) {
-						if (std::find(existing->FromRanges.begin(),
-									  existing->FromRanges.end(),
+					auto& existing = it->second;
+					for (auto& fromRange : *call->FromRanges) {
+						if (std::find(existing->FromRanges->begin(),
+									  existing->FromRanges->end(),
 									  fromRange) ==
-							existing->FromRanges.end()) {
-							existing->FromRanges.push_back(fromRange);
+							existing->FromRanges->end()) {
+							existing->FromRanges->push_back(fromRange);
 						}
 					}
 				} else {
@@ -1438,8 +1434,8 @@ LanguageService::ProvideCallHierarchyIncomingCalls(
 	lsp::lsproto::CallHierarchyIncomingCallsOrNull resp;
 	if (!calls.empty()) {
 		resp.CallHierarchyIncomingCalls =
-			new std::vector<lsp::lsproto::CallHierarchyIncomingCall*>(
-				std::move(calls));
+			std::make_shared<lsp::lsproto::Slice<std::shared_ptr<
+			    lsp::lsproto::CallHierarchyIncomingCall>>>(std::move(calls));
 	}
 	return resp;
 }
@@ -1451,7 +1447,7 @@ lsp::lsproto::CallHierarchyOutgoingCallsResponse
 LanguageService::ProvideCallHierarchyOutgoingCalls(
 	gostd::Context ctx, lsp::lsproto::CallHierarchyItem* item) {
 	compiler::SimpleProgram* program = GetProgram();
-	std::string fileName = item->Uri.FileName();
+	std::string fileName = item->Uri;
 	SourceFile* file = program->GetSourceFile(fileName);
 	if (file == nullptr) {
 		return lsp::lsproto::CallHierarchyOutgoingCallsOrNull{};
@@ -1460,24 +1456,24 @@ LanguageService::ProvideCallHierarchyOutgoingCalls(
 	std::vector<::tsc::Node*> declarations = callHierarchyDeclarations(
 		file, item->SelectionRange.Start, program,
 		true /*allowSourceFile*/);
-	std::vector<lsp::lsproto::CallHierarchyOutgoingCall*> calls;
+	std::vector<std::shared_ptr<lsp::lsproto::CallHierarchyOutgoingCall>> calls;
 	std::unordered_map<lsp::lsproto::Location,
-					   lsp::lsproto::CallHierarchyOutgoingCall*>
+					   std::shared_ptr<lsp::lsproto::CallHierarchyOutgoingCall>>
 		seen;
 	for (auto* declaration : declarations) {
-		for (auto* call : getOutgoingCalls(program, declaration)) {
+		for (auto& call : getOutgoingCalls(program, declaration)) {
 			lsp::lsproto::Location location;
 			location.Uri = call->To->Uri;
 			location.Range = call->To->SelectionRange;
 			auto it = seen.find(location);
 			if (it != seen.end()) {
-				auto* existing = it->second;
-				for (auto& fromRange : call->FromRanges) {
-					if (std::find(existing->FromRanges.begin(),
-								  existing->FromRanges.end(),
+				auto& existing = it->second;
+				for (auto& fromRange : *call->FromRanges) {
+					if (std::find(existing->FromRanges->begin(),
+								  existing->FromRanges->end(),
 								  fromRange) ==
-						existing->FromRanges.end()) {
-						existing->FromRanges.push_back(fromRange);
+						existing->FromRanges->end()) {
+						existing->FromRanges->push_back(fromRange);
 					}
 				}
 			} else {
@@ -1489,8 +1485,8 @@ LanguageService::ProvideCallHierarchyOutgoingCalls(
 	lsp::lsproto::CallHierarchyOutgoingCallsOrNull resp;
 	if (!calls.empty()) {
 		resp.CallHierarchyOutgoingCalls =
-			new std::vector<lsp::lsproto::CallHierarchyOutgoingCall*>(
-				std::move(calls));
+			std::make_shared<lsp::lsproto::Slice<std::shared_ptr<
+			    lsp::lsproto::CallHierarchyOutgoingCall>>>(std::move(calls));
 	}
 	return resp;
 }

@@ -38,7 +38,7 @@ using lsp::lsproto::WatchKindDelete;
 // fileSystemWatcherKey — watch.go:22.
 struct fileSystemWatcherKey {
 	std::string pattern;
-	lsp::lsproto::WatchKind kind = 0;
+	lsp::lsproto::WatchKind kind = lsp::lsproto::WatchKind(0);
 
 	bool operator==(const fileSystemWatcherKey&) const = default;
 };
@@ -163,20 +163,20 @@ inline lsp::lsproto::FileSystemWatcher* newRecursiveDirectoryWatcher(
 	const std::string& directory, lsp::lsproto::WatchKind kind,
 	bool useRelativePattern) {
 	if (useRelativePattern) {
-		auto* baseUri = new lsp::lsproto::URI(
+		auto baseUri = std::make_shared<lsp::lsproto::URI>(
 		    lsconv::FileNameToDocumentURI(directory));
-		auto* rp = new lsp::lsproto::RelativePattern();
+		auto rp = std::make_shared<lsp::lsproto::RelativePattern>();
 		rp->BaseUri.URI = baseUri;
 		rp->Pattern = "**/*";
 		auto* watcher = new lsp::lsproto::FileSystemWatcher();
 		watcher->GlobPattern.RelativePattern = rp;
-		watcher->Kind = new lsp::lsproto::WatchKind(kind);
+		watcher->Kind = std::make_shared<lsp::lsproto::WatchKind>(kind);
 		return watcher;
 	}
-	auto* glob = new std::string(getRecursiveGlobPattern(directory));
+	auto glob = std::make_shared<std::string>(getRecursiveGlobPattern(directory));
 	auto* watcher = new lsp::lsproto::FileSystemWatcher();
 	watcher->GlobPattern.Pattern = glob;
-	watcher->Kind = new lsp::lsproto::WatchKind(kind);
+	watcher->Kind = std::make_shared<lsp::lsproto::WatchKind>(kind);
 	return watcher;
 }
 
@@ -322,9 +322,9 @@ struct WatchedFiles {
 					auto* watcher =
 					    new lsp::lsproto::FileSystemWatcher();
 					watcher->GlobPattern.Pattern =
-					    new std::string(glob);
+					    std::make_shared<std::string>(glob);
 					watcher->Kind =
-					    new lsp::lsproto::WatchKind(watchKind);
+					    std::make_shared<lsp::lsproto::WatchKind>(watchKind);
 					workspaceWatchers.push_back(watcher);
 				}
 				changed = true;

@@ -1,5 +1,6 @@
 // === slice: ls-coreC ===
 // rename.cpp — rename.go: prepareRename validation + workspace-edit rename.
+#include "internal/astnav/tokens.h"
 #include "internal/ls/ls.h"
 
 namespace tsc::ls {
@@ -78,38 +79,11 @@ bool isLabelName(::tsc::Node* node) {
 	return isLabelOfLabeledStatement(node) || isJumpStatementTarget(node);
 }
 
-// ast/utilities.go:4203 — TryGetImportFromModuleSpecifier
-::tsc::Node* tryGetImportFromModuleSpecifier(::tsc::Node* node) {
-	switch (node->parent->kind) {
-	case Kind::ImportDeclaration:
-	case Kind::JSImportDeclaration:
-	case Kind::ExportDeclaration:
-		return node->parent;
-	case Kind::ExternalModuleReference:
-		return node->parent->parent;
-	case Kind::CallExpression:
-		if (isImportCall(node->parent) ||
-			isRequireCall(node->parent,
-							   false /*requireStringLiteralLikeArgument*/)) {
-			return node->parent;
-		}
-		return nullptr;
-	case Kind::LiteralType:
-		if (!isStringLiteral(node)) {
-			return nullptr;
-		}
-		if (isImportTypeNode(node->parent->parent)) {
-			return node->parent->parent;
-		}
-		return nullptr;
-	}
-	return nullptr;
-}
 
 // rename.go:34 — mappedRenameEdit
 struct mappedRenameEdit {
 	lsp::lsproto::DocumentUri uri;
-	lsp::lsproto::TextEdit* edit = nullptr;
+	std::shared_ptr<lsp::lsproto::TextEdit> edit;
 };
 
 // rename.go:39 — renameEditKey
@@ -136,7 +110,7 @@ namespace {
 
 // rename.go:44 — deduplicateRenameEdits
 std::pair<std::map<lsp::lsproto::DocumentUri,
-				   std::vector<lsp::lsproto::TextEdit*>>,
+				   std::vector<std::shared_ptr<lsp::lsproto::TextEdit>>>,
 		  bool>
 deduplicateRenameEdits(std::vector<mappedRenameEdit>& mappedEdits) {
 	std::unordered_map<renameEditKey, std::string> editTexts;
@@ -147,7 +121,8 @@ deduplicateRenameEdits(std::vector<mappedRenameEdit>& mappedEdits) {
 		if (auto it = editTexts.find(key); it != editTexts.end()) {
 			if (it->second != mappedEdit.edit->NewText) {
 				return {std::map<lsp::lsproto::DocumentUri,
-								 std::vector<lsp::lsproto::TextEdit*>>{},
+								 std::vector<
+								     std::shared_ptr<lsp::lsproto::TextEdit>>>{},
 						false};
 			}
 			continue;
@@ -155,7 +130,8 @@ deduplicateRenameEdits(std::vector<mappedRenameEdit>& mappedEdits) {
 		editTexts[key] = mappedEdit.edit->NewText;
 		uniqueEdits.push_back(mappedEdit);
 	}
-	std::map<lsp::lsproto::DocumentUri, std::vector<lsp::lsproto::TextEdit*>>
+	std::map<lsp::lsproto::DocumentUri,
+	         std::vector<std::shared_ptr<lsp::lsproto::TextEdit>>>
 		changes;
 	for (auto& mappedEdit : uniqueEdits) {
 		changes[mappedEdit.uri].push_back(mappedEdit.edit);
@@ -163,24 +139,6 @@ deduplicateRenameEdits(std::vector<mappedRenameEdit>& mappedEdits) {
 	return {changes, true};
 }
 
-// rename.go:209 — nodeIsEligibleForRename
-bool nodeIsEligibleForRename(::tsc::Node* node) {
-	if (node == nullptr) {
-		return false;
-	}
-	switch (node->kind) {
-	case Kind::Identifier:
-	case Kind::PrivateIdentifier:
-	case Kind::StringLiteral:
-	case Kind::NoSubstitutionTemplateLiteral:
-	case Kind::ThisKeyword:
-		return true;
-	case Kind::NumericLiteral:
-		return isLiteralNameOfPropertyDeclarationOrIndexAccess(node);
-	default:
-		return false;
-	}
-}
 
 // isDefinedInLibraryFile checks if a declaration is from a default library file (e.g., lib.d.ts).
 // rename.go:249
@@ -286,22 +244,41 @@ std::string getQuoteFromPreference(lsutil::QuotePreference quotePreference) {
 
 // rename.go:290 — ClientSupportsWillRenameFiles
 bool ClientSupportsWillRenameFiles(gostd::Context ctx) {
-	return lsp::lsproto::GetClientCapabilities(ctx)
+	return lsp::lsproto::getClientCapabilities(ctx)
 		->Workspace.FileOperations.WillRename;
 }
 
 // rename.go:294 — ClientSupportsDocumentChanges
 bool ClientSupportsDocumentChanges(gostd::Context ctx) {
-	return lsp::lsproto::GetClientCapabilities(ctx)
+	return lsp::lsproto::getClientCapabilities(ctx)
 		->Workspace.WorkspaceEdit.DocumentChanges;
+}
+
+// rename.go:209 — nodeIsEligibleForRename
+bool nodeIsEligibleForRename(::tsc::Node* node) {
+	if (node == nullptr) {
+		return false;
+	}
+	switch (node->kind) {
+	case Kind::Identifier:
+	case Kind::PrivateIdentifier:
+	case Kind::StringLiteral:
+	case Kind::NoSubstitutionTemplateLiteral:
+	case Kind::ThisKeyword:
+		return true;
+	case Kind::NumericLiteral:
+		return isLiteralNameOfPropertyDeclarationOrIndexAccess(node);
+	default:
+		return false;
+	}
 }
 
 // rename.go:298 — ClientSupportsRenameResourceOperations
 bool ClientSupportsRenameResourceOperations(gostd::Context ctx) {
-	return containsVec(
-		lsp::lsproto::GetClientCapabilities(ctx)
-			->Workspace.WorkspaceEdit.ResourceOperations,
-		lsp::lsproto::ResourceOperationKindRename);
+	auto ops = lsp::lsproto::getClientCapabilities(ctx)
+	               ->Workspace.WorkspaceEdit.ResourceOperations;
+	return ops.has_value() &&
+	       containsVec(*ops, lsp::lsproto::ResourceOperationKindRename);
 }
 
 // ============================================================================
@@ -312,22 +289,17 @@ std::pair<lsp::lsproto::WorkspaceEditOrNull, gostd::Error>
 LanguageService::ProvideRename(
 	gostd::Context ctx, lsp::lsproto::RenameParams* params,
 	CrossProjectOrchestrator* orchestrator) {
-	return handleCrossProject(
+	return handleCrossProject<lsp::lsproto::RenameParams,
+	                          lsp::lsproto::WorkspaceEditOrNull>(
 		ctx,
 		params,
 		orchestrator,
-		std::function<std::pair<lsp::lsproto::WorkspaceEditOrNull, gostd::Error>(
-			LanguageService*, gostd::Context, lsp::lsproto::RenameParams*,
-			SymbolAndEntriesData, symbolEntryTransformOptions)>(
-			[](LanguageService* l, gostd::Context ctx,
-			   lsp::lsproto::RenameParams* params, SymbolAndEntriesData data,
-			   symbolEntryTransformOptions options) {
-				return l->symbolAndEntriesToRename(ctx, params, data, options);
-			}),
-		std::function<lsp::lsproto::WorkspaceEditOrNull(
-			std::function<void(
-				std::function<bool(lsp::lsproto::WorkspaceEditOrNull)>)>)>(
-			&combineRenameResponse),
+		[](LanguageService* l, const gostd::Context& ctx,
+		   lsp::lsproto::RenameParams* params, SymbolAndEntriesData data,
+		   symbolEntryTransformOptions options) {
+			return l->symbolAndEntriesToRename(ctx, params, data, options);
+		},
+		&combineRenameResponse,
 		true,  /*isRename*/
 		false, /*implementations*/
 		symbolEntryTransformOptions{},
@@ -410,22 +382,32 @@ LanguageService::symbolAndEntriesToRename(gostd::Context ctx,
 			// written back to the original text. Skip it and keep renaming the remaining occurrences.
 			continue;
 		}
-		auto* textEdit = new lsp::lsproto::TextEdit;
+		auto textEdit = std::make_shared<lsp::lsproto::TextEdit>();
 		textEdit->Range = rng;
 		textEdit->NewText = getTextForRename(data.OriginalNode, entry,
 											 params->NewName, ch, quotePreference,
 											 useAliasesForRename);
-		mappedEdits.push_back(mappedRenameEdit{uri, textEdit});
+		mappedEdits.push_back(mappedRenameEdit{uri, std::move(textEdit)});
 	}
 	auto [changes, ok] = deduplicateRenameEdits(mappedEdits);
 	if (!ok) {
 		return {lsp::lsproto::WorkspaceEditOrNull{}, nullptr};
 	}
 	lsp::lsproto::WorkspaceEditOrNull res;
-	res.WorkspaceEdit = new lsp::lsproto::WorkspaceEdit;
-	res.WorkspaceEdit->Changes = new std::map<
-		lsp::lsproto::DocumentUri, std::vector<lsp::lsproto::TextEdit*>>(
-		std::move(changes));
+	res.WorkspaceEdit = std::make_shared<lsp::lsproto::WorkspaceEdit>();
+	lsp::lsproto::Map<lsp::lsproto::DocumentUri,
+	                  lsp::lsproto::Slice<
+	                      std::shared_ptr<lsp::lsproto::TextEdit>>>
+	    changesMap;
+	for (auto& [uri, edits] : changes) {
+		changesMap[uri] = lsp::lsproto::Slice<
+		    std::shared_ptr<lsp::lsproto::TextEdit>>(std::move(edits));
+	}
+	res.WorkspaceEdit->Changes =
+	    std::make_shared<lsp::lsproto::Map<
+	        lsp::lsproto::DocumentUri,
+	        lsp::lsproto::Slice<std::shared_ptr<lsp::lsproto::TextEdit>>>>(
+	        std::move(changesMap));
 	return {res, nullptr};
 }
 

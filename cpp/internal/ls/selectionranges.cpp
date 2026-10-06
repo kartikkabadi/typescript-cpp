@@ -1,5 +1,6 @@
 // === slice: ls-coreC ===
 // selectionranges.cpp — selectionranges.go: smart selection ranges.
+#include "internal/astnav/tokens.h"
 #include "internal/ls/ls.h"
 
 namespace tsc::ls {
@@ -34,7 +35,7 @@ struct selectionRangeBuilder {
 			size_t index = (size_t(oldestIndex) + i) % ranges.size();
 			auto* r = new lsp::lsproto::SelectionRange;
 			r->Range = ranges[index];
-			r->Parent = result;
+			r->Parent = std::shared_ptr<lsp::lsproto::SelectionRange>(result);
 			result = r;
 		}
 		return result;
@@ -194,7 +195,7 @@ lsp::lsproto::SelectionRange* getSmartSelectionRange(LanguageService* l, SourceF
 	lsp::lsproto::Range lastRange{};
 	if (sourceFile->ContentMapper().empty()) {
 		auto [fullRange, _f] =
-			l->converters->ToLSPRange(sourceFile,
+			l->Converters()->ToLSPRange(sourceFile,
 									  newTextRange(int(sourceFile->pos()), int(sourceFile->end())));
 		root = new lsp::lsproto::SelectionRange;
 		root->Range = fullRange;
@@ -232,7 +233,7 @@ lsp::lsproto::SelectionRange* getSmartSelectionRange(LanguageService* l, SourceF
 		}
 
 		auto [lspRange, fidelity] =
-			l->converters->ToLSPRangeForFeature(sourceFile, newTextRange(start, end),
+			l->Converters()->ToLSPRangeForFeature(sourceFile, newTextRange(start, end),
 											  spanmap::FeatureSelectionRanges);
 		if (fidelity.IsNone()) {
 			return;
@@ -445,9 +446,9 @@ lsp::lsproto::SelectionRangeResponse LanguageService::ProvideSelectionRanges(
 		return lsp::lsproto::SelectionRangesOrNull{};
 	}
 
-	std::vector<lsp::lsproto::SelectionRange*> results;
-	results.reserve(params->Positions.size());
-	for (auto& position : params->Positions) {
+	std::vector<std::shared_ptr<lsp::lsproto::SelectionRange>> results;
+	results.reserve(params->Positions->size());
+	for (auto& position : *params->Positions) {
 		auto positions = converters->FromLSPPositionForSourceFile(sourceFile, position,
 																spanmap::FeatureSelectionRanges);
 		if (positions.size() != 1 || !positions[0].Fidelity.IsSingleSegment()) {
@@ -456,12 +457,15 @@ lsp::lsproto::SelectionRangeResponse LanguageService::ProvideSelectionRanges(
 		lsp::lsproto::SelectionRange* selectionRange = getSmartSelectionRange(
 			this, positions[0].Script, int(positions[0].Position));
 		if (selectionRange != nullptr) {
-			results.push_back(selectionRange);
+			results.push_back(
+				std::shared_ptr<lsp::lsproto::SelectionRange>(selectionRange));
 		}
 	}
 
 	lsp::lsproto::SelectionRangesOrNull res;
-	res.SelectionRanges = new std::vector<lsp::lsproto::SelectionRange*>(std::move(results));
+	res.SelectionRanges = std::make_shared<
+		lsp::lsproto::Slice<std::shared_ptr<lsp::lsproto::SelectionRange>>>(
+		std::move(results));
 	return res;
 }
 

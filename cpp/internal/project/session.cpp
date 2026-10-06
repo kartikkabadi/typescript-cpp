@@ -756,8 +756,12 @@ void Session::sendPerformanceTelemetry(const gostd::Context& ctx) {
 	lsp::lsproto::TelemetryEvent telemetry;
 	auto* event =
 	    new lsp::lsproto::PerformanceStatsTelemetryEvent();
-	event->Measurements = measurements;
-	telemetry.PerformanceStatsTelemetryEvent = event;
+	event->Measurements =
+	    std::shared_ptr<lsp::lsproto::PerformanceStatsTelemetryMeasurements>(
+	        measurements);
+	telemetry.PerformanceStatsTelemetryEvent =
+	    std::shared_ptr<lsp::lsproto::PerformanceStatsTelemetryEvent>(
+	        event);
 	if (client->SendTelemetry(ctx, telemetry) != nullptr &&
 	    options->LoggingEnabled) {
 		logging::log(logger, "Error sending performance telemetry");
@@ -830,7 +834,7 @@ lsp::lsproto::TelemetryEvent Session::collectProjectInfoTelemetry(
 		projectType = "configured";
 	}
 
-	std::map<std::string, std::string> props{
+	lsp::lsproto::Map<std::string, std::string> props{
 	    {"configFileName", configFileName},
 	    {"projectType", projectType},
 	    {"version", Version()},
@@ -873,20 +877,20 @@ lsp::lsproto::TelemetryEvent Session::collectProjectInfoTelemetry(
 	            opts->Incremental);
 	if (opts->Target != ScriptTarget::None) {
 		compilerOptions.Set(
-		    "target", scriptTargetDisplay(opts->Target));
+		    "target", std::string(String(opts->Target)));
 	}
 	if (opts->Module != ModuleKind::None) {
 		compilerOptions.Set("module",
-		                    moduleKindDisplay(opts->Module));
+		                    std::string(String(opts->Module)));
 	}
 	if (opts->ModuleResolution !=
 	    ModuleResolutionKind::Unknown) {
 		compilerOptions.Set(
 		    "moduleResolution",
-		    moduleResolutionKindDisplay(opts->ModuleResolution));
+		    std::string(String(opts->ModuleResolution)));
 	}
 	if (opts->Jsx != JsxEmit::None) {
-		compilerOptions.Set("jsx", jsxEmitDisplay(opts->Jsx));
+		compilerOptions.Set("jsx", std::string(String(opts->Jsx)));
 	}
 	props["compilerOptions"] = tsoptions::jsonMarshal(
 	    tsoptions::CompilerOptionsValue{
@@ -907,9 +911,11 @@ lsp::lsproto::TelemetryEvent Session::collectProjectInfoTelemetry(
 	lsp::lsproto::TelemetryEvent telemetry;
 	auto* event = new lsp::lsproto::ProjectInfoTelemetryEvent();
 	event->Properties = std::move(props);
-	event->Measurements = countFileStats(
-	    project->Program->GetSourceFiles());
-	telemetry.ProjectInfoTelemetryEvent = event;
+	event->Measurements =
+	    std::shared_ptr<lsp::lsproto::ProjectInfoTelemetryMeasurements>(
+	        countFileStats(project->Program->GetSourceFiles()));
+	telemetry.ProjectInfoTelemetryEvent =
+	    std::shared_ptr<lsp::lsproto::ProjectInfoTelemetryEvent>(event);
 	return telemetry;
 }
 
@@ -2353,11 +2359,13 @@ void Session::publishProjectDiagnostics(
 		diagnostics.clear();
 	}
 	ctx = WithCurrentLocale(ctx);
-	std::vector<lsp::lsproto::Diagnostic*> lspDiagnostics;
+	std::vector<std::shared_ptr<lsp::lsproto::Diagnostic>>
+	    lspDiagnostics;
 	lspDiagnostics.reserve(diagnostics.size());
 	for (auto* diag : diagnostics) {
 		lspDiagnostics.push_back(
-		    lsconv::DiagnosticToLSPPush(ctx, converters, diag));
+		    std::shared_ptr<lsp::lsproto::Diagnostic>(
+		        lsconv::DiagnosticToLSPPush(ctx, converters, diag)));
 	}
 
 	lsp::lsproto::PublishDiagnosticsParams params;

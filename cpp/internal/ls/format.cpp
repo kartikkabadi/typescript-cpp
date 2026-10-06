@@ -1,6 +1,7 @@
 // === slice: ls-coreC ===
 // format.cpp — format.go: formatting feature handlers (document/range/on-type)
 // plus the mapped-range helpers for content-mapped (virtual) files.
+#include "internal/astnav/tokens.h"
 #include "internal/ls/ls.h"
 
 #include <algorithm>
@@ -21,20 +22,21 @@ TextRange newTextRange(int pos, int end) {
 // ============================================================================
 // format.go:19 — toLSProtoTextEdits. Any non-exact fidelity aborts the whole
 // conversion (Go `return nil`).
-std::vector<lsp::lsproto::TextEdit*> LanguageService::toLSProtoTextEdits(
-	SourceFile* file, std::vector<TextChange> changes) {
-	std::vector<lsp::lsproto::TextEdit*> result;
+lsp::lsproto::Slice<std::shared_ptr<lsp::lsproto::TextEdit>>
+LanguageService::toLSProtoTextEdits(SourceFile* file,
+                                    std::vector<TextChange> changes) {
+	std::vector<std::shared_ptr<lsp::lsproto::TextEdit>> result;
 	result.reserve(changes.size());
 	for (auto& c : changes) {
 		auto [lspRange, fidelity] =
 			converters->ToLSPRange(file, newTextRange(c.pos(), c.end()));
 		if (!fidelity.IsExact()) {
-			return {};
+			return std::nullopt;
 		}
-		lsp::lsproto::TextEdit* edit = new lsp::lsproto::TextEdit;
+		auto edit = std::make_shared<lsp::lsproto::TextEdit>();
 		edit->NewText = c.NewText;
 		edit->Range = lspRange;
-		result.push_back(edit);
+		result.push_back(std::move(edit));
 	}
 	return result;
 }
@@ -53,7 +55,7 @@ lsp::lsproto::DocumentFormattingResponse LanguageService::ProvideFormatDocument(
 	SourceFile* file = getProgramAndFile(documentURI).second;
 	lsutil::FormatCodeSettings formatOpts =
 		lsutil::FromLSFormatOptions(FormatOptions(), *options);
-	std::vector<lsp::lsproto::TextEdit*> edits;
+	lsp::lsproto::Slice<std::shared_ptr<lsp::lsproto::TextEdit>> edits;
 	if (file->ContentMapper().empty()) {
 		edits = toLSProtoTextEdits(file, getFormattingEditsForDocument(ctx, file, formatOpts));
 	} else {
@@ -61,7 +63,8 @@ lsp::lsproto::DocumentFormattingResponse LanguageService::ProvideFormatDocument(
 			ctx, file, formatOpts, newTextRange(0, int(file->OriginalText().size())));
 	}
 	lsp::lsproto::TextEditsOrNull res;
-	res.TextEdits = new std::vector<lsp::lsproto::TextEdit*>(std::move(edits));
+	res.TextEdits = std::make_shared<lsp::lsproto::Slice<
+		std::shared_ptr<lsp::lsproto::TextEdit>>>(std::move(edits));
 	return res;
 }
 
@@ -71,7 +74,8 @@ lsp::lsproto::DocumentFormattingResponse LanguageService::ProvideFormatDocument(
 // formatted only once, preferring the earliest and then longest applicable
 // mapping.
 // format.go:56
-std::vector<lsp::lsproto::TextEdit*> LanguageService::getFormattingEditsForMappedRange(
+lsp::lsproto::Slice<std::shared_ptr<lsp::lsproto::TextEdit>>
+LanguageService::getFormattingEditsForMappedRange(
 	gostd::Context ctx, SourceFile* file, lsutil::FormatCodeSettings options,
 	TextRange originalRange) {
 	std::vector<SourceFile*> projections;
@@ -100,7 +104,7 @@ std::vector<lsp::lsproto::TextEdit*> LanguageService::getFormattingEditsForMappe
 		}
 	}
 
-	std::vector<lsp::lsproto::TextEdit*> edits;
+	std::vector<std::shared_ptr<lsp::lsproto::TextEdit>> edits;
 	for (auto& candidate : nonOverlappingFormattingRanges(candidates)) {
 		TextRange virtualRange = newTextRange(
 			int(candidate.segment.VirtualStart) + int(candidate.originalRange.pos()) -
@@ -118,14 +122,15 @@ std::vector<lsp::lsproto::TextEdit*> LanguageService::getFormattingEditsForMappe
 			if (!fidelity.IsExact()) {
 				continue;
 			}
-			lsp::lsproto::TextEdit* edit = new lsp::lsproto::TextEdit;
+			auto edit = std::make_shared<lsp::lsproto::TextEdit>();
 			edit->Range = lspRange;
 			edit->NewText = change.NewText;
-			edits.push_back(edit);
+			edits.push_back(std::move(edit));
 		}
 	}
 	std::stable_sort(edits.begin(), edits.end(),
-					 [](lsp::lsproto::TextEdit* a, lsp::lsproto::TextEdit* b) {
+					 [](const std::shared_ptr<lsp::lsproto::TextEdit>& a,
+						const std::shared_ptr<lsp::lsproto::TextEdit>& b) {
 						 if (int c = lsp::lsproto::CompareRanges(a->Range, b->Range); c != 0) {
 							 return c < 0;
 						 }
@@ -178,10 +183,12 @@ lsp::lsproto::DocumentRangeFormattingResponse LanguageService::ProvideFormatDocu
 	lsutil::FormatCodeSettings formatOpts =
 		lsutil::FromLSFormatOptions(FormatOptions(), *options);
 	if (!file->ContentMapper().empty()) {
-		std::vector<lsp::lsproto::TextEdit*> edits = getFormattingEditsForMappedRange(
-			ctx, file, formatOpts, converters->FromLSPRangeToOriginal(file, r));
+		lsp::lsproto::Slice<std::shared_ptr<lsp::lsproto::TextEdit>> edits =
+			getFormattingEditsForMappedRange(
+				ctx, file, formatOpts, converters->FromLSPRangeToOriginal(file, r));
 		lsp::lsproto::TextEditsOrNull res;
-		res.TextEdits = new std::vector<lsp::lsproto::TextEdit*>(std::move(edits));
+		res.TextEdits = std::make_shared<lsp::lsproto::Slice<
+		std::shared_ptr<lsp::lsproto::TextEdit>>>(std::move(edits));
 		return res;
 	}
 	auto ranges =
@@ -190,10 +197,11 @@ lsp::lsproto::DocumentRangeFormattingResponse LanguageService::ProvideFormatDocu
 		return lsp::lsproto::TextEditsOrNull{};
 	}
 	file = ranges[0].Script;
-	std::vector<lsp::lsproto::TextEdit*> edits =
+	lsp::lsproto::Slice<std::shared_ptr<lsp::lsproto::TextEdit>> edits =
 		toLSProtoTextEdits(file, getFormattingEditsForRange(ctx, file, formatOpts, ranges[0].Span));
 	lsp::lsproto::TextEditsOrNull res;
-	res.TextEdits = new std::vector<lsp::lsproto::TextEdit*>(std::move(edits));
+	res.TextEdits = std::make_shared<lsp::lsproto::Slice<
+		std::shared_ptr<lsp::lsproto::TextEdit>>>(std::move(edits));
 	return res;
 }
 
@@ -214,11 +222,13 @@ lsp::lsproto::DocumentOnTypeFormattingResponse LanguageService::ProvideFormatDoc
 		return lsp::lsproto::TextEditsOrNull{};
 	}
 	file = positions[0].Script;
-	std::vector<lsp::lsproto::TextEdit*> edits = toLSProtoTextEdits(
-		file, getFormattingEditsAfterKeystroke(ctx, file, formatOpts,
-											   int(positions[0].Position), character));
+	lsp::lsproto::Slice<std::shared_ptr<lsp::lsproto::TextEdit>> edits =
+		toLSProtoTextEdits(file, getFormattingEditsAfterKeystroke(
+							   ctx, file, formatOpts, int(positions[0].Position),
+							   character));
 	lsp::lsproto::TextEditsOrNull res;
-	res.TextEdits = new std::vector<lsp::lsproto::TextEdit*>(std::move(edits));
+	res.TextEdits = std::make_shared<lsp::lsproto::Slice<
+		std::shared_ptr<lsp::lsproto::TextEdit>>>(std::move(edits));
 	return res;
 }
 
@@ -296,11 +306,9 @@ CommentRange* getRangeOfEnclosingComment(SourceFile* file, int position,
 											  return true;
 										  });
 	}
-	getLeadingCommentRangesOfNode(tokenAtPosition, file,
-								  [&](const CommentRange& r) {
-									  commentRanges.push_back(r);
-									  return true;
-								  });
+	for (auto& r : getLeadingCommentRangesOfNode(tokenAtPosition, file)) {
+		commentRanges.push_back(r);
+	}
 	for (auto& commentRange : commentRanges) {
 		// The end marker of a single-line comment does not include the newline character.
 		// In the following case where the cursor is at `^`, we are inside a comment:

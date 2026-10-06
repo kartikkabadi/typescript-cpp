@@ -42,6 +42,13 @@ inline tsc::lsp::lsproto::DocumentUri FileNameToDocumentURI(
 	TSC_UNREACHABLE("FileNameToDocumentURI — owned by ls/lsconv");
 }
 
+// DiagnosticToLSPPull (converters.go:459) — dep-stub: the full port lands
+// with the lsconv slice (needs the unported localize machinery).
+class Converters;
+lsproto::Diagnostic* DiagnosticToLSPPull(
+    gostd::Context ctx, Converters* converters, Diagnostic* diagnostic,
+    bool reportStyleChecksAsWarnings);
+
 // LSPLineMap — linemap.go:14. dep-stub — owned by ls/lsconv.
 struct LSPLineMap;
 
