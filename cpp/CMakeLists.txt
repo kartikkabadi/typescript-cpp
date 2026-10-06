@@ -156,6 +156,18 @@ add_library(tsc STATIC
 	internal/pseudochecker/pseudochecker.cpp
 	# === slice: spanmap ===
 	internal/spanmap/spanmap.cpp
+	# === slice: ls-foundation ===
+	internal/ls/lsutil/asi.cpp
+	internal/ls/lsutil/children.cpp
+	internal/ls/lsutil/completednode.cpp
+	internal/ls/lsutil/formatcodeoptions.cpp
+	internal/ls/lsutil/organizeimports.cpp
+	internal/ls/lsutil/symbol_display.cpp
+	internal/ls/lsutil/userpreferences.cpp
+	internal/ls/lsutil/utilities.cpp
+	internal/ls/change/delete.cpp
+	internal/ls/change/tracker.cpp
+	internal/ls/change/trackerimpl.cpp
 	# === slice: infra ===
 	internal/locale/locale.cpp
 	# === slice: contentmapper ===

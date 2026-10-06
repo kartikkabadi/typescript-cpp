@@ -16,73 +16,16 @@
 #include "internal/core/textchange.h"
 #include "internal/core/types.h"
 #include "internal/scanner/scanner.h"
+#include "internal/ls/lsutil/lsutil.h"
 
-namespace tsc::lsutil {
-// === dep decls for ls slice (tsc/internal/ls/lsutil) ===
-// The enums/structs and GetDefaultFormatCodeSettings below are a real port of
-// formatcodeoptions.go — the format package needs them unconditionally at
-// compile time and runtime, so they cannot be stubbed. The owner slice should
-// move this block when it lands. The AST helpers are dep-stubbed (defined in
-// format/api.cpp under the dep-stub marker).
+namespace tsc {
+// === slice: ls-foundation ===
+// The FormatCodeSettings/SemicolonPreference types and the
+// PositionBelongsToNode/GetFirstToken/PositionIsASICandidate helpers live in
+// the lsutil slice; the alias keeps the format package's `lsutil::` spellings.
+namespace lsutil = tsc::ls::lsutil;
+} // namespace tsc
 
-enum class IndentStyle : int32_t {
-	None,
-	Block,
-	Smart,
-};
-
-// Go: `type SemicolonPreference string` ("ignore" | "insert" | "remove").
-enum class SemicolonPreference : int32_t {
-	Ignore,
-	Insert,
-	Remove,
-};
-inline constexpr SemicolonPreference SemicolonPreferenceIgnore = SemicolonPreference::Ignore;
-inline constexpr SemicolonPreference SemicolonPreferenceInsert = SemicolonPreference::Insert;
-inline constexpr SemicolonPreference SemicolonPreferenceRemove = SemicolonPreference::Remove;
-inline constexpr SemicolonPreference SemicolonPreferenceDefault = SemicolonPreference::Ignore;
-
-struct EditorSettings {
-	int BaseIndentSize = 0;
-	int IndentSize = 0;
-	int TabSize = 0;
-	std::string NewLineCharacter;
-	Tristate ConvertTabsToSpaces = Tristate::Unknown;
-	IndentStyle IndentStyle = IndentStyle::None;
-	Tristate TrimTrailingWhitespace = Tristate::Unknown;
-};
-
-struct FormatCodeSettings : EditorSettings {
-	Tristate InsertSpaceAfterCommaDelimiter = Tristate::Unknown;
-	Tristate InsertSpaceAfterSemicolonInForStatements = Tristate::Unknown;
-	Tristate InsertSpaceBeforeAndAfterBinaryOperators = Tristate::Unknown;
-	Tristate InsertSpaceAfterConstructor = Tristate::Unknown;
-	Tristate InsertSpaceAfterKeywordsInControlFlowStatements = Tristate::Unknown;
-	Tristate InsertSpaceAfterFunctionKeywordForAnonymousFunctions = Tristate::Unknown;
-	Tristate InsertSpaceAfterOpeningAndBeforeClosingNonemptyParenthesis = Tristate::Unknown;
-	Tristate InsertSpaceAfterOpeningAndBeforeClosingNonemptyBrackets = Tristate::Unknown;
-	Tristate InsertSpaceAfterOpeningAndBeforeClosingNonemptyBraces = Tristate::Unknown;
-	Tristate InsertSpaceAfterOpeningAndBeforeClosingEmptyBraces = Tristate::Unknown;
-	Tristate InsertSpaceAfterOpeningAndBeforeClosingTemplateStringBraces = Tristate::Unknown;
-	Tristate InsertSpaceAfterOpeningAndBeforeClosingJsxExpressionBraces = Tristate::Unknown;
-	Tristate InsertSpaceAfterTypeAssertion = Tristate::Unknown;
-	Tristate InsertSpaceBeforeFunctionParenthesis = Tristate::Unknown;
-	Tristate PlaceOpenBraceOnNewLineForFunctions = Tristate::Unknown;
-	Tristate PlaceOpenBraceOnNewLineForControlBlocks = Tristate::Unknown;
-	Tristate InsertSpaceBeforeTypeAnnotation = Tristate::Unknown;
-	Tristate IndentMultiLineObjectLiteralBeginningOnBlankLine = Tristate::Unknown;
-	SemicolonPreference Semicolons = SemicolonPreference::Ignore;
-	Tristate IndentSwitchCase = Tristate::Unknown;
-};
-
-FormatCodeSettings GetDefaultFormatCodeSettings();
-
-// Owned by the ls slice — stubbed in format/api.cpp until it lands.
-bool PositionBelongsToNode(Node* candidate, int position, SourceFile* file);
-Node* GetFirstToken(Node* node, SourceFile* sourceFile);
-bool PositionIsASICandidate(int pos, Node* context, SourceFile* file);
-// === end dep decls for ls slice ===
-} // namespace tsc::lsutil
 
 namespace tsc::format {
 

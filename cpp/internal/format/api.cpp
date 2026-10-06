@@ -5,38 +5,7 @@
 #include "internal/printer/printer.h"
 #include "internal/stringutil/stringutil.h"
 
-namespace tsc::lsutil {
 
-// Real port (needed unconditionally by tsc::format): lsutil/formatcodeoptions.go
-// GetDefaultFormatCodeSettings.
-FormatCodeSettings GetDefaultFormatCodeSettings() {
-	FormatCodeSettings opts;
-	opts.IndentSize = tsc::printer::GetDefaultIndentSize();
-	opts.TabSize = tsc::printer::GetDefaultIndentSize();
-	opts.NewLineCharacter = "\n";
-	opts.ConvertTabsToSpaces = Tristate::True;
-	opts.IndentStyle = IndentStyle::Smart;
-	opts.TrimTrailingWhitespace = Tristate::True;
-	opts.InsertSpaceAfterCommaDelimiter = Tristate::True;
-	opts.InsertSpaceAfterSemicolonInForStatements = Tristate::True;
-	opts.InsertSpaceBeforeAndAfterBinaryOperators = Tristate::True;
-	opts.InsertSpaceAfterKeywordsInControlFlowStatements = Tristate::True;
-	opts.InsertSpaceAfterOpeningAndBeforeClosingNonemptyBraces = Tristate::True;
-	opts.InsertSpaceAfterFunctionKeywordForAnonymousFunctions = Tristate::False;
-	opts.InsertSpaceAfterOpeningAndBeforeClosingNonemptyParenthesis = Tristate::False;
-	opts.InsertSpaceAfterOpeningAndBeforeClosingNonemptyBrackets = Tristate::False;
-	opts.InsertSpaceAfterOpeningAndBeforeClosingTemplateStringBraces = Tristate::False;
-	opts.InsertSpaceAfterOpeningAndBeforeClosingJsxExpressionBraces = Tristate::False;
-	opts.InsertSpaceBeforeFunctionParenthesis = Tristate::False;
-	opts.PlaceOpenBraceOnNewLineForFunctions = Tristate::False;
-	opts.PlaceOpenBraceOnNewLineForControlBlocks = Tristate::False;
-	opts.InsertSpaceAfterConstructor = Tristate::False;
-	opts.Semicolons = SemicolonPreference::Ignore;
-	opts.IndentSwitchCase = Tristate::True;
-	return opts;
-}
-
-} // namespace tsc::lsutil
 
 namespace tsc::format {
 
@@ -224,19 +193,4 @@ std::vector<TextChange> FormatOnEnter(const FormatRequestContext& ctx, SourceFil
 
 } // namespace tsc::format
 
-// === dep stubs — removed when owner slice lands ===
-namespace tsc::lsutil {
 
-bool PositionBelongsToNode(Node* /*current*/, int /*pos*/, SourceFile* /*sourceFile*/) {
-	TSC_UNREACHABLE("lsutil::PositionBelongsToNode — owned by ls slice");
-}
-
-Node* GetFirstToken(Node* /*n*/, SourceFile* /*sourceFile*/) {
-	TSC_UNREACHABLE("lsutil::GetFirstToken — owned by ls slice");
-}
-
-bool PositionIsASICandidate(int /*position*/, Node* /*context*/, SourceFile* /*currentFile*/) {
-	TSC_UNREACHABLE("lsutil::PositionIsASICandidate — owned by ls slice");
-}
-
-} // namespace tsc::lsutil
