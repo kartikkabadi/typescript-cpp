@@ -329,6 +329,20 @@ inline std::string_view removeTrailingDirectorySeparator(std::string_view path) 
 	return path;
 }
 
+// CompareNumberOfDirectorySeparators — path.go:1271.
+inline int compareNumberOfDirectorySeparators(std::string_view path1,
+                                              std::string_view path2) {
+	int a = static_cast<int>(std::count(path1.begin(), path1.end(), '/'));
+	int b = static_cast<int>(std::count(path2.begin(), path2.end(), '/'));
+	if (a < b) {
+		return -1;
+	}
+	if (a > b) {
+		return 1;
+	}
+	return 0;
+}
+
 inline std::string removeTrailingDirectorySeparators(std::string_view path) {
 	while (hasTrailingDirectorySeparator(path)) {
 		path = path.substr(0, path.size() - 1);
@@ -732,6 +746,13 @@ struct ComparePathsOptions {
 		return getStringEqualityComparer(!useCaseSensitiveFileNames);
 	}
 };
+
+// === slice: ls-autoimport ===
+// IsDynamicFileName — path.go:48. Dynamic/virtual file names don't exist on
+// disk (e.g. untitled "^/untitled/..." paths).
+inline bool isDynamicFileName(std::string_view fileName) {
+	return fileName.starts_with("^/");
+}
 
 inline bool pathIsAbsolute(std::string_view path) {
 	return getEncodedRootLength(path) != 0;

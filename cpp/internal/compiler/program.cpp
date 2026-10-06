@@ -13,6 +13,8 @@
 #include "internal/compiler/program.h"
 #include "internal/binder/binder.h"
 #include "internal/compiler/emitter.h"
+#include "internal/module/util.h" // === slice: ls-autoimport ===
+#include "internal/modulespecifiers/types.h" // === slice: ls-autoimport ===
 #include "internal/diagnostics/messages_generated.h"
 #include "internal/outputpaths/outputpaths.h"
 #include "internal/scanner/scanner.h"
@@ -2356,6 +2358,110 @@ uint64_t SimpleProgram::InstantiationCount() {
 	return checker_ != nullptr ? checker_->TotalInstantiationCount : 0;
 }
 
-// === end slice: execute-tsc ===
+// === slice: ls-autoimport ===
+
+// program.go:1785 IsGlobalTypingsFile.
+bool SimpleProgram::IsGlobalTypingsFile(const std::string& fileName) const {
+	if (!tspath::isDeclarationFileName(fileName)) {
+		return false;
+	}
+	return tspath::containsPath(opts_.TypingsLocation, fileName,
+	                            comparePathsOptions());
+}
+
+// program.go:590 GetTypeChecker — single checker (the port has no checker
+// pool; getChecker() is the pool-equivalent, and releasing it is a no-op).
+std::pair<checker::Checker*, std::function<void()>>
+SimpleProgram::GetTypeChecker(gostd::Context ctx) {
+	(void)ctx;
+	return {getChecker(), []() {}};
+}
+
+// program.go:2226 collectPackageNames — lazy like Go's lazyValue.
+SimpleProgram::packageNamesInfo* SimpleProgram::collectPackageNames() {
+	if (packageNames_.has_value()) {
+		return &*packageNames_;
+	}
+	packageNames_.emplace();
+	auto& packageNames = *packageNames_;
+	for (auto* file : files) {
+		if (IsSourceFileDefaultLibrary(file->Path()) ||
+		    IsSourceFileFromExternalLibrary(file) ||
+		    file->FileName().find("/node_modules/") != std::string::npos) {
+			// Checking for /node_modules/ is a little imprecise, but ATA
+			// treats locally installed typings as root files, which would
+			// not pass IsSourceFileFromExternalLibrary.
+			continue;
+		}
+		for (auto* imp : file->imports) {
+			if (tspath::isExternalModuleNameRelative(imp->text())) {
+				continue;
+			}
+			auto rmIt = resolvedModules.find(file->Path());
+			if (rmIt != resolvedModules.end()) {
+				module::ModeAwareCacheKey key{
+				    imp->text(), GetModeForUsageLocation(file, imp)};
+				auto rm2 = rmIt->second.find(key);
+				if (rm2 != rmIt->second.end() && rm2->second != nullptr &&
+				    rm2->second->IsResolved()) {
+					module::ResolvedModule* resolvedModule = rm2->second;
+					if (!resolvedModule->IsExternalLibraryImport) {
+						continue;
+					}
+					// Priority order for getting package name:
+					// 1. PackageId.Name (requires both name and version in
+					//    package.json)
+					std::string name = resolvedModule->PackageId.Name;
+					if (name.empty()) {
+						// 2. GetPackageScopeForPath - get name from
+						//    package.json in the package directory
+						auto packageScope = resolver_->GetPackageScopeForPath(
+						    resolvedModule->ResolvedFileName);
+						if (packageScope != nullptr &&
+						    packageScope->Exists()) {
+							if (auto [scopeName, ok] =
+							        packageScope->Contents->Name.GetValue();
+							    ok) {
+								name = scopeName;
+							}
+						}
+					}
+					if (name.empty()) {
+						// 3. GetPackageNameFromDirectory - extract from
+						//    node_modules path
+						name = modulespecifiers::GetPackageNameFromDirectory(
+						    resolvedModule->ResolvedFileName);
+					}
+					// 4. If all fail, don't add empty string
+					if (!name.empty()) {
+						packageNames.resolved.Add(name);
+						// Detect deep imports: subpath imports in packages
+						// without exports. These are imports like
+						// "lodash/fp" where the package has no exports map,
+						// so auto-import can only find them via recursive
+						// directory search.
+						auto [_, rest] = module::ParsePackageName(imp->text());
+						if (!rest.empty()) {
+							if (auto scope =
+							        resolver_->GetPackageScopeForPath(
+							            resolvedModule->ResolvedFileName);
+							    scope != nullptr && scope->Exists() &&
+							    !scope->Contents->Exports.IsPresent()) {
+								packageNames.deepImportPackages.Add(
+								    module::GetPackageNameFromTypesPackageName(
+								        name));
+							}
+						}
+					}
+					continue;
+				}
+			}
+			packageNames.unresolved.Add(imp->text());
+		}
+	}
+	return &packageNames;
+}
+
+// === end slice: ls-autoimport ===
 
 }  // namespace tsc::compiler

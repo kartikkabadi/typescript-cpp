@@ -216,6 +216,8 @@ private:
 public:
 	Set() = default;
 	Set(std::initializer_list<T> init) : items(init) {}
+	// === slice: ls-autoimport === (NewSetWithSizeHint)
+	explicit Set(size_t hint) { items.reserve(hint); }
 
 	bool Has(const T& key) const { return items.count(key) != 0; }
 	void Add(const T& key) { items.insert(key); }
@@ -229,7 +231,61 @@ public:
 	void AddRange(const std::vector<T>& v) {
 		for (auto& x : v) items.insert(x);
 	}
+
+	// === slice: ls-autoimport === (set.go methods needed by the registry)
+	// Len — Go's (nil *Set).Len() == 0; callers on Set* must null-check like
+	// Go. On a value Set this is Size().
+	size_t Len() const { return items.size(); }
+
+	void Clear() { items.clear(); }
+
+	// AddIfAbsent — returns true if the key was not already present.
+	bool AddIfAbsent(const T& key) { return items.insert(key).second; }
+
+	// Union — adds all of other's keys.
+	void Union(const Set& other) { items.insert(other.items.begin(), other.items.end()); }
+
+	// UnionedWith — new set with all keys of both (nil-tolerant in Go; the
+	// Set* overloads in ls/autoimport cover the nil cases).
+	Set UnionedWith(const Set& other) const {
+		Set result = Clone();
+		result.Union(other);
+		return result;
+	}
+
+	bool Equals(const Set& other) const { return items == other.items; }
+
+	// === slice: ls-autoimport ===
+	// Equals on pointers — Go `(s *Set).Equals(other)`: equal pointers are
+	// equal, nil vs non-nil is not equal. (set.go:104)
+	static bool EqualsPtr(const Set* a, const Set* b) {
+		if (a == b) return true;
+		if (a == nullptr || b == nullptr) return false;
+		return a->items == b->items;
+	}
+
+	bool IsSubsetOf(const Set& other) const {
+		for (auto& key : items) {
+			if (!other.Has(key)) return false;
+		}
+		return true;
+	}
+
+	bool Intersects(const Set& other) const {
+		for (auto& key : items) {
+			if (other.Has(key)) return true;
+		}
+		return false;
+	}
 };
+
+// === slice: ls-autoimport ===
+// NewSetFromItems — collections.NewSetFromItems.
+template <typename T>
+inline Set<T> newSetFromItems(std::initializer_list<T> items) {
+	return Set<T>(items);
+}
+// === end slice: ls-autoimport ===
 
 // === slice: moduletransforms ===
 

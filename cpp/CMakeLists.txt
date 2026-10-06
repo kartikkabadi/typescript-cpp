@@ -263,6 +263,18 @@ add_library(tsc STATIC
 	internal/fswatch/util.cpp
 	internal/fswatch/walkdir.cpp
 	internal/fswatch/watcher.cpp
+	# === slice: ls-autoimport ===
+	internal/project/logging/logging.cpp
+	internal/ls/autoimport/aliasresolver.cpp
+	internal/ls/autoimport/export.cpp
+	internal/ls/autoimport/extract.cpp
+	internal/ls/autoimport/fix.cpp
+	internal/ls/autoimport/import_adder.cpp
+	internal/ls/autoimport/index.cpp
+	internal/ls/autoimport/registry.cpp
+	internal/ls/autoimport/specifiers.cpp
+	internal/ls/autoimport/util.cpp
+	internal/ls/autoimport/view.cpp
 )
 
 target_link_libraries(tsc PUBLIC z) # zlib — pprof profile writer

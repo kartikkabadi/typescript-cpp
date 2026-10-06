@@ -1642,4 +1642,14 @@ inline bool isUnterminatedLiteral(Node* node) {
 // identifier/literal text anywhere in the file. Collects on first call.
 bool sourceFileHasIdentifier(SourceFile* file, const std::string& name);
 
+// === slice: ls-autoimport === — utilities.go helpers used by auto-import.
+// IsRequireVariableStatement — utilities.go:2811.
+bool isRequireVariableStatement(Node* node);
+// GetNonAugmentationDeclaration — utilities.go:3618.
+Node* getNonAugmentationDeclaration(Symbol* symbol);
+// GetSourceFileOfModule — utilities.go:3613.
+SourceFile* getSourceFileOfModule(Symbol* module);
+// TryGetImportFromModuleSpecifier — utilities.go:4203.
+Node* tryGetImportFromModuleSpecifier(Node* node);
+
 }  // namespace tsc

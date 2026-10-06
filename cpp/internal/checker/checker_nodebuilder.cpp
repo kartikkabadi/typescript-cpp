@@ -172,25 +172,6 @@ static SymbolFlags getQualifiedLeftMeaning(SymbolFlags rightMeaning) {
 	return SymbolFlagsNamespace;
 }
 
-// ast.GetNonAugmentationDeclaration (ast/utilities.go:3620).
-static Node* getNonAugmentationDeclaration(Symbol* symbol) {
-	for (Node* d : symbol->declarations) {
-		if (!isExternalModuleAugmentation(d) && !isGlobalScopeAugmentation(d)) {
-			return d;
-		}
-	}
-	return nullptr;
-}
-
-// ast.GetSourceFileOfModule (ast/utilities.go:3613).
-static SourceFile* getSourceFileOfModule(Symbol* module) {
-	Node* declaration = module->valueDeclaration;
-	if (declaration == nullptr) {
-		declaration = getNonAugmentationDeclaration(module);
-	}
-	return getSourceFileOfNode(declaration);
-}
-
 // getNameFromIndexInfo (checker.go:28262).
 static std::string getNameFromIndexInfo(IndexInfo* info) {
 	if (info->declaration != nullptr) {
