@@ -126,6 +126,15 @@ struct Index {
     }
 };
 
+// makeIndex binds a 4-byte-entry table that contains embedded NUL bytes.
+// Index{arr} would aggregate a string_view from `const char*` — strlen stops
+// at the first NUL (every table's first entry is "---\0"/"----"), truncating
+// the table to ~3 bytes and failing every lookup. Carry the array length.
+template <size_t N>
+constexpr Index makeIndex(const char (&arr)[N]) {
+    return Index{std::string_view{arr, N - 1}};
+}
+
 // strToInt — lookup.go.
 unsigned strToInt(std::string_view s) {
     unsigned v = 0;
@@ -156,7 +165,7 @@ std::string langToString(LangID id) {
     if (id == 0) {
         return "und";
     }
-    const Index idx{kLangIndex};
+    const Index idx = makeIndex(kLangIndex);
     std::string_view e = idx.elem(id);
     if (e[3] == 0) {
         return std::string(e.substr(0, 3));
@@ -168,7 +177,7 @@ std::string scriptToString(ScriptID s) {
     if (s == 0) {
         return "Zzzz";
     }
-    return std::string(Index{kScriptIndex}.elem(s));
+    return std::string(makeIndex(kScriptIndex).elem(s));
 }
 
 std::string regionToString(RegionID r) {
@@ -180,7 +189,7 @@ std::string regionToString(RegionID r) {
         std::snprintf(buf, sizeof(buf), "%03d", static_cast<int>(kM49[r]));
         return buf;
     }
-    return std::string(Index{kRegionISOIndex}.elem(r - isoRegionOffset).substr(0, 2));
+    return std::string(makeIndex(kRegionISOIndex).elem(r - isoRegionOffset).substr(0, 2));
 }
 
 // --- scanner — internal/language/parse.go ----------------------------------
@@ -296,8 +305,12 @@ struct Scanner {
                 next = end;
                 i = end - start;
             } else {
-                end = next + static_cast<int>(dash);
+                // b.find is absolute; Go's i = bytes.IndexByte(s.b[next:])
+                // is relative. end = next + i = dash; i stays the token
+                // length (start == next at loop top).
+                end = static_cast<int>(dash);
                 next = end + 1;
+                i = end - start;
             }
             std::string_view tok(b.data() + start, end - start);
             if (i < 1 || i > 8 || !isAlphaNum(tok)) {
@@ -345,7 +358,7 @@ std::pair<LangID, ScanErr> getLangISO2(Scanner& scan) {
     if (!scan.fixTokenCase("zz")) {
         return {0, ScanErr::syntax};
     }
-    const Index idx{kLangIndex};
+    const Index idx = makeIndex(kLangIndex);
     int i = idx.index(scan.token);
     if (i != -1 && idx.elem(i)[3] != 0) {
         return {static_cast<LangID>(i), ScanErr::none};
@@ -357,7 +370,7 @@ std::pair<LangID, ScanErr> getLangISO3(Scanner& scan) {
     if (!scan.fixTokenCase("und")) {
         return {0, ScanErr::syntax};
     }
-    const Index idx{kLangIndex};
+    const Index idx = makeIndex(kLangIndex);
     // first try to match canonical 3-letter entries
     for (int i = idx.index(scan.token.substr(0, 2)); i != -1; i = idx.next(scan.token.substr(0, 2), i)) {
         std::string_view e = idx.elem(i);
@@ -370,7 +383,7 @@ std::pair<LangID, ScanErr> getLangISO3(Scanner& scan) {
             return {id, ScanErr::none};
         }
     }
-    const Index alt{kAltLangISO3};
+    const Index alt = makeIndex(kAltLangISO3);
     if (int i = alt.index(scan.token); i != -1) {
         return {static_cast<LangID>(kAltLangIndex[static_cast<unsigned char>(alt.elem(i)[3])]), ScanErr::none};
     }
@@ -397,7 +410,7 @@ std::pair<LangID, ScanErr> getLangID(Scanner& scan) {
 }
 
 std::pair<RegionID, ScanErr> getRegionISO2(Scanner& scan) {
-    auto [i, err] = findIndex(scan, Index{kRegionISOIndex}, "ZZ");
+    auto [i, err] = findIndex(scan, makeIndex(kRegionISOIndex), "ZZ");
     if (err != ScanErr::none) {
         return {0, err};
     }
@@ -408,14 +421,14 @@ std::pair<RegionID, ScanErr> getRegionISO3(Scanner& scan) {
     if (!scan.fixTokenCase("ZZZ")) {
         return {0, ScanErr::syntax};
     }
-    const Index idx{kRegionISOIndex};
+    const Index idx = makeIndex(kRegionISOIndex);
     for (int i = idx.index(scan.token.substr(0, 1)); i != -1; i = idx.next(scan.token.substr(0, 1), i)) {
         std::string_view e = idx.elem(i);
         if (e[2] == scan.token[1] && e[3] == scan.token[2]) {
             return {static_cast<RegionID>(i + isoRegionOffset), ScanErr::none};
         }
     }
-    std::string_view alt3(kAltRegionISO3);
+    std::string_view alt3{kAltRegionISO3, sizeof(kAltRegionISO3) - 1};
     for (size_t i = 0; i < alt3.size(); i += 3) {
         if (cmp(alt3.substr(i, 3), scan.token) == 0) {
             return {static_cast<RegionID>(kAltRegionIDs[i / 3]), ScanErr::none};
@@ -746,7 +759,7 @@ std::pair<Tag, int> parseTag(Scanner& scan, bool doNorm) {
         end = scan.scan();
     }
     if (scan.token.size() == 4 && isAlpha(scan.token[0])) {
-        std::tie(t.scriptID, e) = getScriptID(scan, Index{kScriptIndex});
+        std::tie(t.scriptID, e) = getScriptID(scan, makeIndex(kScriptIndex));
         if (t.scriptID == 0) {
             scan.gobble(e);
         }
