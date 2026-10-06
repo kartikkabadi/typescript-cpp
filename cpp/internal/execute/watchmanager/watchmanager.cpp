@@ -49,7 +49,7 @@ void WatchManager::EnsureDefaultBackend() {
 		fsb->Inner = fsw;
 		backend = fsb;
 		if (DebugLog != nullptr) {
-			*DebugLog << "[watch] using " << fsw->Name() << " backend\n";
+			*DebugLog << "[watch] using " << fsw->name() << " backend\n";
 		}
 	}
 }
@@ -116,15 +116,15 @@ void WatchManager::onWatchEvents(const std::vector<fswatch::Event>& events,
 					          << " more";
 					break;
 				}
-				*DebugLog << fswatch::eventKindString(events[i].Kind)
-				          << " " << events[i].Path;
+				*DebugLog << fswatch::eventKindString(events[i].kind)
+				          << " " << events[i].path;
 			}
 			*DebugLog << '\n';
 		}
 		{
 			std::lock_guard<std::mutex> lock(changedMu);
 			for (auto& e : events) {
-				changedPaths[e.Path] = e.Kind;
+				changedPaths[e.path] = e.kind;
 			}
 		}
 		signalDoCycle();

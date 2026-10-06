@@ -102,20 +102,14 @@ public:
 	std::string Realpath(std::string_view path) override;
 	AccessibleEntries GetAccessibleEntries(std::string_view path) override;
 
-	SourceFile* GetSourceFile(const SourceFileParseOptions& opts,
-	                          SourceFileMetaData metaData);
+	virtual SourceFile* GetSourceFile(const SourceFileParseOptions& opts,
+	                                  SourceFileMetaData metaData);
 
 	// === slice: incremental ===
 	// host.go GetSourceFile — ReadFile + ParseSourceFile + EnsureScriptKind.
 	// Virtual so execute/watcher's watchCompilerHost can intercept every
 	// load with its mtime cache (watcher.go watchCompilerHost).
 	virtual SourceFile* GetSourceFile(const SourceFileParseOptions& opts);
-	// === end slice: incremental ===
-	// host.go ContentMapperProject — returns the field installed by
-	// execute/tsc when the command line has content mappers.
-	contentmapper::Project* ContentMapperProject() const {
-		return contentMapperProject.get();
-	}
 	// === end slice: incremental ===
 
 	// === slice: execute-tsc ===
@@ -132,12 +126,18 @@ public:
 	// host.go Trace.
 	void Trace(const DiagnosticMessage* msg,
 	           const std::vector<std::string>& args);
-	// host.go GetContentMappedSourceFiles.
-	std::pair<contentmapper::SourceFiles, gostd::Error>
+	// host.go ContentMapperProject — returns the field installed by
+	// execute/tsc when the command line has content mappers. Virtual:
+	// execute/build's compilerHost overrides it (compilerHost.go).
+	virtual contentmapper::Project* ContentMapperProject() const {
+		return contentMapperProject.get();
+	}
+	// host.go GetContentMappedSourceFiles. Virtual for the same reason.
+	virtual std::pair<contentmapper::SourceFiles, gostd::Error>
 	GetContentMappedSourceFiles(const SourceFileParseOptions& parseOptions,
 	                            contentmapper::Mapper* mapper);
-	// host.go GetResolvedProjectReference.
-	tsoptions::ParsedCommandLine* GetResolvedProjectReference(
+	// host.go GetResolvedProjectReference. Virtual for the same reason.
+	virtual tsoptions::ParsedCommandLine* GetResolvedProjectReference(
 	    const std::string& fileName, const tspath::Path& path);
 	// === end slice: execute-tsc ===
 };

@@ -3,6 +3,7 @@
 // emit.go — port of tsc/internal/execute/tsc/emit.go: the emit-and-report
 // pipeline shared by the plain, incremental, and watch compile paths.
 
+#include <filesystem>
 #include <functional>
 #include <ostream>
 #include <vector>
@@ -37,8 +38,8 @@ struct EmitInput {
 	compiler::WriteFile WriteFile;
 	CompileTimes* CompileTimes = nullptr;
 	CommandLineTesting* Testing = nullptr;
-	collections::SyncMap<tspath::Path, vfs::TimePoint>* TestingMTimesCache =
-	    nullptr;
+	collections::SyncMap<tspath::Path, std::filesystem::file_time_type>*
+	    TestingMTimesCache = nullptr;
 	tracing::Tracing* Tracing = nullptr;
 };
 

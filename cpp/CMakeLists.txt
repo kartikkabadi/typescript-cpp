@@ -224,6 +224,12 @@ add_library(tsc STATIC
 	internal/execute/tsc/statistics.cpp
 	internal/execute/watchmanager/watchbackend.cpp
 	internal/execute/watchmanager/watchmanager.cpp
+	# === slice: execute-build ===
+	internal/execute/build/buildtask.cpp
+	internal/execute/build/compilerhost.cpp
+	internal/execute/build/host.cpp
+	internal/execute/build/orchestrator.cpp
+	internal/execute/build/uptodatestatus.cpp
 	# === slice: bundled ===
 	internal/bundled/bundled.cpp
 	internal/bundled/bundled_generated.cpp

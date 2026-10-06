@@ -5,6 +5,7 @@
 // content mapper host creation, and compile timing buckets.
 
 #include <chrono>
+#include <filesystem>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -133,7 +134,8 @@ struct CommandLineTesting {
 	// are deterministic for test baseline.
 	virtual void OnEmittedFiles(
 	    compiler::EmitResult* result,
-	    collections::SyncMap<tspath::Path, vfs::TimePoint>* mTimesCache) = 0;
+	    collections::SyncMap<tspath::Path,
+	                         std::filesystem::file_time_type>* mTimesCache) = 0;
 	virtual void OnListFilesStart(std::ostream* w) = 0;
 	virtual void OnListFilesEnd(std::ostream* w) = 0;
 	virtual void OnStatisticsStart(std::ostream* w) = 0;

@@ -144,6 +144,11 @@ DefaultResolver::DefaultResolver(ResolverOptions opts)
 	}
 }
 
+// resolver.go:167 NewResolver — the ctor above performs the field init.
+DefaultResolver* NewResolver(ResolverOptions opts) {
+	return new DefaultResolver(std::move(opts));
+}
+
 tracer* DefaultResolver::newTraceBuilder() {
 	if (compilerOptions->TraceResolution == Tristate::True) {
 		traceBuilderStorage = tracer{};
@@ -3229,15 +3234,6 @@ const DiagnosticMessage* getResolutionDiagnostic(
 		return needResolveJsonModule();
 	}
 	return needAllowArbitraryExtensions();
-}
-
-}  // namespace tsc::module
-
-// Reopening for the NewResolver factory — resolver.go:167.
-namespace tsc::module {
-
-DefaultResolver* NewResolver(ResolverOptions opts) {
-	return new DefaultResolver(std::move(opts));
 }
 
 }  // namespace tsc::module

@@ -4,34 +4,16 @@
 
 #include "internal/tspath/tspath.h"
 
-namespace tsc::fswatch {
-
-// Sentinel errors — fswatch/watcher.go:31-46.
-const gostd::Error ErrOverflow =
-    gostd::newError("fswatch: event overflow; some changes were missed");
-const gostd::Error ErrWatchTerminated =
-    gostd::newError("fswatch: watch terminated");
-const gostd::Error ErrUnavailable =
-    gostd::newError("fswatch: watcher not available on this platform");
-const gostd::Error ErrFilesystemUnsupported = gostd::newError(
-    "fswatch: watcher backend unsupported on this filesystem");
-
-// Default — fswatch/watcher.go:230.
-// dep-stub: fswatch — owned by fswatch.
-Watcher* Default() { TSC_UNREACHABLE("fswatch::Default — owned by fswatch"); }
-
-}  // namespace tsc::fswatch
-
 namespace tsc::execute::watchmanager {
 namespace {
 
 // watchCloser — adapts fswatch::Watch to io.Closer.
 struct watchCloser : gostd::io::Closer {
-	std::unique_ptr<fswatch::Watch> w;
-	explicit watchCloser(std::unique_ptr<fswatch::Watch> w)
+	std::shared_ptr<fswatch::Watch> w;
+	explicit watchCloser(std::shared_ptr<fswatch::Watch> w)
 	    : w(std::move(w)) {}
 	gostd::Error close() override {
-		return w == nullptr ? nullptr : w->Close();
+		return w == nullptr ? nullptr : w->close();
 	}
 };
 
@@ -61,7 +43,7 @@ FSWatchBackend::WatchDirectories(
 	    requests.size());
 	for (size_t i = 0; i < requests.size(); i++) {
 		auto& request = requests[i];
-		std::vector<fswatch::WatchOption> opts;
+		std::vector<std::shared_ptr<fswatch::WatchOption>> opts;
 		if (request.Recursive) {
 			opts.push_back(fswatch::WithRecursive());
 		}
@@ -69,12 +51,12 @@ FSWatchBackend::WatchDirectories(
 			opts.push_back(fswatch::WithIgnore(request.Ignore));
 		}
 		fswatchRequests[i] = fswatch::WatchDirectoryRequest{
-		    .Dir = request.Dir,
-		    .Callback = request.Callback,
-		    .Options = std::move(opts),
+		    .dir = request.Dir,
+		    .callback = request.Callback,
+		    .options = std::move(opts),
 		};
 	}
-	auto [watches, err] = Inner->WatchDirectories(fswatchRequests);
+	auto [watches, err] = Inner->watchDirectories(std::move(fswatchRequests));
 	if (err) {
 		return {std::vector<std::unique_ptr<gostd::io::Closer>>{}, err};
 	}
