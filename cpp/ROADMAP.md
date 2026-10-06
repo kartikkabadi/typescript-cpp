@@ -70,7 +70,12 @@ oracle before moving on.
 - [x] `execute/tsctests` harness (`tsctestrunner`): **99/99** Go scenario
       ports pass (build/watch/commandline/composite/declarationEmit/noEmit,
       incl. Windows-path VFS).
-- [ ] fourslash LS-test harness — runner + test batch in flight.
+- [ ] fourslash LS-test harness — `fourslashrunner` landed (fork-per-test
+      runner, static registry); batch A = 93 tests, **83 PASS / 8 FAIL /
+      2 SKIP** vs Go oracle (91.4% parity; the 2 skips are Go's own
+      `t.Skip`). The 8 divergences are documented in
+      `internal/fourslash/tests/REPORT_A.md` and are being fixed; batch B
+      (~150-200 more tests) in flight.
 
 ## Performance work
 
