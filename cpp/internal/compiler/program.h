@@ -1143,4 +1143,8 @@ ResolutionMode getDefaultResolutionModeForFile(
     const CompilerOptions* compilerOptions);
 bool importSyntaxAffectsModuleResolution(const CompilerOptions* options);
 
+// fileloader.go:630 ContentMapperProjectDiagnostic — fileless diagnostic
+// for project setup or mapper initialization.
+Diagnostic* ContentMapperProjectDiagnostic(const gostd::Error& err);
+
 }  // namespace tsc::compiler

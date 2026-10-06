@@ -3,6 +3,7 @@
 #include <thread>
 
 #include "internal/execute/build/build.h"
+#include "internal/compiler/program.h"
 #include "internal/tsoptions/tsoptions.h"
 
 namespace tsc::execute::build {
@@ -68,91 +69,6 @@ inline std::optional<int> atoi(std::string_view s) {
 		v = v * 10 + (s[i] - '0');
 	}
 	return neg ? static_cast<int>(-v) : static_cast<int>(v);
-}
-
-// --- compiler/fileloader.go statics replicated file-locally (established
-// convention — they are TU-local there) ------------------------------------
-
-// fileloader.go:575 contentMapperProjectErrorDiagnostic.
-const DiagnosticMessage* contentMapperProjectErrorDiagnostic(
-    const gostd::Error& err) {
-	if (auto* projectError =
-	        gostd::errorAs<contentmapper::ProjectError*>(err)) {
-		switch (projectError->Kind) {
-		case contentmapper::ProjectErrorKindMalformedResponse:
-			return The_content_mapper_returned_a_project_response_that_could_not_be_decoded;
-		case contentmapper::ProjectErrorKindMissingConfigIdentity:
-			return The_content_mapper_did_not_return_configIdentity_which_is_required_when_the_content_mapper_has_dynamicConfig_Colon_true_in_its_package_json;
-		case contentmapper::ProjectErrorKindNonAbsoluteWatchedFile:
-			return The_content_mapper_returned_a_non_absolute_path_in_watchedFiles;
-		case contentmapper::ProjectErrorKindUnexpectedConfigIdentity:
-			return The_content_mapper_returned_configIdentity_which_is_only_allowed_when_it_declares_dynamicConfig_Colon_true_in_its_package_json;
-		case contentmapper::ProjectErrorKindUnexpectedWatchedFiles:
-			return The_content_mapper_returned_watchedFiles_which_is_only_allowed_when_it_declares_dynamicConfig_Colon_true_in_its_package_json;
-		}
-	}
-	return The_content_mapper_process_failed_while_handling_the_project_request;
-}
-
-// fileloader.go:602 ContentMapperInitializationDiagnostic — fileless
-// diagnostic for a mapper initialization failure.
-Diagnostic* contentMapperInitializationDiagnostic(
-    const std::string& labelIn, const gostd::Error& err) {
-	auto* initializeError =
-	    gostd::errorAs<contentmapper::InitializeError*>(err);
-	std::string label = labelIn;
-	if (initializeError != nullptr && label.empty()) {
-		label = initializeError->MapperName;
-	}
-	Diagnostic* diagnostic = tsoptions::newCompilerDiagnostic(
-	    The_content_mapper_0_could_not_be_initialized, {label});
-	if (initializeError != nullptr) {
-		switch (initializeError->Kind) {
-		case contentmapper::InitializeErrorKindProcessStart:
-			return diagnostic->AddMessageChain(tsoptions::newCompilerDiagnostic(
-			    The_content_mapper_command_0_could_not_be_started_Colon_1,
-			    {initializeError->Command, initializeError->Detail}));
-		case contentmapper::InitializeErrorKindProcessExit:
-			return diagnostic->AddMessageChain(tsoptions::newCompilerDiagnostic(
-			    The_content_mapper_process_exited_before_responding_to_the_initialize_request_exit_code_0,
-			    {std::to_string(initializeError->ExitCode)}));
-		case contentmapper::InitializeErrorKindNoResponse:
-			return diagnostic->AddMessageChain(tsoptions::newCompilerDiagnostic(
-			    The_content_mapper_did_not_respond_to_the_initialize_request_within_0_seconds,
-			    {std::to_string(initializeError->TimeoutSeconds)}));
-		case contentmapper::InitializeErrorKindInvalidResponse:
-			return diagnostic->AddMessageChain(tsoptions::newCompilerDiagnostic(
-			    The_content_mapper_returned_an_initialize_response_that_could_not_be_decoded_Colon_0,
-			    {initializeError->Detail}));
-		case contentmapper::InitializeErrorKindRequest:
-			return diagnostic->AddMessageChain(tsoptions::newCompilerDiagnostic(
-			    The_content_mapper_s_initialize_request_failed_Colon_0,
-			    {initializeError->Detail}));
-		case contentmapper::InitializeErrorKindPositionEncoding:
-			return diagnostic->AddMessageChain(tsoptions::newCompilerDiagnostic(
-			    The_content_mapper_selected_unsupported_position_encoding_0,
-			    {initializeError->PositionEncoding}));
-		case contentmapper::InitializeErrorKindEmptyDiagnosticSource:
-			return diagnostic->AddMessageChain(tsoptions::newCompilerDiagnostic(
-			    The_content_mapper_diagnostic_source_must_not_be_empty));
-		case contentmapper::InitializeErrorKindReservedDiagnosticSource:
-			return diagnostic->AddMessageChain(tsoptions::newCompilerDiagnostic(
-			    The_content_mapper_diagnostic_source_0_is_reserved_by_TypeScript,
-			    {initializeError->DiagnosticSource}));
-		}
-	}
-	return diagnostic->AddMessageChain(tsoptions::newCompilerDiagnostic(
-	    The_content_mapper_process_could_not_be_started_or_initialized));
-}
-
-// fileloader.go:630 ContentMapperProjectDiagnostic — fileless diagnostic
-// for project setup or mapper initialization.
-Diagnostic* contentMapperProjectDiagnostic(const gostd::Error& err) {
-	if (gostd::errorAs<contentmapper::InitializeError*>(err) != nullptr) {
-		return contentMapperInitializationDiagnostic("" /*label*/, err);
-	}
-	return tsoptions::newCompilerDiagnostic(
-	    contentMapperProjectErrorDiagnostic(err));
 }
 
 // iter.Seq[tspath.Path] as it appears in this codebase.
@@ -377,7 +293,7 @@ void BuildTask::compileAndEmit(Orchestrator* orchestrator,
 	incremental::Program* oldProgram = nullptr;
 	auto [contentMapperProject_, err] = getContentMapperProject(orchestrator);
 	if (err) {
-		reportDiagnostic(contentMapperProjectDiagnostic(err));
+		reportDiagnostic(compiler::ContentMapperProjectDiagnostic(err));
 		status = new upToDateStatus{upToDateStatusType::BuildErrors, {}};
 		result->exitStatus = etsc::ExitStatusDiagnosticsPresent_OutputsSkipped;
 		return;
@@ -590,10 +506,10 @@ upToDateStatus* BuildTask::getUpToDateStatus(Orchestrator* orchestrator,
 	auto [contentMapperProject_, err] = getContentMapperProject(orchestrator);
 	auto [contentMapperIdentities, identityErr] =
 	    incremental::ContentMapperIdentities(contentMapperProject_);
-	if (identityErr.has_value()) {
-		contentMapperProjectErr = gostd::Error{};
+	if (identityErr != nullptr) {
+		contentMapperProjectErr = identityErr;
 	}
-	if (err != nullptr || identityErr.has_value() ||
+	if (err != nullptr || identityErr != nullptr ||
 	    !buildInfo->ContentMapperIdentitiesMatch(contentMapperIdentities)) {
 		return new upToDateStatus{upToDateStatusType::OutOfDateOptions,
 		                          buildInfoPath};

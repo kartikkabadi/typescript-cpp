@@ -500,12 +500,12 @@ struct toBuildInfo {
 }  // namespace
 
 // snapshottobuildinfo.go:16 snapshotToBuildInfo.
-std::pair<BuildInfo*, std::optional<std::string>> snapshotToBuildInfo(
+std::pair<BuildInfo*, gostd::Error> snapshotToBuildInfo(
     incremental::snapshot* snapshot, compiler::SimpleProgram* program,
     std::string_view buildInfoFileName) {
 	auto [contentMapperIdentities, err] =
 	    ContentMapperIdentities(program->ContentMapperProject());
-	if (err.has_value()) {
+	if (err != nullptr) {
 		return {nullptr, err};
 	}
 	auto* buildInfo = new BuildInfo();
@@ -543,7 +543,7 @@ std::pair<BuildInfo*, std::optional<std::string>> snapshotToBuildInfo(
 	buildInfo->SemanticErrors = snapshot->hasSemanticErrors;
 	buildInfo->CheckPending = snapshot->checkPending;
 	to.setPackageJsons();
-	return {buildInfo, std::nullopt};
+	return {buildInfo, nullptr};
 }
 
 }  // namespace tsc::execute::incremental

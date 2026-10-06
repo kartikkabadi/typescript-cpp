@@ -146,7 +146,7 @@ std::shared_ptr<Watcher>
 newWithBackend(const std::shared_ptr<vfs::FS>& fs,
                const std::shared_ptr<watcherBackend>& backend,
                std::function<void(std::vector<std::shared_ptr<lsproto::FileEvent>>)> onChanges,
-               const std::shared_ptr<project::logging::Logger>& logger) {
+               const std::shared_ptr<tsc::logging::Logger>& logger) {
 	auto w = std::make_shared<Watcher>();
 	w->fs = fs;
 	w->backend = backend;
@@ -158,7 +158,7 @@ newWithBackend(const std::shared_ptr<vfs::FS>& fs,
 std::shared_ptr<Watcher>
 NewWithFSWatcher(const std::shared_ptr<vfs::FS>& fs, fswatch::Watcher* watcher,
                  std::function<void(std::vector<std::shared_ptr<lsproto::FileEvent>>)> onChanges,
-                 const std::shared_ptr<project::logging::Logger>& logger) {
+                 const std::shared_ptr<tsc::logging::Logger>& logger) {
 	auto backend = std::make_shared<defaultWatcherBackend>();
 	backend->watcher = watcher;
 	return newWithBackend(fs, backend, std::move(onChanges), logger);
@@ -167,7 +167,7 @@ NewWithFSWatcher(const std::shared_ptr<vfs::FS>& fs, fswatch::Watcher* watcher,
 std::shared_ptr<Watcher>
 New(const std::shared_ptr<vfs::FS>& fs,
     std::function<void(std::vector<std::shared_ptr<lsproto::FileEvent>>)> onChanges,
-    const std::shared_ptr<project::logging::Logger>& logger) {
+    const std::shared_ptr<tsc::logging::Logger>& logger) {
 	return NewWithFSWatcher(fs, fswatch::Default(), std::move(onChanges), logger);
 }
 

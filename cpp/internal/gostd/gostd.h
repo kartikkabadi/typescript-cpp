@@ -305,6 +305,7 @@ struct ContextImpl {
 using Context = std::shared_ptr<ContextImpl>;
 using CancelFunc = std::function<void()>;
 
+
 inline Context contextBackground() {
 	static const Context bg = std::make_shared<ContextImpl>();
 	return bg;
@@ -430,18 +431,40 @@ inline std::function<bool()> contextAfterFunc(const Context& c,
 	return [flag] { return !flag->exchange(true); };
 }
 
-// context.WithCancel — child cancels with errCanceled when the parent finishes.
+// context.WithCancel — child cancels when the parent finishes, inheriting
+// the parent's Err (Go's propagateCancel passes parent.Err() through).
 inline std::pair<Context, CancelFunc> contextWithCancel(const Context& parent) {
 	auto c = std::make_shared<ContextImpl>();
 	c->cancelable = true;
 	std::weak_ptr<ContextImpl> w = c;
-	contextAfterFunc(parent, [w] {
+	contextAfterFunc(parent, [w, parent] {
 		if (auto s = w.lock()) {
-			ctxCancel(s, errCanceled);
+			ctxCancel(s, ctxErr(parent) ? ctxErr(parent) : errCanceled);
 		}
 	});
 	return {c, [c] { ctxCancel(c, errCanceled); }};
 }
+
+// context.WithCancelCause — the returned cancel takes the cancellation
+// cause; context.Cause(ctx) reads it back (ctx.Err() in this port — Go
+// tracks cause separately but never differs from Err here since every
+// cancellation carries its cause).
+inline std::pair<Context, std::function<void(const Error&)>>
+contextWithCancelCause(const Context& parent) {
+	auto c = std::make_shared<ContextImpl>();
+	std::weak_ptr<ContextImpl> w = c;
+	contextAfterFunc(parent, [w, parent] {
+		if (auto s = w.lock()) {
+			ctxCancel(s, ctxErr(parent) ? ctxErr(parent) : errCanceled);
+		}
+	});
+	return {c, [c](const Error& cause) {
+		ctxCancel(c, cause ? cause : errCanceled);
+	}};
+}
+
+// context.Cause — the error the context was cancelled with (nil while open).
+inline Error contextCause(const Context& c) { return ctxErr(c); }
 
 // context.WithTimeout(parent, d) — as WithCancel plus a deadline that cancels
 // with errDeadlineExceeded.

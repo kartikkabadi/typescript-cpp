@@ -305,7 +305,7 @@ SetupWithOptionsAndTypingsInstaller(
 
 // WithRequestID — projecttestutil.go:276.
 gostd::Context WithRequestID(const gostd::Context& ctx) {
-	return tsc::withRequestID(ctx, "0");
+	return tsc::core::WithRequestID(ctx, "0");
 }
 
 // GetSessionInitOptions — projecttestutil.go:280.

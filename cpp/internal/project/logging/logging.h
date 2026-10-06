@@ -10,14 +10,12 @@
 // functions directly only when the pointer is known non-null.
 #pragma once
 
-#include <atomic>
-#include <chrono>
-#include <functional>
-#include <mutex>
+#include <initializer_list>
 #include <string>
 #include <string_view>
 #include <vector>
 
+#include "internal/ast/ast.h" // tscUnreachable
 #include "internal/gostd/gostd.h"
 
 namespace tsc::logging {
@@ -25,10 +23,27 @@ namespace tsc::logging {
 // formatTime — logger.go. Go's t.Format("15:04:05.000") wrapped in brackets.
 std::string formatTime(std::chrono::system_clock::time_point t);
 
-// Logger — logger.go interface.
+// Logger — logger.go interface. Go's `...any` variadics map to
+// std::initializer_list<gostd::fmtArg> at the call site; the pure virtuals
+// take std::vector<fmtArg> so either argument shape can be forwarded.
 struct Logger {
 	virtual ~Logger() = default;
-	virtual void Log(std::string_view msg) = 0;
+	virtual void Error(const std::vector<gostd::fmtArg>& msg) { Log(msg); }
+	virtual void Errorf(std::string_view format,
+	                    const std::vector<gostd::fmtArg>& args) {
+		Logf(format, args);
+	}
+	virtual void Warn(const std::vector<gostd::fmtArg>& msg) { Log(msg); }
+	virtual void Warnf(std::string_view format,
+	                   const std::vector<gostd::fmtArg>& args) {
+		Logf(format, args);
+	}
+	virtual void Info(const std::vector<gostd::fmtArg>& msg) { Log(msg); }
+	virtual void Infof(std::string_view format,
+	                   const std::vector<gostd::fmtArg>& args) {
+		Logf(format, args);
+	}
+	virtual void Log(const std::vector<gostd::fmtArg>& msg) = 0;
 	virtual void Logf(std::string_view format,
 	                  const std::vector<gostd::fmtArg>& args) = 0;
 	// Verbose returns the logger instance if verbose logging is enabled, and
@@ -37,32 +52,59 @@ struct Logger {
 	virtual bool IsVerbose() = 0;
 	virtual void SetVerbose(bool verbose) = 0;
 
-	// Error/Warn/Info delegate to Log/Logf exactly as the Go methods do.
-	void Error(std::string_view msg) { Log(msg); }
+	// Call-shape conveniences (not Go interface members): braced
+	// initializer_list calls (Go `...any`) and single string_view messages.
+	void Error(std::initializer_list<gostd::fmtArg> msg) {
+		Error(std::vector<gostd::fmtArg>(msg));
+	}
 	void Errorf(std::string_view format,
-	            const std::vector<gostd::fmtArg>& args) {
-		Logf(format, args);
+	            std::initializer_list<gostd::fmtArg> args) {
+		Errorf(format, std::vector<gostd::fmtArg>(args));
 	}
-	void Warn(std::string_view msg) { Log(msg); }
+	void Warn(std::initializer_list<gostd::fmtArg> msg) {
+		Warn(std::vector<gostd::fmtArg>(msg));
+	}
 	void Warnf(std::string_view format,
-	           const std::vector<gostd::fmtArg>& args) {
-		Logf(format, args);
+	           std::initializer_list<gostd::fmtArg> args) {
+		Warnf(format, std::vector<gostd::fmtArg>(args));
 	}
-	void Info(std::string_view msg) { Log(msg); }
+	void Info(std::initializer_list<gostd::fmtArg> msg) {
+		Info(std::vector<gostd::fmtArg>(msg));
+	}
 	void Infof(std::string_view format,
-	           const std::vector<gostd::fmtArg>& args) {
-		Logf(format, args);
+	           std::initializer_list<gostd::fmtArg> args) {
+		Infof(format, std::vector<gostd::fmtArg>(args));
 	}
+	void Log(std::initializer_list<gostd::fmtArg> msg) {
+		Log(std::vector<gostd::fmtArg>(msg));
+	}
+	void Logf(std::string_view format,
+	          std::initializer_list<gostd::fmtArg> args) {
+		Logf(format, std::vector<gostd::fmtArg>(args));
+	}
+	void Log(std::string_view msg) { Log({gostd::fmtArg(msg)}); }
+	void Error(std::string_view msg) { Error({gostd::fmtArg(msg)}); }
+	void Warn(std::string_view msg) { Warn({gostd::fmtArg(msg)}); }
+	void Info(std::string_view msg) { Info({gostd::fmtArg(msg)}); }
 };
 
 // logger — the io.Writer-backed Logger impl (logger.go).
 struct loggerImpl final : Logger {
+	// Keep the base-class call-shape conveniences visible.
+	using Logger::Error;
+	using Logger::Errorf;
+	using Logger::Warn;
+	using Logger::Warnf;
+	using Logger::Info;
+	using Logger::Infof;
+	using Logger::Log;
+	using Logger::Logf;
 	std::mutex mu;
 	bool verbose = false;
 	gostd::io::Writer* writer;
 	std::function<std::string()> prefix;
 
-	void Log(std::string_view msg) override;
+	void Log(const std::vector<gostd::fmtArg>& msg) override;
 	void Logf(std::string_view format,
 	          const std::vector<gostd::fmtArg>& args) override;
 	Logger* Verbose() override;
@@ -88,6 +130,15 @@ struct logEntry {
 };
 
 struct LogTree final : Logger {
+	// Keep the base-class call-shape conveniences visible.
+	using Logger::Error;
+	using Logger::Errorf;
+	using Logger::Warn;
+	using Logger::Warnf;
+	using Logger::Info;
+	using Logger::Infof;
+	using Logger::Log;
+	using Logger::Logf;
 	std::string name;
 	std::mutex mu;
 	std::vector<logEntry*> logs;
@@ -102,7 +153,7 @@ struct LogTree final : Logger {
 	void add(logEntry* log);
 	void writeLogsRecursive(std::string& builder, const std::string& indent);
 
-	void Log(std::string_view msg) override;
+	void Log(const std::vector<gostd::fmtArg>& msg) override;
 	void Logf(std::string_view format,
 	          const std::vector<gostd::fmtArg>& args) override;
 	Logger* Verbose() override;

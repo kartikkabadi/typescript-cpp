@@ -7,16 +7,9 @@
 
 #include "internal/execute/execute.h"
 #include "internal/execute/tsc/emit.h"
+#include "internal/compiler/program.h"
 #include "internal/vfs/cachedvfs/cachedvfs.h"
 #include "internal/vfs/trackingvfs/trackingvfs.h"
-
-// ---------------------------------------------------------------------------
-// dep-stub: compiler — owned by compiler
-// compiler.ContentMapperProjectDiagnostic (contentmapper diag plumbing).
-// ---------------------------------------------------------------------------
-namespace tsc::compiler {
-Diagnostic* ContentMapperProjectDiagnostic(const gostd::Error& err);
-}
 
 namespace tsc::execute {
 
@@ -908,12 +901,3 @@ tsoptions::ParsedCommandLine* Watcher::parseConfigFile() {
 }
 
 }  // namespace tsc::execute
-
-namespace tsc::compiler {
-
-Diagnostic* ContentMapperProjectDiagnostic(const gostd::Error& err) {
-	TSC_UNREACHABLE(
-	    "compiler::ContentMapperProjectDiagnostic — owned by compiler");
-}
-
-}  // namespace tsc::compiler

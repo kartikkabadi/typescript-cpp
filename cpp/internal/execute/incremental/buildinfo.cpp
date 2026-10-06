@@ -1554,16 +1554,12 @@ emitSignature* BuildInfoEmitSignature::toEmitSignature(
 bool BuildInfo::IsValidVersion() const { return Version == version(); }
 
 // buildInfo.go:603 — free fn.
-std::pair<std::vector<std::string>, std::optional<std::string>>
+std::pair<std::vector<std::string>, gostd::Error>
 ContentMapperIdentities(contentmapper::Project* project) {
 	if (project == nullptr) {
-		return {{}, std::nullopt};
+		return {{}, nullptr};
 	}
-	auto [ids, err] = project->Identities();
-	if (err != nullptr) {
-		return {ids, err->Error()};
-	}
-	return {ids, std::nullopt};
+	return project->Identities();
 }
 
 // buildInfo.go:611 ContentMapperIdentitiesMatch — slices.Equal.

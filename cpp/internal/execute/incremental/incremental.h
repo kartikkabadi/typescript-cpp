@@ -416,8 +416,9 @@ struct BuildInfoRootInfoReader {
 	void Roots(const std::function<bool(const tspath::Path&)>& yield) const;
 };
 
-// buildInfo.go:741 ContentMapperIdentities.
-std::pair<std::vector<std::string>, std::optional<std::string>>
+// buildInfo.go:741 ContentMapperIdentities — Go error → gostd::Error (the
+// typed value ContentMapperProjectDiagnostic inspects).
+std::pair<std::vector<std::string>, gostd::Error>
 ContentMapperIdentities(contentmapper::Project* project);
 
 // buildInfo.go:747 IsBuildInfoFileNameDefaultLibrary.
@@ -591,7 +592,7 @@ snapshot* buildInfoToSnapshot(BuildInfo* buildInfo,
                               compiler::CompilerHost* host);
 
 // snapshottobuildinfo.go:16 snapshotToBuildInfo — {buildInfo, err}.
-std::pair<BuildInfo*, std::optional<std::string>> snapshotToBuildInfo(
+std::pair<BuildInfo*, gostd::Error> snapshotToBuildInfo(
     snapshot* s, compiler::SimpleProgram* program,
     std::string_view buildInfoFileName);
 

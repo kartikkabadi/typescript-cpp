@@ -50,7 +50,7 @@ Program* ReadBuildInfoProgram(tsoptions::ParsedCommandLine* config,
 	// produced may be stale, so the old program cannot be reused.
 	auto [contentMapperIdentities, err] =
 	    ContentMapperIdentities(host->ContentMapperProject());
-	if (err.has_value() ||
+	if (err != nullptr ||
 	    !buildInfo->ContentMapperIdentitiesMatch(contentMapperIdentities)) {
 		return nullptr;
 	}

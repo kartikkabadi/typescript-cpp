@@ -371,16 +371,12 @@ compiler::EmitResult* Program::emitBuildInfo(compiler::EmitOptions* options) {
 	}
 	auto [buildInfo, err] = snapshotToBuildInfo(snapshot_, program_,
 	                                            buildInfoFileName);
-	if (err.has_value()) {
+	if (err != nullptr) {
+		// incremental/program.go:353 — EmitResult{EmitSkipped: true,
+		// Diagnostics: {compiler.ContentMapperProjectDiagnostic(err)}}.
 		auto* r = new compiler::EmitResult();
 		r->EmitSkipped = true;
-		// compiler.ContentMapperProjectDiagnostic — owned by the
-		// compiler fileloader slice (content mapper is not ported);
-		// unreachable today since ContentMapperIdentities never errs
-		// without a mapper project.
-		TSC_UNREACHABLE(
-		    "ContentMapperProjectDiagnostic — owned by compiler "
-		    "fileloader slice");
+		r->Diagnostics = {compiler::ContentMapperProjectDiagnostic(err)};
 		return r;
 	}
 	std::string text = marshalBuildInfo(buildInfo);

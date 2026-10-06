@@ -520,7 +520,7 @@ static Diagnostic* contentMapperInitializationDiagnostic(
 
 // fileloader.go:630 ContentMapperProjectDiagnostic — fileless diagnostic
 // for project setup or mapper initialization.
-static Diagnostic* contentMapperProjectDiagnostic(const gostd::Error& err) {
+Diagnostic* ContentMapperProjectDiagnostic(const gostd::Error& err) {
 	if (gostd::errorAs<contentmapper::InitializeError*>(err) != nullptr) {
 		return contentMapperInitializationDiagnostic("" /*label*/, err);
 	}

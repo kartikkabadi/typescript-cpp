@@ -45,9 +45,13 @@ std::string formatTime(std::chrono::system_clock::time_point t) {
 // logger — logger.go
 // ---------------------------------------------------------------------------
 
-void loggerImpl::Log(std::string_view msg) {
+void loggerImpl::Log(const std::vector<gostd::fmtArg>& msg) {
 	std::lock_guard<std::mutex> lk(mu);
-	fprintln(writer, prefix(), msg);
+	std::string text;
+	for (const auto& a : msg) {
+		text += a.text;
+	}
+	fprintln(writer, prefix(), text);
 }
 
 void loggerImpl::Logf(std::string_view format,
@@ -106,8 +110,12 @@ void LogTree::add(logEntry* log) {
 	logs.push_back(log);
 }
 
-void LogTree::Log(std::string_view msg) {
-	add(newLogEntry(nullptr, std::string(msg)));
+void LogTree::Log(const std::vector<gostd::fmtArg>& msg) {
+	std::string text;
+	for (const auto& a : msg) {
+		text += a.text;
+	}
+	add(newLogEntry(nullptr, text));
 }
 
 void LogTree::Logf(std::string_view format,
