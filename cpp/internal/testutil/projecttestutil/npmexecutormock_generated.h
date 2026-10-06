@@ -24,7 +24,7 @@ namespace tsc::testutil::projecttestutil {
 //	}
 struct NpmExecutorMock final : ata::NpmExecutor {
 	// NpmInstallFunc mocks the NpmInstall method.
-	std::function<std::pair<std::vector<uint8_t>, gostd::Error>(
+	std::function<std::pair<std::string, gostd::Error>(
 	    const std::string&, const std::vector<std::string>&)>
 	    NpmInstallFunc;
 
@@ -43,7 +43,7 @@ struct NpmExecutorMock final : ata::NpmExecutor {
 	mutable std::shared_mutex lockNpmInstall;
 
 	// NpmInstall calls NpmInstallFunc — npmexecutormock_generated.go:49.
-	std::pair<std::vector<uint8_t>, gostd::Error>
+	std::pair<std::string, gostd::Error>
 	NpmInstall(const std::string& cwd,
 	           const std::vector<std::string>& args) override;
 

@@ -18,6 +18,7 @@
 #include "internal/gostd/gostd.h"
 #include "internal/json/json.h"
 #include "internal/module/resolver.h"
+#include "internal/ls/crossproject.h" // ls::Project iface
 #include "internal/project/ata/ata.h"
 #include "internal/project/checkerpool.h"
 #include "internal/project/watch.h"
@@ -29,18 +30,6 @@ struct Logger;
 struct LogTree;
 } // namespace tsc::logging
 
-namespace tsc::ls {
-
-// dep decl — ls.Project interface (crossproject.go:17) — owned by ls
-// slice.
-struct Project {
-	virtual ~Project() = default;
-	virtual std::string Id() const = 0;
-	virtual compiler::SimpleProgram* GetProgram() const = 0;
-	virtual bool HasFile(const std::string& fileName) const = 0;
-};
-
-} // namespace tsc::ls
 
 namespace tsc::project {
 

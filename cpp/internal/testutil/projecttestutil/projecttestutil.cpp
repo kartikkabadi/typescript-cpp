@@ -31,7 +31,7 @@ void SessionUtils::SetupNpmExecutorForTypingsInstaller() {
 	npmExecutor->NpmInstallFunc =
 	    [this](const std::string& cwd,
 	           const std::vector<std::string>& packageNames)
-	    -> std::pair<std::vector<uint8_t>, gostd::Error> {
+	    -> std::pair<std::string, gostd::Error> {
 		// packageNames is actually npmInstallArgs due to interface
 		// misnaming
 		const auto& npmInstallArgs = packageNames;
@@ -255,14 +255,15 @@ SetupWithRealFS() {
 	sessionUtils->fs = fs;
 	sessionUtils->client = clientMock;
 	sessionUtils->npmExecutor = npmExecutorMock;
-	sessionUtils->logger = logging::NewTestLogger();
+	sessionUtils->logger =
+	    std::shared_ptr<logging::LogCollector>(logging::newTestLogger());
 
 	project::SessionInit init;
 	init.BackgroundCtx = gostd::contextBackground();
 	init.FS = fs;
-	init.Client = clientMock;
-	init.NpmExecutor = npmExecutorMock;
-	init.Logger = sessionUtils->logger;
+	init.Client = clientMock.get();
+	init.NpmExecutor = npmExecutorMock.get();
+	init.Logger = sessionUtils->logger.get();
 	project::SessionOptions options;
 	options.CurrentDirectory = wd;
 	options.DefaultLibraryPath = bundled::LibPath();
@@ -270,7 +271,7 @@ SetupWithRealFS() {
 	options.WatchEnabled = true;
 	options.LoggingEnabled = true;
 	options.PushDiagnosticsEnabled = true;
-	init.Options = std::make_shared<project::SessionOptions>(options);
+	init.Options = new project::SessionOptions(options);
 
 	return {project::NewSession(&init), sessionUtils};
 }
@@ -326,7 +327,8 @@ GetSessionInitOptions(const FileMap& files, project::SessionOptions* options,
 	sessionUtils->client = clientMock;
 	sessionUtils->npmExecutor = npmExecutorMock;
 	sessionUtils->tiOptions = std::move(tiOptions);
-	sessionUtils->logger = logging::NewTestLogger();
+	sessionUtils->logger =
+	    std::shared_ptr<logging::LogCollector>(logging::newTestLogger());
 
 	// Configure the npm executor mock to handle typings installation
 	sessionUtils->SetupNpmExecutorForTypingsInstaller();
@@ -346,14 +348,12 @@ GetSessionInitOptions(const FileMap& files, project::SessionOptions* options,
 	auto init = std::make_unique<project::SessionInit>();
 	init->BackgroundCtx = gostd::contextBackground();
 	init->Options = options != nullptr
-	                  ? std::shared_ptr<project::SessionOptions>(
-	                        options, [](project::SessionOptions*) {})
-	                  : std::make_shared<project::SessionOptions>(
-	                        defaultOptions);
+	                  ? options
+	                  : new project::SessionOptions(defaultOptions);
 	init->FS = fs;
-	init->Client = clientMock;
-	init->NpmExecutor = npmExecutorMock;
-	init->Logger = sessionUtils->logger;
+	init->Client = clientMock.get();
+	init->NpmExecutor = npmExecutorMock.get();
+	init->Logger = sessionUtils->logger.get();
 	return {std::move(init), sessionUtils};
 }
 

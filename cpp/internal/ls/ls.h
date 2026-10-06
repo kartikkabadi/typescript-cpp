@@ -18,6 +18,7 @@
 #include "internal/compiler/program.h"
 #include "internal/gostd/gostd.h"
 #include "internal/ls/lsdeps.h"
+#include "internal/ls/crossproject.h"
 #include "internal/locale/locale.h"
 #include "internal/lsp/lsproto/lsproto.h"
 #include "internal/module/types.h"

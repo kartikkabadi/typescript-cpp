@@ -12,6 +12,8 @@
 #include "internal/gostd/gostd.h"
 #include "internal/gostd/testing.h"
 #include "internal/project/project.h"
+#include "internal/project/session.h"
+#include "internal/project/sessiontypes.h"
 #include "internal/project/logging/logging.h"
 #include "internal/testutil/projecttestutil/clientmock_generated.h"
 #include "internal/testutil/projecttestutil/npmexecutormock_generated.h"

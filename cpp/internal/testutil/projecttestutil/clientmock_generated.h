@@ -14,6 +14,7 @@
 #include "internal/locale/locale.h"
 #include "internal/lsp/lsproto/lsproto.h"
 #include "internal/project/project.h"
+#include "internal/project/client.h"
 
 namespace tsc::testutil::projecttestutil {
 
@@ -24,19 +25,19 @@ struct ClientMockProgressFinishCall {
 	// Message is the message argument value.
 	const tsc::DiagnosticMessage* Message;
 	// Args is the args argument value.
-	std::vector<std::any> Args;
+	std::vector<std::string> Args;
 };
 struct ClientMockProgressStartCall {
 	// Message is the message argument value.
 	const tsc::DiagnosticMessage* Message;
 	// Args is the args argument value.
-	std::vector<std::any> Args;
+	std::vector<std::string> Args;
 };
 struct ClientMockPublishDiagnosticsCall {
 	// Ctx is the ctx argument value.
 	gostd::Context Ctx;
 	// Params is the params argument value.
-	std::shared_ptr<lsproto::PublishDiagnosticsParams> Params;
+	lsp::lsproto::PublishDiagnosticsParams* Params;
 };
 struct ClientMockRefreshCodeLensCall {
 	// Ctx is the ctx argument value.
@@ -78,7 +79,7 @@ struct ClientMockWatchFilesCall {
 	// ID is the id argument value.
 	project::WatcherID ID;
 	// Watchers is the watchers argument value.
-	std::vector<std::shared_ptr<lsproto::FileSystemWatcher>> Watchers;
+	std::vector<lsp::lsproto::FileSystemWatcher*> Watchers;
 };
 
 // ClientMock — clientmock_generated.go:56. A mock implementation of
@@ -94,30 +95,31 @@ struct ClientMock final : project::Client {
 	std::function<locale::Locale()> GetLocaleFunc;
 	std::function<bool()> IsActiveFunc;
 	std::function<void(const tsc::DiagnosticMessage*,
-	                   const std::vector<std::any>&)>
+	                   const std::vector<std::string>&)>
 	    ProgressFinishFunc;
 	std::function<void(const tsc::DiagnosticMessage*,
-	                   const std::vector<std::any>&)>
+	                   const std::vector<std::string>&)>
 	    ProgressStartFunc;
 	std::function<gostd::Error(
-	    gostd::Context,
-	    const std::shared_ptr<lsproto::PublishDiagnosticsParams>&)>
+	    const gostd::Context&,
+	    lsp::lsproto::PublishDiagnosticsParams*)>
 	    PublishDiagnosticsFunc;
-	std::function<gostd::Error(gostd::Context)> RefreshCodeLensFunc;
-	std::function<gostd::Error(gostd::Context)> RefreshDiagnosticsFunc;
-	std::function<gostd::Error(gostd::Context)> RefreshInlayHintsFunc;
-	std::function<gostd::Error(gostd::Context,
+	std::function<gostd::Error(const gostd::Context&)> RefreshCodeLensFunc;
+	std::function<gostd::Error(const gostd::Context&)> RefreshDiagnosticsFunc;
+	std::function<gostd::Error(const gostd::Context&)> RefreshInlayHintsFunc;
+	std::function<gostd::Error(const gostd::Context&,
 	                           const std::vector<std::string>&)>
 	    RegisterContentMapperExtensionsFunc;
-	std::function<gostd::Error(gostd::Context,
-	                           const lsproto::TelemetryEvent&)>
+	std::function<gostd::Error(const gostd::Context&,
+	                           lsproto::TelemetryEvent)>
 	    SendTelemetryFunc;
 	std::function<void(const std::string&)> SetLocaleFunc;
-	std::function<gostd::Error(gostd::Context, project::WatcherID)>
+	std::function<gostd::Error(const gostd::Context&,
+	    project::WatcherID)>
 	    UnwatchFilesFunc;
 	std::function<gostd::Error(
-	    gostd::Context, project::WatcherID,
-	    const std::vector<std::shared_ptr<lsproto::FileSystemWatcher>>&)>
+	    const gostd::Context&, project::WatcherID,
+	    const std::vector<lsp::lsproto::FileSystemWatcher*>&)>
 	    WatchFilesFunc;
 
 	// calls tracks calls to the methods.
@@ -160,39 +162,37 @@ struct ClientMock final : project::Client {
 	bool IsActive() override;
 	// ProgressFinish — clientmock_generated.go:295.
 	void ProgressFinish(const tsc::DiagnosticMessage* message,
-	                    const std::vector<std::any>& args) override;
+	                    const std::vector<std::string>& args) override;
 	// ProgressStart — clientmock_generated.go:288ish.
 	void ProgressStart(const tsc::DiagnosticMessage* message,
-	                   const std::vector<std::any>& args) override;
+	                   const std::vector<std::string>& args) override;
 	// PublishDiagnostics — clientmock_generated.go:327.
 	gostd::Error PublishDiagnostics(
-	    gostd::Context ctx,
-	    const std::shared_ptr<lsproto::PublishDiagnosticsParams>& params)
-	    override;
+	    const gostd::Context& ctx,
+	    lsp::lsproto::PublishDiagnosticsParams* params) override;
 	// RefreshCodeLens — clientmock_generated.go:364.
-	gostd::Error RefreshCodeLens(gostd::Context ctx) override;
+	gostd::Error RefreshCodeLens(const gostd::Context& ctx) override;
 	// RefreshDiagnostics — clientmock_generated.go:397.
-	gostd::Error RefreshDiagnostics(gostd::Context ctx) override;
+	gostd::Error RefreshDiagnostics(const gostd::Context& ctx) override;
 	// RefreshInlayHints — clientmock_generated.go:430.
-	gostd::Error RefreshInlayHints(gostd::Context ctx) override;
+	gostd::Error RefreshInlayHints(const gostd::Context& ctx) override;
 	// RegisterContentMapperExtensions — clientmock_generated.go:463.
 	gostd::Error RegisterContentMapperExtensions(
-	    gostd::Context ctx, const std::vector<std::string>& extensions)
-	    override;
+	    const gostd::Context& ctx,
+	    const std::vector<std::string>& extensions) override;
 	// SendTelemetry — clientmock_generated.go:500.
-	gostd::Error SendTelemetry(gostd::Context ctx,
-	                           const lsproto::TelemetryEvent& telemetry)
-	    override;
+	gostd::Error SendTelemetry(const gostd::Context& ctx,
+	                           lsproto::TelemetryEvent telemetry) override;
 	// SetLocale — clientmock_generated.go:537.
 	void SetLocale(const std::string& locale) override;
 	// UnwatchFiles — clientmock_generated.go:569.
-	gostd::Error UnwatchFiles(gostd::Context ctx,
+	gostd::Error UnwatchFiles(const gostd::Context& ctx,
 	                          project::WatcherID id) override;
 	// WatchFiles — clientmock_generated.go:606.
 	gostd::Error WatchFiles(
-	    gostd::Context ctx, project::WatcherID id,
-	    const std::vector<std::shared_ptr<lsproto::FileSystemWatcher>>&
-	        watchers) override;
+	    const gostd::Context& ctx, project::WatcherID id,
+	    const std::vector<lsp::lsproto::FileSystemWatcher*>& watchers)
+	    override;
 
 	// Call accessors.
 	std::vector<ClientMockGetLocaleCall> GetLocaleCalls() const;

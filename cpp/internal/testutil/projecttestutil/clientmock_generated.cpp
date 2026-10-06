@@ -45,7 +45,7 @@ std::vector<ClientMockIsActiveCall> ClientMock::IsActiveCalls() const {
 
 // ProgressFinish — clientmock_generated.go:295.
 void ClientMock::ProgressFinish(const tsc::DiagnosticMessage* message,
-                                const std::vector<std::any>& args) {
+                                const std::vector<std::string>& args) {
 	{
 		std::unique_lock lk(lockProgressFinish);
 		calls.ProgressFinish.push_back(ClientMockProgressFinishCall{
@@ -66,7 +66,7 @@ ClientMock::ProgressFinishCalls() const {
 
 // ProgressStart — clientmock_generated.go:288ish.
 void ClientMock::ProgressStart(const tsc::DiagnosticMessage* message,
-                               const std::vector<std::any>& args) {
+                               const std::vector<std::string>& args) {
 	{
 		std::unique_lock lk(lockProgressStart);
 		calls.ProgressStart.push_back(ClientMockProgressStartCall{
@@ -87,8 +87,8 @@ ClientMock::ProgressStartCalls() const {
 
 // PublishDiagnostics — clientmock_generated.go:327.
 gostd::Error ClientMock::PublishDiagnostics(
-    gostd::Context ctx,
-    const std::shared_ptr<lsproto::PublishDiagnosticsParams>& params) {
+    const gostd::Context& ctx,
+    lsp::lsproto::PublishDiagnosticsParams* params) {
 	{
 		std::unique_lock lk(lockPublishDiagnostics);
 		calls.PublishDiagnostics.push_back(ClientMockPublishDiagnosticsCall{
@@ -108,7 +108,7 @@ ClientMock::PublishDiagnosticsCalls() const {
 }
 
 // RefreshCodeLens — clientmock_generated.go:364.
-gostd::Error ClientMock::RefreshCodeLens(gostd::Context ctx) {
+gostd::Error ClientMock::RefreshCodeLens(const gostd::Context& ctx) {
 	{
 		std::unique_lock lk(lockRefreshCodeLens);
 		calls.RefreshCodeLens.push_back(
@@ -128,7 +128,7 @@ ClientMock::RefreshCodeLensCalls() const {
 }
 
 // RefreshDiagnostics — clientmock_generated.go:397.
-gostd::Error ClientMock::RefreshDiagnostics(gostd::Context ctx) {
+gostd::Error ClientMock::RefreshDiagnostics(const gostd::Context& ctx) {
 	{
 		std::unique_lock lk(lockRefreshDiagnostics);
 		calls.RefreshDiagnostics.push_back(
@@ -148,7 +148,7 @@ ClientMock::RefreshDiagnosticsCalls() const {
 }
 
 // RefreshInlayHints — clientmock_generated.go:430.
-gostd::Error ClientMock::RefreshInlayHints(gostd::Context ctx) {
+gostd::Error ClientMock::RefreshInlayHints(const gostd::Context& ctx) {
 	{
 		std::unique_lock lk(lockRefreshInlayHints);
 		calls.RefreshInlayHints.push_back(
@@ -169,7 +169,8 @@ ClientMock::RefreshInlayHintsCalls() const {
 
 // RegisterContentMapperExtensions — clientmock_generated.go:463.
 gostd::Error ClientMock::RegisterContentMapperExtensions(
-    gostd::Context ctx, const std::vector<std::string>& extensions) {
+    const gostd::Context& ctx,
+    const std::vector<std::string>& extensions) {
 	{
 		std::unique_lock lk(lockRegisterContentMapperExtensions);
 		calls.RegisterContentMapperExtensions.push_back(
@@ -191,7 +192,7 @@ ClientMock::RegisterContentMapperExtensionsCalls() const {
 
 // SendTelemetry — clientmock_generated.go:500.
 gostd::Error ClientMock::SendTelemetry(
-    gostd::Context ctx, const lsproto::TelemetryEvent& telemetry) {
+    const gostd::Context& ctx, lsproto::TelemetryEvent telemetry) {
 	{
 		std::unique_lock lk(lockSendTelemetry);
 		calls.SendTelemetry.push_back(ClientMockSendTelemetryCall{
@@ -230,7 +231,7 @@ std::vector<ClientMockSetLocaleCall> ClientMock::SetLocaleCalls() const {
 }
 
 // UnwatchFiles — clientmock_generated.go:569.
-gostd::Error ClientMock::UnwatchFiles(gostd::Context ctx,
+gostd::Error ClientMock::UnwatchFiles(const gostd::Context& ctx,
                                       project::WatcherID id) {
 	{
 		std::unique_lock lk(lockUnwatchFiles);
@@ -252,9 +253,8 @@ std::vector<ClientMockUnwatchFilesCall> ClientMock::UnwatchFilesCalls()
 
 // WatchFiles — clientmock_generated.go:606.
 gostd::Error ClientMock::WatchFiles(
-    gostd::Context ctx, project::WatcherID id,
-    const std::vector<std::shared_ptr<lsproto::FileSystemWatcher>>&
-        watchers) {
+    const gostd::Context& ctx, project::WatcherID id,
+    const std::vector<lsp::lsproto::FileSystemWatcher*>& watchers) {
 	{
 		std::unique_lock lk(lockWatchFiles);
 		calls.WatchFiles.push_back(ClientMockWatchFilesCall{

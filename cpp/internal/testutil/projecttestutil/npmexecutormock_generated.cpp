@@ -7,7 +7,7 @@
 namespace tsc::testutil::projecttestutil {
 
 // NpmInstall calls NpmInstallFunc — npmexecutormock_generated.go:49.
-std::pair<std::vector<uint8_t>, gostd::Error> NpmExecutorMock::NpmInstall(
+std::pair<std::string, gostd::Error> NpmExecutorMock::NpmInstall(
     const std::string& cwd, const std::vector<std::string>& args) {
 	NpmInstallCall callInfo{.Cwd = cwd, .Args = args};
 	{
