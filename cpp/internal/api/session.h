@@ -42,12 +42,15 @@
 #include "internal/module/types.h"
 #include "internal/pprof/pprof.h"
 #include "internal/project/project.h"
+#include "internal/project/session.h"
+#include "internal/project/snapshot.h"
+#include "internal/project/snapshothost.h"
 #include "internal/tsoptions/tsoptions.h"
 #include "internal/tspath/tspath.h"
 #include "internal/vfs/vfs.h"
 
 namespace tsc {
-namespace ls { struct LanguageService; }
+namespace ls { class LanguageService; }
 namespace lsconv { struct LSPLineMap; }
 namespace printer { struct Printer; }
 } // namespace tsc

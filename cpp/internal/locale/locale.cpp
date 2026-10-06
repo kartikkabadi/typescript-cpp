@@ -1019,13 +1019,13 @@ Locale fromContext(const ContextPtr& ctx) {
 }
 
 gostd::Context withLocale(const gostd::Context& ctx, Locale locale) {
-    return gostd::contextWithValue(ctx, &kLocaleContextKey,
+    return gostd::contextWithValue(ctx, detail::localeContextKey(),
                                    std::any(std::move(locale)));
 }
 
 Locale fromContext(const gostd::Context& ctx) {
     if (ctx) {
-        if (const std::any* v = ctx->value(&kLocaleContextKey)) {
+        if (const std::any* v = ctx->value(detail::localeContextKey())) {
             if (const Locale* l = std::any_cast<Locale>(v)) {
                 return *l;
             }
@@ -1038,7 +1038,7 @@ bool hasLocale(const gostd::Context& ctx) {
     if (!ctx) {
         return false;
     }
-    const std::any* v = ctx->value(&kLocaleContextKey);
+    const std::any* v = ctx->value(detail::localeContextKey());
     return v != nullptr && std::any_cast<Locale>(v) != nullptr;
 }
 

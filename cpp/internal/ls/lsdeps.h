@@ -64,6 +64,15 @@ struct MappedPosition : spanmap::MappedPosition {
 	T Script;
 };
 
+// Converters.FromLSPRange — converters.go:127. dep-stub — owned by
+// ls/lsconv.
+template <typename T>
+std::vector<MappedSpan<T>> convertersFromLSPRange(
+	Converters* c, const T& script,
+	const tsc::lsp::lsproto::Range& textRange, spanmap::Feature feature) {
+	TSC_UNREACHABLE("Converters.FromLSPRange — owned by ls/lsconv");
+}
+
 // converters.go:21 — `type Converters struct`.
 class Converters {
 public:

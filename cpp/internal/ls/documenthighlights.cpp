@@ -172,7 +172,7 @@ std::vector<::tsc::Node*> aggregateOwnedThrowStatements(::tsc::Node* node,
 	while (child->parent != nullptr) {
 		::tsc::Node* parent = child->parent;
 
-		if (lsutil::detail::isFunctionBlock(parent) ||
+		if (lsutil::isFunctionBlock(parent) ||
 			parent->kind == Kind::SourceFile) {
 			return parent;
 		}
@@ -435,7 +435,7 @@ std::vector<::tsc::Node*> getThrowOccurrences(::tsc::Node* node,
 
 	// If the "owner" is a function, then we equate 'return' and 'throw' statements in their
 	// ability to "jump out" of the function, and include occurrences for both
-	if (lsutil::detail::isFunctionBlock(owner)) {
+	if (lsutil::isFunctionBlock(owner)) {
 		forEachReturnStatement(owner, [&](::tsc::Node* ret) -> bool {
 			::tsc::Node* keyword = astnav::findChildOfKind(
 				ret, Kind::ReturnKeyword, sourceFile);

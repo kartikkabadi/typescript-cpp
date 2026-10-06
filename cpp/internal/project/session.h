@@ -42,7 +42,7 @@ struct Snapshot;
 
 namespace tsc::ls {
 // LanguageService — owned by the ls slice. dep-stub.
-struct LanguageService;
+class LanguageService;
 // NewLanguageService — languageservice.go:25. dep-stub — owned by ls.
 // (project::ID satisfies the Go autoimport.ProjectID interface; the C++
 // side passes an interned adapter.)

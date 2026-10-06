@@ -860,12 +860,8 @@ struct script {
 };
 
 // === crossproject.go ===
-struct Project {
-	virtual ~Project() = default;
-	virtual std::string Id() = 0;
-	virtual compiler::SimpleProgram* GetProgram() = 0;
-	virtual bool HasFile(const std::string& fileName) = 0;
-};
+// ls::Project interface lives in project/project.h (const-qualified
+// Id/GetProgram/HasFile) — canonical definition.
 
 struct projectAndTextDocumentPosition {
 	Project* project = nullptr;

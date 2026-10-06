@@ -742,4 +742,9 @@ void DiffMaps(const std::unordered_map<K, V>* m1,
 }
 // === end slice: api ===
 
+// Declared here for cross-TU callers (defs live in compileroptions.cpp —
+// DeepEqual helpers on option structs).
+bool intPtrEqual(const int* a, const int* b);
+bool compilerOptionsDeepEqual(const CompilerOptions* a, const CompilerOptions* b);
+
 }  // namespace tsc

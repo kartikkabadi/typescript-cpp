@@ -51,7 +51,7 @@ inline LSPLineMap* ComputeLSPLineStarts(std::string_view text) {
 }
 
 // DiagnosticToLSPPush — owned by ls/lsconv. dep-stub.
-struct Converters;
+class Converters;
 inline tsc::lsp::lsproto::Diagnostic* DiagnosticToLSPPush(
     const gostd::Context& ctx, Converters* converters, Diagnostic* diag) {
 	TSC_UNREACHABLE("DiagnosticToLSPPush — owned by ls/lsconv");
@@ -80,23 +80,9 @@ inline ScriptKind LanguageKindToScriptKind(
 	return ScriptKind::Unknown;
 }
 
-// MappedSpan — converters.go:30 (fields flattened from the embedded
-// spanmap.MappedSpan). Canonical decl; change.h re-uses this.
-template <class T>
-struct MappedSpan {
-	T* Script;
-	tsc::TextRange Span;
-	tsc::spanmap::Fidelity Fidelity;
-};
-
-// MappedPosition — converters.go:35 (embedded spanmap.MappedPosition
-// flattened the same way).
-template <class T>
-struct MappedPosition {
-	T* Script;
-	tsc::TextPos Position;
-	tsc::spanmap::Fidelity Fidelity;
-};
+// MappedSpan / MappedPosition — canonical definitions live in
+// lsdeps.h (field-promoted spanmap bases, `T Script` value member);
+// that header includes this one.
 
 // NewConverters — converters.go:52. dep-stub — owned by ls/lsconv.
 inline Converters* NewConverters(
@@ -105,13 +91,5 @@ inline Converters* NewConverters(
 	TSC_UNREACHABLE("NewConverters — owned by ls/lsconv");
 }
 
-// Converters.FromLSPRange — converters.go:127. dep-stub — owned by
-// ls/lsconv.
-template <typename T>
-std::vector<MappedSpan<T>> convertersFromLSPRange(
-	Converters* c, const T& script,
-	const tsc::lsp::lsproto::Range& textRange, spanmap::Feature feature) {
-	TSC_UNREACHABLE("Converters.FromLSPRange — owned by ls/lsconv");
-}
 
 } // namespace tsc::lsconv

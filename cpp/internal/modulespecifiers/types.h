@@ -15,11 +15,11 @@
 #include "internal/tspath/tspath.h"
 
 namespace tsc {
-class SourceFile;
+struct SourceFile;
 struct Symbol;
 namespace checker {
 class Program;
-struct Checker;
+class Checker;
 } // namespace checker
 namespace module {
 struct ResolvedEntrypoint;

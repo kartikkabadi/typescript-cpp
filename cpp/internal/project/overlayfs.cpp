@@ -3,6 +3,7 @@
 // GetAccessibleEntries, Stat, GetFileByPath, processChanges.
 
 #include "internal/project/overlayfs.h"
+#include "internal/ls/lsdeps.h" // lsconv::convertersFromLSPRange
 
 #include <algorithm>
 #include <cstring>
@@ -311,12 +312,12 @@ overlayFS::processChanges(const std::vector<FileChange>& changes) {
 					    return o->LSPLineMap();
 				    });
 				for (const auto& textChange : change->Changes) {
-					if (auto* partialChange = textChange.Partial;
+					if (auto partialChange = textChange.Partial;
 					    partialChange != nullptr) {
 						auto ranges =
 						    lsconv::convertersFromLSPRange(
 						        converters, o,
-						        partialChange->range,
+						        partialChange->Range,
 						        spanmap::FeatureAll);
 						debug::assert(
 						    ranges.size() == 1,
@@ -326,7 +327,7 @@ overlayFS::processChanges(const std::vector<FileChange>& changes) {
 						auto newContent = tc.ApplyTo(o->content);
 						o = newOverlay(o->fileName, newContent,
 						               change->Version, o->kind);
-					} else if (auto* wholeChange =
+					} else if (auto wholeChange =
 					               textChange.WholeDocument;
 					           wholeChange != nullptr) {
 						o = newOverlay(o->fileName,

@@ -52,16 +52,15 @@ gostd::Error StdioServer::Run(gostd::Context ctx) {
 	sessionInit.BackgroundCtx = ctx;
 	// Logger: nil — TODO: Add logging support
 	sessionInit.FS = fs;
-	sessionInit.Options = std::make_shared<project::SessionOptions>(
-	    project::SessionOptions{
-	        .CurrentDirectory = options->Cwd,
-	        .DefaultLibraryPath = options->DefaultLibraryPath,
-	        .PositionEncoding = lsproto::PositionEncodingKindUTF8,
-	        .WatchEnabled = false,
-	        .LoggingEnabled = false,
-	        .RunExternalCode = options->RunExternalCode,
-	    });
-	sessionInit.Spawner = options->ContentMapperSpawner;
+	sessionInit.Options = new project::SessionOptions{
+	    .CurrentDirectory = options->Cwd,
+	    .DefaultLibraryPath = options->DefaultLibraryPath,
+	    .PositionEncoding = lsproto::PositionEncodingKindUTF8,
+	    .WatchEnabled = false,
+	    .LoggingEnabled = false,
+	    .RunExternalCode = options->RunExternalCode,
+	};
+	sessionInit.Spawner = options->ContentMapperSpawner.get();
 
 	SessionOptions sessionOpts{
 	    // Only msgpack uses binary responses

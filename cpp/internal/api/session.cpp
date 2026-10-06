@@ -48,7 +48,7 @@ namespace autoimport = tsc::ls::autoimport;
 struct projectIDAdapter : autoimport::ProjectID {
 	project::ID id;
 	explicit projectIDAdapter(const project::ID& id) : id(id) {}
-	std::string String() const override { return id.String(); }
+	std::string String() const override { return project::idString(id); }
 };
 
 // Go's api session passes its request ctx into the ls API. Our single-checker
@@ -218,7 +218,7 @@ std::pair<project::Project*, gostd::Error> snapshotData::getProject(
 	    snapshot->ProjectCollection->GetProject(projectHandle);
 	if (proj == nullptr) {
 		return {nullptr, gostd::errorf("%w: project %s not found",
-		                               {ErrClientError, projectHandle.v})};
+		                               {ErrClientError, projectHandle})};
 	}
 	return {proj, nullptr};
 }
@@ -238,7 +238,7 @@ NodeHandle snapshotData::nodeHandleFrom(Node* node) {
 // getOrCreateProjectRegistry returns the registry for the given project, creating it if needed.
 projectRegistryData* snapshotData::getOrCreateProjectRegistry(
     const project::ID& projectID) {
-	if (projectID.v.empty()) {
+	if (projectID.empty()) {
 		throw std::runtime_error(
 		    "getOrCreateProjectRegistry: empty project ID");
 	}
@@ -307,7 +307,7 @@ std::pair<SymbolID, project::ID> snapshotData::registerSymbol(
 	if (symbol == nullptr) {
 		return {0, project::ID("")};
 	}
-	if (canonicalProject.v.empty()) {
+	if (canonicalProject.empty()) {
 		throw std::runtime_error(
 		    "registerSymbol requires a non-empty canonical project");
 	}
@@ -416,7 +416,7 @@ std::pair<checker::Type*, gostd::Error> snapshotData::resolveTypeHandle(
 		return {nullptr, gostd::errorf("%w: empty type handle",
 		                               {ErrClientError})};
 	}
-	if (projectID.v.empty()) {
+	if (projectID.empty()) {
 		return {nullptr,
 		        gostd::errorf("%w: empty project ID for type handle %d",
 		                      {ErrClientError, uint64_t(handle)})};
@@ -432,7 +432,7 @@ std::pair<checker::Type*, gostd::Error> snapshotData::resolveTypeHandle(
 	if (reg == nullptr) {
 		return {nullptr,
 		        gostd::errorf("%w: type handle %d not found (no registry for project %s)",
-		                      {ErrClientError, uint64_t(handle), projectID.v})};
+		                      {ErrClientError, uint64_t(handle), projectID})};
 	}
 
 	std::shared_lock lk(reg->typeRegistryMu);
@@ -455,7 +455,7 @@ snapshotData::resolveSignatureHandle(const project::ID& projectID,
 		return {nullptr, gostd::errorf("%w: empty signature handle",
 		                               {ErrClientError})};
 	}
-	if (projectID.v.empty()) {
+	if (projectID.empty()) {
 		return {nullptr,
 		        gostd::errorf("%w: empty project ID for signature handle %d",
 		                      {ErrClientError, handle})};
@@ -471,7 +471,7 @@ snapshotData::resolveSignatureHandle(const project::ID& projectID,
 	if (reg == nullptr) {
 		return {nullptr,
 		        gostd::errorf("%w: signature handle %d not found (no registry for project %s)",
-		                      {ErrClientError, handle, projectID.v})};
+		                      {ErrClientError, handle, projectID})};
 	}
 
 	std::shared_lock lk(reg->signatureRegistryMu);
@@ -723,7 +723,7 @@ static std::shared_ptr<Session> newSession(
 std::shared_ptr<Session> NewLSPSession(project::Session* projectSession,
                                        const SessionOptions* options) {
 	auto s = newSession(
-	    projectSession->SnapshotHost_,
+	    projectSession->snapshotHost,
 	    [projectSession](gostd::Context ctx) {
 	        return projectSession->WithCurrentLocale(ctx);
 	    },
@@ -772,10 +772,13 @@ std::string Session::GetCurrentDirectory() {
 }
 
 std::shared_ptr<vfs::FS> Session::FS() {
+	// project::Session and SnapshotHost expose raw vfs::FS* (they own the
+	// overlay FS for the session's lifetime); wrap non-owning.
 	if (projectSession != nullptr) {
-		return projectSession->FS();
+		return std::shared_ptr<vfs::FS>(projectSession->FS(),
+		                                [](vfs::FS*) {});
 	}
-	return snapshotHost->FS();
+	return std::shared_ptr<vfs::FS>(snapshotHost->FS(), [](vfs::FS*) {});
 }
 
 std::string Session::DefaultLibraryPath() {
@@ -927,7 +930,7 @@ std::pair<ls::LanguageService*, gostd::Error> Session::setupLanguageService(
 	    snapshot->ProjectCollection->GetProject(projectHandle);
 	if (proj == nullptr) {
 		return {nullptr, gostd::errorf("%w: project %s not found",
-		                               {ErrClientError, projectHandle.v})};
+		                               {ErrClientError, projectHandle})};
 	}
 	// projectIDAdapter and the host are leak-tolerant like the rest of the
 	// dep-stubbed snapshot graph.
@@ -1992,7 +1995,7 @@ Session::handleCreateSnapshot(gostd::Context ctx,
 			        gostd::errorf("%w: %w", {ErrClientError, fileSystemErr})};
 		}
 		snapshotFileSystem = fileSystem;
-		apiRequest->FileSystem = fileSystem;
+		apiRequest->FileSystem = fileSystem.get();
 		apiRequest->ReplaceFileSystem =
 		    params->FileSystem->kind == requestfilesystem::KindFull;
 	}
@@ -2058,7 +2061,7 @@ Session::handleUpdateSnapshot(gostd::Context ctx,
 		snapshotFileSystem = fileSystem;
 	}
 	if (snapshotFileSystem != nullptr) {
-		apiRequest->FileSystem = snapshotFileSystem;
+		apiRequest->FileSystem = snapshotFileSystem.get();
 		apiRequest->ReplaceFileSystem =
 		    changes->FileSystem != nullptr &&
 		    changes->FileSystem->kind == requestfilesystem::KindFull;
@@ -2126,10 +2129,13 @@ Session::toAPISnapshotRequest(gostd::Context ctx,
 	for (const auto& f : changes->OpenFiles) {
 		std::string fileName = f.ToAbsoluteFileName(GetCurrentDirectory());
 		tspath::Path path = toPath(fileName);
-		if (apiRequest->OpenFiles.empty()) {
+		if (apiRequest->OpenFiles == nullptr) {
+			apiRequest->OpenFiles =
+			    new std::unordered_map<tspath::Path, std::string>();
 		}
-		if (apiRequest->OpenFiles.find(path) == apiRequest->OpenFiles.end()) {
-			apiRequest->OpenFiles[path] = fileName;
+		if (apiRequest->OpenFiles->find(path) ==
+		    apiRequest->OpenFiles->end()) {
+			(*apiRequest->OpenFiles)[path] = fileName;
 			apiRequest->EnsureFiles[path] = fileName;
 		}
 	}
@@ -2181,7 +2187,7 @@ Session::toAPISnapshotRequest(gostd::Context ctx,
 			if (ferr) {
 				return {nullptr, ferr};
 			}
-			request->ModuleResolverFactory = std::move(factory);
+			request->ModuleResolverFactory = factory.release();
 			request->ModuleResolverID =
 			    uint64_t(programParams->Options->ModuleResolver);
 		}
@@ -2238,7 +2244,7 @@ Session::toAPISnapshotRequest(gostd::Context ctx,
 			if (ferr) {
 				return {nullptr, ferr};
 			}
-			request->ModuleResolverFactory = std::move(factory);
+			request->ModuleResolverFactory = factory.release();
 			request->ModuleResolverID =
 			    uint64_t(programParams->Options->ModuleResolver);
 		}
@@ -2319,12 +2325,12 @@ void languageServerSnapshotUpdate::commit(Session* s,
 		}
 	}
 	for (project::Project* program : snapshot->CreatedPrograms()) {
-		auto [programID, ok] = program->ID().Synthetic();
+		auto [programID, ok] = project::idSynthetic(program->ID());
 		if (!ok) {
 			TSC_UNREACHABLE(
 			    (std::string(
 			         "created program has non-synthetic project ID: ") +
-			     program->ID().String())
+			     program->ID())
 			        .c_str());
 		}
 		s->createdPrograms.Add(programID);
@@ -2370,13 +2376,15 @@ snapshotOpenState Session::reconcileSnapshotOpens(
 	}
 	{
 		std::vector<tspath::Path> keys;
-		keys.reserve(apiRequest->OpenFiles.size());
-		for (const auto& [path, _] : apiRequest->OpenFiles) {
-			keys.push_back(path);
+		if (apiRequest->OpenFiles != nullptr) {
+			keys.reserve(apiRequest->OpenFiles->size());
+			for (const auto& [path, _] : *apiRequest->OpenFiles) {
+				keys.push_back(path);
+			}
 		}
 		for (const auto& path : keys) {
 			if (state.openFiles.Has(path)) {
-				apiRequest->OpenFiles.erase(path);
+				apiRequest->OpenFiles->erase(path);
 			} else {
 				state.openFiles.Add(path);
 			}
@@ -2564,7 +2572,7 @@ Session::createSnapshotOperationResponse(
 		std::vector<project::SyntheticProjectID> results(
 		    createdPrograms.size());
 		for (size_t i = 0; i < createdPrograms.size(); ++i) {
-			auto [programID, ok] = createdPrograms[i]->ID().Synthetic();
+			auto [programID, ok] = project::idSynthetic(createdPrograms[i]->ID());
 			if (!ok) {
 				throw std::runtime_error(
 				    "created program has non-synthetic project ID");
@@ -2860,7 +2868,7 @@ Session::handleGetGlobalDiagnostics(
 	program->GetSemanticDiagnostics(nullptr);
 
 	std::vector<Diagnostic*> diags =
-	    tsc::Filter(proj->GetProjectDiagnostics(ctx),
+	    tsc::Filter(proj->GetProjectDiagnostics(),
 	                [](Diagnostic* d) { return d->File() == nullptr; });
 	return {NewDiagnosticResponses(std::move(diags)), nullptr};
 }
@@ -3023,7 +3031,8 @@ static std::ostream* discardOstream() {
 std::ostream* apiBuildSystem::Writer() { return discardOstream(); }
 std::ostream* apiBuildSystem::ErrorWriter() { return discardOstream(); }
 std::shared_ptr<vfs::FS> apiBuildSystem::fs() {
-	return session->snapshotHost->FS();
+	return std::shared_ptr<vfs::FS>(session->snapshotHost->FS(),
+	                                [](vfs::FS*) {});
 }
 std::string apiBuildSystem::DefaultLibraryPath() {
 	return session->DefaultLibraryPath();
@@ -3300,15 +3309,19 @@ Session::createSourceFile(const std::string& fileName,
 std::shared_ptr<project::SourceFileLease> Session::acquireSourceFile(
     SourceFileParseOptions options, const std::string& sourceText,
     ScriptKind scriptKind) {
-	return snapshotHost->AcquireSourceFile(std::move(options), sourceText,
-	                                       int(scriptKind));
+	// SnapshotHost returns a raw lease; wrap non-owning (Release() is
+	// explicit, matching Go GC semantics).
+	return std::shared_ptr<project::SourceFileLease>(
+	    snapshotHost->AcquireSourceFile(std::move(options), sourceText,
+	                                    scriptKind),
+	    [](project::SourceFileLease*) {});
 }
 
 // encodeLeasedSourceFile — session.go:1877.
 std::pair<ResultValue, gostd::Error> Session::encodeLeasedSourceFile(
     std::shared_ptr<project::SourceFileLease> lease) {
 	auto [data, indexTable, err] =
-	    encoder::EncodeSourceFile(lease->SourceFile());
+	    encoder::EncodeSourceFile(lease->SourceFile_());
 	if (err) {
 		lease->Release();
 		return {ResultValue{},
@@ -5428,7 +5441,7 @@ std::pair<std::unique_ptr<EmitResponse>, gostd::Error> Session::handleEmit(
 			return std::nullopt;
 		};
 	} else {
-		auto* fs = snapshotHost->FS().get();
+		auto* fs = snapshotHost->FS();
 		options.WriteFile = [fs](const std::string& fileName,
 		                         const std::string& text,
 		                         compiler::WriteFileData* /*data*/)
@@ -6591,7 +6604,7 @@ Session::handleGetImportAdderEdits(
 		if (proj == nullptr) {
 			return {std::vector<std::unique_ptr<TextEdit>>{},
 			        gostd::errorf("%w: project %s not found",
-			                      {ErrClientError, projectID.v})};
+			                      {ErrClientError, projectID})};
 		}
 		program = proj->GetProgram();
 		if (program == nullptr) {
@@ -6843,7 +6856,7 @@ Session::handleGetCompletionsAtPosition(
 		if (proj == nullptr) {
 			return {nullptr,
 			        gostd::errorf("%w: project %s not found",
-			                      {ErrClientError, projectID.v})};
+			                      {ErrClientError, projectID})};
 		}
 		program = proj->GetProgram();
 		if (program == nullptr) {
@@ -6945,7 +6958,7 @@ Session::handleGetReferencedSymbolsForNode(
 		std::vector<NodeHandle> refs;
 		for (auto* ref : entry->References()) {
 			if (ref->IsNodeEntry()) {
-				refs.push_back(sd->nodeHandleFrom(ref->Node()));
+				refs.push_back(sd->nodeHandleFrom(ref->Node_()));
 			}
 		}
 		ReferencedSymbolEntry re;

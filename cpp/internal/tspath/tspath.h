@@ -6,6 +6,8 @@
 #include <string>
 #include <string_view>
 #include <tuple>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "internal/stringutil/stringutil.h"

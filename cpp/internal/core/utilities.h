@@ -1,6 +1,7 @@
 // Port of selected free helpers from tsc/internal/core/core.go.
 #pragma once
 
+#include "internal/gostd/gostd.h" // TSC_UNREACHABLE
 #include <atomic>
 #include <condition_variable>
 #include <functional>
@@ -194,18 +195,6 @@ inline T FirstNonZero(const T& first, const Rest&... rest) {
 	}
 }
 
-// Filter — slices-style: returns elements satisfying pred.
-template <typename T, typename F>
-inline std::vector<T> Filter(std::vector<T> v, F pred) {
-	std::vector<T> out;
-	out.reserve(v.size());
-	for (auto& e : v) {
-		if (pred(e)) {
-			out.push_back(std::move(e));
-		}
-	}
-	return out;
-}
 
 // MapNonNil — core.go:117. Maps slice, dropping results equal to the
 // zero value of U (Go `mapped != *new(U)`).

@@ -55,7 +55,7 @@ ProjectCollectionBuilder* newProjectCollectionBuilder(
 	b->contentMapperHost = contentMapperHost;
 	b->base = oldProjectCollection;
 	bool hasRelativePatternCapability = false;
-	if (auto* caps = lsp::lsproto::getClientCapabilities(ctx);
+	if (auto caps = lsp::lsproto::getClientCapabilities(ctx);
 	    caps != nullptr) {
 		hasRelativePatternCapability =
 		    caps->Workspace.DidChangeWatchedFiles

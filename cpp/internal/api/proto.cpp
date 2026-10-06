@@ -3653,14 +3653,18 @@ std::string DiagnosticSourceLineResponse::marshalJSONTo(json::Encoder& enc) cons
 namespace tsc::project {
 
 // ID JSON round-trip — project.go ID marshals as a plain string.
-std::string ID::unmarshalJSONFrom(json::Decoder& dec) {
+std::string unmarshalJSONFrom(json::Decoder& dec, ID* out) {
 	auto [t, err] = dec.readToken();
 	if (!err.empty()) return err;
 	if (t.k != '"') return "json: cannot unmarshal non-string into Go value of type string";
-	return json::unmarshal(std::string_view(t.raw), &v);
+	std::string v;
+	err = json::unmarshal(std::string_view(t.raw), &v);
+	if (!err.empty()) return err;
+	*out = ID(std::move(v));
+	return {};
 }
-std::string ID::marshalJSONTo(json::Encoder& enc) const {
-	return enc.writeValue(json::Value(json::marshalString(v)));
+std::string marshalJSONTo(json::Encoder& enc, const ID& id) {
+	return enc.writeValue(json::Value(json::marshalString(id)));
 }
 
 }  // namespace tsc::project

@@ -30,7 +30,7 @@ namespace tsc::checker {
 class Checker;
 }
 namespace tsc::compiler {
-struct SimpleProgram;
+class SimpleProgram;
 }
 namespace tsc::vfs::vfsmatch {
 struct SpecMatcher;

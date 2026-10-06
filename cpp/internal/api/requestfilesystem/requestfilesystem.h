@@ -13,6 +13,9 @@
 
 #include "internal/gostd/gostd.h"
 #include "internal/project/project.h"
+#include "internal/project/filechange.h"
+#include "internal/project/files.h"
+#include "internal/project/overlayfs.h"
 #include "internal/tspath/tspath.h"
 #include "internal/vfs/vfs.h"
 

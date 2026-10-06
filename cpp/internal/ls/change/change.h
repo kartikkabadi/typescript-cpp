@@ -25,7 +25,7 @@ class ChangeTrackerWriter;
 }
 namespace tsc {
 struct CompilerOptions;
-struct NodeFactory;
+class NodeFactory;
 }
 
 namespace tsc::lsconv {
