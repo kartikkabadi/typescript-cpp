@@ -147,3 +147,4 @@ tools/gotestsum.exe.hash
 /tsc/lexdump
 /tsc/parsebench
 /tsc/scanbench
+__pycache__/
