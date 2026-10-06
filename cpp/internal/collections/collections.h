@@ -219,6 +219,10 @@ public:
 
 	bool Has(const T& key) const { return items.count(key) != 0; }
 	void Add(const T& key) { items.insert(key); }
+	// === slice: ls-coreC ===
+	// AddIfAbsent — returns true if the key was not already present.
+	bool AddIfAbsent(const T& key) { return items.insert(key).second; }
+	// === end slice: ls-coreC ===
 	void Delete(const T& key) { items.erase(key); }
 	size_t Size() const { return items.size(); }
 

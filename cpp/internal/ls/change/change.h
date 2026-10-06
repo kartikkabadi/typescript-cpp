@@ -68,7 +68,48 @@ struct Converters {
 		tsc::spanmap::Feature feature) {
 		TSC_UNREACHABLE("Converters::FromLSPPositionForSourceFile — owned by lsp slice");
 	}
+
+	// === slice: ls-coreC — additional Converters methods (dep stubs) ===
+	// converters.go:74 — ToLSPRangeForFeature
+	std::pair<tsc::lsp::lsproto::Range, tsc::spanmap::Fidelity> ToLSPRangeForFeature(
+		SourceFile* script, tsc::TextRange textRange, tsc::spanmap::Feature feature) {
+		TSC_UNREACHABLE("Converters::ToLSPRangeForFeature — owned by lsp slice");
+	}
+	// converters.go:93 — ToLSPPositionForFeature
+	std::pair<tsc::lsp::lsproto::Position, tsc::spanmap::Fidelity> ToLSPPositionForFeature(
+		SourceFile* script, tsc::TextPos position, tsc::spanmap::Feature feature) {
+		TSC_UNREACHABLE("Converters::ToLSPPositionForFeature — owned by lsp slice");
+	}
+	// converters.go:107 — ToLSPLocation
+	std::pair<tsc::lsp::lsproto::Location, tsc::spanmap::Fidelity> ToLSPLocation(
+		SourceFile* script, tsc::TextRange rng) {
+		TSC_UNREACHABLE("Converters::ToLSPLocation — owned by lsp slice");
+	}
+	// converters.go:119 — ToLSPLocationForFeature
+	std::pair<tsc::lsp::lsproto::Location, tsc::spanmap::Fidelity> ToLSPLocationForFeature(
+		SourceFile* script, tsc::TextRange rng, tsc::spanmap::Feature feature) {
+		TSC_UNREACHABLE("Converters::ToLSPLocationForFeature — owned by lsp slice");
+	}
+	// converters.go:149 — FromLSPRangeIntersectingForSourceFile
+	std::vector<MappedSpan<SourceFile>> FromLSPRangeIntersectingForSourceFile(
+		SourceFile* file, tsc::lsp::lsproto::Range textRange,
+		tsc::spanmap::Feature feature) {
+		TSC_UNREACHABLE("Converters::FromLSPRangeIntersectingForSourceFile — owned by lsp slice");
+	}
+	// converters.go:224 — FromLSPRangeToOriginal
+	tsc::TextRange FromLSPRangeToOriginal(SourceFile* script,
+										  tsc::lsp::lsproto::Range textRange) {
+		TSC_UNREACHABLE("Converters::FromLSPRangeToOriginal — owned by lsp slice");
+	}
+	// === end slice: ls-coreC ===
 };
+
+// === slice: ls-coreC ===
+// converters.go:332 — FileNameToDocumentURI (dep stub — lsp slice)
+inline tsc::lsp::lsproto::DocumentUri FileNameToDocumentURI(std::string_view fileName) {
+	TSC_UNREACHABLE("FileNameToDocumentURI — owned by lsp slice");
+}
+// === end slice: ls-coreC ===
 
 // === end dep decls/stubs ===
 

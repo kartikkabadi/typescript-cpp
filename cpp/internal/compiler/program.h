@@ -775,6 +775,21 @@ public:
 	// release callback is a no-op like Go's when sharing the one checker.
 	std::pair<checker::Checker*, std::function<void()>>
 	GetTypeCheckerForFileExclusive(SourceFile* file);
+	// === slice: ls-coreC ===
+	// program.go GetTypeChecker(ctx) — the program's single checker with a
+	// no-op release callback (delegates to GetTypeCheckerForFileExclusive,
+	// which ignores the file on a single-checker program).
+	std::pair<checker::Checker*, std::function<void()>>
+	GetTypeChecker(const gostd::Context& ctx);
+	// program.go GetGlobalTypingsCacheLocation — ProgramOptions.TypingsLocation.
+	std::string GetGlobalTypingsCacheLocation() override { return opts_.TypingsLocation; }
+	// program.go ContentMapperExtensions — extensions registered by the parsed
+	// command line (empty when built through the plain ctor).
+	std::vector<std::string> ContentMapperExtensions() override {
+		return commandLine_ != nullptr ? commandLine_->ContentMapperExtensions()
+									   : std::vector<std::string>{};
+	}
+	// === end slice: ls-coreC ===
 	// program.go:2068 GetParseFileRedirect — always "" (no content mappers).
 	std::string GetParseFileRedirect(const std::string& fileName) {
 		return "";

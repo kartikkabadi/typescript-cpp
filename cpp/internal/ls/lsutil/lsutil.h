@@ -87,6 +87,41 @@ int ComparePositions(Position pos, Position other);
 // util.go:22 — CompareRanges (real port: trivial)
 int CompareRanges(Range lsRange, Range other);
 
+// === slice: ls-coreC — additional shared decls ===
+// lsp.go:17 — DocumentUri is a URI string. FileName() decodes it back to a
+// file path (handles file://, ts-nul-authority, vscode-remote, untitled,
+// bundled, and UNC schemes).
+struct DocumentUri : std::string {
+	using std::string::basic_string;
+	DocumentUri() = default;
+	DocumentUri(std::string s) : std::string(std::move(s)) {}
+	DocumentUri(const std::string& s) : std::string(s) {}
+	std::string FileName() const; // dep-stub (lsp slice)
+};
+
+// lsproto.go — protocol.Location
+struct Location {
+	DocumentUri Uri;
+	Range Range;
+	bool operator==(const Location&) const = default;
+};
+
+// lsproto.go — protocol.LocationLink
+struct LocationLink {
+	Range* OriginSelectionRange = nullptr;
+	DocumentUri TargetUri;
+	Range TargetRange;
+	Range TargetSelectionRange;
+	bool operator==(const LocationLink& o) const {
+		return (OriginSelectionRange == nullptr) == (o.OriginSelectionRange == nullptr) &&
+			   (OriginSelectionRange == nullptr ||
+				*OriginSelectionRange == *o.OriginSelectionRange) &&
+			   TargetUri == o.TargetUri && TargetRange == o.TargetRange &&
+			   TargetSelectionRange == o.TargetSelectionRange;
+	}
+};
+// === end slice: ls-coreC ===
+
 // === end dep decls ===
 
 } // namespace tsc::lsp::lsproto
