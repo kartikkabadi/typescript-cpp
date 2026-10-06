@@ -7,16 +7,15 @@ plus the pathological single file `tsc/testdata/tests/cases/compiler/deeplyNeste
 
 ## TL;DR
 
-| workload                              | before        | after round 1 | after round 2 |
-|---------------------------------------|---------------|---------------|---------------|
-| `tscpp check deeplyNestedMappedTypes` | ~130 s        | **0.40–0.43 s** | same (byte-identical) |
-| `tsc -p` emit (perfproj, med ratio)   | ~1.95× slower | ~1.79× (real; emit crashed ~20% before) | **~1.43×** |
-| `tsc -p` --noEmit                     | ~2.33× slower | ~1.87×        | **~1.37×** |
-| `tsc -p` --declaration                | ~2.37× slower | ~2.15×        | **~1.48×** |
-| `tsc -p` parse phase                  | 0.107 s vs Go 0.035 s | same | **~0.066 s** |
-| `parse-all` testdata corpus (4.6MB)   | 1,173 ms, 3.9 MB/s | same | **~30 ms, ~150 MB/s (39×)** |
-
-Round 2 = parallel-emit crash fixes + arena block sizing/memset below.
+| workload                              | before        | latest        |
+|---------------------------------------|---------------|---------------|
+| `tscpp check deeplyNestedMappedTypes` | ~130 s        | **0.40–0.43 s** (byte-identical to checkdump oracle) |
+| `tsc -p` emit (perfproj, med ratio)   | ~1.95× slower | **~1.4–1.6× slower** (noisy) |
+| `tsc -p` --noEmit                     | ~2.33× slower | **~1.37–1.44×** |
+| `tsc -p` --declaration                | ~2.37× slower | **~1.39–1.48×** |
+| `tsc -p` parse phase                  | 0.107 s vs Go 0.035 s | **~0.063–0.066 s** |
+| `--diagnostics` Instantiations        | 8,934 (+35% vs Go) | **6,630 = Go exactly** |
+| `parse-all` testdata corpus (4.6MB)   | 1,173 ms, 3.9 MB/s | **~30 ms, ~150 MB/s (39×)** |
 
 ## Fixed: amortize the tracked-arena mark/sweep (GOGC-style pacing)
 
@@ -155,13 +154,20 @@ machine noise dominate; ordering below is the profile, attribution is manual.
 
 ## Known bugs found while profiling (not fixed here)
 
-- **Open lead: instantiation over-count.** `--diagnostics` shows
-  Instantiations 8,934 vs Go 6,630 (+35%) and Types 59,779 vs 56,792
-  (+5%) while output stays byte-identical — some upstream path creates
-  semantically identical duplicates (likely a dedup cache keyed more
-  narrowly than Go's, or `couldContainTypeVariables` computed differently).
-  The `instantiateType` cache plumbing itself is verified faithful
-  (activeTypeMappersCaches/findActiveMapper match checker.go).
+- **Instantiation over-count: ROOT-CAUSED AND FIXED.** `--diagnostics`
+  showed Instantiations 8,934 vs Go 6,630 (+35%) and Types +5%.
+  Instrumenting both binaries with per-flag histograms + per-caller
+  attribution (Go `runtime.Callers`, C++ scoped `thread_local` site tags)
+  pinned it to `getTypeOfInstantiatedSymbol`/`getWriteTypeOfInstantiatedSymbol`
+  (908 → 2960): the file-scoped `staleForCheckFile` invalidation forced
+  every instantiated member symbol to re-instantiate once per file.
+  Go caches `links.resolvedType`/`links.writeType` for the checker's
+  whole lifetime (checker.go:16849-16861) — the entries hold a pure
+  instantiated type with no diagnostics to re-fire. Removed the file
+  staleness check in those two functions only (the other ~66
+  `staleForCheckFile` sites guard real diagnostic-attribution paths and
+  stay). Instantiations now **6,630 = Go exactly**; Types 59,779 →
+  58,819.
 - **`getNodeBuilderEx` tracked arenas are never released**
   (`checker_printer.cpp` `TypeToTypeNode`/`TypeToTypeNodeEx`/
   `TypePredicateToTypePredicateNode` paths create
