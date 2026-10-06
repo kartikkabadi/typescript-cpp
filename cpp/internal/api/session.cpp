@@ -862,56 +862,6 @@ std::pair<checkerSetup, gostd::Error> Session::setupChecker(
 	return {checkerSetup{sd, program, c, []() {}, projectHandle}, nullptr};
 }
 
-// snapshotLSHost — Go's project.Snapshot satisfies ls.Host structurally; C++
-// needs an explicit adapter. Owned by the returned LanguageService (raw,
-// leak-tolerant like the rest of the dep-stubbed graph).
-struct snapshotLSHost : ls::Host {
-	project::Snapshot* snapshot = nullptr;
-	explicit snapshotLSHost(project::Snapshot* s) : snapshot(s) {}
-
-	bool UseCaseSensitiveFileNames() override {
-		return snapshot->UseCaseSensitiveFileNames();
-	}
-	std::pair<std::string, bool> ReadFile(
-	    const std::string& fileName) override {
-		return snapshot->ReadFile(fileName);
-	}
-	lsconv::Converters* Converters() override {
-		return snapshot->Converters();
-	}
-	ls::lsutil::UserPreferences GetPreferences(
-	    const std::string& activeFile) override {
-		return snapshot->GetPreferences(activeFile);
-	}
-	sourcemap::ECMALineInfo* GetECMALineInfo(
-	    const std::string& fileName) override {
-		return snapshot->GetECMALineInfo(fileName);
-	}
-	ls::autoimport::Registry* AutoImportRegistry() override {
-		return snapshot->AutoImportRegistry();
-	}
-	std::vector<std::string> ReadDirectory(
-	    const std::string& currentDir, const std::string& path,
-	    const std::vector<std::string>& extensions,
-	    const std::vector<std::string>* excludes,
-	    const std::vector<std::string>& includes, int depth) override {
-		std::vector<std::string> empty;
-		return snapshot->ReadDirectory(currentDir, path, extensions,
-		                               excludes ? *excludes : empty, includes,
-		                               depth);
-	}
-	std::vector<std::string> GetDirectories(
-	    const std::string& path) override {
-		return snapshot->GetDirectories(path);
-	}
-	bool DirectoryExists(const std::string& path) override {
-		return snapshot->DirectoryExists(path);
-	}
-	bool FileExists(const std::string& path) override {
-		return snapshot->FileExists(path);
-	}
-};
-
 // setupLanguageService creates a LanguageService for the given snapshot/project.
 // Unlike setupChecker, this does NOT acquire a checker from the pool, so callers that
 // only need an LS (and not a Checker) can avoid blocking on / holding a pooled checker.
@@ -935,7 +885,7 @@ std::pair<ls::LanguageService*, gostd::Error> Session::setupLanguageService(
 	// projectIDAdapter and the host are leak-tolerant like the rest of the
 	// dep-stubbed snapshot graph.
 	return {new ls::LanguageService(new projectIDAdapter{proj->ID()}, program,
-	                                new snapshotLSHost{snapshot}, activeFile),
+	                                new project::SnapshotLSHost(snapshot), activeFile),
 	        nullptr};
 }
 
