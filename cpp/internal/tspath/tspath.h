@@ -1,9 +1,11 @@
 // tspath — minimal port (extension helpers)
 #pragma once
 #include <algorithm>
+#include <cctype>
 #include <functional>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <vector>
 
 #include "internal/stringutil/stringutil.h"
@@ -41,6 +43,25 @@ inline bool isDeclarationFileName(std::string_view fileName) {
 
 inline bool isVolumeCharacter(char ch) {
 	return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z');
+}
+
+// path.go:50 — IsDynamicFileName: true for dynamic/virtual file names
+// ("^/untitled/...").
+inline bool isDynamicFileName(std::string_view fileName) {
+	return fileName.size() >= 2 && fileName[0] == '^' && fileName[1] == '/';
+}
+
+// path.go:1143 — SplitVolumePath: splits a leading DOS volume ("c:") from
+// the rest of the path.
+inline std::tuple<std::string, std::string_view, bool>
+splitVolumePath(std::string_view path) {
+	if (path.size() >= 2 && isVolumeCharacter(path[0]) && path[1] == ':') {
+		std::string volume;
+		volume += (char)std::tolower((unsigned char)path[0]);
+		volume += path[1];
+		return {volume, path.substr(2), true};
+	}
+	return {"", path, false};
 }
 
 inline int getFileUrlVolumeSeparatorEnd(std::string_view url, int start) {
@@ -760,11 +781,7 @@ struct ComparePathsOptions {
 };
 
 // === slice: ls-autoimport ===
-// IsDynamicFileName — path.go:48. Dynamic/virtual file names don't exist on
-// disk (e.g. untitled "^/untitled/..." paths).
-inline bool isDynamicFileName(std::string_view fileName) {
-	return fileName.starts_with("^/");
-}
+// IsDynamicFileName — path.go:48 lives above (canonical port).
 
 inline bool pathIsAbsolute(std::string_view path) {
 	return getEncodedRootLength(path) != 0;

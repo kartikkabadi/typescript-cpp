@@ -209,13 +209,22 @@ std::string unmarshalDecodeImpl(Decoder& dec, T* out);
 
 // decode elements of a JSON array (the '[' is already consumed).
 template <class T>
+struct isStdArray : std::false_type {};
+template <class T, size_t N>
+struct isStdArray<std::array<T, N>> : std::true_type {};
+
+// decode elements of a JSON array (the '[' is already consumed).
+template <class T>
 std::string unmarshalArray(Decoder& dec, T* out) {
     using U = std::decay_t<T>;
-    if constexpr (std::is_bounded_array_v<U>) {
+    if constexpr (std::is_bounded_array_v<U> || isStdArray<U>::value) {
+        constexpr size_t N = std::is_bounded_array_v<U> ? std::extent_v<U> : std::tuple_size_v<U>;
         size_t i = 0;
         while (dec.peekKind() != ']') {
-            if (i >= std::extent_v<U>) {
-                return "json: cannot unmarshal array into Go value of fixed size";
+            if (i >= N) {
+                // Go drains the tail elements even when the destination is full.
+                if (auto err = dec.skipValue(); !err.empty()) return err;
+                continue;
             }
             std::string err = unmarshalDecodeImpl(dec, &(*out)[i]);
             if (!err.empty()) return err;
@@ -279,8 +288,6 @@ std::string unmarshalNumber(std::string_view raw, T* out) {
         *out = static_cast<U>(d);
         return {};
     } else {
-        // === slice: api === — split parse/assign so underlying_type is only
-        // named on the enum branch (underlying_type<non-enum> is ill-formed).
         if constexpr (std::is_enum_v<U>) {
             std::underlying_type_t<U> val{};
             auto [ptr, ec] = std::from_chars(raw.data(), raw.data() + raw.size(), val);
@@ -291,6 +298,7 @@ std::string unmarshalNumber(std::string_view raw, T* out) {
                 return "json: cannot unmarshal number into Go value of integer type";
             }
             *out = static_cast<U>(val);
+            return {};
         } else {
             U val{};
             auto [ptr, ec] = std::from_chars(raw.data(), raw.data() + raw.size(), val);
@@ -301,8 +309,8 @@ std::string unmarshalNumber(std::string_view raw, T* out) {
                 return "json: cannot unmarshal number into Go value of integer type";
             }
             *out = val;
+            return {};
         }
-        return {};
     }
 }
 
@@ -390,7 +398,7 @@ std::string unmarshalDecodeImpl(Decoder& dec, T* out) {
             auto [t, err] = dec.readToken();
             if (!err.empty()) return err;
             return unmarshalObjectInto(dec, out);
-        } else if constexpr (IsIterable<U> || std::is_bounded_array_v<U>) {
+        } else if constexpr (IsIterable<U> || std::is_bounded_array_v<U> || isStdArray<U>::value) {
             if (k != '[') {
                 return "json: cannot unmarshal non-array into Go array value";
             }

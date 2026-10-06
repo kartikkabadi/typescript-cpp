@@ -311,6 +311,11 @@ add_library(tsc STATIC
 	internal/ls/autoimport/specifiers.cpp
 	internal/ls/autoimport/util.cpp
 	internal/ls/autoimport/view.cpp
+
+	# === slice: lsp-proto ===
+	internal/lsp/lsproto/lsproto.cpp
+	internal/lsp/lsproto/lsproto_generated.cpp
+	internal/lsp/lspwatcher/lspwatcher.cpp
 )
 
 target_link_libraries(tsc PUBLIC z) # zlib — pprof profile writer

@@ -1166,7 +1166,7 @@ std::pair<std::string, gostd::Error> asString(const Dom& v, const char* goType) 
 // writers
 // ---------------------------------------------------------------------------
 
-std::string marshalString(std::string_view s) {
+Value marshalString(std::string_view s) {
 	std::string out;
 	out.reserve(s.size() + 2);
 	out += '"';
@@ -1206,11 +1206,11 @@ std::string marshalString(std::string_view s) {
 	return out;
 }
 
-std::string marshalInt64(int64_t v) { return std::to_string(v); }
-std::string marshalBool(bool v) { return v ? "true" : "false"; }
+Value marshalInt64(int64_t v) { return std::to_string(v); }
+Value marshalBool(bool v) { return v ? "true" : "false"; }
 
-std::string marshalObject(
-    const std::vector<std::pair<std::string, std::string>>& members) {
+Value marshalObject(
+    const std::vector<std::pair<std::string, Value>>& members) {
 	std::string out = "{";
 	bool first = true;
 	for (const auto& [k, v] : members) {
@@ -1224,7 +1224,7 @@ std::string marshalObject(
 	return out;
 }
 
-std::string marshalArray(const std::vector<std::string>& elements) {
+Value marshalArray(const std::vector<Value>& elements) {
 	std::string out = "[";
 	bool first = true;
 	for (const auto& e : elements) {

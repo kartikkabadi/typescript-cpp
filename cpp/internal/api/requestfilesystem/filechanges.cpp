@@ -14,7 +14,7 @@ project::FileChangeSummary requestFileSystem::ExpandFileChanges(
 	auto expand = [this](collections::Set<lsproto::DocumentUri>* uris) {
 		collections::Set<lsproto::DocumentUri> additional;
 		for (auto& uri : uris->Keys()) {
-			for (auto& alias : aliasesForPath(uri.FileName())) {
+			for (auto& alias : aliasesForPath(lsp::lsproto::documentUriFileName(uri))) {
 				additional.Add(lsconv::FileNameToDocumentURI(alias));
 			}
 		}

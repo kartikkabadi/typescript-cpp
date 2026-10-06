@@ -72,7 +72,7 @@ std::string ResponseError::String() const {
 
 namespace {
 
-void putOmitZero(std::vector<std::pair<std::string, std::string>>& members,
+void putOmitZero(std::vector<std::pair<std::string, json::Value>>& members,
                  std::string_view name, const std::string& raw) {
 	if (!raw.empty()) {
 		members.emplace_back(name, raw);
@@ -84,7 +84,7 @@ void putOmitZero(std::vector<std::pair<std::string, std::string>>& members,
 // marshalRequestMessage — json.Marshal(RequestMessage): field order jsonrpc,
 // id, method, params with omitzero.
 json::Value marshalRequestMessage(const RequestMessage& m) {
-	std::vector<std::pair<std::string, std::string>> members;
+	std::vector<std::pair<std::string, json::Value>> members;
 	members.emplace_back("jsonrpc", "\"2.0\"");
 	if (m.Id != nullptr) {
 		members.emplace_back("id", m.Id->marshalJSON());
@@ -96,7 +96,7 @@ json::Value marshalRequestMessage(const RequestMessage& m) {
 
 // marshalResponseMessage — json.Marshal(ResponseMessage).
 json::Value marshalResponseMessage(const ResponseMessage& m) {
-	std::vector<std::pair<std::string, std::string>> members;
+	std::vector<std::pair<std::string, json::Value>> members;
 	members.emplace_back("jsonrpc", "\"2.0\"");
 	if (m.Id != nullptr) {
 		members.emplace_back("id", m.Id->marshalJSON());
@@ -113,7 +113,7 @@ json::Value marshalResponseMessage(const ResponseMessage& m) {
 
 // marshalMessage — json.Marshal(Message).
 json::Value marshalMessage(const Message& m) {
-	std::vector<std::pair<std::string, std::string>> members;
+	std::vector<std::pair<std::string, json::Value>> members;
 	members.emplace_back("jsonrpc", "\"2.0\"");
 	if (m.Id.has_value()) {
 		members.emplace_back("id", m.Id->marshalJSON());

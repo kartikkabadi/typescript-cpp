@@ -833,7 +833,7 @@ std::vector<std::unique_ptr<Fix>> View::GetFixes(
 		f->AutoImportFix->ModuleSpecifier = moduleSpecifier;
 		f->AutoImportFix->Name = e->Name();
 		f->AutoImportFix->UsagePosition =
-		    const_cast<lsp::lsproto::Position*>(usagePosition);
+		    std::make_shared<lsp::lsproto::Position>(*usagePosition);
 		f->ModuleSpecifierKind = moduleSpecifierKind;
 		f->IsReExport = !(e->Target.ModuleID == e->exportID.ModuleID);
 		f->ModuleFileName = e->ModuleFileName;
@@ -922,7 +922,7 @@ std::unique_ptr<Fix> View::tryUseExistingNamespaceImport(
 		f->AutoImportFix->ImportIndex =
 		    static_cast<int32_t>(existingImport.index);
 		f->AutoImportFix->UsagePosition =
-		    const_cast<lsp::lsproto::Position*>(usagePosition);
+		    std::make_shared<lsp::lsproto::Position>(*usagePosition);
 		f->AutoImportFix->NamespacePrefix = namespacePrefix;
 		return f;
 	}

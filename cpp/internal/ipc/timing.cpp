@@ -29,7 +29,7 @@ json::Value marshalServerTimingInfo(const serverTimingInfo& i) {
 	      json::marshalInt64(static_cast<int64_t>(i.totals.requestCount))},
 	     {"totalProcessingTimeMs",
 	      json::detail::goFloat(i.totals.totalProcessingTimeMs)}});
-	std::vector<std::string> recents;
+	std::vector<json::Value> recents;
 	recents.reserve(i.recentRequests.size());
 	for (const auto& r : i.recentRequests) {
 		recents.push_back(json::marshalObject(

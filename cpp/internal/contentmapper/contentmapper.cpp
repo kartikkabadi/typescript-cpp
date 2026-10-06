@@ -52,7 +52,7 @@ xxh3::Uint128 Mapper::TransformIdentity(const CompilerOptions* options) const {
 	if (err == nullptr) {
 		// json.Marshal(*OrderedMap[string, json.Value]) — object in insertion
 		// order.
-		std::vector<std::pair<std::string, std::string>> members;
+		std::vector<std::pair<std::string, json::Value>> members;
 		for (const auto& name : declared.Keys()) {
 			members.emplace_back(name, declared.GetOrZero(name));
 		}

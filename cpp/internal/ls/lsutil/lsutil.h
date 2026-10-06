@@ -23,7 +23,7 @@
 #include "internal/collections/collections.h"
 #include "internal/core/text.h"
 #include "internal/core/types.h"
-#include "internal/lsp/lsproto/lsproto.h" // tsc::lsp::lsproto alias bridge
+#include "internal/lsp/lsproto/lsproto.h"
 
 namespace tsc::checker {
 class Checker;
@@ -41,6 +41,10 @@ namespace tsc::json {
 class Encoder;
 class Decoder;
 }
+
+
+
+
 
 
 namespace tsc::ls::lsutil {

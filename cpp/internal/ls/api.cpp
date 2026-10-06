@@ -93,7 +93,7 @@ LanguageService::tryGetProgramAndFile(const std::string& fileName) {
 // languageservice.go:63 getProgramAndFile.
 std::pair<compiler::SimpleProgram*, SourceFile*>
 LanguageService::getProgramAndFile(const lsproto::DocumentUri& documentURI) {
-	std::string fileName = documentURI.FileName();
+	std::string fileName = lsp::lsproto::documentUriFileName(documentURI);
 	auto [program, file] = tryGetProgramAndFile(fileName);
 	if (file == nullptr) {
 		TSC_UNREACHABLE(("file not found: " + fileName).c_str());

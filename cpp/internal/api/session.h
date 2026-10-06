@@ -50,7 +50,6 @@ namespace tsc {
 namespace ls { struct LanguageService; }
 namespace lsconv { struct LSPLineMap; }
 namespace printer { struct Printer; }
-namespace lsproto { struct TextEdit; struct Position; }
 } // namespace tsc
 
 namespace tsc::api {

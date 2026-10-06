@@ -2136,7 +2136,7 @@ Session::toAPISnapshotRequest(gostd::Context ctx,
 
 	for (const auto& f : changes->CloseFiles) {
 		tspath::Path path =
-		    toPath(f.ToURI(GetCurrentDirectory()).FileName());
+		    toPath(lsp::lsproto::documentUriFileName(f.ToURI(GetCurrentDirectory())));
 		if (apiRequest->CloseFiles == nullptr) {
 			apiRequest->CloseFiles =
 			    collections::newSetWithSizeHint<tspath::Path>(

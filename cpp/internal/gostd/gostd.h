@@ -16,6 +16,7 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -277,6 +278,9 @@ struct ContextImpl {
 	bool done = false;
 	Error err;
 	std::vector<std::function<void()>> afterFuncs;
+	// context.WithValue support: opaque keyed values inherited from parents.
+	std::shared_ptr<ContextImpl> parent;
+	std::unordered_map<std::string, std::shared_ptr<void>> values;
 };
 
 using Context = std::shared_ptr<ContextImpl>;
@@ -337,6 +341,7 @@ inline std::function<bool()> contextAfterFunc(const Context& c,
 // context.WithCancel — child cancels with errCanceled when the parent finishes.
 inline std::pair<Context, CancelFunc> contextWithCancel(const Context& parent) {
 	auto c = std::make_shared<ContextImpl>();
+	c->parent = parent;
 	std::weak_ptr<ContextImpl> w = c;
 	contextAfterFunc(parent, [w] {
 		if (auto s = w.lock()) {
@@ -363,6 +368,27 @@ contextWithTimeout(const Context& parent,
 		}
 	}).detach();
 	return {c, cancel};
+}
+
+// context.WithValue — child context carrying one opaque value under a key;
+// lookups walk the parent chain like Go's context.Value.
+inline Context contextWithValue(const Context& parent, std::string key,
+                                std::shared_ptr<void> value) {
+	auto c = std::make_shared<ContextImpl>();
+	c->parent = parent;
+	c->values.emplace(std::move(key), std::move(value));
+	return c;
+}
+
+// ctx.Value(key) — walks the parent chain; returns nullptr when absent.
+inline std::shared_ptr<void> ctxValue(const Context& c, const std::string& key) {
+	for (auto* p = c.get(); p != nullptr; p = p->parent.get()) {
+		auto it = p->values.find(key);
+		if (it != p->values.end()) {
+			return it->second;
+		}
+	}
+	return nullptr;
 }
 
 // ---------------------------------------------------------------------------
