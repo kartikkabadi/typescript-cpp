@@ -156,6 +156,10 @@ public:
 	}
 };
 
+} // namespace
+
+// spawnProcess — sys.go:74. Exported (non-static) for cmd/tscpp/lsp.cpp's
+// ServerOptions.Spawn wiring (lsp.go:64); declared in sys.h.
 std::pair<std::shared_ptr<gostd::io::ReadWriteCloser>, gostd::Error>
 spawnProcess(const std::vector<std::string>& command, const std::string& dir,
              gostd::io::Writer* stderr) {
@@ -237,6 +241,8 @@ spawnProcess(const std::vector<std::string>& command, const std::string& dir,
 	                             std::move(pump))),
 	        nullptr};
 }
+
+namespace {
 
 // osSys — sys.go:18. The production System: real stdout/stderr, the bundled
 // os filesystem, process clock.

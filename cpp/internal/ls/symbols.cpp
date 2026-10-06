@@ -575,11 +575,6 @@ bool programHasTSFile(compiler::SimpleProgram* program) {
 	return false;
 }
 
-// symbols.go:619 — isInsideNodeModules
-bool isInsideNodeModules(const std::string& fileName) {
-	return fileName.find("/node_modules/") != std::string::npos;
-}
-
 // symbols.go:615 — shouldExcludeFile
 bool shouldExcludeFile(SourceFile* file, compiler::SimpleProgram* program,
 					   bool excludeLibrarySymbols) {
@@ -652,6 +647,12 @@ int compareDeclarationInfos(const DeclarationInfo& d1,
 }
 
 } // namespace
+
+// symbols.go:619 — isInsideNodeModules (declared in ls.h; shared with
+// rename.cpp).
+bool isInsideNodeModules(std::string_view fileName) {
+	return fileName.find("/node_modules/") != std::string_view::npos;
+}
 
 // symbols.go:669 — getSymbolKindFromNode
 lsp::lsproto::SymbolKind getSymbolKindFromNode(::tsc::Node* node) {

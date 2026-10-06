@@ -185,6 +185,8 @@ add_library(tsc STATIC
 	internal/ls/callhierarchy.cpp
 	internal/ls/hover.cpp
 	internal/ls/hovericon.cpp
+	internal/ls/autoinsert.cpp
+	internal/ls/linkedediting.cpp
 	# === slice: infra ===
 	internal/locale/locale.cpp
 	# === slice: contentmapper ===
@@ -416,5 +418,5 @@ add_library(tsc STATIC
 
 target_link_libraries(tsc PUBLIC z) # zlib — pprof profile writer
 
-add_executable(tscpp cmd/tscpp/main.cpp cmd/tscpp/sys.cpp)
+add_executable(tscpp cmd/tscpp/main.cpp cmd/tscpp/sys.cpp cmd/tscpp/lsp.cpp cmd/tscpp/api.cpp)
 target_link_libraries(tscpp PRIVATE tsc)

@@ -30,7 +30,7 @@ std::string firstNonZeroString(const std::string& a, const std::string& b) {
 std::unique_ptr<View> NewView(
     Registry* registry, SourceFile* importingFile, ProjectID* projectID,
     compiler::SimpleProgram* program, checker::Checker* typeChecker,
-    const modulespecifiers::UserPreferences& preferences) {
+    modulespecifiers::UserPreferences preferences) {
 	tspath::Path importingFilePath = importingFile->Path();
 	if (SourceFile* canonical = importingFile->CanonicalSourceFile()) {
 		importingFilePath = canonical->Path();

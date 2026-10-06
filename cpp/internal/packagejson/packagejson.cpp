@@ -5,6 +5,8 @@
 
 #include "internal/packagejson/packagejson.h"
 
+#include "internal/json/json.h"
+
 namespace tsc::packagejson {
 
 namespace {
@@ -503,6 +505,76 @@ std::shared_ptr<InfoCacheEntry> InfoCacheEntry::WithPackageDirectory(
 	copy->DirectoryExists = DirectoryExists;
 	copy->Contents = Contents;
 	return copy;
+}
+
+// JSONValue::unmarshalJSONFrom / unmarshalJSONValueFrom —
+// jsonvalue.go:88-135. Go's `any` payload is modeled here as one slot per
+// kind on JsonValueBase; `type` selects the live member. The T=JSONValue
+// instantiation recurses through json::unmarshalDecode for array elements
+// and object members, matching the Go generic's nested-value decode.
+std::string JSONValue::unmarshalJSONFrom(json::Decoder& dec) {
+	switch (dec.peekKind()) {
+	case 'n': // json.Null.Kind()
+		if (auto [t, e] = dec.readToken(); !e.empty()) {
+			return e;
+		}
+		str.clear();
+		array.reset();
+		object.reset();
+		type = JSONValueType::Null;
+		return {};
+	case '"':
+		type = JSONValueType::String;
+		if (auto e = json::unmarshalDecode(dec, &str); !e.empty()) {
+			return e;
+		}
+		return {};
+	case '[': {
+		if (auto [t, e] = dec.readToken(); !e.empty()) {
+			return e;
+		}
+		auto elements =
+		    std::make_shared<std::vector<JSONValue>>();
+		while (dec.peekKind() != json::EndArray.kind()) {
+			JSONValue element;
+			if (auto e = json::unmarshalDecode(dec, &element);
+			    !e.empty()) {
+				return e;
+			}
+			elements->push_back(std::move(element));
+		}
+		if (auto [t, e] = dec.readToken(); !e.empty()) {
+			return e;
+		}
+		type = JSONValueType::Array;
+		array = std::move(elements);
+		return {};
+	}
+	case '{': {
+		auto obj = std::make_shared<
+		    collections::OrderedMap<std::string, JSONValue>>();
+		if (auto e = json::unmarshalDecode(dec, obj.get());
+		    !e.empty()) {
+			return e;
+		}
+		type = JSONValueType::Object;
+		object = std::move(obj);
+		return {};
+	}
+	case 't':
+	case 'f':
+		type = JSONValueType::Boolean;
+		if (auto e = json::unmarshalDecode(dec, &boolean); !e.empty()) {
+			return e;
+		}
+		return {};
+	default:
+		type = JSONValueType::Number;
+		if (auto e = json::unmarshalDecode(dec, &num); !e.empty()) {
+			return e;
+		}
+		return {};
+	}
 }
 
 }  // namespace tsc::packagejson

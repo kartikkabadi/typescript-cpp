@@ -1670,11 +1670,10 @@ parseContentMapperContributions(
 }
 
 // isValidContributedContentMapperExtension — server.go:2511.
-bool isValidContributedContentMapperExtension(
-	const std::string& extension) {
+bool isValidContributedContentMapperExtension(std::string_view extension) {
 	if (extension.size() <= 1 || extension[0] != '.' ||
-	    tspath::getAnyExtensionFromPath("file" + extension, nullptr,
-	                                    false) != extension) {
+	    tspath::getAnyExtensionFromPath("file" + std::string(extension),
+	                                    nullptr, false) != extension) {
 		return false;
 	}
 	for (const auto& group : tspath::allSupportedExtensionsWithJson) {

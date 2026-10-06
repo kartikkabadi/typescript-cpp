@@ -32,6 +32,7 @@
 #include "internal/binder/binder.h"
 #include "internal/compiler/program.h"
 #include "internal/execute/execute.h"
+#include "cmd/tscpp/sys.h"
 
 // sys.cpp — tsc/cmd/tsc/sys.go
 tsc::execute::tsc::System* newSystem();
@@ -695,13 +696,23 @@ int main(int argc, char** argv) {
 	}
 	std::string mode = argv[1];
 	// tsc/cmd/tsc/main.go — the real CLI: `tscpp tsc <args...>` forwards all
-	// remaining args to execute.CommandLine with the os-backed System.
+	// remaining args to execute.CommandLine with the os-backed System —
+	// except --lsp/--api, which Go intercepts at args[0] before CommandLine
+	// (main.go:19-25).
 	if (mode == "tsc") {
-		tsc::execute::tsc::System* sys = newSystem();
 		std::vector<std::string> args;
 		for (int i = 2; i < argc; i++) {
 			args.emplace_back(argv[i]);
 		}
+		if (!args.empty()) {
+			if (args[0] == "--lsp") {
+				return runLSP({args.begin() + 1, args.end()});
+			}
+			if (args[0] == "--api") {
+				return runAPI({args.begin() + 1, args.end()});
+			}
+		}
+		tsc::execute::tsc::System* sys = newSystem();
 		auto result = tsc::execute::CommandLine(gostd::contextBackground(), sys,
 		                                   args, nullptr);
 		return static_cast<int>(result.Status);

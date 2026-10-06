@@ -3438,6 +3438,16 @@ bool ClientSupportsRenameResourceOperations(gostd::Context ctx);
 // symbols.go:619 — isInsideNodeModules (owned by this slice, defined in symbols.cpp)
 bool isInsideNodeModules(std::string_view fileName);
 
+// findallreferences.go:286 — getContextNode (defined in
+// findallreferences.cpp; called from definition.cpp).
+::tsc::Node* getContextNode(::tsc::Node* node);
+
+// definition.go:380 — getDeclarationsFromObjectLiteralElement (defined in
+// definition.cpp).
+std::vector<::tsc::Node*>
+getDeclarationsFromObjectLiteralElement(::tsc::checker::Checker* c,
+                                        ::tsc::Node* node);
+
 // ============================================================================
 // format.go — slice types
 // ============================================================================

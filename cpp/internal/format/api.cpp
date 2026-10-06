@@ -10,7 +10,7 @@
 namespace tsc::format {
 
 FormatRequestContext WithFormatCodeSettings(FormatRequestContext ctx,
-											const lsutil::FormatCodeSettings& options,
+											lsutil::FormatCodeSettings options,
 											std::string newLine) {
 	ctx.options = options;
 	ctx.newLine = std::move(newLine);

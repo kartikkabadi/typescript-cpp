@@ -392,7 +392,7 @@ bool isNewExpressionTarget(Node* node, bool includeElementAccess,
 // === forward declarations — file-local fns defined later ===
 ReferenceEntry* newNodeEntry(Node* node);
 Node* getContextNodeForNodeEntry(Node* node);
-Node* getContextNode(Node* node);
+// getContextNode — declared in ls.h (defined below).
 TextRange getRangeOfNode(Node* node, SourceFile* sourceFile, Node* endNode);
 bool isDefinitionVisible(checker::EmitResolver* emitResolver,
                          Node* declaration);

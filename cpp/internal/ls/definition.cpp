@@ -22,8 +22,8 @@ struct Deferred {
 // (isJumpStatementTarget / isRightSideOfPropertyAccess live in
 // utilities.cpp)
 
-// findallreferences.cpp — findallreferences.go:297.
-::tsc::Node* getContextNode(::tsc::Node* node);
+// getContextNode — findallreferences.go:286. Declared in ls.h (defined in
+// findallreferences.cpp at tsc::ls scope).
 
 // ast/utilities.go:3764 — GetInvokedExpression
 ::tsc::Node* getInvokedExpression(::tsc::Node* node) {
@@ -57,9 +57,8 @@ bool isObjectLiteralElement(::tsc::Node* node) {
 	}
 }
 
-// definition.go:380 — fwd decl (defined below, used earlier)
-std::vector<::tsc::Node*> getDeclarationsFromObjectLiteralElement(
-	checker::Checker* c, ::tsc::Node* node);
+// definition.go:380 — fwd decl lives in ls.h (defined below, used
+// earlier).
 
 // ast/utilities.go:2998 — IsCallLikeExpression
 bool isCallLikeExpression(::tsc::Node* node) {
