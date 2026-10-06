@@ -429,9 +429,14 @@ Node* Checker::SignatureToSignatureDeclaration(
 	nodebuilder::Flags flags) {
 	auto [nodeBuilder, release] = getNodeBuilder();
 	FnGuard releaseGuard{std::move(release)};
-	return nodeBuilder->SignatureToSignatureDeclaration(
+	Node* result = nodeBuilder->SignatureToSignatureDeclaration(
 		signature, kind, enclosingDeclaration, flags,
 		nodebuilder::InternalFlagsNone, nullptr);
+	// Go: the caller holds the returned node, so the GC keeps it (and
+	// everything it references) alive across ReleaseArenas. Pin it so our
+	// mark keeps the subtree too — callers keep the node past release.
+	nodeBuilder->EmitContext()->pin(result);
+	return result;
 }
 
 // ExpandSymbolForHover produces declaration strings for a symbol with verbosity support for expandable hover.

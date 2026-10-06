@@ -267,8 +267,8 @@ void wrappingTracker::ReportTruncationError() {
 
 bool wrappingTracker::TrackSymbol(Symbol* symbol, Node* enclosingDeclaration,
                                   SymbolFlags meaning) {
-	bound->trackedSymbols.push_back(
-		new TrackedSymbolArgs{symbol, enclosingDeclaration, meaning});
+	bound->trackedSymbols.push_back(bound->ctx->impl->own(
+		new TrackedSymbolArgs{symbol, enclosingDeclaration, meaning}));
 	return false;
 }
 
@@ -276,7 +276,7 @@ bool wrappingTracker::TrackSymbol(Symbol* symbol, Node* enclosingDeclaration,
 
 wrappingTracker* newWrappingTracker(nodebuilder::SymbolTracker* inner,
                                     recoveryBoundary* bound) {
-	auto* w = new wrappingTracker();
+	auto* w = bound->ctx->impl->own(new wrappingTracker());
 	w->wrapped = inner;
 	w->bound = bound;
 	return w;
@@ -296,7 +296,7 @@ SymbolTrackerImpl* newSymbolTrackerImpl(NodeBuilderContext* context,
 		}
 	}
 
-	auto* impl = new SymbolTrackerImpl();
+	auto* impl = context->impl->own(new SymbolTrackerImpl());
 	impl->context = context;
 	impl->inner = tracker;
 	impl->DisableTrackSymbol = false;
@@ -313,8 +313,8 @@ bool SymbolTrackerImpl::TrackSymbol(Symbol* symbol, Node* enclosingDeclaration,
 		}
 		// Skip recording type parameters as they dont contribute to late painted statements
 		if (!(symbol->flags & SymbolFlagsTypeParameter)) {
-			context->trackedSymbols.push_back(
-				new TrackedSymbolArgs{symbol, enclosingDeclaration, meaning});
+			context->trackedSymbols.push_back(context->impl->own(
+				new TrackedSymbolArgs{symbol, enclosingDeclaration, meaning}));
 		}
 	}
 	return false;
@@ -415,7 +415,7 @@ void SymbolTrackerImpl::PopErrorFallbackNode() {
 
 recoveryBoundary* NodeBuilderImpl::createRecoveryBoundary() {
 	ch->checkNotCanceled();
-	auto* bound = new recoveryBoundary();
+	auto* bound = own(new recoveryBoundary());
 	bound->ctx = ctx;
 	bound->oldTracker = ctx->tracker;
 	bound->oldTrackedSymbols = ctx->trackedSymbols;
@@ -561,7 +561,7 @@ NodeVisitor* getExistingNodeTreeVisitor(NodeBuilderImpl* b,
 		std::function<Node*(Node*)> tryVisitTypeReference;
 		std::function<Node*(Node*)> visitExistingNodeTreeSymbolsWorker;
 	};
-	auto* env = new ExistingEnv{b, bound};
+	auto* env = b->own(new ExistingEnv{b, bound});
 	// note: also handles renaming type parameters renamed within the current context
 	env->attachSymbolToLeftmostIdentifier =
 		[env](Node* leftmost, Node* node, Symbol* sym) -> Node* {
@@ -585,7 +585,8 @@ NodeVisitor* getExistingNodeTreeVisitor(NodeBuilderImpl* b,
 			}
 			return env->b->setTextRange(node->visitEachChild(*vis), node);
 		};
-		vis = newNodeVisitor(visitorFunc, env->b->f, NodeVisitorHooks{});
+		vis = env->b->own(
+			newNodeVisitor(visitorFunc, env->b->f, NodeVisitorHooks{}));
 		return visitorFunc(node);
 	};
 	env->trackExistingEntityName =
@@ -1204,7 +1205,7 @@ NodeVisitor* getExistingNodeTreeVisitor(NodeBuilderImpl* b,
 		env->nonLocalNode = oldNonLocalNode;
 		return res;
 	};
-	env->visitor = newNodeVisitor(
+	env->visitor = env->b->own(newNodeVisitor(
 		[env](Node* node) -> Node* {
 			// If there was an error in a sibling node bail early, the result will be discarded anyway
 			if (env->bound->hadError) {
@@ -1260,7 +1261,7 @@ NodeVisitor* getExistingNodeTreeVisitor(NodeBuilderImpl* b,
 
 			return result;
 		},
-		env->b->f, hooks);
+		env->b->f, hooks));
 	return env->visitor;
 }
 

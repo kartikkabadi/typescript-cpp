@@ -598,6 +598,29 @@ struct NodeFactoryHooks {
 	std::function<void(Node* node, Node* original)> onClone;
 };
 
+// Liveness tracers for tracked arenas (ReleaseArenas port): byte-scan covers
+// every inline pointer field (children, parent, NextContainer, ...); the
+// explicit walks below cover the few container members that hold node
+// pointers (NodeList::nodes, SourceFile caches, JSDocTypeLiteral tags,
+// SyntaxList::Children).
+void traceArenaNode(const void* obj, size_t size, Arena& a);
+void traceArenaNodeList(const void* obj, size_t size, Arena& a);
+
+// Arena::Tracer specializations for the types allocated in node arenas.
+template <class T>
+    requires std::is_base_of_v<Node, T>
+struct Arena::Tracer<T> {
+	static Arena::TraceFn get() { return &traceArenaNode; }
+};
+template <>
+struct Arena::Tracer<NodeList> {
+	static Arena::TraceFn get() { return &traceArenaNodeList; }
+};
+template <>
+struct Arena::Tracer<ModifierList> {
+	static Arena::TraceFn get() { return &traceArenaNodeList; }
+};
+
 class NodeFactory {
 	Arena arena_;
 	int32_t nodeCount_ = 0;

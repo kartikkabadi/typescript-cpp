@@ -738,14 +738,13 @@ static bool everyVec(const std::vector<T>& v, F&& pred) {
 static NodeBuilderImpl* newNodeBuilderImpl(
 	Checker* ch, printer::EmitContext* e,
 	std::unordered_map<Node*, Symbol*>* idToSymbol) {
-	if (idToSymbol == nullptr) {
-		idToSymbol = new std::unordered_map<Node*, Symbol*>();
-	}
 	auto* b = new NodeBuilderImpl();
 	b->f = &e->factory;
 	b->ch = ch;
 	b->e = e;
-	b->idToSymbol = *idToSymbol;
+	if (idToSymbol != nullptr) {
+		b->idToSymbol = *idToSymbol;
+	}
 	b->pc = pseudochecker::newPseudoChecker(ch->strictNullChecks,
 	                                      ch->exactOptionalPropertyTypes);
 	NodeBuilderImpl* bp = b;
@@ -4925,7 +4924,7 @@ Node* NodeBuilderImpl::visitAndTransformType(
 	    !ctx->encounteredError) {
 		NodeBuilderLinks* enclosingLinks =
 		    links.Get(ctx->enclosingDeclaration);
-		auto* entry = new SerializedTypeEntry();
+		auto* entry = own(new SerializedTypeEntry());
 		entry->node = result;
 		entry->truncating = ctx->truncating;
 		entry->addedLength = addedLength;
@@ -7598,6 +7597,108 @@ bool NodeBuilderImpl::isNamespaceMember(Symbol* p) {
 // emitContext — implements NodeBuilderInterface.
 printer::EmitContext* NodeBuilder::EmitContext() { return impl->e; }
 
+// ~NodeBuilder / ~NodeBuilderImpl — the builder's lifetime follows Go: it
+// dies when its emit context is reset or destroyed (registered via
+// EmitContext::addCleanup in newNodeBuilderEx). Deleting impl frees both
+// link arenas wholesale; ownedDeletes reclaims the heap objects helpers
+// created (contexts, trackers, boundaries, cache entries).
+NodeBuilder::~NodeBuilder() { delete impl; }
+
+NodeBuilderImpl::~NodeBuilderImpl() {
+	delete cloneBindingNameVisitor;
+	delete pc;
+	auto pending = std::move(ownedDeletes);
+	ownedDeletes.clear();
+	for (auto& fn : pending) {
+		fn();
+	}
+}
+
+// markEmitRoots (checker.h) — marks every node the builder's caches and
+// in-flight contexts keep alive across the emit context's ReleaseArenas,
+// mirroring Go liveness: serializedTypes entries (their TypeNodes are
+// handed out via DeepCloneNode and must stay valid), idToSymbol keys,
+// current/pushed contexts (enclosingDeclaration, typeParameterNames,
+// namedParameters, trackedSymbols, tracker graph including recovery
+// boundaries and their deferred-report closures).
+void NodeBuilder::markEmitRoots(Arena& a) {
+	std::unordered_set<NodeBuilderContext*> seenContexts;
+	std::unordered_set<nodebuilder::SymbolTracker*> seenTrackers;
+	auto markNode = [&a](Node* n) { a.markPointer(n); };
+	auto markTrackedSymbols = [&a, &markNode](
+		const std::vector<TrackedSymbolArgs*>& ts) {
+		for (TrackedSymbolArgs* t : ts) {
+			if (t == nullptr) {
+				continue;
+			}
+			markNode(t->enclosingDeclaration);
+			a.scanObject(t, sizeof(TrackedSymbolArgs));
+		}
+	};
+	std::function<void(nodebuilder::SymbolTracker*)> markTracker;
+	std::function<void(NodeBuilderContext*)> markContext;
+	markContext = [&](NodeBuilderContext* c) {
+		if (c == nullptr || !seenContexts.insert(c).second) {
+			return;
+		}
+		a.scanObject(c, sizeof(NodeBuilderContext));
+		markNode(c->enclosingDeclaration);
+		markNode(c->enclosingFile);
+		if (c->typeParameterNames.m != nullptr) {
+			for (auto& [id, name] : *c->typeParameterNames.m) {
+				markNode(name);
+			}
+		}
+		markTrackedSymbols(c->trackedSymbols);
+		markTracker(c->tracker);
+	};
+	markTracker = [&](nodebuilder::SymbolTracker* t) {
+		if (t == nullptr || !seenTrackers.insert(t).second) {
+			return;
+		}
+		if (auto* sti = dynamic_cast<SymbolTrackerImpl*>(t)) {
+			markContext(sti->context);
+			markTracker(sti->inner);
+			return;
+		}
+		if (auto* wt = dynamic_cast<wrappingTracker*>(t)) {
+			markTracker(wt->wrapped);
+			if (recoveryBoundary* bound = wt->bound) {
+				markContext(bound->ctx);
+				markTrackedSymbols(bound->trackedSymbols);
+				markTrackedSymbols(bound->oldTrackedSymbols);
+				markTracker(bound->oldTracker);
+				for (auto& f : bound->deferredReports) {
+					a.scanObject(&f, sizeof(f));
+				}
+			}
+		}
+		// Other SymbolTracker impls (transformer-side) own no node
+		// references into this arena.
+	};
+	for (auto& [key, links] : impl->links.entries) {
+		markNode(key);
+		for (auto& [id, entry] : links->serializedTypes) {
+			markNode(entry->node);
+			a.scanObject(entry, sizeof(SerializedTypeEntry));
+			markTrackedSymbols(entry->trackedSymbols);
+		}
+	}
+	for (auto& [key, sym] : impl->idToSymbol) {
+		markNode(key);
+	}
+	markContext(impl->ctx);
+	for (NodeBuilderContext* c : ctxStack) {
+		markContext(c);
+	}
+	if (impl->cloneBindingNameVisitor != nullptr) {
+		a.scanObject(impl->cloneBindingNameVisitor, sizeof(NodeVisitor));
+	}
+	if (impl->pc != nullptr) {
+		a.scanObject(impl->pc, sizeof(*impl->pc));
+	}
+}
+
 // enterContext (nodebuilder.go:30).
 void NodeBuilder::enterContext(Node* enclosingDeclaration,
                                nodebuilder::Flags flags,
@@ -7610,7 +7711,8 @@ void NodeBuilder::enterContext(Node* enclosingDeclaration,
 		maxTruncationLength = verbosity->MaxTruncationLength;
 	}
 	ctxStack.push_back(impl->ctx);
-	impl->ctx = new NodeBuilderContext();
+	impl->ctx = impl->own(new NodeBuilderContext());
+	impl->ctx->impl = impl;
 	impl->ctx->host = host;
 	impl->ctx->tracker = tracker;
 	impl->ctx->flags = flags;
@@ -7960,6 +8062,18 @@ NodeBuilder* newNodeBuilderEx(
 	b->ctxStack = {};
 	b->ctxStack.reserve(1);
 	b->host = ch->program;
+	// Go: the builder dies when this transform's emit context is done (the
+	// pooled context's Reset; getNodeBuilderEx contexts are GC-owned).
+	// Register the delete on the context — reset() runs it after the
+	// transform's nodes are printed.
+	e->addCleanup([b] { delete b; });
+	if (e->factory.arena().isTracked()) {
+		// When the context's factory arena is tracked, the builder's
+		// caches are extra GC roots for releaseArenas (nodebuilder.go:
+		// the builder outlives each ReleaseArenas call in Go, so its
+		// serializedTypes TypeNodes stay alive).
+		e->addRootTracer([b](Arena& arena) { b->markEmitRoots(arena); });
+	}
 	return b;
 }
 
@@ -7977,11 +8091,11 @@ NodeBuilder* NewNodeBuilderEx(Checker* ch, printer::EmitContext* e,
 // getNodeBuilder (nodebuilder.go:291).
 std::pair<NodeBuilder*, std::function<void()>> Checker::getNodeBuilder() {
 	std::function<void()> releaseNodes = [this]() {
-		// Go: EmitContext().Factory.ReleaseArenas() — lets GC reclaim arena
-		// memory no longer referenced. Our bump arena cannot tell referenced
-		// nodes apart, so EmitContext::releaseArenas keeps the blocks alive
-		// (serializedTypes caches hold factory-arena nodes) and only reset()s
-		// the context's node-keyed maps.
+		// Go: EmitContext().Factory.ReleaseArenas() — drops arena slices so
+		// the GC can reclaim nodes no longer referenced. The tracked factory
+		// arena does the same: releaseArenas keeps nodes reachable from the
+		// context maps and the builder's caches (serializedTypes) and frees
+		// the rest.
 		typeToStringNodebuilder->EmitContext()->releaseArenas();
 	};
 	if (typeToStringNodebuilder != nullptr) {
@@ -7994,7 +8108,9 @@ std::pair<NodeBuilder*, std::function<void()>> Checker::getNodeBuilder() {
 // getNodeBuilderEx (nodebuilder.go:304).
 NodeBuilder* Checker::getNodeBuilderEx(
 	std::unordered_map<Node*, Symbol*>* idToSymbol) {
-	NodeBuilder* b = newNodeBuilderEx(this, new printer::EmitContext(),
+	NodeBuilder* b = newNodeBuilderEx(this,
+	                                new printer::EmitContext(
+	                                    /*trackFactoryArena*/ true),
 	                                idToSymbol);
 	return b;
 }
