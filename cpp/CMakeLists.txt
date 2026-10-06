@@ -242,6 +242,13 @@ add_library(tsc STATIC
 	internal/execute/build/host.cpp
 	internal/execute/build/orchestrator.cpp
 	internal/execute/build/uptodatestatus.cpp
+	# === slice: testrunner ===
+	internal/gostd/regexp.cpp
+	internal/testrunner/runner.cpp
+	internal/testrunner/test_case_parser.cpp
+	internal/testrunner/testrunner_deps.cpp
+	internal/testrunner/transpile_runner.cpp
+	internal/testrunner/compiler_runner.cpp
 	# === slice: bundled ===
 	internal/bundled/bundled.cpp
 	internal/bundled/bundled_generated.cpp

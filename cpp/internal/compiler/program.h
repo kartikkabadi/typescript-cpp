@@ -878,6 +878,18 @@ public:
 	std::pair<checker::Checker*, std::function<void()>> GetTypeChecker(
 		gostd::Context ctx);
 	// === end slice: ls-autoimport ===
+
+	// === slice: testrunner ===
+	// program.go:517 GetContentMapper — the content mapper that produced
+	// the given source file, or nullptr when the file was not produced by
+	// a content mapper.
+	contentmapper::Mapper* GetContentMapper(SourceFile* file);
+	// program.go:597 ForEachCheckerParallel — the port has a single lazy
+	// checker covering every file (the checkerPool equivalent); invoke
+	// the callback once with it.
+	void ForEachCheckerParallel(
+	    const std::function<void(int, checker::Checker*)>& cb);
+	// === end slice: testrunner ===
 };
 
 // program.go: GetDiagnosticsOfAnyProgram — generalized to ProgramLike for
