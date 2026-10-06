@@ -203,8 +203,7 @@ requestPathNode* composeRequestPaths(requestPathNode* base,
 			       tspath::getCanonicalFileName(right, caseSensitive);
 		};
 		for (auto& [path, child] : overlay->children) {
-			std::string name =
-			    std::string(tspath::getBaseFileName(std::string(path)));
+			std::string name{tspath::getBaseFileName(path)};
 			if (child->fallback == requestFallback::Missing ||
 			    child->replacesSubtree()) {
 				std::erase_if(entries.files, [&](const std::string& e) {

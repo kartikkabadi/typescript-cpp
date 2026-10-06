@@ -3108,35 +3108,13 @@ Type* Checker::getWriteTypeOfSymbol(Symbol* symbol) {
 }
 
 // ---------------------------------------------------------------------------
-// symbolToString — interim qualified-name implementation.
-// TODO(nodebuilder): replace with the faithful nodebuilder+printer port
-// (printer.go symbolToStringEx) once the nodebuilder lands.
+// symbolToString — printer.go:120. The faithful nodebuilder+printer port of
+// symbolToStringEx lives in checker_printer.cpp (it needs the file-local
+// createPrinterWith* helpers there).
 // ---------------------------------------------------------------------------
 
 std::string Checker::symbolToString(Symbol* symbol) {
 	return symbolToStringEx(symbol, nullptr, SymbolFlagsAll, SymbolFormatFlagsAllowAnyNodeKind);
-}
-
-std::string Checker::symbolToStringEx(Symbol* symbol, Node* /*enclosingDeclaration*/,
-									  SymbolFlags /*meaning*/, SymbolFormatFlags /*flags*/) {
-	if (symbol == nullptr) {
-		return "(unknown)";
-	}
-	std::string name = symbol->name;
-	if (name.empty() || name == InternalSymbolNameComputed) {
-		name = "<computed>";
-	}
-	// Qualify with the chain of parents that introduce a name (modules, enums,
-	// classes, interfaces, functions get `.`, everything else gets skipped).
-	std::string prefix;
-	for (Symbol* parent = symbol->parent; parent != nullptr; parent = parent->parent) {
-		if (parent->name.empty() || parent->name == InternalSymbolNameComputed ||
-			parent->name.size() == 0) {
-			continue;
-		}
-		prefix = parent->name + "." + prefix;
-	}
-	return prefix + name;
 }
 
 

@@ -695,10 +695,31 @@ std::string DocumentIdentifier::unmarshalJSONFrom(json::Decoder& dec) {
 	}
 }
 
+// DocumentIdentifier::marshalJSONTo — proto.go:284 field tags
+// (`fileName,omitempty`, `uri,omitempty`); Go has no custom marshaler, so
+// the wire form is the tagged object.
+std::string DocumentIdentifier::marshalJSONTo(json::Encoder& enc) const {
+	objWriter w{enc};
+	w.begin();
+	if (!FileName.empty()) w.member("fileName", FileName);
+	if (!URI.empty()) w.member("uri", URI);
+	return w.end();
+}
+
 // EnsurePrograms::unmarshalJSONFrom — proto.go:399. `true` or an array of
 // project IDs.
 std::pair<bool, std::string> EnsurePrograms::unmarshalField(std::string_view, json::Decoder&) {
 	return {false, {}};
+}
+
+// EnsurePrograms::marshalJSONTo — proto.go:398 has no custom marshaler, so
+// Go emits the default field names `All` and `Projects`.
+std::string EnsurePrograms::marshalJSONTo(json::Encoder& enc) const {
+	objWriter w{enc};
+	w.begin();
+	w.member("All", All);
+	w.member("Projects", Projects);
+	return w.end();
 }
 
 std::string EnsurePrograms::unmarshalJSONFrom(json::Decoder& dec) {
@@ -3786,5 +3807,511 @@ json::Value literalValueToJSON(const checker::LiteralValue& value) {
 	}
 	return "null";
 }
+
+
+// ---------------------------------------------------------------------------
+// proto.go:42-58 — orchestrator IDs and symbol/type/signature handles.
+// ---------------------------------------------------------------------------
+
+static std::atomic<uint64_t> nextBuildOrchestratorId{0};
+
+BuildOrchestratorID NewBuildOrchestratorID() {
+    return BuildOrchestratorID(nextBuildOrchestratorId.fetch_add(1, std::memory_order_relaxed) + 1);
+}
+
+SymbolID SymbolHandle(Symbol* symbol) {
+    return SymbolID(getSymbolId(symbol));
+}
+
+TypeID TypeHandle(checker::Type* t) {
+    return TypeID(t->id);
+}
+
+SignatureID SignatureHandle(checker::Signature* sig) {
+    return SignatureID(sig->id);
+}
+
+// ---------------------------------------------------------------------------
+// proto.go:327-356 — DocumentIdentifier helpers.
+// ---------------------------------------------------------------------------
+
+std::string DocumentIdentifier::ToFileName() const {
+    if (!URI.empty()) {
+        return lsproto::documentUriFileName(URI);
+    }
+    return FileName;
+}
+
+lsproto::DocumentUri DocumentIdentifier::ToURI(const std::string& cwd) const {
+    if (!URI.empty()) {
+        return URI;
+    }
+    return lsconv::FileNameToDocumentURI(
+        tspath::getNormalizedAbsolutePath(FileName, cwd));
+}
+
+std::string DocumentIdentifier::ToAbsoluteFileName(const std::string& cwd) const {
+    if (!URI.empty()) {
+        return lsproto::documentUriFileName(URI);
+    }
+    return tspath::getNormalizedAbsolutePath(FileName, cwd);
+}
+
+std::string DocumentIdentifier::String() const {
+    if (!URI.empty()) {
+        return URI;
+    }
+    return FileName;
+}
+
+// ---------------------------------------------------------------------------
+// proto.go:1067-1088 — handle slices.
+// ---------------------------------------------------------------------------
+
+std::vector<SymbolID> symbolHandles(const std::vector<Symbol*>& symbols) {
+    if (symbols.empty()) {
+        return {};
+    }
+    std::vector<SymbolID> handles(symbols.size());
+    for (size_t i = 0; i < symbols.size(); i++) {
+        handles[i] = SymbolHandle(symbols[i]);
+    }
+    return handles;
+}
+
+std::vector<TypeID> typeHandles(const std::vector<checker::Type*>& types) {
+    if (types.empty()) {
+        return {};
+    }
+    std::vector<TypeID> handles(types.size());
+    for (size_t i = 0; i < types.size(); i++) {
+        handles[i] = TypeHandle(types[i]);
+    }
+    return handles;
+}
+
+// ---------------------------------------------------------------------------
+// proto.go:1196-1280 — newTypeResponse.
+// ---------------------------------------------------------------------------
+
+std::shared_ptr<TypeResponse> newTypeResponse(checker::Type* t, TypeID id) {
+    auto resp = std::make_shared<TypeResponse>();
+    resp->Id = id;
+    resp->Flags = uint32_t(t->flags);
+
+    if (t->symbol != nullptr) {
+        resp->Symbol = SymbolHandle(t->symbol);
+    }
+
+    if (t->alias != nullptr) {
+        resp->AliasTypeArguments = typeHandles(t->alias->typeArguments);
+        if (t->alias->symbol != nullptr) {
+            resp->AliasSymbol = SymbolHandle(t->alias->symbol);
+        }
+    }
+
+    const auto flags = t->flags;
+    if (flags & checker::TypeFlagsFreshable) {
+        auto* lit = t->AsLiteralType();
+        if (flags & checker::TypeFlagsLiteral) {
+            resp->Value = literalValueToJSON(lit->value);
+        }
+        if (lit->freshType != nullptr) {
+            resp->FreshType = TypeHandle(lit->freshType);
+        }
+        if (lit->regularType != nullptr) {
+            resp->RegularType = TypeHandle(lit->regularType);
+        }
+    } else if (flags & checker::TypeFlagsObject) {
+        resp->ObjectFlags = uint32_t(t->objectFlags);
+        resp->IsTupleType = checker::IsTupleType(t);
+        const auto objectFlags = t->objectFlags;
+        if (objectFlags & checker::ObjectFlagsReference) {
+            auto* ref = t->AsTypeReference();
+            if (checker::IsTupleTypeTarget(t)) {
+                auto* tuple = t->AsTupleType();
+                resp->ElementFlags.reserve(tuple->elementInfos.size());
+                for (const auto& info : tuple->elementInfos) {
+                    resp->ElementFlags.push_back(info.flags);
+                }
+                resp->FixedLength = tuple->fixedLength;
+                resp->TupleReadonly = tuple->readonly;
+            }
+            if (ref->target != nullptr) {
+                resp->Target = TypeHandle(ref->target);
+            }
+        }
+        if (objectFlags & checker::ObjectFlagsClassOrInterface) {
+            auto* iface = t->AsInterfaceType();
+            resp->TypeParameters = typeHandles(checker::interfaceTypeTypeParameters(iface));
+            resp->OuterTypeParameters = typeHandles(checker::interfaceTypeOuterTypeParameters(iface));
+            resp->LocalTypeParameters = typeHandles(checker::interfaceTypeLocalTypeParameters(iface));
+            if (iface->thisType != nullptr) {
+                resp->ThisType = TypeHandle(iface->thisType);
+            }
+        }
+    } else if (flags & checker::TypeFlagsUnionOrIntersection) {
+        // types omitted; fetched via separate request
+    } else if (flags & checker::TypeFlagsIndex) {
+        resp->Target = TypeHandle(t->AsIndexType()->target);
+    } else if (flags & checker::TypeFlagsIndexedAccess) {
+        auto* data = t->AsIndexedAccessType();
+        resp->ObjectType = TypeHandle(data->objectType);
+        resp->IndexType = TypeHandle(data->indexType);
+    } else if (flags & checker::TypeFlagsConditional) {
+        auto* data = t->AsConditionalType();
+        resp->CheckType = TypeHandle(data->checkType);
+        resp->ExtendsType = TypeHandle(data->extendsType);
+    } else if (flags & checker::TypeFlagsSubstitution) {
+        auto* data = t->AsSubstitutionType();
+        resp->BaseType = TypeHandle(data->baseType);
+        resp->SubstConstraint = TypeHandle(data->constraint);
+    } else if (flags & checker::TypeFlagsTemplateLiteral) {
+        auto* tl = t->AsTemplateLiteralType();
+        resp->Texts = tl->texts;
+        // types omitted; fetched via separate request
+    } else if (flags & checker::TypeFlagsStringMapping) {
+        resp->Target = TypeHandle(t->AsStringMappingType()->target);
+    } else if (flags & checker::TypeFlagsTypeParameter) {
+        resp->IsThisType = t->AsTypeParameter()->isThisType;
+    } else if (flags & checker::TypeFlagsIntrinsic) {
+        resp->IntrinsicName = t->AsIntrinsicType()->intrinsicName;
+    }
+
+    return resp;
+}
+
+// ---------------------------------------------------------------------------
+// proto.go:1398-1408 — NewPackageId.
+// ---------------------------------------------------------------------------
+
+std::shared_ptr<PackageId> NewPackageId(const module::PackageId& packageID) {
+    if (packageID.Name.empty()) {
+        return nullptr;
+    }
+    auto resp = std::make_shared<PackageId>();
+    resp->Name = packageID.Name;
+    resp->SubModuleName = packageID.SubModuleName;
+    resp->Version = packageID.Version;
+    resp->PeerDependencies = packageID.PeerDependencies;
+    return resp;
+}
+
+// ---------------------------------------------------------------------------
+// proto.go:1012-1032 — toProtocolJSONValue.
+//
+// Go discriminates on the value's dynamic type; CompilerOptionsValue already
+// erased enum kinds into int64, and Raw only ever holds JSON-parse output
+// (bool/number/string/array/object), so the -1 enum shifts are unreachable
+// here — int64 values pass through exactly like Go's `default` branch.
+// ---------------------------------------------------------------------------
+
+json::Value toProtocolJSONValue(const tsoptions::CompilerOptionsValue& value) {
+    if (const auto* p = value.get<bool>()) {
+        return json::marshalBool(*p);
+    }
+    if (const auto* p = value.get<int64_t>()) {
+        return json::Value(std::to_string(*p));
+    }
+    if (const auto* p = value.get<double>()) {
+        return json::Value(json::detail::goFloat(*p));
+    }
+    if (const auto* p = value.get<Tristate>()) {
+        switch (*p) {
+        case Tristate::True:
+            return json::Value("true");
+        case Tristate::False:
+            return json::Value("false");
+        default:
+            return json::Value("null");
+        }
+    }
+    if (const auto* p = value.get<std::string>()) {
+        return json::marshalString(*p);
+    }
+    if (value.get<const DiagnosticMessage*>() != nullptr) {
+        // encoding/json renders a struct with no exported fields as {}.
+        return json::Value("{}");
+    }
+    if (const auto* p = value.get<tsoptions::JsonStrList>()) {
+        std::string out = "[";
+        for (size_t i = 0; i < p->size(); i++) {
+            if (i) out += ',';
+            out += json::marshalString((*p)[i]);
+        }
+        out += ']';
+        return json::Value(std::move(out));
+    }
+    if (const auto* p = value.get<tsoptions::JsonArray>()) {
+        std::string out = "[";
+        for (size_t i = 0; i < p->size(); i++) {
+            if (i) out += ',';
+            out += toProtocolJSONValue((*p)[i]);
+        }
+        out += ']';
+        return json::Value(std::move(out));
+    }
+    if (const auto* p = value.get<tsoptions::JsonObjectPtr>()) {
+        std::string out = "{";
+        if (*p) {
+            bool first = true;
+            for (const auto& [k, v] : (*p)->Entries()) {
+                if (!first) out += ',';
+                first = false;
+                out += json::marshalString(k);
+                out += ':';
+                out += toProtocolJSONValue(v);
+            }
+        }
+        out += '}';
+        return json::Value(std::move(out));
+    }
+    if (const auto* p = value.get<tsoptions::JsonGoMapPtr>()) {
+        // map[string]any: Go's encoding/json sorts keys.
+        std::vector<std::string> keys;
+        keys.reserve((*p)->size());
+        for (const auto& [k, _] : *(*p)) {
+            keys.push_back(k);
+        }
+        std::sort(keys.begin(), keys.end());
+        std::string out = "{";
+        for (size_t i = 0; i < keys.size(); i++) {
+            if (i) out += ',';
+            out += json::marshalString(keys[i]);
+            out += ':';
+            out += toProtocolJSONValue((*p)->at(keys[i]));
+        }
+        out += '}';
+        return json::Value(std::move(out));
+    }
+    return json::Value("null");
+}
+
+// ---------------------------------------------------------------------------
+// proto.go:983-1010 — NewConfigFileResponse.
+// ---------------------------------------------------------------------------
+
+std::shared_ptr<ConfigFileResponse> NewConfigFileResponse(
+    tsoptions::ParsedCommandLine* parsedCommandLine) {
+    if (parsedCommandLine == nullptr) {
+        return nullptr;
+    }
+    std::optional<bool> compileOnSave;
+    if (parsedCommandLine->CompileOnSave != nullptr) {
+        compileOnSave = *parsedCommandLine->CompileOnSave;
+    } else if (const auto* obj = parsedCommandLine->Raw.get<tsoptions::JsonObjectPtr>();
+               obj != nullptr && *obj != nullptr) {
+        if (const auto* b = (*obj)->GetOrZero("compileOnSave").get<bool>();
+            b != nullptr) {
+            compileOnSave = *b;
+        }
+    }
+    auto resp = std::make_shared<ConfigFileResponse>();
+    resp->FileNames = parsedCommandLine->FileNames();
+    resp->Options = parsedCommandLine->CompilerOptions();
+    resp->ProjectReferences = parsedCommandLine->ProjectReferences();
+    resp->TypeAcquisition = parsedCommandLine->TypeAcquisition();
+    resp->CompileOnSave = compileOnSave;
+    resp->Raw = toProtocolJSONValue(parsedCommandLine->Raw);
+    resp->Errors = NewDiagnosticResponses(parsedCommandLine->Errors);
+    return resp;
+}
+
+// ---------------------------------------------------------------------------
+// proto.go:1035-1050 — NewProjectResponse.
+// ---------------------------------------------------------------------------
+
+std::shared_ptr<ProjectResponse> NewProjectResponse(project::Project* p) {
+    if (p == nullptr || p->CommandLine == nullptr) {
+        TSC_UNREACHABLE("NewProjectResponse called with unloaded project");
+    }
+    std::string configFileName;
+    if (p->Kind == project::KindConfigured) {
+        configFileName = p->ConfigFileName();
+    }
+    auto resp = std::make_shared<ProjectResponse>();
+    resp->Id = p->ID();
+    resp->ConfigFileName = configFileName;
+    resp->CurrentDirectory = p->CurrentDirectory();
+    resp->Dirty = p->IsDirty();
+    resp->ParsedCommandLine = NewConfigFileResponse(p->CommandLine);
+    resp->RootFiles = p->CommandLine->FileNames();
+    return resp;
+}
+
+// ---------------------------------------------------------------------------
+// proto.go:1915-2060 — diagnostic responses.
+// ---------------------------------------------------------------------------
+
+// getECMALineAndUTF16CharacterOfPosition over a diagnosticwriter::FileLike —
+// scanner.go:2684 specializes the shared routine for FileLike's ecmaLineMap.
+static std::pair<int64_t, UTF16Offset> ecmaLineAndUTF16CharacterOfPosition(
+    const diagnosticwriter::FileLike* file, int position) {
+    const auto& lineMap = file->ecmaLineMap();
+    int64_t line = tsc::computeLineOfPosition(lineMap, position);
+    int64_t lineStartPosition = lineMap[line];
+    auto text = file->text();
+    return {line, UTF16Offset(tsc::utf16Len(
+        text.substr(size_t(lineStartPosition), size_t(position - lineStartPosition))))};
+}
+
+std::vector<std::shared_ptr<DiagnosticSourceLineResponse>> diagnosticSourceLines(
+    const diagnosticwriter::FileLike* file, int64_t firstLine, int64_t lastLine) {
+    const auto& lineMap = file->ecmaLineMap();
+    if (lineMap.empty()) {
+        return {};
+    }
+
+    std::vector<int64_t> lines;
+    lines.reserve(std::min<int64_t>(lastLine - firstLine + 1, 4));
+    if (lastLine - firstLine >= 4) {
+        lines = {firstLine, firstLine + 1, lastLine - 1, lastLine};
+    } else {
+        for (int64_t line = firstLine; line <= lastLine; line++) {
+            lines.push_back(line);
+        }
+    }
+
+    std::string_view text = file->text();
+    std::vector<std::shared_ptr<DiagnosticSourceLineResponse>> result;
+    result.reserve(lines.size());
+    for (int64_t line : lines) {
+        size_t start = size_t(lineMap[line]);
+        size_t end = text.size();
+        if (line + 1 < int64_t(lineMap.size())) {
+            end = size_t(lineMap[line + 1]);
+        }
+        auto resp = std::make_shared<DiagnosticSourceLineResponse>();
+        resp->Line = line;
+        resp->Text = std::string(text.substr(start, end - start));
+        result.push_back(std::move(resp));
+    }
+    return result;
+}
+
+std::shared_ptr<DiagnosticResponse> NewDiagnosticResponse(Diagnostic* d) {
+    return newDiagnosticResponse(diagnosticwriter::wrapASTDiagnostic(d));
+}
+
+std::shared_ptr<DiagnosticResponse> newDiagnosticResponse(
+    diagnosticwriter::ASTDiagnostic* d) {
+    const auto* file = d->file();
+    int pos = d->pos();
+    int end = d->end();
+    if (file != nullptr) {
+        int len = int(file->text().size());
+        pos = std::max(0, std::min(pos, len));
+        end = std::max(pos, std::min(end, len));
+    }
+    auto resp = std::make_shared<DiagnosticResponse>();
+    resp->Pos = pos;
+    resp->End = end;
+    resp->Code = d->code();
+    resp->Category = d->category();
+    resp->Source = std::string(d->source());
+    resp->Text = d->localize(locale::Default);
+    resp->ReportsUnnecessary = d->diagnostic()->reportsUnnecessary;
+    resp->ReportsDeprecated = d->diagnostic()->reportsDeprecated;
+
+    if (file != nullptr) {
+        resp->FileName = std::string(file->fileName());
+        if (SourceFile* sourceFile = file->asSourceFile();
+            sourceFile != nullptr) {
+            auto* positionMap = sourceFile->GetPositionMap();
+            resp->Pos = positionMap->UTF8ToUTF16(pos);
+            resp->End = positionMap->UTF8ToUTF16(end);
+        } else {
+            resp->Pos = int(tsc::utf16Len(file->text().substr(0, size_t(pos))));
+            resp->End = int(tsc::utf16Len(file->text().substr(0, size_t(end))));
+        }
+        auto [startLine, startCharacter] =
+            ecmaLineAndUTF16CharacterOfPosition(file, pos);
+        auto [endLine, endCharacter] =
+            ecmaLineAndUTF16CharacterOfPosition(file, end);
+        auto startPos = std::make_shared<DiagnosticPositionResponse>();
+        startPos->Line = startLine;
+        startPos->Character = startCharacter;
+        resp->StartPosition = std::move(startPos);
+        auto endPos = std::make_shared<DiagnosticPositionResponse>();
+        endPos->Line = endLine;
+        endPos->Character = endCharacter;
+        resp->EndPosition = std::move(endPos);
+        resp->SourceLines = diagnosticSourceLines(file, startLine, endLine);
+    }
+
+    if (auto chain = d->messageChain(); !chain.empty()) {
+        resp->MessageChain.reserve(chain.size());
+        for (auto* c : chain) {
+            resp->MessageChain.push_back(
+                newDiagnosticResponse(static_cast<diagnosticwriter::ASTDiagnostic*>(c)));
+        }
+    }
+
+    if (auto related = d->relatedInformation(); !related.empty()) {
+        resp->RelatedInformation.reserve(related.size());
+        for (auto* r : related) {
+            resp->RelatedInformation.push_back(
+                newDiagnosticResponse(static_cast<diagnosticwriter::ASTDiagnostic*>(r)));
+        }
+    }
+
+    return resp;
+}
+
+std::string DiagnosticResponse::marshalJSONTo(json::Encoder& enc) const {
+    objWriter w{enc};
+    w.begin();
+    if (!FileName.empty()) w.member("fileName", FileName);
+    w.member("pos", Pos);
+    w.member("end", End);
+    if (StartPosition != nullptr) w.member("startPosition", StartPosition);
+    if (EndPosition != nullptr) w.member("endPosition", EndPosition);
+    if (!SourceLines.empty()) w.member("sourceLines", SourceLines);
+    w.member("code", Code);
+    w.member("category", Category);
+    if (!Source.empty()) w.member("source", Source);
+    w.member("text", Text);
+    if (ReportsUnnecessary) w.member("reportsUnnecessary", ReportsUnnecessary);
+    if (ReportsDeprecated) w.member("reportsDeprecated", ReportsDeprecated);
+    if (!MessageChain.empty()) w.member("messageChain", MessageChain);
+    if (!RelatedInformation.empty()) {
+        w.member("relatedInformation", RelatedInformation);
+    }
+    return w.end();
+}
+
+Diagnostic* DiagnosticResponse::ToDiagnostic() const {
+    auto* d = new Diagnostic();
+    d->file = nullptr;
+    d->loc = TextRange{TextPos(Pos), TextPos(End)};
+    d->code = Code;
+    d->category = Category;
+    d->message = NewAdHocMessage(Text);
+    d->messageChain.reserve(MessageChain.size());
+    for (const auto& c : MessageChain) {
+        d->messageChain.push_back(c->ToDiagnostic());
+    }
+    d->relatedInformation.reserve(RelatedInformation.size());
+    for (const auto& r : RelatedInformation) {
+        d->relatedInformation.push_back(r->ToDiagnostic());
+    }
+    d->reportsUnnecessary = ReportsUnnecessary;
+    d->reportsDeprecated = ReportsDeprecated;
+    return d;
+}
+
+std::vector<std::shared_ptr<DiagnosticResponse>> NewDiagnosticResponses(
+    std::span<Diagnostic* const> diags) {
+    if (diags.empty()) {
+        return {};
+    }
+    std::vector<std::shared_ptr<DiagnosticResponse>> result;
+    result.reserve(diags.size());
+    for (auto* d : diags) {
+        result.push_back(NewDiagnosticResponse(d));
+    }
+    return result;
+}
+
 
 }  // namespace tsc::api

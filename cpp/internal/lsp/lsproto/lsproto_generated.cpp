@@ -3660,7 +3660,8 @@ std::vector<StructFieldBinding> LocationLink::fieldBindings() {
 }
 
 std::string LocationLink::unmarshalJSONFrom(json::Decoder& dec) {
-    return unmarshalStructGo(dec, fieldBindings());
+    auto err = unmarshalStructGo(dec, fieldBindings());
+    return err;
 }
 
 std::string LocationLink::marshalJSONTo(json::Encoder& enc) const {
@@ -4907,7 +4908,8 @@ std::string Registration::marshalJSONTo(json::Encoder& enc) const {
     }
     if (auto err = enc.writeValue(method); !err.empty()) return err;
     if (auto err = enc.writeValue("\"registerOptions\""); !err.empty()) return err;
-    return marshalOpts(enc);
+    if (auto err = marshalOpts(enc); !err.empty()) return err;
+    return enc.writeToken(json::EndObject);
 }
 
 bool Registration::isZero() const {

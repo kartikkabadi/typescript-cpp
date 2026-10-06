@@ -85,7 +85,11 @@ struct Overlay : fileBase, FileHandle {
 	xxh3::Uint128 Hash() const override { return hash; }
 	std::string FileName() const override { return fileName; }
 	int32_t Version() const override { return version; }
-	std::string Text() const { return content; }
+	// Script-concept accessors return a const ref like every other Script
+	// impl — a by-value return makes `std::string_view sv = script->Text()`
+	// dangle (the prvalue dies at the end of the full-expression; Go's
+	// string return shares the backing bytes).
+	const std::string& Text() const { return content; }
 	std::string OriginalFileName() const { return FileName(); }
 
 	// SpanMap and OriginalText satisfy lsconv.Script. An overlay holds the
@@ -93,7 +97,7 @@ struct Overlay : fileBase, FileHandle {
 	// foreign text, not the transformed output), so it never carries a
 	// span map and its original text is its own text.
 	spanmap::SpanMap* SpanMap() const { return nullptr; }
-	std::string OriginalText() const { return content; }
+	const std::string& OriginalText() const { return content; }
 
 	// MatchesDiskText may return false negatives, but never false
 	// positives.

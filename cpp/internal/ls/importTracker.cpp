@@ -1090,20 +1090,4 @@ std::vector<ModuleReference> findModuleReferences(
 	return refs;
 }
 
-// === dep stubs — removed when owner slice lands ===
-
-// getPropertySymbolOfObjectBindingPatternWithoutPropertyName — utilities.go
-// (ls-coreA).
-Symbol* getPropertySymbolOfObjectBindingPatternWithoutPropertyName(
-    Symbol* symbol, checker::Checker* ch) {
-	TSC_UNREACHABLE(
-	    "getPropertySymbolOfObjectBindingPatternWithoutPropertyName — owned by ls-coreA");
-}
-
-// isSourceFileWithGlobalExports — utilities.go:1409 (ls-coreA).
-bool isSourceFileWithGlobalExports(Node* node) {
-	TSC_UNREACHABLE(
-	    "isSourceFileWithGlobalExports — owned by ls-coreA");
-}
-
 } // namespace tsc::ls

@@ -73,6 +73,11 @@ public:
 		if (child.failed_) {
 			failed_ = true;
 		}
+		// Go doesn't mark the parent skipped for a skipped subtest, but
+		// the runner needs the result: propagate it for reporting.
+		if (child.skipped_) {
+			skipped_ = true;
+		}
 		return !child.failed_;
 	}
 

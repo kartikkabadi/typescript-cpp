@@ -276,6 +276,7 @@ add_library(tsc STATIC
 	internal/testrunner/transpile_runner.cpp
 	internal/testrunner/compiler_runner.cpp
 	# === slice: testutil ===
+	internal/patience/patience.cpp
 	internal/testutil/harnessutil/harnessutil.cpp
 	internal/testutil/harnessutil/recorderfs.cpp
 	internal/testutil/harnessutil/sourcemap_recorder.cpp
@@ -426,3 +427,11 @@ target_link_libraries(tsc PUBLIC z) # zlib — pprof profile writer
 
 add_executable(tscpp cmd/tscpp/main.cpp cmd/tscpp/sys.cpp cmd/tscpp/lsp.cpp cmd/tscpp/api.cpp)
 target_link_libraries(tscpp PRIVATE tsc)
+
+# fourslash test runner — ported Go fourslash tests register statically
+# (internal/fourslash/tests/registry.h) and run one test per forked child.
+file(GLOB FOURSLASH_TEST_SOURCES CONFIGURE_DEPENDS
+	internal/fourslash/tests/tests_*.cpp)
+add_executable(fourslashrunner cmd/fourslashrunner/main.cpp
+	internal/fourslash/tests/registry.cpp ${FOURSLASH_TEST_SOURCES})
+target_link_libraries(fourslashrunner PRIVATE tsc)

@@ -17,6 +17,8 @@ FormattingContext* NewFormattingContext(SourceFile* file, FormatRequestKind kind
 void FormattingContext::UpdateContext(TextRangeWithKind cur, Node* curParent,
 									  TextRangeWithKind next, Node* nextParent,
 									  Node* commonParent) {
+	if (curParent == nullptr || nextParent == nullptr || commonParent == nullptr) {
+	}
 	if (curParent == nullptr) {
 		TSC_UNREACHABLE("nil current range node parent in update context");
 	}

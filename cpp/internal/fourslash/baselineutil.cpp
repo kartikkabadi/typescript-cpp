@@ -167,6 +167,8 @@ std::string FourslashTest::getBaselineForGroupedSpansWithFileContents(
 	auto addFileEntry = [&](const std::string& path) {
 		auto fileName = lsconv::FileNameToDocumentURI(path);
 		auto ranges = groupedRanges->Get(fileName);
+		for (auto& r : ranges) {
+		}
 		if (ranges.empty()) {
 			return;
 		}

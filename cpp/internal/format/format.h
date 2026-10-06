@@ -493,7 +493,9 @@ struct formatSpanWorker {
 	std::unique_ptr<FormattingContext> formattingContext;
 
 	std::vector<TextChange> edits;
-	TextRangeWithKind previousRange;
+	// Go zero value is {0,0,Kind(0)=Unknown}; TextRange{} defaults to {-1,-1}
+	// in this port, which would break the previousRange==Unknown sentinel checks.
+	TextRangeWithKind previousRange = NewTextRangeWithKind(0, 0, Kind::Unknown);
 	int previousRangeTriviaEnd = 0;
 	Node* previousParent = nullptr;
 	int previousRangeStartLine = 0;

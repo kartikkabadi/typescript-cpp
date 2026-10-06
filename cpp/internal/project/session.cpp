@@ -99,11 +99,7 @@ Session* NewSession(SessionInit* init) {
 // internProjectID — session.go (C++ adapter for
 // autoimport.ProjectID-keyed interfaces).
 ls::autoimport::ProjectID* Session::internProjectID(const ID& id) {
-	auto [it, inserted] = projectIDCache.try_emplace(id);
-	if (inserted) {
-		it->second = std::make_unique<projectIDAdapter>(id);
-	}
-	return it->second.get();
+	return ls::autoimport::InternProjectID(idString(id));
 }
 
 // ataProjectIDAdapter — session.go ATA call: Go's project.ID() is a

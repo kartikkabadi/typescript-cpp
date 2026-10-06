@@ -640,8 +640,14 @@ LanguageService::ProvideCompletion(const ContextPtr& ctx,
 	if (err != nullptr) {
 		return {lsproto::CompletionItemsOrListOrNull{}, err};
 	}
-	lsproto::CompletionList* completionList =
-	    ensureItemData(file, position, completionListInternal->toLSP());
+	// Go allows a nil-receiver method call (`completionListInternal.toLSP()`
+	// where getCompletionsAtPosition returned nil, nil). In C++ calling a
+	// member function on a null pointer is UB and optimizers may elide
+	// toLSP's `this == nullptr` guard, so null-check at the call site.
+	lsproto::CompletionList* completionList = ensureItemData(
+	    file, position,
+	    completionListInternal != nullptr ? completionListInternal->toLSP()
+	                                      : nullptr);
 	if (file->SpanMap() != nullptr) {
 		filterContentMappedAutoImports(ctx, program, file, completionList);
 	}
@@ -7027,7 +7033,7 @@ bool isInJsxText(Node* contextToken, Node* location) {
 static std::shared_ptr<lsp::lsproto::ResolvedClientCapabilities>
 resolvedCaps(const ContextPtr& ctx) {
 	(void)ctx;
-	return lsp::lsproto::getClientCapabilities(gostd::contextBackground());
+	return lsp::lsproto::getClientCapabilities(ctx);
 }
 
 // completions.go:5417

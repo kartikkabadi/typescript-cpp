@@ -167,7 +167,10 @@ Node* ChangeTrackerWriter::assignPositionsToNodeWorker(Node* node,
 // assignPositionsToNodeArray — changetrackerwriter.go:169.
 NodeList* ChangeTrackerWriter::assignPositionsToNodeArray(NodeList* nodes,
                                                         NodeVisitor* v) {
-	NodeList* visited = v->visitNodesHooked(nodes);
+	// changetrackerwriter.go:158 calls v.VisitNodes — the raw element
+	// iteration, NOT the hooked wrapper (which would recurse into this
+	// function forever).
+	NodeList* visited = v->visitNodes(nodes);
 	if (visited == nullptr) {
 		return visited;
 	}

@@ -99,11 +99,7 @@ struct autoImportRegistryCloneHost : ls::autoimport::RegistryCloneHost {
 	    projectIDs;
 
 	ls::autoimport::ProjectID* internID(const ID& id) {
-		auto [it, inserted] = projectIDs.try_emplace(id);
-		if (inserted) {
-			it->second = std::make_unique<projectIDAdapter>(id);
-		}
-		return it->second.get();
+		return ls::autoimport::InternProjectID(idString(id));
 	}
 
 	// FS implements autoimport.RegistryCloneHost.
@@ -197,13 +193,8 @@ struct autoImportRegistryCloneHost : ls::autoimport::RegistryCloneHost {
 	// GetProgramForProject implements autoimport.RegistryCloneHost.
 	compiler::SimpleProgram* GetProgramForProject(
 	    ls::autoimport::ProjectID* projectID) override {
-		auto* adapter =
-		    dynamic_cast<projectIDAdapter*>(projectID);
-		if (adapter == nullptr) {
-			TSC_UNREACHABLE("unexpected project ID type");
-		}
-		auto* project =
-		    projectCollection->GetProject(adapter->id);
+		auto* project = projectCollection->GetProject(
+		    ID{projectID->String()});
 		if (project == nullptr) {
 			return nullptr;
 		}

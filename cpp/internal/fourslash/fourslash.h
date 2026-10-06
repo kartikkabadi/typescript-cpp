@@ -516,13 +516,14 @@ struct markerAndItem {
 	std::shared_ptr<Marker> Marker;
 	T Item;
 
-	// marshalJSONTo — Go struct marshal of markerAndItem: exported fields
-	// "Marker" and "Item". Marker marshals only its exported Go fields
-	// (Position, LSPosition, Name, Data); fileName is unexported.
+	// marshalJSONTo — Go struct marshal of markerAndItem: json tags
+	// `json:"marker"` / `json:"item"` (baselineutil.go:666). Marker
+	// marshals only its exported Go fields (Position, LSPosition, Name,
+	// Data); fileName is unexported.
 	std::string marshalJSONTo(json::Encoder& enc) const {
 		if (auto e = enc.writeToken(json::BeginObject); !e.empty())
 			return e;
-		if (auto e = enc.writeValue("\"Marker\""); !e.empty()) return e;
+		if (auto e = enc.writeValue("\"marker\""); !e.empty()) return e;
 		if (Marker == nullptr) {
 			if (auto e = enc.writeValue("null"); !e.empty()) return e;
 		} else {
@@ -556,13 +557,15 @@ struct markerAndItem {
 				    !e.empty())
 					return e;
 			} else {
-				if (auto e = enc.writeValue("null"); !e.empty())
+				// encoding/json/v2 marshals a nil map[string]any
+				// as {}, not null.
+				if (auto e = enc.writeValue("{}"); !e.empty())
 					return e;
 			}
 			if (auto e = enc.writeToken(json::EndObject); !e.empty())
 				return e;
 		}
-		if (auto e = enc.writeValue("\"Item\""); !e.empty()) return e;
+		if (auto e = enc.writeValue("\"item\""); !e.empty()) return e;
 		if constexpr (requires { Item == nullptr; }) {
 			if (Item == nullptr) {
 				if (auto e = enc.writeValue("null"); !e.empty())
@@ -697,12 +700,16 @@ struct fourslashDiagnosticFile final : diagnosticwriter::FileLike {
 	std::shared_ptr<testutil::harnessutil::TestFile> file_;
 	std::vector<TextPos> ecmaLineMap_;
 
-	// diagnosticwriter::FileLike
+	// diagnosticwriter::FileLike — the `?:` arms must both be
+	// string_view; mixing std::string and "" creates a temporary
+	// std::string and the returned view dangles.
 	std::string_view fileName() const override {
-		return file_ ? file_->UnitName : "";
+		return file_ ? std::string_view(file_->UnitName)
+		             : std::string_view();
 	}
 	std::string_view text() const override {
-		return file_ ? file_->Content : "";
+		return file_ ? std::string_view(file_->Content)
+		             : std::string_view();
 	}
 	const std::vector<TextPos>& ecmaLineMap() const override;
 	// Script-style helpers (not part of FileLike)
@@ -1778,8 +1785,8 @@ bool isSuggestionDiagnostic(
 
 // compareDiagnostics / compareRelatedDiagnostics —
 // fourslash.go:5643,5667.
-int compareDiagnostics(const fourslashDiagnostic* d1,
-                       const fourslashDiagnostic* d2);
+int compareDiagnostics(fourslashDiagnostic* d1,
+                       fourslashDiagnostic* d2);
 int compareRelatedDiagnostics(
     const std::vector<std::shared_ptr<fourslashDiagnostic>>& d1,
     const std::vector<std::shared_ptr<fourslashDiagnostic>>& d2);

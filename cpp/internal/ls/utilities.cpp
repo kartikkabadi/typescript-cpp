@@ -2094,20 +2094,4 @@ bool isSourceFileWithGlobalExports(Node* node) {
 	       node->as<SourceFile>()->GlobalExports.size() != 0;
 }
 
-// --- dep-stubs (owned by sibling ls files) ---
-
-// format.go:257 getRangeOfEnclosingComment — ls/format.go slice.
-CommentRange* getRangeOfEnclosingComment(SourceFile* /*file*/,
-                                         int /*position*/,
-                                         Node* /*precedingToken*/,
-                                         Node* /*tokenAtPosition*/) {
-	TSC_UNREACHABLE("getRangeOfEnclosingComment — format.go slice");
-}
-
-// findallreferences.go:335 getRangeOfNode — findallreferences slice.
-TextRange getRangeOfNode(Node* /*node*/, SourceFile* /*sourceFile*/,
-                         Node* /*endNode*/) {
-	TSC_UNREACHABLE("getRangeOfNode — findallreferences slice");
-}
-
 } // namespace tsc::ls

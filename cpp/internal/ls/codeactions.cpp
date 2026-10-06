@@ -9,6 +9,7 @@
 #include "internal/locale/locale.h"
 #include "internal/spanmap/spanmap.h"
 
+#include <cstdio>
 #include <algorithm>
 
 namespace tsc::ls {
@@ -35,12 +36,18 @@ int CodeAction::Compare(const CodeAction* b) const {
 
 // codeFixProviders — codeactions.go:71. The list of all registered code fix
 // providers.
-std::vector<CodeFixProvider*> codeFixProviders{
-    ImportFixProvider,
-    IsolatedDeclarationsFixProvider,
-    FixClassIncorrectlyImplementsInterfaceProvider,
-    // Add more code fix providers here as they are implemented
-};
+// Function-local static: providers live in other TUs, so eager global-init
+// order is unspecified — Go's package init is dependency-ordered (providers
+// first). A magic-static reproduces that ordering.
+std::vector<CodeFixProvider*>& codeFixProviders() {
+	static std::vector<CodeFixProvider*> providers{
+	    ImportFixProvider,
+	    IsolatedDeclarationsFixProvider,
+	    FixClassIncorrectlyImplementsInterfaceProvider,
+	    // Add more code fix providers here as they are implemented
+	};
+	return providers;
+}
 
 // ProvideCodeActions — codeactions.go:79.
 std::pair<lsproto::CommandOrCodeActionArrayOrNull, gostd::Error>
@@ -50,7 +57,8 @@ LanguageService::ProvideCodeActions(const gostd::Context& ctx,
 
 	std::vector<lsproto::CommandOrCodeAction> actions;
 
-	if (params->Context != nullptr && params->Context->Only != nullptr) {
+	if (params->Context != nullptr && params->Context->Only != nullptr &&
+	    params->Context->Only->has_value()) {
 		for (auto& kind : **params->Context->Only) {
 			auto matchingKinds = getOrganizeImportsActionsForKind(kind);
 			for (auto& matchingKind : matchingKinds) {
@@ -74,6 +82,7 @@ LanguageService::ProvideCodeActions(const gostd::Context& ctx,
 	}
 
 	if (params->Context != nullptr &&
+	    params->Context->Diagnostics.has_value() &&
 	    wantsQuickFixes(params->Context->Only)) {
 		std::unordered_map<std::string, CodeFixProvider*> fixIdSeen;
 
@@ -90,7 +99,7 @@ LanguageService::ProvideCodeActions(const gostd::Context& ctx,
 
 			auto errorCode = *diag->Code->Integer;
 
-			for (auto* provider : codeFixProviders) {
+			for (auto* provider : codeFixProviders()) {
 				if (!codeFixProviderMatchesLSPDiagnostic(provider,
 				                                         diag.get())) {
 					continue;
@@ -295,7 +304,7 @@ LanguageService::createFixAllAction(const gostd::Context& ctx,
 	    lsproto::Map<lsproto::DocumentUri,
 	                 lsproto::Slice<std::shared_ptr<lsproto::TextEdit>>>>();
 
-	for (auto* provider : codeFixProviders) {
+	for (auto* provider : codeFixProviders()) {
 		if (provider->GetAllCodeActions == nullptr) {
 			continue;
 		}

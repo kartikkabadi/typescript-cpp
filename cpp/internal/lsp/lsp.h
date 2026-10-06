@@ -369,17 +369,25 @@ struct Writer {
 		const std::shared_ptr<lsproto::Message>& msg) = 0;
 };
 
-// lspReader — server.go:115.
+// lspReader — server.go:115. keepAlive pins the underlying io.Reader for the
+// shared_ptr overloads of ToReader/ToWriter (Go: the GC keeps it reachable
+// through the reader chain).
 struct lspReader : Reader {
 	lsproto::BaseReader r;
+	std::shared_ptr<gostd::io::Reader> keepAlive;
 	explicit lspReader(gostd::io::Reader* in) : r(lsproto::NewBaseReader(in)) {}
+	explicit lspReader(std::shared_ptr<gostd::io::Reader> in)
+	    : r(lsproto::NewBaseReader(in.get())), keepAlive(std::move(in)) {}
 	std::pair<std::shared_ptr<lsproto::Message>, gostd::Error> Read() override;
 };
 
 // lspWriter — server.go:119.
 struct lspWriter : Writer {
 	lsproto::BaseWriter w;
+	std::shared_ptr<gostd::io::Writer> keepAlive;
 	explicit lspWriter(gostd::io::Writer* out) : w(lsproto::NewBaseWriter(out)) {}
+	explicit lspWriter(std::shared_ptr<gostd::io::Writer> out)
+	    : w(lsproto::NewBaseWriter(out.get())), keepAlive(std::move(out)) {}
 	gostd::Error Write(const std::shared_ptr<lsproto::Message>& msg) override;
 };
 
@@ -398,8 +406,10 @@ struct messageMarshalError : gostd::ErrObj {
 
 // ToReader — server.go:150.
 std::shared_ptr<Reader> ToReader(gostd::io::Reader* r);
+std::shared_ptr<Reader> ToReader(std::shared_ptr<gostd::io::Reader> r);
 // ToWriter — server.go:162.
 std::shared_ptr<Writer> ToWriter(gostd::io::Writer* w);
+std::shared_ptr<Writer> ToWriter(std::shared_ptr<gostd::io::Writer> w);
 
 // userFacingRequestFailedError — server.go:1103. A string-typed error whose
 // Unwrap reports RequestFailed; the message is shown to the user.

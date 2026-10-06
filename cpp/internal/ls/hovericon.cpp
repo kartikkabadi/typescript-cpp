@@ -157,68 +157,42 @@ lsp::lsproto::VSImageId* getVSHoverImageId(
 // (ImageElement + ClassifiedTextElement wrapped in a ContainerElement).
 lsp::lsproto::VSContainerElement* buildVSHoverRawContent(
     lsp::lsproto::VSImageId* imageId,
-    std::vector<lsp::lsproto::VSClassifiedTextRun*> quickInfoRuns,
-    std::vector<lsp::lsproto::VSClassifiedTextRun*> documentationRuns) {
-	if (quickInfoRuns.empty()) {
+    lsp::lsproto::Slice<std::shared_ptr<lsp::lsproto::VSClassifiedTextRun>> quickInfoRuns,
+    lsp::lsproto::Slice<std::shared_ptr<lsp::lsproto::VSClassifiedTextRun>> documentationRuns) {
+	if (!quickInfoRuns || quickInfoRuns->empty()) {
 		return nullptr;
 	}
 
-	auto sharedRuns =
-	    [](const std::vector<lsp::lsproto::VSClassifiedTextRun*>& runs) {
-		    std::vector<
-		        std::shared_ptr<lsp::lsproto::VSClassifiedTextRun>>
-		        out;
-		    out.reserve(runs.size());
-		    for (auto* r : runs) {
-			    out.emplace_back(r, [](lsp::lsproto::VSClassifiedTextRun*) {});
-		    }
-		    return out;
-	    };
+	auto imageElement = std::make_shared<lsp::lsproto::VSImageElement>();
+	imageElement->ImageId = std::shared_ptr<lsp::lsproto::VSImageId>(imageId);
+	auto qiElement = std::make_shared<lsp::lsproto::VSClassifiedTextElement>();
+	qiElement->Runs = std::move(*quickInfoRuns);
 
-	auto* imageElement = new lsp::lsproto::VSImageElement;
-	imageElement->ImageId =
-	    std::shared_ptr<lsp::lsproto::VSImageId>(
-	        imageId, [](lsp::lsproto::VSImageId*) {});
-	auto* qiElement = new lsp::lsproto::VSClassifiedTextElement;
-	qiElement->Runs = sharedRuns(quickInfoRuns);
-
-	auto* displayLine = new lsp::lsproto::VSContainerElement;
+	auto displayLine = std::make_shared<lsp::lsproto::VSContainerElement>();
 	displayLine->Style = lsp::lsproto::VSContainerElementStyleWrapped;
 	displayLine->Elements = std::vector<
 	    lsp::lsproto::
 	        VSImageElementOrClassifiedTextElementOrContainerElement>{
-	    {std::shared_ptr<lsp::lsproto::VSImageElement>(
-	        imageElement, [](lsp::lsproto::VSImageElement*) {}),
-	     nullptr, nullptr},
-	    {nullptr,
-	     std::shared_ptr<lsp::lsproto::VSClassifiedTextElement>(
-	         qiElement,
-	         [](lsp::lsproto::VSClassifiedTextElement*) {}),
-	     nullptr},
+	    {std::move(imageElement), nullptr, nullptr},
+	    {nullptr, std::move(qiElement), nullptr},
 	};
 
-	if (documentationRuns.empty()) {
-		return displayLine;
+	if (!documentationRuns || documentationRuns->empty()) {
+		return new lsp::lsproto::VSContainerElement(std::move(*displayLine));
 	}
 
-	auto* docElement = new lsp::lsproto::VSClassifiedTextElement;
-	docElement->Runs = sharedRuns(documentationRuns);
+	auto docElement = std::make_shared<lsp::lsproto::VSClassifiedTextElement>();
+	docElement->Runs = std::move(*documentationRuns);
 
-	auto* stacked = new lsp::lsproto::VSContainerElement;
+	auto stacked = std::make_shared<lsp::lsproto::VSContainerElement>();
 	stacked->Style = lsp::lsproto::VSContainerElementStyleStacked;
 	stacked->Elements = std::vector<
 	    lsp::lsproto::
 	        VSImageElementOrClassifiedTextElementOrContainerElement>{
-	    {nullptr, nullptr,
-	     std::shared_ptr<lsp::lsproto::VSContainerElement>(
-	         displayLine, [](lsp::lsproto::VSContainerElement*) {})},
-	    {nullptr,
-	     std::shared_ptr<lsp::lsproto::VSClassifiedTextElement>(
-	         docElement,
-	         [](lsp::lsproto::VSClassifiedTextElement*) {}),
-	     nullptr},
+	    {nullptr, nullptr, std::move(displayLine)},
+	    {nullptr, std::move(docElement), nullptr},
 	};
-	return stacked;
+	return new lsp::lsproto::VSContainerElement(std::move(*stacked));
 }
 
 } // namespace tsc::ls

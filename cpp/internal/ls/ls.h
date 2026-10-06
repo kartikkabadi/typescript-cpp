@@ -857,8 +857,8 @@ struct script {
 
 	std::string FileName() const { return fileName; }
 	std::string OriginalFileName() const { return fileName; }
-	std::string Text() const { return text; }
-	std::string OriginalText() const { return text; }
+	const std::string& Text() const { return text; }
+	const std::string& OriginalText() const { return text; }
 	spanmap::SpanMap* SpanMap() const { return nullptr; }
 };
 
@@ -2525,8 +2525,8 @@ std::vector<Symbol*> getApparentProperties(checker::Type* t, Node* node,
 bool containsNonPublicProperties(const std::vector<Symbol*>& props);
 // completions.go:4447 filterObjectMembersList.
 std::pair<std::vector<Symbol*>, collections::Set<std::string>>
-filterObjectMembersList(std::vector<Symbol*> contextualMemberSymbols,
-                        std::vector<Node*> existingMembers,
+filterObjectMembersList(const std::vector<Symbol*>& contextualMemberSymbols,
+                        const std::vector<Node*>& existingMembers,
                         SourceFile* file, int position,
                         checker::Checker* typeChecker);
 // completions.go:4508 isCurrentlyEditingNode.
@@ -2546,14 +2546,14 @@ Node* tryGetObjectTypeDeclarationCompletionContainer(
 bool isFromObjectTypeDeclaration(Node* node);
 // completions.go:4646 filterClassMembersList.
 std::vector<Symbol*> filterClassMembersList(
-    std::vector<Symbol*> baseSymbols,
+    const std::vector<Symbol*>& baseSymbols,
     const std::vector<Node*>& existingMembers,
     ModifierFlags classElementModifierFlags, SourceFile* file, int position);
 // completions.go:4688 tryGetContainingJsxElement.
 Node* tryGetContainingJsxElement(Node* contextToken, SourceFile* file);
 // completions.go:4751 filterJsxAttributes.
 std::pair<std::vector<Symbol*>, collections::Set<std::string>>
-filterJsxAttributes(std::vector<Symbol*> symbols,
+filterJsxAttributes(const std::vector<Symbol*>& symbols,
                   const std::vector<Node*>& attributes, SourceFile* file,
                   int position, checker::Checker* typeChecker);
 // completions.go:4781 isTypeKeywordTokenOrIdentifier.
@@ -3344,7 +3344,7 @@ Diagnostic* aggregateSynthesizedDiagnostics(
 DiagnosticCategory worstCategory(std::vector<Diagnostic*> diags);
 
 // === codeactions.go free functions ===
-extern std::vector<CodeFixProvider*> codeFixProviders;
+std::vector<CodeFixProvider*>& codeFixProviders();
 bool hasMultipleFixableDiagnostics(
     const gostd::Context& ctx, compiler::SimpleProgram* program,
     SourceFile* file, const std::vector<int32_t>& errorCodes);

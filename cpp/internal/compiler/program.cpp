@@ -10,6 +10,7 @@
 //  - The checker's per-file check walker isn't ported yet, so checker
 //    diagnostics are empty (faithful for this slice's output).
 
+#include <cstdio>
 #include "internal/compiler/program.h"
 #include "internal/binder/binder.h"
 #include "internal/compiler/emitter.h"
@@ -2426,6 +2427,9 @@ SimpleProgram* NewProgram(const ProgramOptions& opts) {
 	// program.go: opts.Config — pass the caller's ParsedCommandLine through
 	// to the program (borrowed); the impl ctor stores it in commandLine_ so
 	// loader-time ContentMapperExtensions() sees the real config.
+	{
+		auto& o = *opts.Config->ParsedConfig->CompilerOptions;
+	}
 	auto* p = new SimpleProgram(opts.Host,
 	                            *opts.Config->ParsedConfig->CompilerOptions,
 	                            opts.Config->ParsedConfig->FileNames,
