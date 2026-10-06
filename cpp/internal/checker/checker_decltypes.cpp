@@ -753,11 +753,10 @@ Type* Checker::getNonMissingTypeOfSymbol(Symbol* symbol) {
 // getTypeOfInstantiatedSymbol — checker.go:16847
 Type* Checker::getTypeOfInstantiatedSymbol(Symbol* symbol) {
 	auto* links = valueSymbolLinks.Get(symbol);
-	if (links->resolvedType == nullptr ||
-		staleForCheckFile(links->resolvedTypeCheckFile)) {
-		// Go: fresh per-checker cache — recompute under this file.
-		links->resolvedType = nullptr;
-		links->resolvedTypeCheckFile = checkFileTag();
+	// checker.go:16849-16853 — Go caches links.resolvedType for the life of
+	// the checker (no per-file invalidation; this cache holds a pure
+	// instantiated type, no diagnostics to re-fire).
+	if (links->resolvedType == nullptr) {
 		links->resolvedType = instantiateType(getTypeOfSymbol(links->target), links->mapper);
 	}
 	return links->resolvedType;
@@ -766,11 +765,8 @@ Type* Checker::getTypeOfInstantiatedSymbol(Symbol* symbol) {
 // getWriteTypeOfInstantiatedSymbol — checker.go:16855
 Type* Checker::getWriteTypeOfInstantiatedSymbol(Symbol* symbol) {
 	auto* links = valueSymbolLinks.Get(symbol);
-	if (links->writeType == nullptr ||
-		staleForCheckFile(links->writeTypeCheckFile)) {
-		// Go: fresh per-checker cache — recompute under this file.
-		links->writeType = nullptr;
-		links->writeTypeCheckFile = checkFileTag();
+	// checker.go:16855-16861 — same per-checker lifetime as resolvedType.
+	if (links->writeType == nullptr) {
 		links->writeType = instantiateType(getWriteTypeOfSymbol(links->target), links->mapper);
 	}
 	return links->writeType;
