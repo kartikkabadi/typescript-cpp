@@ -857,8 +857,8 @@ struct script {
 
 	std::string FileName() const { return fileName; }
 	std::string OriginalFileName() const { return fileName; }
-	std::string Text() const { return text; }
-	std::string OriginalText() const { return text; }
+	const std::string& Text() const { return text; }
+	const std::string& OriginalText() const { return text; }
 	spanmap::SpanMap* SpanMap() const { return nullptr; }
 };
 
@@ -3344,7 +3344,7 @@ Diagnostic* aggregateSynthesizedDiagnostics(
 DiagnosticCategory worstCategory(std::vector<Diagnostic*> diags);
 
 // === codeactions.go free functions ===
-extern std::vector<CodeFixProvider*> codeFixProviders;
+std::vector<CodeFixProvider*>& codeFixProviders();
 bool hasMultipleFixableDiagnostics(
     const gostd::Context& ctx, compiler::SimpleProgram* program,
     SourceFile* file, const std::vector<int32_t>& errorCodes);

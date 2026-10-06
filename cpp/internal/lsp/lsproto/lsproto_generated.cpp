@@ -3660,7 +3660,8 @@ std::vector<StructFieldBinding> LocationLink::fieldBindings() {
 }
 
 std::string LocationLink::unmarshalJSONFrom(json::Decoder& dec) {
-    return unmarshalStructGo(dec, fieldBindings());
+    auto err = unmarshalStructGo(dec, fieldBindings());
+    return err;
 }
 
 std::string LocationLink::marshalJSONTo(json::Encoder& enc) const {

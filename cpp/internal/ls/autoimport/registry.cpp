@@ -17,6 +17,8 @@
 
 #include <algorithm>
 #include <thread>
+#include <mutex>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 
@@ -268,6 +270,28 @@ std::unique_ptr<Registry> NewRegistry(
 // ~Registry — see header comment on ownership: buckets and directories are
 // shared across clones, so we intentionally do not free them here.
 Registry::~Registry() = default;
+
+// stringProjectID — registry.go:32 adapter for plain string IDs.
+namespace {
+struct stringProjectID : ProjectID {
+	std::string id;
+	explicit stringProjectID(std::string s) : id(std::move(s)) {}
+	std::string String() const override { return id; }
+};
+}  // namespace
+
+// InternProjectID — canonical ProjectID per ID string; see autoimport.h.
+ProjectID* InternProjectID(std::string id) {
+	static std::mutex mu;
+	static std::unordered_map<std::string, std::unique_ptr<stringProjectID>>
+	    interned;
+	std::lock_guard<std::mutex> lock(mu);
+	auto [it, inserted] = interned.try_emplace(id);
+	if (inserted) {
+		it->second = std::make_unique<stringProjectID>(std::move(id));
+	}
+	return it->second.get();
+}
 
 // IsPreparedForImportingFile — registry.go:354.
 bool Registry::IsPreparedForImportingFile(
@@ -717,8 +741,13 @@ void registryBuilder::markBucketsDirty(RegistryChange& change,
 				    } else {
 					    // Check if this path (possibly a realpath of a
 					    // workspace package) is in any bucket's Paths.
-					    for (const auto& bucketDirPath :
-					         cleanNodeModulesBuckets) {
+					    // Go `delete(map, k)` mid-range is legal; C++
+					    // unordered_set::erase invalidates the element,
+					    // so advance the iterator before the body runs.
+					    for (auto bit = cleanNodeModulesBuckets.begin();
+					         bit != cleanNodeModulesBuckets.end();) {
+						    tspath::Path bucketDirPath = *bit;
+						    ++bit;
 						    auto [entry, _] =
 						        nodeModules->Get(bucketDirPath);
 						    auto pit =
@@ -742,7 +771,10 @@ void registryBuilder::markBucketsDirty(RegistryChange& change,
 			    // contains the file directly. Any other significant
 			    // change, like a created failed lookup location, is
 			    // handled by newProgramStructure.
-			    for (const auto& projectDirPath : cleanProjectBuckets) {
+			    for (auto pit = cleanProjectBuckets.begin();
+			         pit != cleanProjectBuckets.end();) {
+				    ProjectID* projectDirPath = *pit;
+				    ++pit;
 				    auto [entry, _] = projects->Get(projectDirPath);
 				    if (entry->Value()->Paths.count(path)) {
 					    // Project buckets don't use package-based granular

@@ -283,17 +283,18 @@ newFourslash(gostd::testing::T* t, const std::string& content,
 		};
 	}
 
+	auto f = std::make_shared<FourslashTest>();
+	// Go: the converters closure and f.scriptInfos share one map (maps are
+	// reference types), so capture f's member, not a copy of the local.
 	auto converters = std::make_shared<testConverters>(
 	    lsproto::PositionEncodingKindUTF8,
-	    [&scriptInfos](const std::string& fileName) -> lsconv::LSPLineMap* {
-		    auto it = scriptInfos.find(fileName);
-		    if (it == scriptInfos.end()) {
+	    [f](const std::string& fileName) -> lsconv::LSPLineMap* {
+		    auto it = f->scriptInfos.find(fileName);
+		    if (it == f->scriptInfos.end()) {
 			    return nullptr;
 		    }
 		    return it->second->lineMap;
 	    });
-
-	auto f = std::make_shared<FourslashTest>();
 	f->testData = std::make_shared<TestData>(std::move(testData));
 	f->stateEnableFormatting = true;
 	f->reportFormatOnTypeCrash = true;
@@ -319,7 +320,11 @@ newFourslash(gostd::testing::T* t, const std::string& content,
 	// !!! temporary; remove when we have
 	// `handleDidChangeConfiguration`/implicit project config support
 	// !!! replace with a proper request *after initialize*
-	client->SetCompilerOptionsForInferredProjects(&compilerOptions);
+	// Go's `compilerOptions` variable escapes to the heap because the
+	// client stores a pointer to it past this frame; allocate it so the
+	// stored pointer stays valid after NewFourslash returns.
+	client->SetCompilerOptionsForInferredProjects(
+	    new CompilerOptions(compilerOptions));
 	f->initialize(t, options->Capabilities, options->RunExternalCode);
 
 	if (f->testData->isStateBaseliningEnabled()) {
@@ -3493,11 +3498,15 @@ void FourslashTest::verifyBaselineDefinitions(
 		auto result = getDefinitions(t, this, activeFilename,
 		                             currentCaretPosition);
 
+		if (result.DefinitionLinks != nullptr &&
+		    result.DefinitionLinks->has_value()) {
+		}
 		std::vector<documentSpan> resultAsSpans;
 		std::shared_ptr<documentSpan> additionalSpan;
 		if (result.Locations != nullptr) {
 			for (auto& loc : orNilSlice(result.Locations)) {
 				resultAsSpans.push_back(locationToSpan(loc));
+				auto& e = resultAsSpans.back();
 			}
 		} else if (result.Location != nullptr) {
 			resultAsSpans = {locationToSpan(*result.Location)};
@@ -6935,21 +6944,6 @@ std::string reindentJsonText(const std::string& raw) {
 		}
 	}
 	return buf.str();
-}
-
-// baselineRequestOrNotificationWorker — statebaseline.go:58-63 (marshal
-// output written to the state baseline).
-void FourslashTest::baselineRequestOrNotificationWorker(
-    gostd::testing::T* t, const std::string& rawJson) {
-	t->Helper();
-	if (!testData->isStateBaseliningEnabled()) {
-		return;
-	}
-	std::string res = reindentJsonText(rawJson);
-	stateBaseline_->baseline.WriteString("\n");
-	stateBaseline_->baseline.WriteString(res);
-	stateBaseline_->baseline.WriteString("\n");
-	stateBaseline_->isInitialized = true;
 }
 
 // verifyBaselines — fourslash.go:5227.

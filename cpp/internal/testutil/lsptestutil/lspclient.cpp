@@ -88,10 +88,10 @@ clientTransport newClientTransport() {
 	auto serverToClientReader = s2c.first;
 	auto serverToClientWriter = s2c.second;
 	clientTransport t;
-	t.serverIn = lsp::ToReader(clientToServerReader.get());
-	t.serverOut = lsp::ToWriter(serverToClientWriter.get());
-	t.clientIn = lsp::ToReader(serverToClientReader.get());
-	t.clientOut = lsp::ToWriter(clientToServerWriter.get());
+	t.serverIn = lsp::ToReader(clientToServerReader);
+	t.serverOut = lsp::ToWriter(serverToClientWriter);
+	t.clientIn = lsp::ToReader(serverToClientReader);
+	t.clientOut = lsp::ToWriter(clientToServerWriter);
 	t.closeClientOut = [clientToServerWriter] {
 		clientToServerWriter->close();
 	};
@@ -237,7 +237,8 @@ NewLSPClient(gostd::testing::T* t, lsp::ServerOptions serverOpts,
 			const std::function<void()>& f;
 			~deferClose() { f(); }
 		} d{closeServerOut};
-		return server->Run(ctx);
+		auto e = server->Run(ctx);
+		return e;
 	});
 
 	// Start async message router

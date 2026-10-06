@@ -243,6 +243,11 @@ struct ProjectID {
 	virtual std::string String() const = 0;
 };
 
+// InternProjectID — Go maps key ProjectID by interface (value) equality;
+// canonical interning gives C++ pointer-keyed maps the same equality
+// domain, so every adapter site must go through here.
+ProjectID* InternProjectID(std::string id);
+
 // newProgramStructure — registry.go:86
 using newProgramStructure = int;
 inline constexpr newProgramStructure newProgramStructureFalse = 0;

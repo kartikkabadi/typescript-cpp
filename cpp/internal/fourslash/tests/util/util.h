@@ -19,6 +19,13 @@ namespace tsc::fourslash::tests::util {
 struct IgnoredT {};
 inline const IgnoredT Ignored{};
 
+// ptr — Go `&T{...}` address-of-a-composite-literal → heap T* (test-only;
+// intentionally leaked, mirrors Go's GC lifetime).
+template <typename T>
+T* ptr(T v) {
+	return new T(std::move(v));
+}
+
 // DefaultCommitCharacters — util.go:16.
 inline const std::vector<std::string> DefaultCommitCharacters{".", ",",
                                                               ";"};

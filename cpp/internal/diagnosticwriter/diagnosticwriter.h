@@ -29,6 +29,10 @@ public:
     virtual std::string_view fileName() const = 0;
     virtual std::string_view text() const = 0;
     virtual const std::vector<TextPos>& ecmaLineMap() const = 0;
+    // asSourceFile models Go's `file.(*ast.SourceFile)` assertion in
+    // api.NewDiagnosticResponse: non-nil only for the SourceFile-backed
+    // FileLike (nil for renamedFile/originalTextFile).
+    virtual SourceFile* asSourceFile() const { return nullptr; }
 };
 
 // Diagnostic — diagnosticwriter.go:28. Abstracts over ast::Diagnostic and

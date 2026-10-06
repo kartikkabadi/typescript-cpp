@@ -6,6 +6,8 @@
 
 #include "internal/lsp/lsproto/lsproto.h"
 
+#include "internal/core/context.h"
+
 #include <cstdlib>
 #include <sstream>
 
@@ -744,6 +746,20 @@ gostd::Context withClientCapabilities(gostd::Context ctx,
 }
 
 std::shared_ptr<ResolvedClientCapabilities> getClientCapabilities(gostd::Context ctx) {
+	if (auto* v = ctx ? ctx->value(&kClientCapabilitiesKey) : nullptr) {
+		if (auto caps = std::any_cast<std::shared_ptr<ResolvedClientCapabilities>>(*v);
+			caps != nullptr) {
+			return caps;
+		}
+	}
+	return std::make_shared<ResolvedClientCapabilities>();
+}
+
+// GetClientCapabilities for the ls layer's value-only ContextPtr —
+// toContextPtr wraps the same key/value chain, so the lookup is identical
+// to the gostd::Context overload above (lsp.go:293).
+std::shared_ptr<ResolvedClientCapabilities> getClientCapabilities(
+	const ContextPtr& ctx) {
 	if (auto* v = ctx ? ctx->value(&kClientCapabilitiesKey) : nullptr) {
 		if (auto caps = std::any_cast<std::shared_ptr<ResolvedClientCapabilities>>(*v);
 			caps != nullptr) {

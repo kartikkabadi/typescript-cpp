@@ -4,19 +4,39 @@
 
 namespace tsc::printer {
 
+// core/compileroptions.go:490 GetNewLineKind — file-local replica
+// (same helper as in ls/completions.cpp).
+static NewLineKind syntheticGetNewLineKind(std::string_view s) {
+	if (s == "\r\n") {
+		return NewLineKind::CarriageReturnLineFeed;
+	}
+	if (s == "\n") {
+		return NewLineKind::LineFeed;
+	}
+	return NewLineKind::None;
+}
+
 // PrintAndPositionNode — syntheticfile.go:15
 std::pair<std::string, Node*> PrintAndPositionNode(
 	tsc::NodeFactory* factory, Node* node, SourceFile* sourceFile,
 	const std::string& newLine, int indentSize, EmitContext* emitContext) {
-	// dep — NewChangeTrackerWriter lives in the changetrackerwriter slice
-	// (explicitly out of scope for this port).
-	TSC_UNREACHABLE("PrintAndPositionNode — changetrackerwriter slice");
-	(void)factory;
-	(void)node;
-	(void)sourceFile;
-	(void)newLine;
-	(void)indentSize;
-	(void)emitContext;
+	ChangeTrackerWriter* writer =
+		NewChangeTrackerWriter(newLine, indentSize);
+	PrinterOptions options{};
+	options.NewLine = syntheticGetNewLineKind(newLine);
+	options.NeverAsciiEscape = true;
+	options.PreserveSourceNewlines = true;
+	options.TerminateUnterminatedLiterals = true;
+	NewPrinter(options, writer->GetPrintHandlers(), emitContext)
+		->Write(node, sourceFile, writer, nullptr);
+
+	std::string text = writer->String();
+	if (text.size() >= newLine.size() &&
+	    text.compare(text.size() - newLine.size(), newLine.size(), newLine) == 0) {
+		text.resize(text.size() - newLine.size());
+	}
+	Node* positioned = writer->AssignPositionsToNode(node, factory);
+	return {text, positioned};
 }
 
 // CreateSyntheticSourceFile — syntheticfile.go:35

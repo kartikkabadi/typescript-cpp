@@ -707,7 +707,8 @@ lsp::lsproto::DefinitionResponse LanguageService::createDefinitionLocations(
 	collections::Set<fileRange> locationRanges;
 
 	if (reference != nullptr) {
-		lsp::lsproto::Range targetRange;
+		// definition.go:224 — Go zero-initializes targetRange here.
+		lsp::lsproto::Range targetRange{};
 		auto link = std::make_shared<lsp::lsproto::LocationLink>();
 		link->OriginSelectionRange =
 			std::make_shared<lsp::lsproto::Range>(originSelectionRange);

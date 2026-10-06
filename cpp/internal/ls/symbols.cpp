@@ -319,7 +319,7 @@ std::vector<std::shared_ptr<lsp::lsproto::DocumentSymbol>> mergeExpandos(
 	// Collect namespaces.
 	std::unordered_map<std::string, int> nameToNamespaceIndex;
 	for (size_t i = 0; i < symbols.size(); i++) {
-		auto& symbol = symbols[i];
+		auto symbol = symbols[i];
 		if (isAnonymousName(symbol->Name)) {
 			continue;
 		}
@@ -336,8 +336,8 @@ std::vector<std::shared_ptr<lsp::lsproto::DocumentSymbol>> mergeExpandos(
 		}
 	}
 	for (size_t i = 0; i < symbols.size(); i++) {
-		auto& symbol = symbols[i];
-		if (symbol->Children != nullptr) {
+		auto symbol = symbols[i];
+		if (symbol->Children != nullptr && symbol->Children->has_value()) {
 			auto children = mergeExpandos(**symbol->Children);
 			*symbol->Children = std::move(children);
 		}
@@ -386,6 +386,12 @@ void mergeChildren(
 		if (target->Children == nullptr) {
 			target->Children = source->Children;
 		} else {
+			if (!target->Children->has_value()) {
+				target->Children->emplace();
+			}
+			if (!source->Children->has_value()) {
+				return;
+			}
 			(*target->Children)
 				->insert((*target->Children)->end(),
 				         (*source->Children)->begin(),

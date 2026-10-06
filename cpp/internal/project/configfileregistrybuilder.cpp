@@ -473,7 +473,7 @@ changeFileResult configFileRegistryBuilder::DidChangeFiles(
 		}
 		auto fileName = lsp::lsproto::documentUriFileName(uri);
 		auto path = fs->toPath(fileName);
-		auto baseName = tspath::getBaseFileName(std::string{path});
+		auto baseName = tspath::getBaseFileName(path);
 		if (isConfigBaseName(std::string{baseName})) {
 			createdOrDeletedConfigFiles.insert(path);
 		}
@@ -486,7 +486,7 @@ changeFileResult configFileRegistryBuilder::DidChangeFiles(
 		auto fileName = lsp::lsproto::documentUriFileName(uri);
 		auto path = fs->toPath(fileName);
 		deletedFiles.emplace(path, fileName);
-		auto baseName = tspath::getBaseFileName(std::string{path});
+		auto baseName = tspath::getBaseFileName(path);
 		if (isConfigBaseName(std::string{baseName})) {
 			createdOrDeletedConfigFiles.insert(path);
 		}
@@ -499,7 +499,7 @@ changeFileResult configFileRegistryBuilder::DidChangeFiles(
 		auto fileName = lsp::lsproto::documentUriFileName(uri);
 		auto path = fs->toPath(fileName);
 		createdFiles.emplace(path, fileName);
-		auto baseName = tspath::getBaseFileName(std::string{path});
+		auto baseName = tspath::getBaseFileName(path);
 		if (isConfigBaseName(std::string{baseName})) {
 			createdOrDeletedConfigFiles.insert(path);
 		}
@@ -542,7 +542,7 @@ changeFileResult configFileRegistryBuilder::DidChangeFiles(
 			}
 			// This was a config file, so assume it's not also a root file
 			createdFiles.erase(path);
-		} else if (tspath::getBaseFileName(std::string{path}) ==
+		} else if (tspath::getBaseFileName(path) ==
 		           "package.json") {
 			bool manifestChanged = false;
 			configs->Range(

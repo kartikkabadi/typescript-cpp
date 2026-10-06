@@ -1651,12 +1651,24 @@ Signature* Checker::resolveCall(Node* node,
 		result = chooseOverload(&s, assignableRelation);
 	}
 	callResolutionStack.pop_back();
+	if (candidatesOutArray != nullptr) {
+		// Go's `*candidatesOutArray = s.candidates` copies the slice header, so
+		// the out-array shares s.candidates' backing array and sees
+		// `s.candidates[i] = checkCandidate` mutations inside chooseOverload
+		// (instantiated candidates visible to signature help). Re-sync.
+		*candidatesOutArray = s.candidates;
+	}
 	if (result != nullptr) {
 		return result;
 	}
 	result = getCandidateForOverloadFailure(s.node, s.candidates, s.args,
 											candidatesOutArray != nullptr,
 											checkMode);
+	if (candidatesOutArray != nullptr) {
+		// pickLongestCandidateSignature may also replace an s.candidates
+		// entry — same shared-backing sync as above.
+		*candidatesOutArray = s.candidates;
+	}
 	// Preemptively cache the result; getResolvedSignature will do this after we return, but
 	// we need to ensure that the result is present for the error checks below so that if
 	// this signature is encountered again, we handle the circularity (rather than producing a
@@ -2376,7 +2388,7 @@ std::vector<Type*> Checker::inferTypeArguments(
 
 // checker.go:9690 — getCandidateForOverloadFailure
 Signature* Checker::getCandidateForOverloadFailure(
-	Node* node, std::vector<Signature*> candidates, std::vector<Node*> args,
+	Node* node, std::vector<Signature*>& candidates, std::vector<Node*> args,
 	bool hasCandidatesOutArray, CheckMode checkMode) {
 	// Else should not have called this.
 	checkNodeDeferred(node);

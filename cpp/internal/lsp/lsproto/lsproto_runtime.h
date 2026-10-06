@@ -72,6 +72,11 @@ inline std::string unmarshalJSONFrom(json::Decoder& dec, ResponseError* e) {
 
 } // namespace tsc::jsonrpc
 
+namespace tsc {
+class Context;
+using ContextPtr = std::shared_ptr<const Context>;
+} // namespace tsc
+
 namespace tsc::lsp::lsproto {
 
 using gostd::Error;
@@ -566,6 +571,9 @@ struct ResolvedClientCapabilities;
 gostd::Context withClientCapabilities(gostd::Context ctx,
 	const std::shared_ptr<ResolvedClientCapabilities>& caps);
 std::shared_ptr<ResolvedClientCapabilities> getClientCapabilities(gostd::Context ctx);
+// Overload for the ls layer's value-only ContextPtr (toContextPtr adapter).
+std::shared_ptr<ResolvedClientCapabilities> getClientCapabilities(
+    const tsc::ContextPtr& ctx);
 
 // ---------------------------------------------------------------------------
 // baseproto.go — BaseReader / BaseWriter wrap the jsonrpc frame codecs.

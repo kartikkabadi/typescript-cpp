@@ -21,8 +21,14 @@ std::pair<std::string, modulespecifiers::ResultKind> View::GetModuleSpecifier(
 		if (auto it = registry->entrypoints.find(e->Path);
 		    it != registry->entrypoints.end()) {
 			for (const auto& entrypoint : it->second) {
-				if (entrypoint->IncludeConditions->IsSubsetOf(*conditions) &&
-				    !conditions->Intersects(*entrypoint->ExcludeConditions)) {
+				// Go nil-receiver semantics: nil.IsSubsetOf -> true;
+				// nil.Intersects -> false.
+				if ((entrypoint->IncludeConditions == nullptr ||
+				     entrypoint->IncludeConditions->IsSubsetOf(*conditions)) &&
+				    !(conditions != nullptr &&
+				      entrypoint->ExcludeConditions != nullptr &&
+				      conditions->Intersects(
+				          *entrypoint->ExcludeConditions))) {
 					std::string specifier =
 					    modulespecifiers::ProcessEntrypointEnding(
 					        entrypoint.get(), userPreferences, program,

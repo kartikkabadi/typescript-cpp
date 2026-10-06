@@ -31,6 +31,7 @@ public:
     const std::vector<TextPos>& ecmaLineMap() const override {
         return file_->ecmaLineMap();
     }
+    SourceFile* asSourceFile() const override { return file_; }
 
 private:
     SourceFile* file_;

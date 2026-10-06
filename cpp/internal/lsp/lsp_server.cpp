@@ -5,6 +5,7 @@
 // lsp_handlers.cpp.
 #include "internal/lsp/lsp.h"
 
+#include <cstdio>
 #include <thread>
 
 #include "internal/api/session.h"
@@ -143,10 +144,16 @@ gostd::Error lspWriter::Write(
 std::shared_ptr<Reader> ToReader(gostd::io::Reader* r) {
 	return std::make_shared<lspReader>(r);
 }
+std::shared_ptr<Reader> ToReader(std::shared_ptr<gostd::io::Reader> r) {
+	return std::make_shared<lspReader>(std::move(r));
+}
 
 // ToWriter — server.go:162.
 std::shared_ptr<Writer> ToWriter(gostd::io::Writer* w) {
 	return std::make_shared<lspWriter>(w);
+}
+std::shared_ptr<Writer> ToWriter(std::shared_ptr<gostd::io::Writer> w) {
+	return std::make_shared<lspWriter>(std::move(w));
 }
 
 // ---------------------------------------------------------------------------
@@ -793,12 +800,13 @@ gostd::Error Server::RefreshDiagnostics(const gostd::Context& ctx) {
 // PublishDiagnostics — server.go:725 (project.Client).
 gostd::Error Server::PublishDiagnostics(
 	const gostd::Context& ctx, lsproto::PublishDiagnosticsParams* params) {
-	// Go params is *lsproto.PublishDiagnosticsParams — aliasing shared_ptr
-	// (non-owning) preserves that the caller retains ownership.
+	// Callers pass stack-local params; Go's escape analysis would heap-
+	// allocate them and the queued message would hold the pointer. The
+	// notification marshals asynchronously in writeLoop, so it must own a
+	// copy — a non-owning alias would dangle after the caller returns.
 	return sendNotification(
 		lsproto::TextDocumentPublishDiagnosticsInfo,
-		std::shared_ptr<lsproto::PublishDiagnosticsParams>(
-			params, [](lsproto::PublishDiagnosticsParams*) {}));
+		std::make_shared<lsproto::PublishDiagnosticsParams>(*params));
 }
 
 // SendTelemetry — server.go:730 (project.Client).
@@ -1284,6 +1292,13 @@ gostd::Error Server::writeLoop(gostd::Context ctx) {
 			return err;
 		}
 		auto& msg = *msgOpt;
+		{
+			if (msg->Kind == jsonrpc::MessageKind::Response) {
+				auto r = msg->AsResponse();
+			} else {
+				auto r = msg->AsRequest();
+			}
+		}
 		if (auto werr = w->Write(msg); werr != nullptr) {
 			if (auto* marshalErr =
 			        gostd::errorAs<messageMarshalError*>(werr);

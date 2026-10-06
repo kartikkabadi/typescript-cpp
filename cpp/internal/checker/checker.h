@@ -4197,8 +4197,11 @@ public:
 	std::vector<Type*> inferTypeArguments(Node* node, Signature* signature,
 	                                      const std::vector<Node*>& args, CheckMode checkMode,
 	                                      InferenceContext* context);
+	// checker.go:9690 — Go's candidates is a slice sharing the caller's
+	// backing array (s.candidates); pickLongestCandidateSignature's
+	// candidates[bestIndex] mutation must be visible to it — by reference.
 	Signature* getCandidateForOverloadFailure(Node* node,
-	                                          std::vector<Signature*> candidates,
+	                                          std::vector<Signature*>& candidates,
 	                                          std::vector<Node*> args,
 	                                          bool hasCandidatesOutArray,
 	                                          CheckMode checkMode);

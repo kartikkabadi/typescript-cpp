@@ -884,8 +884,9 @@ std::pair<ls::LanguageService*, gostd::Error> Session::setupLanguageService(
 	}
 	// projectIDAdapter and the host are leak-tolerant like the rest of the
 	// dep-stubbed snapshot graph.
-	return {new ls::LanguageService(new projectIDAdapter{proj->ID()}, program,
-	                                new project::SnapshotLSHost(snapshot), activeFile),
+	return {new ls::LanguageService(
+	            autoimport::InternProjectID(project::idString(proj->ID())),
+	            program, new project::SnapshotLSHost(snapshot), activeFile),
 	        nullptr};
 }
 
@@ -6535,11 +6536,11 @@ Session::handleGetImportAdderEdits(
 	}
 
 	auto userPreferences = workingSnapshot->UserPreferences();
-	projectIDAdapter pid{projectID};
+	auto* pid = autoimport::InternProjectID(projectID);
 	if (auto* registry = workingSnapshot->AutoImportRegistry();
 	    registry == nullptr ||
 	    !registry->IsPreparedForImportingFile(sourceFile->FileName(),
-	                                          &pid, userPreferences)) {
+	                                          pid, userPreferences)) {
 		auto* preparedSnapshot = snapshotHost->CloneSnapshotWithAutoImports(
 		    ctx, workingSnapshot,
 		    params->File.ToURI(GetCurrentDirectory()), nullptr);
@@ -6580,7 +6581,7 @@ Session::handleGetImportAdderEdits(
 	// lazily-created checker; done() is a no-op.
 	auto* ch = program->getChecker();
 
-	auto view = autoimport::NewView(registry, sourceFile, &pid, program,
+	auto view = autoimport::NewView(registry, sourceFile, pid, program,
 	                              ch,
 	                              userPreferences.ModuleSpecifierPreferences());
 	auto importAdder = autoimport::NewImportAdder(
