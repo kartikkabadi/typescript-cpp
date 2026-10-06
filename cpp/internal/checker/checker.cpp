@@ -3107,37 +3107,8 @@ Type* Checker::getWriteTypeOfSymbol(Symbol* symbol) {
 	return getTypeOfSymbol(symbol);
 }
 
-// ---------------------------------------------------------------------------
-// symbolToString — interim qualified-name implementation.
-// TODO(nodebuilder): replace with the faithful nodebuilder+printer port
-// (printer.go symbolToStringEx) once the nodebuilder lands.
-// ---------------------------------------------------------------------------
-
-std::string Checker::symbolToString(Symbol* symbol) {
-	return symbolToStringEx(symbol, nullptr, SymbolFlagsAll, SymbolFormatFlagsAllowAnyNodeKind);
-}
-
-std::string Checker::symbolToStringEx(Symbol* symbol, Node* /*enclosingDeclaration*/,
-									  SymbolFlags /*meaning*/, SymbolFormatFlags /*flags*/) {
-	if (symbol == nullptr) {
-		return "(unknown)";
-	}
-	std::string name = symbol->name;
-	if (name.empty() || name == InternalSymbolNameComputed) {
-		name = "<computed>";
-	}
-	// Qualify with the chain of parents that introduce a name (modules, enums,
-	// classes, interfaces, functions get `.`, everything else gets skipped).
-	std::string prefix;
-	for (Symbol* parent = symbol->parent; parent != nullptr; parent = parent->parent) {
-		if (parent->name.empty() || parent->name == InternalSymbolNameComputed ||
-			parent->name.size() == 0) {
-			continue;
-		}
-		prefix = parent->name + "." + prefix;
-	}
-	return prefix + name;
-}
+// symbolToString/symbolToStringEx — faithful nodebuilder+printer port lives in
+// checker_printer.cpp (printer.go:124/132).
 
 
 // checker.go:16055 getTargetOfAliasDeclaration

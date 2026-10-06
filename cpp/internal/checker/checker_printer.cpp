@@ -187,6 +187,77 @@ std::string Checker::typeToStringEx(Type* t, Node* enclosingDeclaration,
 // --- SymbolToString — printer.go:120 ---------------------------------------------
 std::string Checker::SymbolToString(Symbol* s) { return symbolToString(s); }
 
+// --- symbolToString — printer.go:124 ---------------------------------------------
+std::string Checker::symbolToString(Symbol* symbol) {
+	return symbolToStringEx(symbol, nullptr, SymbolFlagsAll,
+	                        SymbolFormatFlagsAllowAnyNodeKind);
+}
+
+// --- symbolToStringEx — printer.go:132 ---------------------------------------------
+std::string Checker::symbolToStringEx(Symbol* symbol,
+                                      Node* enclosingDeclaration,
+                                      SymbolFlags meaning,
+                                      SymbolFormatFlags flags) {
+	auto [writer, putWriter] = printer::GetSingleLineStringWriter();
+	FnGuard putGuard{std::move(putWriter)};
+
+	nodebuilder::Flags nodeFlags = nodebuilder::FlagsIgnoreErrors;
+	nodebuilder::InternalFlags internalNodeFlags =
+		nodebuilder::InternalFlagsNone;
+	if ((flags & SymbolFormatFlagsUseOnlyExternalAliasing) != 0) {
+		nodeFlags = nodeFlags | nodebuilder::FlagsUseOnlyExternalAliasing;
+	}
+	if ((flags & SymbolFormatFlagsWriteTypeParametersOrArguments) != 0) {
+		nodeFlags =
+			nodeFlags | nodebuilder::FlagsWriteTypeParametersInQualifiedName;
+	}
+	if ((flags & SymbolFormatFlagsUseAliasDefinedOutsideCurrentScope) != 0) {
+		nodeFlags =
+			nodeFlags | nodebuilder::FlagsUseAliasDefinedOutsideCurrentScope;
+	}
+	if ((flags & SymbolFormatFlagsDoNotIncludeSymbolChain) != 0) {
+		internalNodeFlags = internalNodeFlags |
+			nodebuilder::InternalFlagsDoNotIncludeSymbolChain;
+	}
+	if ((flags & SymbolFormatFlagsWriteComputedProps) != 0) {
+		internalNodeFlags = internalNodeFlags |
+			nodebuilder::InternalFlagsWriteComputedProps;
+	}
+
+	auto [nodeBuilder, release] = getNodeBuilder();
+	FnGuard releaseGuard{std::move(release)};
+	SourceFile* sourceFile = nullptr;
+	if (enclosingDeclaration != nullptr) {
+		sourceFile = getSourceFileOfNode(enclosingDeclaration);
+	}
+	printer::Printer* p;
+	// add neverAsciiEscape for GH#39027
+	if (enclosingDeclaration != nullptr &&
+	    enclosingDeclaration->kind == Kind::SourceFile) {
+		p = createPrinterWithRemoveCommentsOmitTrailingSemicolonNeverAsciiEscape(
+			nodeBuilder->EmitContext());
+	} else {
+		p = createPrinterWithRemoveCommentsOmitTrailingSemicolon(
+			nodeBuilder->EmitContext());
+	}
+
+	Node* entity;
+	if ((flags & SymbolFormatFlagsAllowAnyNodeKind) != 0) {
+		entity = nodeBuilder->SymbolToNode(symbol, meaning,
+		                                 enclosingDeclaration, nodeFlags,
+		                                 internalNodeFlags,
+		                                 nullptr); // TODO: GH#18217
+	} else {
+		entity = nodeBuilder->SymbolToEntityName(symbol, meaning,
+		                                       enclosingDeclaration, nodeFlags,
+		                                       internalNodeFlags,
+		                                       nullptr); // TODO: GH#18217
+	}
+	p->Write(entity /*sourceFile*/, sourceFile, writer,
+	         nullptr); // TODO: GH#18217
+	return writer->String();
+}
+
 // --- SymbolToStringEx — printer.go:128 ---------------------------------------------
 std::string Checker::SymbolToStringEx(Symbol* symbol,
                                       Node* enclosingDeclaration,
