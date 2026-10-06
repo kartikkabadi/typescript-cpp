@@ -165,6 +165,13 @@ add_library(tsc STATIC
 	internal/contentmapper/host.cpp
 	internal/contentmapper/hostimpl.cpp
 	internal/contentmapper/transform.cpp
+	# === slice: ipc ===
+	internal/ipc/conn_async.cpp
+	internal/ipc/conn_sync.cpp
+	internal/ipc/protocol_jsonrpc.cpp
+	internal/ipc/timing.cpp
+	internal/ipc/transport.cpp
+	internal/ipc/transport_unix.cpp
 	# === slice: tsoptions ===
 	internal/tsoptions/commandlineoption.cpp
 	internal/tsoptions/commandlineparser.cpp

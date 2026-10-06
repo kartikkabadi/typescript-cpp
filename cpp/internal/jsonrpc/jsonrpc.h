@@ -2,7 +2,10 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
+#include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 
@@ -111,5 +114,73 @@ json::Value marshalMessage(const Message& m);
 std::pair<Message, gostd::Error> unmarshalMessage(const json::Value& data);
 std::pair<ResponseError, gostd::Error> unmarshalResponseError(
     const json::Value& data);
+
+// === slice: ipc ===
+
+// ID equality + hash — Go map[jsonrpc.ID]chan *Message keys on the ID value.
+inline bool operator==(const ID& a, const ID& b) {
+	return a.str == b.str && a.int_ == b.int_;
+}
+struct IDHash {
+	size_t operator()(const ID& id) const {
+		return std::hash<std::string>{}(id.str) * 0x9e3779b97f4a7c15ULL +
+		       std::hash<int32_t>{}(id.int_);
+	}
+};
+
+// --- baseproto.go ------------------------------------------------------------
+// LSP base protocol: Content-Length header framing over a byte stream.
+
+inline const gostd::Error ErrInvalidHeader =
+    gostd::newError("jsonrpc: invalid header");
+inline const gostd::Error ErrInvalidContentLength =
+    gostd::newError("jsonrpc: invalid content length");
+inline const gostd::Error ErrNoContentLength =
+    gostd::newError("jsonrpc: no content length");
+
+// Reader — baseproto.go:25. Reads JSON-RPC messages with Content-Length
+// framing (bufio.Reader equivalent internally).
+class Reader {
+public:
+	explicit Reader(gostd::io::Reader* r) : r_(r) {}
+	// Read reads the next message payload (bufio + io.ReadFull semantics).
+	std::pair<std::string, gostd::Error> Read();
+
+private:
+	gostd::io::Reader* r_;
+	std::string buf_;
+
+	// readBytes — bufio.Reader.ReadBytes: collects through delim; on error
+	// returns the accumulated bytes (incl. partial fragment) plus the error.
+	std::pair<std::string, gostd::Error> readBytes(char delim);
+	// readFull — io.ReadFull over the buffered reader.
+	gostd::Error readFull(std::span<char> out);
+};
+
+// Writer — baseproto.go:79. Writes JSON-RPC messages with Content-Length
+// framing (bufio.Writer equivalent internally).
+class Writer {
+public:
+	explicit Writer(gostd::io::Writer* w) : w_(w) {}
+	// Write writes a message payload with the Content-Length header, then
+	// flushes (bufio: header + payload buffer, single Flush).
+	gostd::Error Write(std::string_view data);
+
+private:
+	gostd::io::Writer* w_;
+	std::string buf_;
+
+	gostd::Error flush();
+};
+
+// NewReader / NewWriter — baseproto.go:32,86.
+inline std::unique_ptr<Reader> NewReader(gostd::io::Reader* r) {
+	return std::make_unique<Reader>(r);
+}
+inline std::unique_ptr<Writer> NewWriter(gostd::io::Writer* w) {
+	return std::make_unique<Writer>(w);
+}
+
+// === end slice: ipc ===
 
 } // namespace tsc::jsonrpc
