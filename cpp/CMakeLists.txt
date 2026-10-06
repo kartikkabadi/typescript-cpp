@@ -262,6 +262,12 @@ add_library(tsc STATIC
 	internal/execute/build/host.cpp
 	internal/execute/build/orchestrator.cpp
 	internal/execute/build/uptodatestatus.cpp
+	# === slice: tsctests ===
+	internal/execute/tsctests/fs.cpp
+	internal/execute/tsctests/mock_watch_backend.cpp
+	internal/execute/tsctests/readablebuildinfo.cpp
+	internal/execute/tsctests/runner.cpp
+	internal/execute/tsctests/sys.cpp
 	# === slice: testrunner ===
 	internal/gostd/regexp.cpp
 	internal/testrunner/runner.cpp

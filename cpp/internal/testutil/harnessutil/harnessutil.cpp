@@ -393,13 +393,11 @@ struct cachedCompilerHost : compiler::CompilerHost {
 	}
 };
 
-// === TracerForBaselining — harnessutil.go:489 ===
+}  // namespace
 
-struct TracerForBaselining {
-	tspath::ComparePathsOptions opts;
-	std::unordered_map<tspath::Path, bool> packageJsonCache;
-	std::string* builder;
-};
+// === TracerForBaselining — harnessutil.go:489 (declared in harnessutil.h) ===
+// Out-of-line member definitions must live at
+// tsc::testutil::harnessutil scope, not inside the anonymous namespace.
 
 // NewTracerForBaselining — harnessutil.go:495.
 TracerForBaselining* NewTracerForBaselining(
@@ -411,8 +409,8 @@ TracerForBaselining* NewTracerForBaselining(
 }
 
 // sanitizeTrace — harnessutil.go:519.
-std::string sanitizeTrace(TracerForBaselining* t, const std::string& msg,
-                          bool usePackageJsonCache) {
+std::string TracerForBaselining::sanitizeTrace(
+    const std::string& msg, bool usePackageJsonCache) {
 	// Version
 	if (auto pos = msg.find("'" + std::string(version()) + "'");
 	    pos != std::string::npos) {
@@ -429,13 +427,12 @@ std::string sanitizeTrace(TracerForBaselining* t, const std::string& msg,
 		cutPrefix(file, "File '", &file);
 		if (usePackageJsonCache) {
 			auto filePath =
-			    tspath::toPath(file, t->opts.currentDirectory,
-			                   t->opts.useCaseSensitiveFileNames);
-			if (t->packageJsonCache.find(filePath) !=
-			    t->packageJsonCache.end()) {
+			    tspath::toPath(file, opts.currentDirectory,
+			                   opts.useCaseSensitiveFileNames);
+			if (packageJsonCache.find(filePath) != packageJsonCache.end()) {
 				return msg;
 			}
-			t->packageJsonCache[filePath] = false;
+			packageJsonCache[filePath] = false;
 		}
 		return "File '" + std::string(file) + "' does not exist.";
 	}
@@ -445,13 +442,12 @@ std::string sanitizeTrace(TracerForBaselining* t, const std::string& msg,
 		cutPrefix(file, "File '", &file);
 		if (usePackageJsonCache) {
 			auto filePath =
-			    tspath::toPath(file, t->opts.currentDirectory,
-			                   t->opts.useCaseSensitiveFileNames);
-			if (t->packageJsonCache.find(filePath) !=
-			    t->packageJsonCache.end()) {
+			    tspath::toPath(file, opts.currentDirectory,
+			                   opts.useCaseSensitiveFileNames);
+			if (packageJsonCache.find(filePath) != packageJsonCache.end()) {
 				return msg;
 			}
-			t->packageJsonCache[filePath] = true;
+			packageJsonCache[filePath] = true;
 		}
 		return "Found 'package.json' at '" + std::string(file) + "'.";
 	}
@@ -460,11 +456,10 @@ std::string sanitizeTrace(TracerForBaselining* t, const std::string& msg,
 			std::string_view file = str;
 			cutPrefix(file, "File '", &file);
 			auto filePath =
-			    tspath::toPath(file, t->opts.currentDirectory,
-			                   t->opts.useCaseSensitiveFileNames);
-			if (t->packageJsonCache.find(filePath) ==
-			    t->packageJsonCache.end()) {
-				t->packageJsonCache[filePath] = false;
+			    tspath::toPath(file, opts.currentDirectory,
+			                   opts.useCaseSensitiveFileNames);
+			if (packageJsonCache.find(filePath) == packageJsonCache.end()) {
+				packageJsonCache[filePath] = false;
 				return msg;
 			}
 			return "File '" + std::string(file) +
@@ -474,11 +469,10 @@ std::string sanitizeTrace(TracerForBaselining* t, const std::string& msg,
 			std::string_view file = str;
 			cutSuffix(file, "'.", &file);
 			auto filePath =
-			    tspath::toPath(file, t->opts.currentDirectory,
-			                   t->opts.useCaseSensitiveFileNames);
-			if (t->packageJsonCache.find(filePath) ==
-			    t->packageJsonCache.end()) {
-				t->packageJsonCache[filePath] = true;
+			    tspath::toPath(file, opts.currentDirectory,
+			                   opts.useCaseSensitiveFileNames);
+			if (packageJsonCache.find(filePath) == packageJsonCache.end()) {
+				packageJsonCache[filePath] = true;
 				return msg;
 			}
 			return "File '" + std::string(file) +
@@ -490,25 +484,25 @@ std::string sanitizeTrace(TracerForBaselining* t, const std::string& msg,
 
 // Trace — harnessutil.go:502. `builder` is a std::string (Go
 // *strings.Builder); Fprintln appends "\n".
-void traceForBaselining(TracerForBaselining* t, const DiagnosticMessage* msg,
-                        const std::vector<std::string>& args) {
-	*t->builder += sanitizeTrace(t, localize(
-	                                locale::Default, msg, "", args),
-	                            true);
-	*t->builder += "\n";
+void TracerForBaselining::Trace(const DiagnosticMessage* msg,
+                                const std::vector<std::string>& args) {
+	*builder += sanitizeTrace(
+	    localize(locale::Default, msg, "", args), true);
+	*builder += "\n";
 }
 
-// TraceWithWriter — harnessutil.go:507 (io.Writer → std::string*).
-void traceWithWriterForBaselining(TracerForBaselining* t, std::string* w,
-                                  const std::string& msg,
-                                  bool usePackageJsonCache) {
-	*w += sanitizeTrace(t, msg, usePackageJsonCache);
-	*w += "\n";
+// TraceWithWriter — harnessutil.go:507 (io.Writer → std::ostream*).
+void TracerForBaselining::TraceWithWriter(std::ostream* w,
+                                          const std::string& msg,
+                                          bool usePackageJsonCache) {
+	*w << sanitizeTrace(msg, usePackageJsonCache) << '\n';
 }
 
 // String/Reset — harnessutil.go:607/611.
-const std::string& traceString(TracerForBaselining* t) { return *t->builder; }
-void traceReset(TracerForBaselining* t) { t->packageJsonCache.clear(); }
+const std::string& TracerForBaselining::String() const { return *builder; }
+void TracerForBaselining::Reset() { packageJsonCache.clear(); }
+
+namespace {
 
 // createCompilerHost — harnessutil.go:615.
 cachedCompilerHost* createCompilerHost(
@@ -520,14 +514,14 @@ cachedCompilerHost* createCompilerHost(
 	    tspath::ComparePathsOptions{fs->UseCaseSensitiveFileNames(),
 	                                currentDirectory},
 	    tracerBuilder);
-		auto* h = new cachedCompilerHost();
+	auto* h = new cachedCompilerHost();
 	h->currentDirectory = currentDirectory;
 	h->fs = fs;
 	h->defaultLibraryPath = defaultLibraryPath;
 	h->extendedConfigCache = nullptr;
 	h->trace = [tracer](const DiagnosticMessage* m,
 	                    const std::vector<std::string>& a) {
-		traceForBaselining(tracer, m, a);
+		tracer->Trace(m, a);
 	};
 	h->contentMapperProject = contentMapperProject;
 	h->tracer = tracer;
@@ -1304,7 +1298,7 @@ CompilationResult* CompileFilesEx(
 	                                contentMapperProject);
 	auto* result = compileFilesWithHost(host, config, harnessOptions);
 	result->Symlinks = symlinks;
-	result->Trace = traceString(host->tracer);
+	result->Trace = host->tracer->String();
 	result->Repeat =
 	    [t, inputFiles, otherFiles, harnessOptions, compilerOptions,
 	     currentDirectory, symlinks,

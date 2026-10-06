@@ -757,6 +757,23 @@ public:
 	// === end slice: modulespecifiers ===
 	const std::vector<const FileIncludeReason*>* GetIncludeReasons(
 	    const tspath::Path& path) const;
+	// === slice: tsctests ===
+	// GetIncludeReasonsMap — program.go:2109 GetIncludeReasons — the whole
+	// include-reason map (tsctests dumps it in OnProgram; the per-path
+	// overload above is the lookup spelling other callers use).
+	const std::unordered_map<tspath::Path,
+	                         std::vector<const FileIncludeReason*>>&
+	GetIncludeReasonsMap() const {
+		return includeProcessor_.fileIncludeReasons;
+	}
+	// IsMissingPath — program.go:2114 (Go marks it "Testing only").
+	bool IsMissingPath(const tspath::Path& path) const {
+		return std::any_of(missingFiles.begin(), missingFiles.end(),
+		                   [&](const std::string& missingPath) {
+			                   return toPath(missingPath) == path;
+		                   });
+	}
+	// === end slice: tsctests ===
 	tspath::Path toPath(const std::string& fileName) const;
 	tspath::ComparePathsOptions comparePathsOptions() const;
 	void verifyCompilerOptions();
