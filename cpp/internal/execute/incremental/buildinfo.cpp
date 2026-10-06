@@ -1735,4 +1735,9 @@ void BuildInfoRootInfoReader::Roots(
 	}
 }
 
+// buildInfo.go:377.
+bool BuildInfoEmitSignature::noEmitSignature() const {
+	return Signature.empty() && !DiffersOnlyInDtsMap && !DiffersInOptions;
+}
+
 }  // namespace tsc::execute::incremental

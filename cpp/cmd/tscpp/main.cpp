@@ -8,6 +8,7 @@
 //        report aggregate throughput (source files only, no dumps)
 //   tscpp bind <file>          bind and dump symbols/flow/locals (oracle-comparable)
 //   tscpp check <file>         semantic-check and dump diagnostics (oracle-comparable)
+//   tscpp tsc <args...>        the real tsc CLI (tsc/cmd/tsc → execute.CommandLine)
 #include <atomic>
 #include <chrono>
 #include <cstdio>
@@ -30,6 +31,10 @@
 #include "internal/ast/flow.h"
 #include "internal/binder/binder.h"
 #include "internal/compiler/program.h"
+#include "internal/execute/execute.h"
+
+// sys.cpp — tsc/cmd/tsc/sys.go
+tsc::execute::tsc::System* newSystem();
 #include "internal/diagnostics/diagnostics.h"
 #include "internal/parser/parser.h"
 #include "internal/scanner/scanner.h"
@@ -662,13 +667,33 @@ static void installCrashExitHandlers() {
 
 int main(int argc, char** argv) {
 	installCrashExitHandlers();
-	if (argc < 3) {
+	if (argc < 2) {
 		std::fprintf(
 			stderr,
-			"usage: tscpp <lex|lex-json|bench|parse|bench-parse|parse-all|bind|check|emit|emitdump> <file|dir> [iters|workers]\n");
+			"usage: tscpp <lex|lex-json|bench|parse|bench-parse|parse-all|bind|check|emit|emitdump> <file|dir> [iters|workers]\n"
+		"       tscpp tsc <args...>  the real tsc CLI\n");
+		return 2;
+	}
+	if (argc < 3 && std::string(argv[1]) != "tsc") {
+		std::fprintf(
+			stderr,
+			"usage: tscpp <lex|lex-json|bench|parse|bench-parse|parse-all|bind|check|emit|emitdump> <file|dir> [iters|workers]\n"
+			"       tscpp tsc <args...>  the real tsc CLI\n");
 		return 2;
 	}
 	std::string mode = argv[1];
+	// tsc/cmd/tsc/main.go — the real CLI: `tscpp tsc <args...>` forwards all
+	// remaining args to execute.CommandLine with the os-backed System.
+	if (mode == "tsc") {
+		tsc::execute::tsc::System* sys = newSystem();
+		std::vector<std::string> args;
+		for (int i = 2; i < argc; i++) {
+			args.emplace_back(argv[i]);
+		}
+		auto result = tsc::execute::CommandLine(gostd::contextBackground(), sys,
+		                                   args, nullptr);
+		return static_cast<int>(result.Status);
+	}
 	if (mode != "lex" && mode != "lex-json" && mode != "bench" &&
 	    mode != "parse" && mode != "bench-parse" && mode != "parse-all" &&
 	    mode != "bind" && mode != "check" && mode != "emit" &&

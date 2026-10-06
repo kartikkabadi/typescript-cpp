@@ -249,5 +249,5 @@ add_library(tsc STATIC
 
 target_link_libraries(tsc PUBLIC z) # zlib — pprof profile writer
 
-add_executable(tscpp cmd/tscpp/main.cpp)
+add_executable(tscpp cmd/tscpp/main.cpp cmd/tscpp/sys.cpp)
 target_link_libraries(tscpp PRIVATE tsc)

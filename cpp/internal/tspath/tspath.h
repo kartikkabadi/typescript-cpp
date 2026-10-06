@@ -1261,9 +1261,15 @@ inline std::string getNormalizedAbsolutePathWithoutRoot(
 	return absolutePath.substr(rootLength);
 }
 
-// convertToRelativePath — path.go:821. Declared here; defined as a
-// tsoptions-slice dep-stub until the owning slice lands it.
-std::string convertToRelativePath(std::string_view absoluteOrRelativePath,
-                                  const ComparePathsOptions& options);
+// ConvertToRelativePath — path.go:821.
+inline std::string convertToRelativePath(
+    std::string_view absoluteOrRelativePath,
+    const ComparePathsOptions& options) {
+	if (!isRootedDiskPath(absoluteOrRelativePath)) {
+		return std::string(absoluteOrRelativePath);
+	}
+	return getRelativePathToDirectoryOrUrl(
+	    options.currentDirectory, absoluteOrRelativePath, false, options);
+}
 
 }  // namespace tsc::tspath

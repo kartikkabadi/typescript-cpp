@@ -3232,3 +3232,12 @@ const DiagnosticMessage* getResolutionDiagnostic(
 }
 
 }  // namespace tsc::module
+
+// Reopening for the NewResolver factory — resolver.go:167.
+namespace tsc::module {
+
+DefaultResolver* NewResolver(ResolverOptions opts) {
+	return new DefaultResolver(std::move(opts));
+}
+
+}  // namespace tsc::module

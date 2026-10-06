@@ -2888,13 +2888,3 @@ GetParsedCommandLineOfConfigFilePath(
 }
 
 }  // namespace tsc::tsoptions
-
-// === dep stubs — removed when owner slice lands ===
-
-namespace tsc::tspath {
-// convertToRelativePath — path.go:821. Owned by the tspath slice.
-std::string convertToRelativePath(std::string_view absoluteOrRelativePath,
-                                  const ComparePathsOptions& options) {
-	TSC_UNREACHABLE("convertToRelativePath — tsoptions dep");
-}
-}  // namespace tsc::tspath

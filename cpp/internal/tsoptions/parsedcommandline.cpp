@@ -6,6 +6,7 @@
 #include "internal/core/spelling.h"
 #include "internal/diagnostics/messages_generated.h"
 #include "internal/module/types.h"
+#include "internal/glob/glob.h"
 #include "internal/module/vfsmatch.h"
 #include "internal/tspath/tspath.h"
 
@@ -266,7 +267,7 @@ ParsedCommandLine::WildcardDirectories() {
 }
 
 // WildcardDirectoryGlobs — parsedcommandline.go:276.
-std::vector<glob::Glob*>* ParsedCommandLine::WildcardDirectoryGlobs() {
+std::vector<std::shared_ptr<glob::Glob>>* ParsedCommandLine::WildcardDirectoryGlobs() {
 	auto* wildcardDirectories = WildcardDirectories();
 	if (wildcardDirectories == nullptr) {
 		return nullptr;
@@ -275,13 +276,14 @@ std::vector<glob::Glob*>* ParsedCommandLine::WildcardDirectoryGlobs() {
 	std::call_once(includeGlobsOnce, [&] {
 		if (includeGlobs == nullptr) {
 			auto [fileGlob, recursiveFileGlob] = fileGlobPatterns();
-			auto globs = std::make_shared<std::vector<glob::Glob*>>();
+			auto globs =
+			    std::make_shared<std::vector<std::shared_ptr<glob::Glob>>>();
 			globs->reserve(wildcardDirectories->size());
 			for (const auto& [dir, recursive] : *wildcardDirectories) {
 				std::string pattern = tspath::normalizePath(dir) + "/" +
 				    (recursive ? recursiveFileGlob : fileGlob);
-				if (auto [parsed, err] = glob::Parse(pattern); err) {
-					globs->push_back(parsed);
+				if (auto [parsed, err] = glob::parse(pattern); err.empty()) {
+					globs->push_back(std::move(parsed));
 				}
 			}
 			includeGlobs = globs;
@@ -418,8 +420,8 @@ bool ParsedCommandLine::PossiblyMatchesFileName(std::string_view fileName) {
 	if (auto* wildcardDirectoryGlobs = WildcardDirectoryGlobs();
 	    wildcardDirectoryGlobs != nullptr &&
 	    !wildcardDirectoryGlobs->empty()) {
-		for (auto* glob : *wildcardDirectoryGlobs) {
-			if (glob->Match(fileName)) {
+		for (const auto& glob : *wildcardDirectoryGlobs) {
+			if (glob->match(fileName)) {
 				return true;
 			}
 		}

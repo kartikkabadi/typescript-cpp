@@ -366,6 +366,8 @@ void PrintBuildHelp(
 	}
 }
 
+namespace {
+
 // generateSectionOptionsOutput — help.go:148.
 std::vector<std::string> generateSectionOptionsOutput(
     System* sys, locale::Locale locale, std::string_view sectionName,
@@ -633,7 +635,6 @@ valueCandidate* getValueCandidate(
 	return res;
 }
 
-namespace {
 // getPossibleValues — help.go:359.
 std::string getPossibleValues(const tsoptions::CommandLineOption* option) {
 	if (option->Kind == tsoptions::CommandLineOptionTypeString ||
@@ -692,7 +693,6 @@ std::string getPossibleValues(const tsoptions::CommandLineOption* option) {
 	}
 	return out;
 }
-}  // namespace
 
 // getPrettyOutput — help.go:391.
 std::vector<std::string> getPrettyOutput(const colors& colors,
@@ -733,7 +733,9 @@ std::vector<std::string> getPrettyOutput(const colors& colors,
 	return res;
 }
 
-// getDisplayNameTextOfOption — help.go:426.
+}  // namespace
+
+// getDisplayNameTextOfOption — help.go:426 (exported via help.h).
 std::string getDisplayNameTextOfOption(
     const tsoptions::CommandLineOption* option) {
 	return "--" + option->Name +

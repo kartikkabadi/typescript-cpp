@@ -16,6 +16,7 @@
 
 #include "internal/ast/ast.h"
 #include "internal/collections/collections.h"
+#include "internal/glob/glob.h"
 #include "internal/contentmapper/contentmapper.h"
 #include "internal/core/types.h"
 #include "internal/locale/locale.h"
@@ -601,15 +602,8 @@ ParseCommandLineWorkerDiagnostics& buildOptionsDidYouMeanDiagnostics();
 // parsedoptions.go / parsedcommandline.go / parsedbuildcommandline.go
 // ---------------------------------------------------------------------------
 
-namespace glob {  // dep-stub decls — owned by the glob slice
-// glob.go — a compiled wildcard spec.
-struct Glob {
-	// Match — glob.go:215. dep-stubbed in wildcarddirectories' TU.
-	bool Match(std::string_view input) const;
-};
-// glob.Parse — glob.go:47. Returns (glob, ok): ok=false on parse error.
-std::pair<Glob*, bool> Parse(std::string_view pattern);
-}  // namespace glob
+// The glob package is ported for real in internal/glob (tsc::glob); uses
+// below resolve through ordinary namespace lookup.
 
 // outputpaths dep-stub block removed — the real outputpaths.h port is in
 // tsc::outputpaths; unqualified `outputpaths::` lookups below resolve to it.
@@ -694,7 +688,7 @@ struct ParsedCommandLine : module::ResolvedProjectReference,
 	mutable std::once_flag wildcardDirectoriesOnce;
 	std::shared_ptr<std::unordered_map<std::string, bool>> wildcardDirectories;
 	mutable std::once_flag includeGlobsOnce;
-	std::shared_ptr<std::vector<glob::Glob*>> includeGlobs;
+	std::shared_ptr<std::vector<std::shared_ptr<glob::Glob>>> includeGlobs;
 
 	mutable std::once_flag sourceAndOutputMapsOnce;
 	std::shared_ptr<
@@ -764,7 +758,7 @@ struct ParsedCommandLine : module::ResolvedProjectReference,
 	    const std::function<bool(std::string_view outputName)>& yield);
 	std::string GetBuildInfoFileName();
 	std::unordered_map<std::string, bool>* WildcardDirectories();
-	std::vector<glob::Glob*>* WildcardDirectoryGlobs();
+	std::vector<std::shared_ptr<glob::Glob>>* WildcardDirectoryGlobs();
 	std::vector<std::string> LiteralFileNames();
 	void SetParsedOptions(ParsedOptions* o) { ParsedConfig = o; }
 	void SetCompilerOptions(tsc::CompilerOptions* o) {
