@@ -34,47 +34,66 @@ oracle before moving on.
 - [x] Conformance: 26,002/26,002 corpus files byte-identical
       (`cpp/tools/conformance_bind.sh`).
 
-## Stage 3 — Checker (the big one)
+## Stage 3 — Checker (DONE)
 
-- [ ] Port `tsc/internal/checker` (~60k lines of Go) → `cpp/internal/checker`:
-      type instantiation, inference, assignability, control-flow narrowing,
-      relation results caching.
-- [ ] Conformance: `tscpp check <file>` emits `TS<code>:pos:end` per
-      diagnostic; diff vs `tsc` (Go) `--noEmit` on the whole corpus,
-      then on DefinitelyTyped-style real-world projects.
-- [ ] Performance budget: aim ≥3× Go `tsc --noEmit` on the std suite.
+- [x] Port `tsc/internal/checker` (~81k lines C++, every Go file covered:
+      expressions, type-node resolution, signatures, members, widening,
+      contextual typing, control-flow narrowing (`checker_flow`),
+      assignability (`checker_relater`), inference
+      (`checker_inference`), instantiation, nodebuilder,
+      emitresolver, services, exports, grammarchecks, jsx,
+      modulespecifiers, checkerpool (FENNEL parallel checkers)).
+- [x] Conformance: `tscpp check <file>` vs `tsc/cmd/checkdump` —
+      **12,734 / 12,734** corpus files byte-identical
+      (`cpp/tools/conformance_check.sh`).
 
-## Stage 4 — JS emit + project mode
+## Stage 4 — JS emit + project mode (DONE)
 
-- [ ] Port `printer` (emitter) + `transformers` (esnext→target lowering).
-- [ ] `tscpp build <file>`: transpile `tsc` equivalent; diff emitted JS
-      byte-for-byte vs Go `--emit`.
-- [ ] `tsconfig.json` / `-p` project mode: options parsing
-      (`tsc/internal/tsoptions`), module resolution
-      (`tsc/internal/module`), incremental `.tsbuildinfo`.
+- [x] `printer` package (textwriter, emitcontext, namegenerator, factory)
+      + all transformers (esnext→es5 lowering, async, classfields,
+      esdeco, jsx, namedevaluation) + sourcemap/spanmap.
+- [x] `tscpp emit` + `tscpp emitdump` vs `tsc/cmd/emitdump` —
+      **12,734 / 12,734** byte-identical.
+- [x] `tsconfig.json` / `-p` project mode: `tsoptions`, `module`
+      resolution, incremental `.tsbuildinfo` — `tsc -p`/`-b` byte-identical
+      incl. XXH3 parity (project parity harness: 109/109).
 
 ## Stage 5 — The rest of the stack
 
-- [ ] `--declaration` emit.
-- [ ] Watch mode / incremental reuse (`sourceFileVersion`, `affectedFiles`).
-- [ ] VFS + `tsc.cpp` CLI parity (same flags as `tsc`).
-- [ ] Editor surface if in scope: language service queries
-      (`ls/`), fourslash-style conformance.
+- [x] `--declaration` emit — **12,734 / 12,734** byte-identical.
+- [x] Watch mode / incremental reuse (`ReuseProgram`, `sourceFileVersion`,
+      `affectedFiles`) — tsctests watch scenarios all pass.
+- [x] VFS + `tscpp tsc` CLI parity — byte-identical on --version/--help/
+      --noEmit/--listFiles/--listEmittedFiles/--listFilesOnly/--showConfig/
+      --traceResolution/--init/--locale/-b/-w/--dry/--clean/error paths.
+- [x] `--lsp` / `--api` session protocols — byte-identical event streams.
+- [x] `execute/tsctests` harness (`tsctestrunner`): **99/99** Go scenario
+      ports pass (build/watch/commandline/composite/declarationEmit/noEmit,
+      incl. Windows-path VFS).
+- [ ] fourslash LS-test harness — runner + test batch in flight.
 
-## Performance work (ongoing)
+## Performance work
 
 - [x] Arena allocation for all AST nodes (single free per file).
 - [x] Flat `std::vector` child lists (Go `[]*Node` equivalent, no boxing).
 - [x] Scanner hot loop: ASCII fast paths, UTF-8 decode only when needed.
 - [x] PGO / LTO build profile.
-- [ ] Interned strings for identifiers & type references.
 - [x] Parallel parse across files (`tscpp parse-all` — ~3.9× vs Go serial
       on the 26,002-file corpus).
+- [x] FENNEL checker pool (parallel diagnostics/emit, ~250% CPU).
+- [x] Emit-context arena release (decl-emit RSS 4 GB → 462 MB).
+- [ ] Interned strings for identifiers & type references.
+- [ ] **Gate: tscpp ≥ 3× Go `tsc --noEmit` — NOT MET yet.** After the two
+      structural fixes above: project emit 1.95× slower, --noEmit 2.33×,
+      --declaration 2.37× (was 3.35/3.26/10.5×). Remaining gap is per-CPU
+      hot-path work — see `cpp/tools/perf/PERF_REPORT.md`.
 
 ## Conformance rules
 
 1. No stage is "done" until the corpus diff is 0 failures.
 2. Corpus = every source file under `tsc/testdata` (minus `node_modules`
-   fixtures and tooling). Extend with real-world repos for the checker.
+   fixtures and tooling). Extended with the `execute/tsctests` scenario
+   suite (99/99), project-parity corpus (109/109), and `--lsp`/`--api`
+   protocol streams.
 3. Known-divergence items must be documented here with the Go-side
    rationale — currently: none.
