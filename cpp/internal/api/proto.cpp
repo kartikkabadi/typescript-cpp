@@ -695,10 +695,31 @@ std::string DocumentIdentifier::unmarshalJSONFrom(json::Decoder& dec) {
 	}
 }
 
+// DocumentIdentifier::marshalJSONTo — proto.go:284 field tags
+// (`fileName,omitempty`, `uri,omitempty`); Go has no custom marshaler, so
+// the wire form is the tagged object.
+std::string DocumentIdentifier::marshalJSONTo(json::Encoder& enc) const {
+	objWriter w{enc};
+	w.begin();
+	if (!FileName.empty()) w.member("fileName", FileName);
+	if (!URI.empty()) w.member("uri", URI);
+	return w.end();
+}
+
 // EnsurePrograms::unmarshalJSONFrom — proto.go:399. `true` or an array of
 // project IDs.
 std::pair<bool, std::string> EnsurePrograms::unmarshalField(std::string_view, json::Decoder&) {
 	return {false, {}};
+}
+
+// EnsurePrograms::marshalJSONTo — proto.go:398 has no custom marshaler, so
+// Go emits the default field names `All` and `Projects`.
+std::string EnsurePrograms::marshalJSONTo(json::Encoder& enc) const {
+	objWriter w{enc};
+	w.begin();
+	w.member("All", All);
+	w.member("Projects", Projects);
+	return w.end();
 }
 
 std::string EnsurePrograms::unmarshalJSONFrom(json::Decoder& dec) {

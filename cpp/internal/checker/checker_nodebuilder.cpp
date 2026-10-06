@@ -958,6 +958,11 @@ Node* NodeBuilderImpl::appendReferenceToType(Node* root, Node* ref) {
 
 // createElidedInformationPlaceholder (nodebuilderimpl.go:346).
 Node* NodeBuilderImpl::createElidedInformationPlaceholder() {
+	ctx->approximateLength += 3;
+	if ((ctx->flags & nodebuilder::FlagsNoTruncation) == 0) {
+		return f->newTypeReferenceNode(f->newIdentifier("..."),
+		                               nullptr /*typeArguments*/);
+	}
 	return e->addSyntheticLeadingComment(
 		f->newKeywordTypeNode(Kind::AnyKeyword), Kind::MultiLineCommentTrivia,
 		"elided", false /*hasTrailingNewLine*/);

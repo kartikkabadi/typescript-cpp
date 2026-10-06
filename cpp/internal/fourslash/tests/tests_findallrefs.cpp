@@ -31,7 +31,7 @@ REGISTER_FOURSLASH_TEST(TestFindAllRefsBadImport, TestFindAllRefsBadImport);
 // findAllRefsNoSubstitutionTemplateLiteralNoCrash1_test.go
 static void TestFindAllRefsNoSubstitutionTemplateLiteralNoCrash1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
-		const std::string content = R"TS(type Test = ` + "`" + `T/*1*/` + "`" + `;)TS";
+		const std::string content = R"TS(type Test = `T/*1*/`;)TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr, content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
 		f->VerifyBaselineFindAllReferences(t, {"1"});
 	});
