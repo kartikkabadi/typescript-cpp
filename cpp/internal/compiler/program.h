@@ -21,6 +21,7 @@
 #include "internal/ast/ast.h"
 #include "internal/ast/diagnostics_util.h"
 #include "internal/checker/checker.h"
+#include "internal/core/context.h"
 #include "internal/core/types.h"
 #include "internal/module/resolver.h"
 #include "internal/module/types.h"
@@ -678,6 +679,30 @@ public:
 	GetResolvedTypeReferenceDirective(SourceFile* file,
 	                                  const std::string& typeDirectiveName,
 	                                  ResolutionMode mode);
+	// === slice: ls-coreA ===
+	// program.go:590 GetTypeChecker / :607 GetTypeCheckerForFile — Go's
+	// checker pool hands out per-file checkers; the single-checker port
+	// shares the one checker (same as GetTypeCheckerForFileExclusive).
+	std::pair<checker::Checker*, std::function<void()>> GetTypeChecker(
+	    const ContextPtr& ctx) {
+		return GetTypeCheckerForFileExclusive(nullptr);
+	}
+	std::pair<checker::Checker*, std::function<void()>> GetTypeCheckerForFile(
+	    const ContextPtr& ctx, SourceFile* file) {
+		return GetTypeCheckerForFileExclusive(file);
+	}
+	// program.go:2171 GetResolvedTypeReferenceDirectiveFromTypeReferenceDirective.
+	module::ResolvedTypeReferenceDirective*
+	GetResolvedTypeReferenceDirectiveFromTypeReferenceDirective(
+	    const FileReference* typeRef, SourceFile* sourceFile) {
+		// getModeForTypeReferenceDirectiveInFile inlined below (program.go:2188).
+		ResolutionMode mode = typeRef->ResolutionMode != ResolutionModeNone
+		                        ? typeRef->ResolutionMode
+		                        : GetDefaultResolutionModeForFile(sourceFile);
+		return GetResolvedTypeReferenceDirective(sourceFile, typeRef->FileName,
+		                                         mode);
+	}
+	// === end slice: ls-coreA ===
 	module::ResolvedModule* GetResolvedModuleFromModuleSpecifier(
 	    SourceFile* file, Node* moduleSpecifier) override;
 	// === slice: modulespecifiers ===

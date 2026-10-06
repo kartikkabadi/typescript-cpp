@@ -1438,6 +1438,10 @@ bool isConstTypeReference(Node* node);
 bool isConstAssertion(Node* node);
 Node* getDeclarationOfKind(Symbol* symbol, Kind kind);
 Node* findConstructorDeclaration(Node* node);
+// === slice: ls-coreA ===
+// utilities.go:4100 — defined in checker/checker_jsdoc.cpp (ast-owned fn).
+Node* getNextJSDocCommentLocation(Node* node);
+// === end slice: ls-coreA ===
 
 // utilities.go — ported with the checker bootstrap slice.
 bool isTypeDeclaration(Node* node);

@@ -236,6 +236,16 @@ add_library(tsc STATIC
 	internal/vfs/vfstest/vfstest.cpp
 	# === slice: transpile ===
 	internal/transpile/transpile.cpp
+	# === slice: ls-coreA ===
+	internal/lsp/lsproto/lsproto.cpp
+	internal/ls/lsdeps.cpp
+	internal/ls/api.cpp
+	internal/ls/utilities.cpp
+	internal/ls/jsdoc.cpp
+	internal/ls/jsdoc_snippet.cpp
+	internal/ls/displaypartswriter.cpp
+	internal/ls/completions.cpp
+	internal/ls/string_completions.cpp
 	# === slice: fswatch ===
 	internal/fswatch/debounce.cpp
 	internal/fswatch/event.cpp

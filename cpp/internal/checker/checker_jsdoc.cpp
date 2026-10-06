@@ -5,35 +5,10 @@
 
 #include "internal/diagnostics/messages_generated.h"
 
-namespace tsc::checker {
+namespace tsc {
 
-// ---------------------------------------------------------------------------
-// Helpers ported file-locally until their own slices land:
-//   nodeStartsNewLexicalEnvironment — utilities.go:1763
-//   GetNextJSDocCommentLocation     — ast/utilities.go:4100
-// ---------------------------------------------------------------------------
-
-// utilities.go:1763
-bool nodeStartsNewLexicalEnvironment(Node* node) {
-	switch (node->kind) {
-		case Kind::Constructor:
-		case Kind::FunctionExpression:
-		case Kind::FunctionDeclaration:
-		case Kind::ArrowFunction:
-		case Kind::MethodDeclaration:
-		case Kind::GetAccessor:
-		case Kind::SetAccessor:
-		case Kind::ModuleDeclaration:
-		case Kind::SourceFile:
-			return true;
-		default:
-			break;
-	}
-	return false;
-}
-
-// ast/utilities.go:4100
-static Node* getNextJSDocCommentLocation(Node* node) {
+// ast/utilities.go:4100 — package-ast function; used by checker and ls.
+Node* getNextJSDocCommentLocation(Node* node) {
 	if (Node* parent = node->parent) {
 		switch (parent->kind) {
 			case Kind::PropertyAssignment:
@@ -55,6 +30,35 @@ static Node* getNextJSDocCommentLocation(Node* node) {
 		}
 	}
 	return nullptr;
+}
+
+} // namespace tsc
+
+namespace tsc::checker {
+
+// ---------------------------------------------------------------------------
+// Helpers ported file-locally until their own slices land:
+//   nodeStartsNewLexicalEnvironment — utilities.go:1763
+//   GetNextJSDocCommentLocation     — ast/utilities.go:4100 (now in tsc)
+// ---------------------------------------------------------------------------
+
+// utilities.go:1763
+bool nodeStartsNewLexicalEnvironment(Node* node) {
+	switch (node->kind) {
+		case Kind::Constructor:
+		case Kind::FunctionExpression:
+		case Kind::FunctionDeclaration:
+		case Kind::ArrowFunction:
+		case Kind::MethodDeclaration:
+		case Kind::GetAccessor:
+		case Kind::SetAccessor:
+		case Kind::ModuleDeclaration:
+		case Kind::SourceFile:
+			return true;
+		default:
+			break;
+	}
+	return false;
 }
 
 // ---------------------------------------------------------------------------

@@ -219,6 +219,12 @@ public:
 
 	bool Has(const T& key) const { return items.count(key) != 0; }
 	void Add(const T& key) { items.insert(key); }
+	// AddIfAbsent — returns true if the key was not already present.
+	// (=== slice: ls-coreA === — mirrors collections.Set.AddIfAbsent.)
+	bool AddIfAbsent(const T& key) { return items.insert(key).second; }
+	// Reserve — capacity hint (=== slice: ls-coreA === — collections.go
+	// NewSetWithSizeHint).
+	void Reserve(size_t hint) { items.reserve(hint); }
 	void Delete(const T& key) { items.erase(key); }
 	size_t Size() const { return items.size(); }
 
@@ -230,6 +236,26 @@ public:
 		for (auto& x : v) items.insert(x);
 	}
 };
+
+// === slice: ls-coreA ===
+
+// NewSetFromItems — collections.go NewSetFromItems.
+template <typename T, typename... Ts>
+Set<T> NewSetFromItems(Ts... vals) {
+	Set<T> s;
+	(s.Add(vals), ...);
+	return s;
+}
+
+// NewSetWithSizeHint — collections.go NewSetWithSizeHint.
+template <typename T>
+Set<T> NewSetWithSizeHint(size_t hint) {
+	Set<T> s;
+	s.Reserve(hint);
+	return s;
+}
+
+// === end slice: ls-coreA ===
 
 // === slice: moduletransforms ===
 
