@@ -393,14 +393,16 @@ std::vector<Export*> importAdder::getAllExportsForSymbol(Symbol* symbol) {
 // TypeToAutoImportableTypeNode — import_adder.go:385
 Node* TypeToAutoImportableTypeNode(checker::Checker* c,
                                    ImportAdder* importAdder, checker::Type* t,
-                                   Node* contextNode /* !!! flags */) {
-	std::unordered_map<Node*, Symbol*> idToSymbol;
+                                   Node* contextNode /* !!! flags */,
+                                   NodeFactory* factory) {
+	auto* idToSymbol = new std::unordered_map<Node*, Symbol*>();
 	Node* typeNode = c->TypeToTypeNode(t, contextNode, nodebuilder::FlagsNone,
-	                                 &idToSymbol);
+	                                 idToSymbol);
 	if (typeNode == nullptr) {
 		return nullptr;
 	}
-	return TypeNodeToAutoImportableTypeNode(typeNode, importAdder, &idToSymbol);
+	return TypeNodeToAutoImportableTypeNode(typeNode, importAdder, idToSymbol,
+	                                      factory);
 }
 
 // TypeNodeToAutoImportableTypeNode — import_adder.go:398. Converts import type
@@ -408,9 +410,11 @@ Node* TypeToAutoImportableTypeNode(checker::Checker* c,
 // imports with the import adder.
 Node* TypeNodeToAutoImportableTypeNode(
     Node* typeNode, ImportAdder* importAdder,
-    std::unordered_map<Node*, Symbol*>* idToSymbol) {
+    std::unordered_map<Node*, Symbol*>* idToSymbol,
+    NodeFactory* factory) {
 	auto [referenceTypeNode, importableSymbols] =
-	    TryGetAutoImportableReferenceFromTypeNode(typeNode, idToSymbol);
+	    TryGetAutoImportableReferenceFromTypeNode(typeNode, idToSymbol,
+	                                            factory);
 	if (referenceTypeNode != nullptr) {
 		if (importAdder != nullptr) {
 			importSymbols(importAdder, importableSymbols);
@@ -437,10 +441,10 @@ void importSymbols(ImportAdder* importAdder,
 // with type references, and a list of symbols that must be imported to use the type reference.
 std::pair<Node*, std::vector<Symbol*>>
 TryGetAutoImportableReferenceFromTypeNode(
-    Node* importTypeNode, std::unordered_map<Node*, Symbol*>* idToSymbol) {
+    Node* importTypeNode, std::unordered_map<Node*, Symbol*>* idToSymbol,
+    NodeFactory* factory) {
 	std::vector<Symbol*> symbols;
 	NodeVisitor* visitor = nullptr;
-	NodeFactory factory;
 	auto visit = [&](Node* node) -> Node* {
 		if (isLiteralImportTypeNode(node) &&
 		    node->as<ImportTypeNode>()->Qualifier != nullptr) {
@@ -463,19 +467,19 @@ TryGetAutoImportableReferenceFromTypeNode(
 			Node* qualifier;
 			if (name != firstIdentifier->text()) {
 				qualifier = replaceFirstIdentifierOfEntityName(
-				    &factory, importTypeNode->Qualifier,
-				    factory.newIdentifier(name));
+				    factory, importTypeNode->Qualifier,
+				    factory->newIdentifier(name));
 			} else {
 				qualifier = importTypeNode->Qualifier;
 			}
 			symbols.push_back(symbol);
 			NodeList* typeArguments =
 			    visitor->visitNodes(importTypeNode->TypeArguments);
-			return factory.newTypeReferenceNode(qualifier, typeArguments);
+			return factory->newTypeReferenceNode(qualifier, typeArguments);
 		}
 		return visitor->visitEachChild(node);
 	};
-	visitor = newNodeVisitor(visit, &factory, NodeVisitorHooks{});
+	visitor = newNodeVisitor(visit, factory, NodeVisitorHooks{});
 	std::unique_ptr<NodeVisitor> visitorOwner(visitor);
 
 	Node* typeNode = visitor->visitNode(importTypeNode);

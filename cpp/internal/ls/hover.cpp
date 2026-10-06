@@ -211,8 +211,8 @@ symbolDisplayInfo getQuickInfoAndDeclarationAtLocation(
 			return;
 		}
 		printer::EmitContext* emitContext = printer::NewEmitContext();
-		std::unordered_map<::tsc::Node*, ::tsc::Symbol*> idToSymbol;
-		checker::NodeBuilder* nb = c->getNodeBuilderEx(&idToSymbol);
+		auto* idToSymbol = new std::unordered_map<::tsc::Node*, ::tsc::Symbol*>();
+		checker::NodeBuilder* nb = c->getNodeBuilderEx(idToSymbol);
 		nodebuilder::Flags combinedFlags =
 			nodebuilder::Flags(flags &
 							   checker::TypeFormatFlagsNodeBuilderFlagsMask) |
@@ -228,7 +228,7 @@ symbolDisplayInfo getQuickInfoAndDeclarationAtLocation(
 		options.NewLine = NewLineKind::LineFeed;
 		printer::Printer* p = printer::NewPrinter(
 			options, printer::PrintHandlers{}, emitContext);
-		p->IdToSymbol = idToSymbol;
+		p->IdToSymbol = *idToSymbol;
 		displayPartsWriter* tempDpw = newDisplayPartsWriter(true);
 		p->Write(typeNode, sourceFile, tempDpw, nullptr);
 		dpw->WriteFrom(tempDpw);
@@ -263,8 +263,8 @@ symbolDisplayInfo getQuickInfoAndDeclarationAtLocation(
 			}
 		}
 		printer::EmitContext* emitContext = printer::NewEmitContext();
-		std::unordered_map<::tsc::Node*, ::tsc::Symbol*> idToSymbol;
-		checker::NodeBuilder* nb = c->getNodeBuilderEx(&idToSymbol);
+		auto* idToSymbol = new std::unordered_map<::tsc::Node*, ::tsc::Symbol*>();
+		checker::NodeBuilder* nb = c->getNodeBuilderEx(idToSymbol);
 		nodebuilder::Flags combinedFlags =
 			nodebuilder::Flags(flags &
 							   checker::TypeFormatFlagsNodeBuilderFlagsMask) |
@@ -280,7 +280,7 @@ symbolDisplayInfo getQuickInfoAndDeclarationAtLocation(
 		options.NewLine = NewLineKind::LineFeed;
 		printer::Printer* p = printer::NewPrinter(
 			options, printer::PrintHandlers{}, emitContext);
-		p->IdToSymbol = idToSymbol;
+		p->IdToSymbol = *idToSymbol;
 		displayPartsWriter* tempDpw = newDisplayPartsWriter(true);
 		p->Write(sigNode, sourceFile, tempDpw, nullptr);
 		dpw->WriteFrom(tempDpw);

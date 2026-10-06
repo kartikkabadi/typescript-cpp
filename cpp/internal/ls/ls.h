@@ -635,7 +635,7 @@ struct missingMemberFixer {
 	locale::Locale loc;
 
 	std::pair<checker::NodeBuilder*,
-	          std::unordered_map<Node*, Symbol*>>
+	          std::unordered_map<Node*, Symbol*>*>
 	createNodeBuilder();
 	std::vector<Node*> createMemberFromSymbol(
 	    Symbol* symbol, Node* enclosingDeclaration, SourceFile* sourceFile,

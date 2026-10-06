@@ -202,7 +202,7 @@ Node* createPropertyName(NodeFactory* factory, Node* node,
 missingMemberFixer* newMissingMemberFixer(
     change::Tracker* changeTracker, compiler::SimpleProgram* program,
     checker::Checker* typeChecker, const lsutil::UserPreferences& preferences,
-    autoimport::ImportAdder* importAdder, const locale::Locale& loc) {
+    autoimport::ImportAdder* importAdder, locale::Locale loc) {
 	return new missingMemberFixer{
 	    .changeTracker = changeTracker,
 	    .typeChecker = typeChecker,
@@ -214,11 +214,13 @@ missingMemberFixer* newMissingMemberFixer(
 }
 
 // createNodeBuilder — codeactions_missingmemberfixer.go:46.
-std::pair<checker::NodeBuilder*, std::unordered_map<Node*, Symbol*>>
+// Go returns the map by reference; we return a heap-allocated map so the
+// builder's writes stay visible to all later fixer calls.
+std::pair<checker::NodeBuilder*, std::unordered_map<Node*, Symbol*>*>
 missingMemberFixer::createNodeBuilder() {
-	auto idToSymbol = std::unordered_map<Node*, Symbol*>();
+	auto* idToSymbol = new std::unordered_map<Node*, Symbol*>();
 	auto* nodeBuilder = checker::NewNodeBuilderEx(
-	    typeChecker, changeTracker->emitContext, &idToSymbol);
+	    typeChecker, changeTracker->emitContext, idToSymbol);
 	return {nodeBuilder, idToSymbol};
 }
 
@@ -257,7 +259,7 @@ std::vector<Node*> missingMemberFixer::createMemberFromSymbol(
 		auto [nodeBuilder, idToSymbol] = createNodeBuilder();
 		auto* typeNode =
 		    createTypeNode(t, enclosingDeclaration, flags, nodeBuilder,
-		                   &idToSymbol);
+		                   idToSymbol);
 		Node* questionToken = nullptr;
 		if (optional &&
 		    (preserveOptional & preserveOptionalFlagsProperty) != 0) {
@@ -296,7 +298,7 @@ std::vector<Node*> missingMemberFixer::createMemberFromSymbol(
 				        nullptr /*typeParameters*/,
 				        nullptr /*parameters*/,
 				        createTypeNode(t, enclosingDeclaration, flags,
-				                       nodeBuilder, &idToSymbol),
+				                       nodeBuilder, idToSymbol),
 				        nullptr /*fullSignature*/,
 				        createBody(body, quotePreference, signatureOnly)));
 			}
@@ -319,7 +321,7 @@ std::vector<Node*> missingMemberFixer::createMemberFromSymbol(
 				            changeTracker->nodeFactory, 1,
 				            {parameter->name()->text()},
 				            {createTypeNode(t, enclosingDeclaration, flags,
-				                            nodeBuilder, &idToSymbol)},
+				                            nodeBuilder, idToSymbol)},
 				            1, isInJSFile(enclosingDeclaration)),
 				        nullptr /*type*/, nullptr /*fullSignature*/,
 				        createBody(body, quotePreference, signatureOnly)));
@@ -506,13 +508,13 @@ Node* missingMemberFixer::createSignatureDeclarationFromSignature(
 				Node* constraint = typeParameter->Constraint;
 				if (constraint != nullptr) {
 					constraint =
-					    importTypeNode(constraint, &idToSymbol);
+					    importTypeNode(constraint, idToSymbol);
 				}
 
 				Node* defaultType = typeParameter->DefaultType;
 				if (defaultType != nullptr) {
 					defaultType =
-					    importTypeNode(defaultType, &idToSymbol);
+					    importTypeNode(defaultType, idToSymbol);
 				}
 
 				nodes.push_back(
@@ -541,7 +543,7 @@ Node* missingMemberFixer::createSignatureDeclarationFromSignature(
 			Node* parameterTypeNode = parameter->Type;
 			if (parameterTypeNode != nullptr) {
 				parameterTypeNode =
-				    importTypeNode(parameterTypeNode, &idToSymbol);
+				    importTypeNode(parameterTypeNode, idToSymbol);
 			}
 
 			nodes.push_back(
@@ -556,7 +558,7 @@ Node* missingMemberFixer::createSignatureDeclarationFromSignature(
 	}
 
 	if (typeNode != nullptr) {
-		typeNode = importTypeNode(typeNode, &idToSymbol);
+		typeNode = importTypeNode(typeNode, idToSymbol);
 	}
 
 	Node* questionToken = nullptr;
@@ -697,7 +699,7 @@ Node* missingMemberFixer::createSignatureDeclarationFromSignatures(
 	           (Node*)nullptr),
 	    nullptr /*typeParameters*/, parameters,
 	    getReturnTypeFromSignatures(signatures, enclosingDeclaration,
-	                                nodeBuilder, &idToSymbol),
+	                                nodeBuilder, idToSymbol),
 	    nullptr /*fullSignature*/,
 	    createBody(body, quotePreference, false /*signatureOnly*/));
 }
@@ -736,8 +738,8 @@ Node* missingMemberFixer::importTypeNode(
 	}
 
 	auto [importedTypeNode, symbols] =
-	    autoimport::TryGetAutoImportableReferenceFromTypeNode(typeNode,
-	                                                        idToSymbol);
+	    autoimport::TryGetAutoImportableReferenceFromTypeNode(
+	        typeNode, idToSymbol, changeTracker->nodeFactory);
 	if (importedTypeNode != nullptr) {
 		for (auto* symbol : symbols) {
 			auto* exportSymbol = getExportedSymbol(symbol);

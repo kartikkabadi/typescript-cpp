@@ -474,16 +474,16 @@ struct inlayHintState {
 								   nodebuilder::FlagsAllowUniqueESSymbolType |
 								   nodebuilder::
 									   FlagsUseAliasDefinedOutsideCurrentScope;
-		std::unordered_map<::tsc::Node*, ::tsc::Symbol*> idToSymbol;
+		auto* idToSymbol = new std::unordered_map<::tsc::Node*, ::tsc::Symbol*>();
 		// !!! Avoid type node reuse so we collect identifier symbols.
 		::tsc::Node* typeNode = checker->TypeToTypeNode(
-			t, nullptr /*enclosingDeclaration*/, flags, &idToSymbol);
+			t, nullptr /*enclosingDeclaration*/, flags, idToSymbol);
 		debug::assert(typeNode != nullptr, "should always get typenode");
 		lsp::lsproto::StringOrInlayHintLabelParts out;
 		out.InlayHintLabelParts =
 			std::make_shared<lsp::lsproto::Slice<
 				std::shared_ptr<lsp::lsproto::InlayHintLabelPart>>>(
-				getInlayHintLabelParts(typeNode, idToSymbol));
+				getInlayHintLabelParts(typeNode, *idToSymbol));
 		return out;
 	}
 
@@ -494,19 +494,19 @@ struct inlayHintState {
 								   nodebuilder::FlagsAllowUniqueESSymbolType |
 								   nodebuilder::
 									   FlagsUseAliasDefinedOutsideCurrentScope;
-		std::unordered_map<::tsc::Node*, ::tsc::Symbol*> idToSymbol;
+		auto* idToSymbol = new std::unordered_map<::tsc::Node*, ::tsc::Symbol*>();
 		// !!! Avoid type node reuse so we collect identifier symbols.
 		::tsc::Node* typeNode =
 			checker->TypePredicateToTypePredicateNode(
 				typePredicate, nullptr /*enclosingDeclaration*/, flags,
-				&idToSymbol);
+				idToSymbol);
 		debug::assert(typeNode != nullptr,
 					  "should always get typePredicateNode");
 		lsp::lsproto::StringOrInlayHintLabelParts out;
 		out.InlayHintLabelParts =
 			std::make_shared<lsp::lsproto::Slice<
 				std::shared_ptr<lsp::lsproto::InlayHintLabelPart>>>(
-				getInlayHintLabelParts(typeNode, idToSymbol));
+				getInlayHintLabelParts(typeNode, *idToSymbol));
 		return out;
 	}
 
