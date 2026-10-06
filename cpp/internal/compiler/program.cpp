@@ -331,10 +331,19 @@ SimpleProgram::SimpleProgram(CompilerHost* host_,
 	}
 	// === end slice: incremental ===
 
+	// program.go:285 NewProgram — seed the ProgramOptions the file
+	// loader, mapper and reuse machinery read (loader.opts). The
+	// options/factories fields this ctor has no caller wiring for stay
+	// zero-valued.
+	opts_.Host = host;
+	opts_.Config = commandLine_;
+	opts_.Tracing = tr_;
+
 	// fileLoader{} setup (processAllProgramFiles body, fileloader.go:152)
 	filesLoader loader;
 	filesParser parser;
 	includeProcessor_.processingDiagArena.clear();
+	loader.opts = &opts_;
 	loader.host = host;
 	loader.compilerOptions = &options;
 	loader.parser = &parser;
@@ -359,20 +368,20 @@ SimpleProgram::SimpleProgram(CompilerHost* host_,
 	parser.loader = &loader;
 	parser.maxDepth = maxNodeModuleJsDepth;
 
-	// module.NewResolver(ResolverOptions{...}) — no project reference
-	// redirects, no typingsLocation/ProjectName for the CLI path.
-	module::ResolverOptions resolverOptions;
-	resolverOptions.Host = host;
-	resolverOptions.CompilerOptions = &options;
-	resolverOptions.TypingsLocation = "";
-	resolverOptions.ProjectName = "";
-	resolverOptions.ExtraExtensions = {};
-	resolver_ = std::make_unique<module::DefaultResolver>(resolverOptions);
-	loader.resolver = resolver_.get();
+	// fileloader.go:152 — the loader builds the project-reference
+	// mapper and the resolver inside processAllProgramFiles (the
+	// resolver's Host may be the mapper's dts-faking host).
+	loader.processAllProgramFiles(rootFileNames, SingleThreaded());
 
-	loader.processAllProgramFiles(rootFileNames);
-
-	// Move collected state into the program (processedFiles).
+	// Move collected state into the program (processedFiles — the
+	// filesparser.go:565 literal).
+	finishedProcessing = true;
+	resolver_ = std::move(loader.resolverOwned);
+	projectReferenceFileMapper_ =
+	    std::move(loader.projectReferenceFileMapper);
+	duplicateSourceFiles = std::move(parser.duplicateSourceFiles);
+	outputFileToProjectReferenceSource =
+	    std::move(parser.outputFileToProjectReferenceSource);
 	files = std::move(parser.files);
 	filesByPath = std::move(parser.filesByPath);
 	resolvedModules = std::move(parser.resolvedModules);
@@ -384,7 +393,8 @@ SimpleProgram::SimpleProgram(CompilerHost* host_,
 	    std::move(parser.importHelpersImportSpecifiers);
 	// Keep the synthetic import specifier nodes (created in
 	// filesParser::factory) alive for the program's lifetime.
-	syntheticImportArena = std::move(parser.factory.arena());
+	syntheticImportArena =
+	    std::make_shared<Arena>(std::move(parser.factory.arena()));
 	sourceFilesFoundSearchingNodeModules =
 	    std::move(parser.sourceFilesFoundSearchingNodeModules);
 	libFiles = std::move(parser.libFiles);
@@ -394,6 +404,9 @@ SimpleProgram::SimpleProgram(CompilerHost* host_,
 	fileNameList = std::move(rootFileNames);
 	// filesparser.go:584 — loader's content-mapper failure diagnostics.
 	contentMapperDiagnostics = std::move(loader.contentMapperDiagnostics);
+	// filesparser.go:585 — moduleResolutionError (empty: the C++
+	// resolver interface has no error channel).
+	moduleResolutionError_ = loader.moduleResolutionError;
 
 	// initCheckerPool — lazily: getChecker() materializes the single
 	// checker.
@@ -962,10 +975,17 @@ SourceFile* SimpleProgram::GetSourceFile(const std::string& fileName) {
 	return GetSourceFileByPath(toPath(fileName));
 }
 
+// program.go:2076 GetSourceFileForResolvedModule — on a miss, retry
+// through the project-reference redirect.
 SourceFile* SimpleProgram::GetSourceFileForResolvedModule(
     const std::string& fileName) {
 	SourceFile* file = GetSourceFile(fileName);
-	// GetParseFileRedirect — project references not in scope → none.
+	if (file == nullptr) {
+		if (std::string filename = GetParseFileRedirect(fileName);
+		    !filename.empty()) {
+			return GetSourceFile(filename);
+		}
+	}
 	return file;
 }
 
@@ -977,8 +997,9 @@ std::string SimpleProgram::GetCurrentDirectory() {
 	return host->GetCurrentDirectory();
 }
 
+// program.go:231 UseCaseSensitiveFileNames — the host's fs decides.
 bool SimpleProgram::UseCaseSensitiveFileNames() {
-	return true; // POSIX FS
+	return host->FS()->UseCaseSensitiveFileNames();
 }
 
 const std::vector<const FileIncludeReason*>* SimpleProgram::GetIncludeReasons(
@@ -1017,11 +1038,109 @@ bool SimpleProgram::IsSourceFileFromExternalLibrary(SourceFile* file) const {
 	return sourceFilesFoundSearchingNodeModules.count(file->Path()) != 0;
 }
 
-// program.go: IsSourceFromProjectReference — none (no project references).
+// program.go:194 IsSourceFromProjectReference — mapper delegate.
 bool SimpleProgram::IsSourceFromProjectReference(
     const tspath::Path& path) const {
-	return false;
+	return projectReferenceFileMapper_ != nullptr &&
+	       projectReferenceFileMapper_->isSourceFromProjectReference(
+	           path);
 }
+
+// === slice: project ===
+
+// program.go — the tsoptions.ParsedCommandLine that satisfies both
+// checker::RedirectInfo and checker::ProjectReference gets one cached
+// adapter per config (stable deque storage — Go's GC shares the single
+// interface value).
+SimpleProgram::parsedCommandLineAdapter* SimpleProgram::adapterFor(
+    tsoptions::ParsedCommandLine* ref) {
+	if (ref == nullptr) {
+		return nullptr;
+	}
+	auto it = parsedCommandLineAdapterIndex_.find(ref);
+	if (it != parsedCommandLineAdapterIndex_.end()) {
+		return it->second;
+	}
+	parsedCommandLineAdapters_.push_back(parsedCommandLineAdapter{});
+	parsedCommandLineAdapters_.back().ref = ref;
+	parsedCommandLineAdapters_.back().redirectInfo.ref = ref;
+	parsedCommandLineAdapters_.back().projectRef.ref = ref;
+	auto* adapter = &parsedCommandLineAdapters_.back();
+	parsedCommandLineAdapterIndex_[ref] = adapter;
+	return adapter;
+}
+
+// tsoptions -> checker SourceOutputAndProjectReference materialization;
+// the resolved ParsedCommandLine rides through the shared adapter so the
+// checker's ProjectReference* stays stable for a given config.
+checker::SourceOutputAndProjectReference* SimpleProgram::toCheckerRef(
+    tsoptions::SourceOutputAndProjectReference* ref) {
+	if (ref == nullptr) {
+		return nullptr;
+	}
+	auto it = checkerRefCache_.find(ref);
+	if (it != checkerRefCache_.end()) {
+		return &it->second;
+	}
+	auto* resolved = ref->Resolved != nullptr
+	                     ? &adapterFor(ref->Resolved)->projectRef
+	                     : nullptr;
+	auto [insIt, _] = checkerRefCache_.emplace(
+	    ref,
+	    checker::SourceOutputAndProjectReference{
+	        ref->Source, ref->OutputDts, resolved});
+	return &insIt->second;
+}
+
+// program.go:181 GetSourceOfProjectReferenceIfOutputIncluded — the
+// output->source map only carries entries when
+// !canUseProjectReferenceSource(); otherwise the name is returned
+// unchanged.
+std::string SimpleProgram::GetSourceOfProjectReferenceIfOutputIncluded(
+    const HasFileName& file) {
+	auto it = outputFileToProjectReferenceSource.find(file.Path());
+	if (it != outputFileToProjectReferenceSource.end()) {
+		return it->second;
+	}
+	return file.FileName();
+}
+
+// program.go:189 GetProjectReferenceFromSource — checker.Program
+// override (mapper delegate through the tsoptions->checker adapter).
+checker::SourceOutputAndProjectReference*
+SimpleProgram::GetProjectReferenceFromSource(const tspath::Path& path) {
+	return toCheckerRef(
+	    projectReferenceFileMapper_->getProjectReferenceFromSource(
+	        path));
+}
+
+// program.go:198 GetProjectReferenceFromOutputDts — checker.Program
+// override.
+const checker::SourceOutputAndProjectReference*
+SimpleProgram::GetProjectReferenceFromOutputDts(const std::string& path) {
+	return toCheckerRef(
+	    projectReferenceFileMapper_->getProjectReferenceFromOutputDts(
+	        tspath::Path(path)));
+}
+
+// program.go:206 GetRedirectForResolution — checker.Program override;
+// the resolved config adapts into checker::RedirectInfo.
+checker::RedirectInfo* SimpleProgram::GetRedirectForResolution(
+    SourceFile* file) {
+	auto* adapter = adapterFor(
+	    projectReferenceFileMapper_
+	        ->getRedirectParsedCommandLineForResolution(
+	            HasFileName{file->FileName(), file->Path()}));
+	return adapter != nullptr ? &adapter->redirectInfo : nullptr;
+}
+
+// program.go:202 GetResolvedProjectReferenceFor.
+std::pair<tsoptions::ParsedCommandLine*, bool>
+SimpleProgram::GetResolvedProjectReferenceFor(const tspath::Path& path) {
+	return projectReferenceFileMapper_->getResolvedReferenceFor(path);
+}
+
+// === end slice: project ===
 
 const SourceFileMetaData& SimpleProgram::GetSourceFileMetaData(
     const tspath::Path& path) const {
@@ -1138,12 +1257,12 @@ std::string SimpleProgram::CommonSourceDirectory() {
 
 // program.go:1390 IsEmitBlocked / :1384 blockEmittingOfFile
 bool SimpleProgram::IsEmitBlocked(const std::string& emitFileName) const {
-	return hasEmitBlockingDiagnostics.contains(toPath(emitFileName));
+	return hasEmitBlockingDiagnostics->contains(toPath(emitFileName));
 }
 
 void SimpleProgram::blockEmittingOfFile(const std::string& emitFileName,
                                         Diagnostic* diag) {
-	hasEmitBlockingDiagnostics.insert(toPath(emitFileName));
+	hasEmitBlockingDiagnostics->insert(toPath(emitFileName));
 	programDiagnostics.push_back(diag);
 }
 
@@ -2029,10 +2148,68 @@ void SimpleProgram::verifyCompilerOptions() {
 	}
 }
 
-// program.go:1398 verifyProjectReferences — RangeResolvedProjectReference
-// iterates over resolved project references; there are none in this mode,
-// so this is a faithful no-op.
-void SimpleProgram::verifyProjectReferences() {}
+// program.go:1394 verifyProjectReferences — walk the resolved
+// references reporting missing configs, missing composite/noEmit
+// settings and tsbuildinfo collisions.
+void SimpleProgram::verifyProjectReferences() {
+	std::string buildInfoFileName =
+	    opts_.Config != nullptr &&
+	            !tristateIsTrue(Options()->SuppressOutputPathCheck)
+	        ? opts_.Config->GetBuildInfoFileName()
+	        : std::string{};
+	auto createDiagnosticForReference =
+	    [&](tsoptions::ParsedCommandLine* config, int index,
+	        const DiagnosticMessage* message,
+	        std::vector<std::string> args) {
+		    Diagnostic* diag = tsoptions::CreateDiagnosticAtReferenceSyntax(
+		        config, index, message, args);
+		    if (diag == nullptr) {
+			    diag = tsoptions::newCompilerDiagnostic(message, args);
+		    }
+		    programDiagnostics.push_back(diag);
+	    };
+
+	RangeResolvedProjectReference(
+	    [&](tspath::Path path, tsoptions::ParsedCommandLine* config,
+	        tsoptions::ParsedCommandLine* parent, int index) -> bool {
+		    ProjectReference* ref = parent->ProjectReferences()[index];
+		    // !!! Deprecated in 5.0 and removed since 5.5
+		    // verifyRemovedProjectReference(ref, parent, index);
+		    if (config == nullptr) {
+			    createDiagnosticForReference(
+			        parent, index, File_0_not_found,
+			        {std::string(ref->Path)});
+			    return true;
+		    }
+		    const CompilerOptions* refOptions = config->CompilerOptions();
+		    if (!tristateIsTrue(refOptions->Composite) ||
+		        tristateIsTrue(refOptions->NoEmit)) {
+			    if (!parent->FileNames().empty()) {
+				    if (!tristateIsTrue(refOptions->Composite)) {
+					    createDiagnosticForReference(
+					        parent, index,
+					        Referenced_project_0_must_have_setting_composite_Colon_true,
+					        {std::string(ref->Path)});
+				    }
+				    if (tristateIsTrue(refOptions->NoEmit)) {
+					    createDiagnosticForReference(
+					        parent, index,
+					        Referenced_project_0_may_not_disable_emit,
+					        {std::string(ref->Path)});
+				    }
+			    }
+		    }
+		    if (!buildInfoFileName.empty() &&
+		        buildInfoFileName == config->GetBuildInfoFileName()) {
+			    createDiagnosticForReference(
+			        parent, index,
+			        Cannot_write_file_0_because_it_will_overwrite_tsbuildinfo_file_generated_by_referenced_project_1,
+			        {buildInfoFileName, std::string(ref->Path)});
+			    hasEmitBlockingDiagnostics->insert(toPath(buildInfoFileName));
+		    }
+		    return true;
+	    });
+}
 
 // program.go:2010 GetDiagnosticsOfAnyProgram — generalized to ProgramLike
 // so the incremental Program can drive it (execute/incremental slice).
@@ -2252,13 +2429,11 @@ SimpleProgram* NewProgram(const ProgramOptions& opts) {
 	                            opts.Tracing);
 	p->opts_ = opts;
 	// === slice: project ===
-	// program.go:436 initCheckerPool — the pool is created by
-	// opts.CreateCheckerPool when non-nil; when nil Go builds its own
+	// program.go:299 NewProgram -> initCheckerPool: the pool is created
+	// by opts.CreateCheckerPool when non-nil; when nil Go builds its own
 	// checkerPool, whose machinery is unported (the lazy single
 	// checker covers that role here).
-	if (opts.CreateCheckerPool != nullptr) {
-		p->checkerPool_ = opts.CreateCheckerPool(p);
-	}
+	p->initCheckerPool();
 	// === end slice: project ===
 	if (tracePop) {
 		tracePop();
@@ -2334,19 +2509,445 @@ void SimpleProgram::ExplainFiles(std::ostream& w,
 	explainSourceFiles(static_cast<int>(files.size() + redirectFiles.size()));
 }
 
+// program.go:495-509 — the canReplaceFileInProgram equality helpers.
+namespace {
+
+// equalModuleSpecifiers — program.go:495.
+bool equalModuleSpecifiers(Node* n1, Node* n2) {
+	return n1->kind == n2->kind &&
+	       (!isStringLiteral(n1) || n1->text() == n2->text());
+}
+
+// equalModuleAugmentationNames — program.go:499.
+bool equalModuleAugmentationNames(Node* n1, Node* n2) {
+	return n1->kind == n2->kind && n1->text() == n2->text();
+}
+
+// equalFileReferences — program.go:503.
+bool equalFileReferences(FileReference* f1, FileReference* f2) {
+	return f1->FileName == f2->FileName &&
+	       f1->ResolutionMode == f2->ResolutionMode &&
+	       f1->Preserve == f2->Preserve;
+}
+
+// equalCheckJSDirectives — program.go:507.
+bool equalCheckJSDirectives(CheckJsDirective* d1, CheckJsDirective* d2) {
+	return (d1 == nullptr && d2 == nullptr) ||
+	       (d1 != nullptr && d2 != nullptr && d1->Enabled == d2->Enabled);
+}
+
+}  // namespace
+
+// program.go:454 canReplaceFileInProgram.
+bool SimpleProgram::canReplaceFileInProgram(SourceFile* file1,
+                                            SourceFile* file2) {
+	return file2 != nullptr &&
+	       file1->ParseOptions() == file2->ParseOptions() &&
+	       file1->ScriptKind == file2->ScriptKind &&
+	       isExternalOrCommonJSModule(file1) ==
+	           isExternalOrCommonJSModule(file2) &&
+	       file1->UsesUriStyleNodeCoreModules ==
+	           file2->UsesUriStyleNodeCoreModules &&
+	       file1->imports.size() == file2->imports.size() &&
+	       [&] {
+		       for (size_t i = 0; i < file1->imports.size(); i++) {
+			       auto* n1 = file1->imports[i];
+			       auto* n2 = file2->imports[i];
+			       if (!equalModuleSpecifiers(n1, n2) ||
+			           GetModeForUsageLocation(file1, n1) !=
+			               GetModeForUsageLocation(file2, n2)) {
+				       return false;
+			       }
+		       }
+		       return true;
+	       }() &&
+	       std::equal(file1->ModuleAugmentations.begin(),
+	                  file1->ModuleAugmentations.end(),
+	                  file2->ModuleAugmentations.begin(),
+	                  file2->ModuleAugmentations.end(),
+	                  equalModuleAugmentationNames) &&
+	       file1->AmbientModuleNames == file2->AmbientModuleNames &&
+	       std::equal(file1->ReferencedFiles.begin(),
+	                  file1->ReferencedFiles.end(),
+	                  file2->ReferencedFiles.begin(),
+	                  file2->ReferencedFiles.end(),
+	                  equalFileReferences) &&
+	       std::equal(file1->TypeReferenceDirectives.begin(),
+	                  file1->TypeReferenceDirectives.end(),
+	                  file2->TypeReferenceDirectives.begin(),
+	                  file2->TypeReferenceDirectives.end(),
+	                  equalFileReferences) &&
+	       std::equal(file1->LibReferenceDirectives.begin(),
+	                  file1->LibReferenceDirectives.end(),
+	                  file2->LibReferenceDirectives.begin(),
+	                  file2->LibReferenceDirectives.end(),
+	                  equalFileReferences) &&
+	       equalCheckJSDirectives(file1->CheckJsDirective,
+	                            file2->CheckJsDirective);
+}
+
+// program.go:472 needsImportHelpersImportSpecifier.
+bool SimpleProgram::needsImportHelpersImportSpecifier(SourceFile* file) {
+	auto [redirect, _] =
+	    projectReferenceFileMapper_->getRedirectForResolution(
+	        HasFileName{file->FileName(), file->Path()});
+	const CompilerOptions* optionsForFile =
+	    module::GetCompilerOptionsWithRedirect(
+	        opts_.Config->CompilerOptions(), redirect);
+	if (!tristateIsTrue(optionsForFile->ImportHelpers)) {
+		return false;
+	}
+	bool isJavaScriptFile = isSourceFileJS(file);
+	bool isExternalModuleFile = isExternalModule(file);
+	if (!isJavaScriptFile &&
+	    (file->IsDeclarationFile ||
+	     (!optionsForFile->GetIsolatedModules() &&
+	      !isExternalModuleFile))) {
+		return false;
+	}
+	return true;
+}
+
+// program.go:486 jsxRuntimeImportSpecifier (member renamed
+// jsxRuntimeImportSpecifierForFile — the field's map has the same name).
+std::string SimpleProgram::jsxRuntimeImportSpecifierForFile(
+    SourceFile* file) {
+	if (!isSourceFileJS(file) && file->ScriptKind != ScriptKind::TSX) {
+		return "";
+	}
+	auto [redirect, _] =
+	    projectReferenceFileMapper_->getRedirectForResolution(
+	        HasFileName{file->FileName(), file->Path()});
+	const CompilerOptions* optionsForFile =
+	    module::GetCompilerOptionsWithRedirect(
+	        opts_.Config->CompilerOptions(), redirect);
+	return getJSXRuntimeImport(
+	    getJSXImplicitImportBase(optionsForFile, file), optionsForFile);
+}
+
 // program.go:332 ReuseProgram — the UpdateProgram single-file fast path.
-// dep-stub — owned by compiler: the program-state replay machinery
-// (processedFiles, lazyValue caches, updateFileIncludeProcessor,
-// initCheckerPool) is not ported.
+// The &Program{...} literal (program.go:405-413) is an in-place field
+// splice: the reuse ctor leaves all state zero, then the processedFiles
+// fields + the named program-level fields copy over (Go's map fields are
+// shared references — ours are value copies / shared_ptr where sharing
+// is semantic).
 std::tuple<SimpleProgram*, SourceFile*, bool> SimpleProgram::ReuseProgram(
     const tspath::Path& changedFilePath, CompilerHost* newHost,
     const std::function<void*(SimpleProgram*)>& createCheckerPool,
     const std::function<module::Resolver*(const module::ResolverOptions&)>&
         createModuleResolver) {
-	TSC_UNREACHABLE("SimpleProgram::ReuseProgram — owned by compiler");
+	ProgramOptions newOpts = opts_;
+	newOpts.Host = newHost;
+	if (createCheckerPool) {
+		newOpts.CreateCheckerPool = createCheckerPool;
+	}
+	if (createModuleResolver) {
+		newOpts.CreateModuleResolver = createModuleResolver;
+	}
+	SourceFile* oldFile = filesByPath[changedFilePath];
+	SourceFile* newFile = nullptr;
+	std::vector<SourceFile*> oldSupplementalFiles;
+	std::vector<SourceFile*> newSupplementalFiles;
+	if (!oldFile->ContentMapper().empty()) {
+		// Content-mapped files are produced by running an external
+		// transform, which a plain reparse can't reproduce. Re-run the
+		// transform through the host; any failure (or a missing file)
+		// falls back to a full rebuild so the file loader's failure
+		// policy runs.
+		auto* mapper = newOpts.Config->GetContentMapperForFileName(
+		    oldFile->FileName());
+		auto [files, err] = newHost->GetContentMappedSourceFiles(
+		    oldFile->ParseOptions(), mapper);
+		newFile = files.Canonical;
+		if (err) {
+			return {nullptr, nullptr, false};
+		}
+		oldSupplementalFiles =
+		    oldFile->SupplementalSourceFiles() != nullptr
+		        ? *oldFile->SupplementalSourceFiles()
+		        : std::vector<SourceFile*>{};
+		newSupplementalFiles = files.Supplemental;
+	} else {
+		newFile = newHost->GetSourceFile(oldFile->ParseOptions());
+	}
+
+	// If this file is part of a package redirect group (same package
+	// installed in multiple node_modules locations), we need to rebuild
+	// the program because the redirect targets might need
+	// recalculation.
+	if (redirectFilesByPath.find(changedFilePath) !=
+	        redirectFilesByPath.end() ||
+	    redirectTargetsMap.find(changedFilePath) !=
+	        redirectTargetsMap.end()) {
+		return {nullptr, newFile, false};
+	}
+
+	if (!canReplaceFileInProgram(oldFile, newFile)) {
+		return {nullptr, newFile, false};
+	}
+	// Cloning does not recompute synthetic helper or JSX-runtime import
+	// bookkeeping. Fall back to a full build whenever either version
+	// requires those imports.
+	if (importHelpersImportSpecifiers[oldFile->Path()] != nullptr ||
+	    needsImportHelpersImportSpecifier(newFile)) {
+		return {nullptr, newFile, false};
+	}
+	if (jsxRuntimeImportSpecifiers.find(oldFile->Path()) !=
+	        jsxRuntimeImportSpecifiers.end() ||
+	    !jsxRuntimeImportSpecifierForFile(newFile).empty()) {
+		return {nullptr, newFile, false};
+	}
+	if (oldSupplementalFiles.size() != newSupplementalFiles.size()) {
+		return {nullptr, newFile, false};
+	}
+	for (size_t i = 0; i < oldSupplementalFiles.size(); i++) {
+		auto* oldSupplemental = oldSupplementalFiles[i];
+		auto* newSupplemental = newSupplementalFiles[i];
+		if (oldSupplemental->Path() != newSupplemental->Path() ||
+		    !canReplaceFileInProgram(oldSupplemental, newSupplemental)) {
+			return {nullptr, newFile, false};
+		}
+		if (importHelpersImportSpecifiers[oldSupplemental->Path()] !=
+		        nullptr ||
+		    needsImportHelpersImportSpecifier(newSupplemental)) {
+			return {nullptr, newFile, false};
+		}
+		if (jsxRuntimeImportSpecifiers.find(oldSupplemental->Path()) !=
+		        jsxRuntimeImportSpecifiers.end() ||
+		    !jsxRuntimeImportSpecifierForFile(newSupplemental)
+		         .empty()) {
+			return {nullptr, newFile, false};
+		}
+	}
+	// TODO: reverify compiler options when config has changed?
+	// program.go:405 &Program{...} — the reuse splice.
+	auto* result = new SimpleProgram();
+	result->opts_ = newOpts;
+	// host / options / config — Go reads these off p.opts.Host /
+	// p.opts.Config.CompilerOptions(); the C++ program stores them
+	// separately, so wire the new host + carry the config.
+	result->host = newHost;
+	result->options = options;
+	result->host->compilerOptions = &result->options;
+	result->commandLine_ = newOpts.Config;
+	result->tr_ = tr_;
+	if (commandLineOwned_ != nullptr) {
+		// This program synthesized its config — the reuse re-synthesizes
+		// its own so it doesn't borrow storage the source program owns.
+		result->commandLineOwned_.reset(
+		    tsoptions::NewParsedCommandLine(
+		        &result->options, result->fileNameList, {},
+		        result->comparePathsOptions()));
+		result->commandLine_ = result->commandLineOwned_.get();
+	}
+	result->skipModuleResolution = skipModuleResolution;
+	result->usesUriStyleNodeCoreModules = usesUriStyleNodeCoreModules;
+	result->programDiagnostics = programDiagnostics;
+	result->hasEmitBlockingDiagnostics = hasEmitBlockingDiagnostics;
+	result->contentMapperOptionDiagnostics =
+	    contentMapperOptionDiagnostics;
+	result->configFileParsingDiagnostics = configFileParsingDiagnostics;
+	// processedFiles fields (fileloader.go:113-145) — the Go literal
+	// copies the struct wholesale.
+	result->resolver_ = resolver_;
+	result->files = files;
+	result->duplicateSourceFiles = duplicateSourceFiles;
+	result->filesByPath = filesByPath;
+	result->projectReferenceFileMapper_ = projectReferenceFileMapper_;
+	result->missingFiles = missingFiles;
+	result->resolvedModules = resolvedModules;
+	result->typeResolutionsInFile = typeResolutionsInFile;
+	result->sourceFileMetaDatas = sourceFileMetaDatas;
+	result->jsxRuntimeImportSpecifiers = jsxRuntimeImportSpecifiers;
+	result->importHelpersImportSpecifiers =
+	    importHelpersImportSpecifiers;
+	result->libFiles = libFiles;
+	result->sourceFilesFoundSearchingNodeModules =
+	    sourceFilesFoundSearchingNodeModules;
+	result->outputFileToProjectReferenceSource =
+	    outputFileToProjectReferenceSource;
+	result->redirectTargetsMap = redirectTargetsMap;
+	result->redirectFilesByPath = redirectFilesByPath;
+	result->contentMapperDiagnostics = contentMapperDiagnostics;
+	result->moduleResolutionError_ = moduleResolutionError_;
+	result->finishedProcessing = finishedProcessing;
+	result->fileNameList = fileNameList;
+	result->syntheticImportArena = syntheticImportArena;
+	// includeProcessor is rebuilt below by updateFileIncludeProcessor
+	// (program.go:431) — Go drops its sync maps when re-keying against
+	// the new program.
+	result->unresolvedImports.tryReuse(&unresolvedImports);
+	result->knownSymlinks.tryReuse(&knownSymlinks);
+	result->packageNames_.tryReuse(&packageNames_);
+	result->initCheckerPool();
+	auto indexIt =
+	    std::find_if(result->files.begin(), result->files.end(),
+	                 [newFile](SourceFile* file) {
+		                 return file->Path() == newFile->Path();
+	                 });
+	auto index = indexIt - result->files.begin();
+	result->files[index] = newFile;
+	result->filesByPath[newFile->Path()] = newFile;
+	if (!oldSupplementalFiles.empty()) {
+		for (size_t i = 0; i < oldSupplementalFiles.size(); i++) {
+			auto* oldSupplemental = oldSupplementalFiles[i];
+			auto* newSupplemental = newSupplementalFiles[i];
+			auto supIt = std::find_if(
+			    result->files.begin(), result->files.end(),
+			    [oldSupplemental](SourceFile* file) {
+				    return file == oldSupplemental;
+			    });
+			auto supplementalIndex = supIt - result->files.begin();
+			result->files[supplementalIndex] = newSupplemental;
+			result->filesByPath[newSupplemental->Path()] =
+			    newSupplemental;
+		}
+	}
+	updateFileIncludeProcessor(result);
+	return {result, newFile, true};
 }
 
-// === slice: project ===
+// program.go:435 initCheckerPool — panics when the program hasn't
+// finished processing files; the port's pool is the opaque
+// checkerPool_ slot filled by opts.CreateCheckerPool (the compiler's
+// built-in checkerPool machinery is intentionally unported — the lazy
+// single checker covers that role, program.cpp:2255).
+void SimpleProgram::initCheckerPool() {
+	if (!finishedProcessing) {
+		TSC_UNREACHABLE(
+		    "Program must finish processing files before initializing "
+		    "checker pool");
+	}
+	if (opts_.CreateCheckerPool) {
+		checkerPool_ = opts_.CreateCheckerPool(this);
+	}
+}
+
+// program.go:542 extractUnresolvedImports — the unresolvedImports
+// lazyValue's compute step (set accumulates across all files).
+collections::Set<std::string>* SimpleProgram::extractUnresolvedImports() {
+	auto* unresolvedSet = new collections::Set<std::string>();
+	for (auto* sourceFile : files) {
+		for (auto& imp :
+		     extractUnresolvedImportsFromSourceFile(sourceFile)) {
+			unresolvedSet->Add(imp);
+		}
+	}
+	return unresolvedSet;
+}
+
+// program.go:555 extractUnresolvedImportsFromSourceFile — non-relative
+// specifiers whose resolution is missing or landed on a non-TS
+// extension are "unresolved" for auto-import purposes.
+std::vector<std::string>
+SimpleProgram::extractUnresolvedImportsFromSourceFile(SourceFile* file) {
+	std::vector<std::string> unresolvedImports;
+	auto it = resolvedModules.find(file->Path());
+	if (it != resolvedModules.end()) {
+		for (auto& [cacheKey, resolution] : it->second) {
+			bool resolved = resolution->IsResolved();
+			if ((!resolved ||
+			     !tspath::extensionIsOneOf(
+			         resolution->Extension,
+			         tspath::supportedTSExtensionsWithJsonFlat)) &&
+			    !tspath::isExternalModuleNameRelative(cacheKey.Name)) {
+				unresolvedImports.push_back(cacheKey.Name);
+			}
+		}
+	}
+	return unresolvedImports;
+}
+
+// program.go:2300 GetSymlinkCache — lazyValue[symlinks.KnownSymlinks]:
+// resolutions' realpath bookkeeping plus a package.json dependency probe
+// (records each runtime dep's original->resolved package.json pair).
+symlinks::KnownSymlinks* SimpleProgram::GetSymlinkCache() {
+	return knownSymlinks.getValue([this]() -> symlinks::KnownSymlinks* {
+		auto* knownSymlinks = symlinks::NewKnownSymlink(
+		    GetCurrentDirectory(), UseCaseSensitiveFileNames());
+
+		// Resolved modules store realpath information when they're
+		// resolved inside node_modules
+		if (!resolvedModules.empty() || !typeResolutionsInFile.empty()) {
+			knownSymlinks->SetSymlinksFromResolutions(
+			    [this](const std::function<void(
+			               module::ResolvedModule*, std::string_view,
+			               ResolutionMode, tspath::Path)>& cb,
+			           SourceFile* file) {
+				    ForEachResolvedModule(cb, file);
+			    },
+			    [this](const std::function<void(
+			               module::ResolvedTypeReferenceDirective*,
+			               std::string_view, ResolutionMode,
+			               tspath::Path)>& cb,
+			           SourceFile* file) {
+				    ForEachResolvedTypeReferenceDirective(cb,
+				                                          file);
+			    });
+		}
+
+		// Check other dependencies for symlinks
+		collections::Set<tspath::Path> seenPackageJsons;
+		for (auto& [filePath, meta] : sourceFileMetaDatas) {
+			if (meta.PackageJsonDirectory.empty() ||
+			    !SourceFileMayBeEmitted(
+			        GetSourceFileByPath(filePath), false) ||
+			    !seenPackageJsons.AddIfAbsent(
+			        toPath(meta.PackageJsonDirectory))) {
+				continue;
+			}
+			std::string packageJsonName = tspath::combinePaths(
+			    meta.PackageJsonDirectory, {"package.json"});
+			auto info = GetPackageJsonInfo(packageJsonName);
+			if (info == nullptr || info->GetContents() == nullptr) {
+				continue;
+			}
+
+			for (auto& dep : info->GetContents()
+			                      ->GetRuntimeDependencyNames()
+			                      .Keys()) {
+				// Skip work in common case: we already saved a
+				// symlink for this package directory in the
+				// node_modules adjacent to this package.json
+				auto possibleDirectoryPath = toPath(
+				    tspath::combinePaths(meta.PackageJsonDirectory,
+				                         {"node_modules", dep}));
+				if (knownSymlinks->HasDirectory(
+				        possibleDirectoryPath)) {
+					continue;
+				}
+				if (dep.rfind("@types", 0) != 0) {
+					auto possibleTypesDirectoryPath = toPath(
+					    tspath::combinePaths(
+					        meta.PackageJsonDirectory,
+					        {"node_modules",
+					         module::GetTypesPackageName(dep)}));
+					if (knownSymlinks->HasDirectory(
+					        possibleTypesDirectoryPath)) {
+						continue;
+					}
+				}
+
+				auto packageResolution =
+				    resolver_->ResolvePackageDirectory(
+				        dep, packageJsonName,
+				        ResolutionModeCommonJS, nullptr);
+				if (packageResolution != nullptr &&
+				    packageResolution->IsResolved() &&
+				    !packageResolution->OriginalPath.empty()) {
+					knownSymlinks->ProcessResolution(
+					    tspath::combinePaths(
+					        packageResolution->OriginalPath,
+					        {"package.json"}),
+					    tspath::combinePaths(
+					        packageResolution->ResolvedFileName,
+					        {"package.json"}));
+				}
+			}
+		}
+		return knownSymlinks;
+	});
+}
 
 // program.go:305 UpdateProgram — ReuseProgram fast path, else a fresh
 // program built from opts with the host/factories swapped.
@@ -2364,10 +2965,10 @@ std::tuple<SimpleProgram*, SourceFile*, bool> SimpleProgram::UpdateProgram(
 	SourceFile* newFile = std::get<1>(reuseResult);
 	ProgramOptions newOpts = opts_;
 	newOpts.Host = newHost;
-	if (createCheckerPool != nullptr) {
+	if (createCheckerPool) {
 		newOpts.CreateCheckerPool = createCheckerPool;
 	}
-	if (createModuleResolver != nullptr) {
+	if (createModuleResolver) {
 		newOpts.CreateModuleResolver = createModuleResolver;
 	}
 	return {NewProgram(newOpts), newFile, false};
@@ -2486,89 +3087,104 @@ void SimpleProgram::ForEachCheckerParallel(
 
 // === end slice: testrunner ===
 
-// program.go:2226 collectPackageNames — lazy like Go's lazyValue.
+// program.go:2226 collectPackageNames — lazyValue[packageNamesInfo].
 SimpleProgram::packageNamesInfo* SimpleProgram::collectPackageNames() {
-	if (packageNames_.has_value()) {
-		return &*packageNames_;
-	}
-	packageNames_.emplace();
-	auto& packageNames = *packageNames_;
-	for (auto* file : files) {
-		if (IsSourceFileDefaultLibrary(file->Path()) ||
-		    IsSourceFileFromExternalLibrary(file) ||
-		    file->FileName().find("/node_modules/") != std::string::npos) {
-			// Checking for /node_modules/ is a little imprecise, but ATA
-			// treats locally installed typings as root files, which would
-			// not pass IsSourceFileFromExternalLibrary.
-			continue;
-		}
-		for (auto* imp : file->imports) {
-			if (tspath::isExternalModuleNameRelative(imp->text())) {
+	return packageNames_.getValue([this]() -> packageNamesInfo* {
+		auto* packageNames = new packageNamesInfo{};
+		for (auto* file : files) {
+			if (IsSourceFileDefaultLibrary(file->Path()) ||
+			    IsSourceFileFromExternalLibrary(file) ||
+			    file->FileName().find("/node_modules/") !=
+			        std::string::npos) {
+				// Checking for /node_modules/ is a little imprecise, but
+				// ATA treats locally installed typings as root files,
+				// which would not pass
+				// IsSourceFileFromExternalLibrary.
 				continue;
 			}
-			auto rmIt = resolvedModules.find(file->Path());
-			if (rmIt != resolvedModules.end()) {
-				module::ModeAwareCacheKey key{
-				    imp->text(), GetModeForUsageLocation(file, imp)};
-				auto rm2 = rmIt->second.find(key);
-				if (rm2 != rmIt->second.end() && rm2->second != nullptr &&
-				    rm2->second->IsResolved()) {
-					module::ResolvedModule* resolvedModule = rm2->second;
-					if (!resolvedModule->IsExternalLibraryImport) {
-						continue;
-					}
-					// Priority order for getting package name:
-					// 1. PackageId.Name (requires both name and version in
-					//    package.json)
-					std::string name = resolvedModule->PackageId.Name;
-					if (name.empty()) {
-						// 2. GetPackageScopeForPath - get name from
-						//    package.json in the package directory
-						auto packageScope = resolver_->GetPackageScopeForPath(
-						    resolvedModule->ResolvedFileName);
-						if (packageScope != nullptr &&
-						    packageScope->Exists()) {
-							if (auto [scopeName, ok] =
-							        packageScope->Contents->Name.GetValue();
-							    ok) {
-								name = scopeName;
-							}
-						}
-					}
-					if (name.empty()) {
-						// 3. GetPackageNameFromDirectory - extract from
-						//    node_modules path
-						name = modulespecifiers::GetPackageNameFromDirectory(
-						    resolvedModule->ResolvedFileName);
-					}
-					// 4. If all fail, don't add empty string
-					if (!name.empty()) {
-						packageNames.resolved.Add(name);
-						// Detect deep imports: subpath imports in packages
-						// without exports. These are imports like
-						// "lodash/fp" where the package has no exports map,
-						// so auto-import can only find them via recursive
-						// directory search.
-						auto [_, rest] = module::ParsePackageName(imp->text());
-						if (!rest.empty()) {
-							if (auto scope =
-							        resolver_->GetPackageScopeForPath(
-							            resolvedModule->ResolvedFileName);
-							    scope != nullptr && scope->Exists() &&
-							    !scope->Contents->Exports.IsPresent()) {
-								packageNames.deepImportPackages.Add(
-								    module::GetPackageNameFromTypesPackageName(
-								        name));
-							}
-						}
-					}
+			for (auto* imp : file->imports) {
+				if (tspath::isExternalModuleNameRelative(imp->text())) {
 					continue;
 				}
+				auto rmIt = resolvedModules.find(file->Path());
+				if (rmIt != resolvedModules.end()) {
+					module::ModeAwareCacheKey key{
+					    imp->text(), GetModeForUsageLocation(file, imp)};
+					auto rm2 = rmIt->second.find(key);
+					if (rm2 != rmIt->second.end() &&
+					    rm2->second != nullptr &&
+					    rm2->second->IsResolved()) {
+						module::ResolvedModule* resolvedModule =
+						    rm2->second;
+						if (!resolvedModule->IsExternalLibraryImport) {
+							continue;
+						}
+						// Priority order for getting package name:
+						// 1. PackageId.Name (requires both name and
+						//    version in package.json)
+						std::string name = resolvedModule->PackageId.Name;
+						if (name.empty()) {
+							// 2. GetPackageScopeForPath - get name from
+							//    package.json in the package directory
+							auto packageScope =
+							    resolver_->GetPackageScopeForPath(
+							        resolvedModule->ResolvedFileName);
+							if (packageScope != nullptr &&
+							    packageScope->Exists()) {
+								if (auto [scopeName, ok] =
+								        packageScope->Contents->Name
+								            .GetValue();
+								    ok) {
+									name = scopeName;
+								}
+							}
+						}
+						if (name.empty()) {
+							// 3. GetPackageNameFromDirectory - extract
+							//    from node_modules path
+							name =
+							    modulespecifiers::
+							        GetPackageNameFromDirectory(
+							            resolvedModule
+							                ->ResolvedFileName);
+						}
+						// 4. If all fail, don't add empty string
+						if (!name.empty()) {
+							packageNames->resolved.Add(name);
+							// Detect deep imports: subpath imports in
+							// packages without exports. These are
+							// imports like "lodash/fp" where the
+							// package has no exports map, so
+							// auto-import can only find them via
+							// recursive directory search.
+							auto [_, rest] =
+							    module::ParsePackageName(imp->text());
+							if (!rest.empty()) {
+								if (auto scope =
+								        resolver_
+								            ->GetPackageScopeForPath(
+								                resolvedModule
+								                    ->ResolvedFileName);
+								    scope != nullptr &&
+								    scope->Exists() &&
+								    !scope->Contents->Exports
+								         .IsPresent()) {
+									packageNames->deepImportPackages
+									    .Add(
+									        module::
+									            GetPackageNameFromTypesPackageName(
+									                name));
+								}
+							}
+						}
+						continue;
+					}
+				}
+				packageNames->unresolved.Add(imp->text());
 			}
-			packageNames.unresolved.Add(imp->text());
 		}
-	}
-	return &packageNames;
+		return packageNames;
+	});
 }
 
 // === end slice: ls-autoimport ===

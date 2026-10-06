@@ -706,6 +706,49 @@ Diagnostic* includeProcessor::getRelatedInfo(const FileIncludeReason* r,
 	return relatedInfo;
 }
 
+// includeprocessor.go:28 updateFileIncludeProcessor — a reused program
+// rebuilds the processor keeping only the reasons + diagnostics (the
+// SyncMap caches resolve against the new program). The arenas move too:
+// they own every FileIncludeReason/processingDiagnostic the kept maps
+// point at (Go relies on GC).
+void updateFileIncludeProcessor(SimpleProgram* p) {
+	auto& old = p->includeProcessor_;
+	includeProcessor fresh;
+	fresh.fileIncludeReasons = std::move(old.fileIncludeReasons);
+	fresh.processingDiagnostics = std::move(old.processingDiagnostics);
+	fresh.reasonArena = std::move(old.reasonArena);
+	fresh.processingDiagArena = std::move(old.processingDiagArena);
+	fresh.diagArena = std::move(old.diagArena);
+	p->includeProcessor_ = std::move(fresh);
+}
+
+// includeprocessor.go:98 getCompilerOptionsObjectLiteralSyntax —
+// once-computed lookup of the config's "compilerOptions" object literal.
+ObjectLiteralExpression*
+includeProcessor::getCompilerOptionsObjectLiteralSyntax(SimpleProgram* p) {
+	if (!compilerOptionsSyntaxComputed) {
+		compilerOptionsSyntaxComputed = true;
+		tsoptions::TsConfigSourceFile* configFile =
+		    p->opts_.Config != nullptr ? p->opts_.Config->ConfigFile
+		                             : nullptr;
+		if (configFile != nullptr) {
+			if (PropertyAssignment* compilerOptionsProperty =
+			        tsoptions::ForEachTsConfigPropArray<PropertyAssignment>(
+			            configFile->SourceFile, "compilerOptions",
+			            [](PropertyAssignment* prop) { return prop; });
+			    compilerOptionsProperty != nullptr &&
+			    compilerOptionsProperty->Initializer != nullptr &&
+			    isObjectLiteralExpression(
+			        compilerOptionsProperty->Initializer)) {
+				compilerOptionsSyntax =
+				    compilerOptionsProperty->Initializer
+				        ->as<ObjectLiteralExpression>();
+			}
+		}
+	}
+	return compilerOptionsSyntax;
+}
+
 // includeprocessor.go: explainRedirectAndImpliedFormat
 std::vector<Diagnostic*> includeProcessor::explainRedirectAndImpliedFormat(
     SimpleProgram* program, const tspath::Path& filePath,
@@ -723,8 +766,21 @@ std::vector<Diagnostic*> includeProcessor::explainRedirectAndImpliedFormat(
 	if (redirectsFilePtr == nullptr && sourceFile == nullptr) {
 		return result;
 	}
-	// No project references — GetSourceOfProjectReferenceIfOutputIncluded
-	// == identity.
+	// Go's `file` is the redirectsFile when present else the source file
+	// (both satisfy ast.HasFileName) — includeprocessor.go:131-142.
+	HasFileName file = redirectsFilePtr != nullptr
+	                       ? HasFileName{redirectsFilePtr->fileName,
+	                                     filePath}
+	                       : HasFileName{sourceFile->FileName(), filePath};
+	// includeprocessor.go:144-149 — a file produced as a project
+	// reference's declared output explains which source emitted it.
+	if (std::string source =
+	        program->GetSourceOfProjectReferenceIfOutputIncluded(file);
+	    source != file.FileName()) {
+		result.push_back(tsoptions::newCompilerDiagnostic(
+		    File_is_output_of_project_reference_source_0,
+		    {toFileName(source)}));
+	}
 	if (redirectsFilePtr != nullptr) {
 		SourceFile* targetFile =
 		    program->GetSourceFileByPath(redirectsFilePtr->target);

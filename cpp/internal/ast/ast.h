@@ -319,13 +319,35 @@ struct SourceFileMetaData {
 struct ExternalModuleIndicatorOptions {
 	JsxEmit JSX = JsxEmit::None;
 	bool Force = false;
+
+	bool operator==(const ExternalModuleIndicatorOptions&) const = default;
 };
 
 struct SourceFileParseOptions {
 	std::string FileName;
 	std::string Path;
 	ExternalModuleIndicatorOptions ExternalModuleIndicatorOptions;
+
+	// parseoptions.go:8 — Go compares the whole struct (`file1.ParseOptions()
+	// == file2.ParseOptions()`); all members are comparable.
+	bool operator==(const SourceFileParseOptions&) const = default;
 };
+
+// ast.go:2436 HasFileName — Go's two-method interface (FileName()/Path())
+// over a file. Ported as a value pair; parseTask, redirectsFile and
+// SourceFile all carry the same pair so callers construct this directly.
+struct HasFileName {
+	std::string fileName;
+	tspath::Path path;
+
+	const std::string& FileName() const { return fileName; }
+	const tspath::Path& Path() const { return path; }
+};
+
+// utilities.go:3819 NewHasFileName.
+inline HasFileName NewHasFileName(std::string fileName, tspath::Path path) {
+	return HasFileName{std::move(fileName), std::move(path)};
+}
 
 enum class MappedDiagnosticDirectivePolicy : uint8_t {
 	Ignore = 0,

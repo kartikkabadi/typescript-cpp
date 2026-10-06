@@ -1,14 +1,13 @@
 // symlinks — port of tsc/internal/symlinks/knownsymlinks.go.
-// === slice: modulespecifiers === (written for the modulespecifiers slice;
-// SetSymlinksFromResolutions is omitted — its callback plumbing has no C++
-// caller yet.)
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
 
 #include "internal/collections/collections.h"
+#include "internal/module/types.h"
 #include "internal/tspath/tspath.h"
 
 namespace tsc::symlinks {
@@ -114,6 +113,39 @@ public:
 			set->Add(symlink);
 		}
 		files.Store(symlinkPath, realpath);
+	}
+
+	// SetSymlinksFromResolutions — knownsymlinks.go:81. Each forEach
+	// callback takes (resolution callback, file == nullptr for all files),
+	// mirroring program.go ForEachResolvedModule /
+	// ForEachResolvedTypeReferenceDirective.
+	void SetSymlinksFromResolutions(
+	    const std::function<void(
+	        const std::function<void(module::ResolvedModule*,
+	                                 std::string_view, ResolutionMode,
+	                                 tspath::Path)>&,
+	        SourceFile*)>& forEachResolvedModule,
+	    const std::function<void(
+	        const std::function<void(module::ResolvedTypeReferenceDirective*,
+	                                 std::string_view, ResolutionMode,
+	                                 tspath::Path)>&,
+	        SourceFile*)>& forEachResolvedTypeReferenceDirective) {
+		forEachResolvedModule(
+		    [this](module::ResolvedModule* resolution,
+		           std::string_view /*moduleName*/, ResolutionMode /*mode*/,
+		           tspath::Path /*filePath*/) {
+			    ProcessResolution(resolution->OriginalPath,
+			                      resolution->ResolvedFileName);
+		    },
+		    nullptr);
+		forEachResolvedTypeReferenceDirective(
+		    [this](module::ResolvedTypeReferenceDirective* resolution,
+		           std::string_view /*moduleName*/, ResolutionMode /*mode*/,
+		           tspath::Path /*filePath*/) {
+			    ProcessResolution(resolution->OriginalPath,
+			                      resolution->ResolvedFileName);
+		    },
+		    nullptr);
 	}
 
 	// ProcessResolution — knownsymlinks.go:93.
