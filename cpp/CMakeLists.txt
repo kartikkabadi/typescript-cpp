@@ -263,6 +263,11 @@ add_library(tsc STATIC
 	internal/fswatch/util.cpp
 	internal/fswatch/walkdir.cpp
 	internal/fswatch/watcher.cpp
+
+	# === slice: lsp-proto ===
+	internal/lsp/lsproto/lsproto.cpp
+	internal/lsp/lsproto/lsproto_generated.cpp
+	internal/lsp/lspwatcher/lspwatcher.cpp
 )
 
 target_link_libraries(tsc PUBLIC z) # zlib — pprof profile writer

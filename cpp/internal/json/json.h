@@ -34,7 +34,15 @@ namespace tsc::json {
 using Kind = char;
 
 // jsontext.Value — the raw textual representation of a complete JSON value.
-using Value = std::string;
+// Derived from std::string (not an alias) so marshal/unmarshal dispatch can
+// tell raw JSON text apart from Go `string` fields, which encode as quoted
+// strings; inheritance keeps all string-like semantics for call sites.
+struct Value : public std::string {
+    using std::string::string;
+    Value() = default;
+    Value(std::string s) : std::string(std::move(s)) {}
+    Value(const char* s) : std::string(s) {}
+};
 
 // jsontext.Token.
 struct Token {
@@ -267,12 +275,12 @@ std::pair<std::string, gostd::Error> asString(const Dom& v, const char* goType);
 // Writers — encoding/json output: HTML-escaping (< > & → \u003c \u003e \u0026),
 // control chars → \u00XX, invalid UTF-8 → \ufffd (json.Marshal passes
 // jsontext.AllowInvalidUTF8(true)).
-std::string marshalString(std::string_view s);
-std::string marshalInt64(int64_t v);
-std::string marshalBool(bool v);
+Value marshalString(std::string_view s);
+Value marshalInt64(int64_t v);
+Value marshalBool(bool v);
 // marshalObject/marshalArray take pre-marshaled member values.
-std::string marshalObject(const std::vector<std::pair<std::string, std::string>>& members);
-std::string marshalArray(const std::vector<std::string>& elements);
+Value marshalObject(const std::vector<std::pair<std::string, Value>>& members);
+Value marshalArray(const std::vector<Value>& elements);
 // marshalRaw emits v verbatim when it is a valid JSON value; empty -> error.
 std::pair<std::string, gostd::Error> marshalRaw(const Value& v);
 

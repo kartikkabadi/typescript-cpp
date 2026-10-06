@@ -23,6 +23,7 @@
 #include "internal/collections/collections.h"
 #include "internal/core/text.h"
 #include "internal/core/types.h"
+#include "internal/lsp/lsproto/lsproto.h"
 
 namespace tsc::checker {
 class Checker;
@@ -36,60 +37,10 @@ struct SpecMatcher;
 namespace tsc::modulespecifiers {
 struct UserPreferences;
 }
-namespace tsc::lsp::lsproto {
-struct FormattingOptions;
-}
 namespace tsc::json {
 class Encoder;
 class Decoder;
 }
-
-namespace tsc::lsp::lsproto {
-
-// === dep decls — owned by lsp slice (tsc/internal/lsp/lsproto) ===
-// Minimal lsproto surface needed by this package. Declared here so both
-// lsutil and ls::change can use them; the lsp slice owns the real package
-// and will replace these decls when it lands.
-
-// lsproto.go — protocol.Position
-struct Position {
-	uint32_t Line = 0;
-	uint32_t Character = 0;
-
-	bool operator==(const Position&) const = default;
-};
-
-// lsproto.go — protocol.Range
-struct Range {
-	Position Start;
-	Position End;
-
-	bool operator==(const Range&) const = default;
-};
-
-// lsproto.go — protocol.TextEdit
-struct TextEdit {
-	Range Range;
-	std::string NewText;
-};
-
-// lsproto.go — protocol.FormattingOptions
-struct FormattingOptions {
-	uint32_t TabSize = 0;
-	bool InsertSpaces = false;
-	std::optional<bool> TrimTrailingWhitespace;
-	std::optional<bool> InsertFinalNewline;
-	std::optional<bool> TrimFinalNewlines;
-};
-
-// util.go:11 — ComparePositions (real port: trivial)
-int ComparePositions(Position pos, Position other);
-// util.go:22 — CompareRanges (real port: trivial)
-int CompareRanges(Range lsRange, Range other);
-
-// === end dep decls ===
-
-} // namespace tsc::lsp::lsproto
 
 namespace tsc::ls::lsutil {
 

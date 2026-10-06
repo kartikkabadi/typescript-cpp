@@ -23,7 +23,7 @@ namespace {
 // ---------------------------------------------------------------------------
 
 json::Value marshalInitializeParams(const InitializeParams& p) {
-	std::vector<std::pair<std::string, std::string>> members;
+	std::vector<std::pair<std::string, json::Value>> members;
 	if (!p.Locale.empty()) { // `json:"locale,omitempty"`
 		members.emplace_back("locale", json::marshalString(p.Locale));
 	}
@@ -42,7 +42,7 @@ json::Value marshalInitializeParams(const InitializeParams& p) {
 // Defined in contentmapper.cpp next to the field table.
 
 json::Value marshalOpenProjectParams(const OpenProjectParams& p) {
-	std::vector<std::pair<std::string, std::string>> members;
+	std::vector<std::pair<std::string, json::Value>> members;
 	members.emplace_back("configFileName",
 	                     json::marshalString(p.ConfigFileName));
 	members.emplace_back("projectHandle",
