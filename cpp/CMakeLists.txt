@@ -282,6 +282,25 @@ add_library(tsc STATIC
 	internal/ls/autoimport/specifiers.cpp
 	internal/ls/autoimport/util.cpp
 	internal/ls/autoimport/view.cpp
+	# === slice: project ===
+	internal/project/ata/ata.cpp
+	internal/project/ata/discovertypings.cpp
+	internal/project/ata/typesmap.cpp
+	internal/project/ata/validatepackagename.cpp
+	internal/project/checkerpool.cpp
+	internal/project/compilerhost.cpp
+	internal/project/configfileregistrybuilder.cpp
+	internal/project/extendedconfigcache.cpp
+	internal/project/overlayfs.cpp
+	internal/project/parsecache.cpp
+	internal/project/project.cpp
+	internal/project/projectcollection.cpp
+	internal/project/projectcollectionbuilder.cpp
+	internal/project/session.cpp
+	internal/project/snapshot.cpp
+	internal/project/snapshotfs.cpp
+	internal/project/snapshothost.cpp
+	internal/project/watch.cpp
 )
 
 target_link_libraries(tsc PUBLIC z) # zlib — pprof profile writer

@@ -22,6 +22,7 @@
 #include "internal/ast/flags.h"
 #include "internal/collections/collections.h"
 #include "internal/core/text.h"
+#include "internal/gostd/gostd.h" // gostd::Context (lsproto dep decls)
 #include "internal/core/types.h"
 
 namespace tsc::checker {
@@ -204,6 +205,198 @@ struct AutoImportFix {
 	std::string NamespacePrefix;
 };
 
+// === dep decls for project — owned by lsp slice ===
+
+// ResolvedDidChangeWatchedFilesClientCapabilities — lsp_generated.go:15324.
+struct ResolvedDidChangeWatchedFilesClientCapabilities {
+	bool RelativePatternSupport = false;
+};
+
+// ResolvedWorkspaceClientCapabilities — lsp_generated.go:15679 (only the
+// nested capability the project slice reads is modeled).
+struct ResolvedWorkspaceClientCapabilities {
+	ResolvedDidChangeWatchedFilesClientCapabilities DidChangeWatchedFiles;
+};
+
+// ResolvedClientCapabilities — lsp_generated.go:17496 (truncated to the
+// fields the project slice reads).
+struct ResolvedClientCapabilities {
+	ResolvedWorkspaceClientCapabilities Workspace;
+};
+
+// WithClientCapabilities / GetClientCapabilities — lsp.go:289-298.
+// Real implementations over gostd::Context (context.WithValue).
+namespace detail {
+inline const void* clientCapabilitiesKey() {
+	static const char k = 0;
+	return &k;
+}
+} // namespace detail
+inline gostd::Context withClientCapabilities(
+	const gostd::Context& ctx, ResolvedClientCapabilities* caps) {
+	return gostd::contextWithValue(
+	    ctx, detail::clientCapabilitiesKey(),
+	    std::shared_ptr<ResolvedClientCapabilities>(caps, [](auto*) {}));
+}
+inline ResolvedClientCapabilities* getClientCapabilities(
+	const gostd::Context& ctx) {
+	if (auto* v = gostd::ctxValue(ctx, detail::clientCapabilitiesKey())) {
+		if (auto p = std::any_cast<std::shared_ptr<ResolvedClientCapabilities>>(
+		        *v)) {
+			return p.get();
+		}
+	}
+	static ResolvedClientCapabilities empty;
+	return &empty;
+}
+
+
+
+// URI — lsp.go:83 (`type URI string`).
+using URI = std::string;
+
+// WorkspaceFolder — lsp_generated.go:130.
+struct WorkspaceFolder {
+	URI Uri;
+	std::string Name;
+};
+
+// WorkspaceFolderOrURI — lsp_generated.go:13502. Go: union
+// {*WorkspaceFolder | *URI}.
+struct WorkspaceFolderOrURI {
+	WorkspaceFolder* WorkspaceFolder = nullptr;
+	URI* URI = nullptr;
+};
+
+// RelativePattern — lsp_generated.go:7160.
+struct RelativePattern {
+	WorkspaceFolderOrURI BaseUri;
+	std::string Pattern;
+};
+
+// PatternOrRelativePattern — lsp_generated.go:13324. Go: union
+// {*Pattern | *RelativePattern}.
+struct PatternOrRelativePattern {
+	std::string* Pattern = nullptr;
+	RelativePattern* RelativePattern = nullptr;
+};
+
+// WatchKind — lsp_generated.go:10283.
+using WatchKind = uint32_t;
+inline constexpr WatchKind WatchKindCreate = 1;
+inline constexpr WatchKind WatchKindChange = 2;
+inline constexpr WatchKind WatchKindDelete = 4;
+
+// FileSystemWatcher — lsp_generated.go:5456.
+struct FileSystemWatcher {
+	PatternOrRelativePattern GlobPattern;
+	WatchKind* Kind = nullptr;
+};
+
+// Diagnostic — lsp_generated.go:5476. Opaque to the project slice: produced
+// by lsconv::DiagnosticToLSPPush (dep-stub) and only ever passed through.
+struct Diagnostic;
+
+// PublishDiagnosticsParams — lsp_generated.go:2046.
+struct PublishDiagnosticsParams {
+	DocumentUri Uri;
+	int32_t* Version = nullptr;
+	std::vector<Diagnostic*> Diagnostics;
+};
+
+// StringLiteralLanguageServerErrorResponse — lsp_generated.go:15005.
+struct StringLiteralLanguageServerErrorResponse {};
+// StringLiteralError — lsp_generated.go:15027.
+struct StringLiteralError {};
+// StringLiteralLanguageServerPerformanceStats — lsp_generated.go.
+struct StringLiteralLanguageServerPerformanceStats {};
+// StringLiteralUsage — lsp_generated.go.
+struct StringLiteralUsage {};
+// StringLiteralLanguageServerProjectInfo — lsp_generated.go.
+struct StringLiteralLanguageServerProjectInfo {};
+
+// RequestFailureTelemetryProperties — lsp_generated.go.
+struct RequestFailureTelemetryProperties;
+
+// RequestFailureTelemetryEvent — lsp_generated.go:8999.
+struct RequestFailureTelemetryEvent {
+	StringLiteralLanguageServerErrorResponse EventName;
+	StringLiteralError TelemetryPurpose;
+	RequestFailureTelemetryProperties* Properties = nullptr;
+};
+
+// PerformanceStatsTelemetryMeasurements — lsp_generated.go:9219.
+struct PerformanceStatsTelemetryMeasurements {
+	double OpenFileCount = 0;
+	double UptimeSeconds = 0;
+	double ProjectCount = 0;
+	double ConfigCount = 0;
+	double CachedDiskFileCount = 0;
+	double MemoryUsedBytes = 0;
+	double GoMemLimit = 0;
+	double GoGCPercent = 0;
+	double HeapGoalBytes = 0;
+	double HeapLiveBytes = 0;
+	double HeapObjectCount = 0;
+	double HeapStackBytes = 0;
+	double HeapReleasedBytes = 0;
+	double HeapFreeBytes = 0;
+	double GcScanHeapBytes = 0;
+	double GoMaxProcs = 0;
+	double GoroutineCount = 0;
+	double GcCyclesTotal = 0;
+	double GcCPUSeconds = 0;
+	double UserCPUSeconds = 0;
+	double SystemMemTotal = 0;
+	double SystemMemUsed = 0;
+	double AutoImportProjectBucketCount = 0;
+	double AutoImportNodeModulesBucketCount = 0;
+	double AutoImportUniquePackageCount = 0;
+	double AutoImportProjectExportCount = 0;
+	double AutoImportNodeModulesExportCount = 0;
+	double AutoImportProjectFileCount = 0;
+	double AutoImportNodeModulesFileCount = 0;
+	double AutoImportNodeModulesUnfilteredBucketCount = 0;
+};
+
+// PerformanceStatsTelemetryEvent — lsp_generated.go:9201.
+struct PerformanceStatsTelemetryEvent {
+	StringLiteralLanguageServerPerformanceStats EventName;
+	StringLiteralUsage TelemetryPurpose;
+	PerformanceStatsTelemetryMeasurements* Measurements = nullptr;
+};
+
+// ProjectInfoTelemetryMeasurements — lsp_generated.go:9333.
+struct ProjectInfoTelemetryMeasurements {
+	double JsFileCount = 0;
+	double JsFileSize = 0;
+	double JsxFileCount = 0;
+	double JsxFileSize = 0;
+	double TsFileCount = 0;
+	double TsFileSize = 0;
+	double TsxFileCount = 0;
+	double TsxFileSize = 0;
+	double DtsFileCount = 0;
+	double DtsFileSize = 0;
+};
+
+// ProjectInfoTelemetryEvent — lsp_generated.go:9312.
+struct ProjectInfoTelemetryEvent {
+	StringLiteralLanguageServerProjectInfo EventName;
+	StringLiteralUsage TelemetryPurpose;
+	std::map<std::string, std::string> Properties;
+	ProjectInfoTelemetryMeasurements* Measurements = nullptr;
+};
+
+// TelemetryEvent — lsp_generated.go:11750. Go: union
+// {*RequestFailureTelemetryEvent | *PerformanceStatsTelemetryEvent |
+//  *ProjectInfoTelemetryEvent | nil}.
+struct TelemetryEvent {
+	RequestFailureTelemetryEvent* RequestFailureTelemetryEvent = nullptr;
+	PerformanceStatsTelemetryEvent* PerformanceStatsTelemetryEvent = nullptr;
+	ProjectInfoTelemetryEvent* ProjectInfoTelemetryEvent = nullptr;
+};
+
 // === end dep decls ===
 
 } // namespace tsc::lsp::lsproto
@@ -382,6 +575,11 @@ struct InlayHintsPreferences {
 	Tristate IncludeInlayPropertyDeclarationTypeHints = Tristate::Unknown;               // raw:"includeInlayPropertyDeclarationTypeHints" config:"inlayHints.propertyDeclarationTypes.enabled"
 	Tristate IncludeInlayFunctionLikeReturnTypeHints = Tristate::Unknown;                // raw:"includeInlayFunctionLikeReturnTypeHints" config:"inlayHints.functionLikeReturnTypes.enabled"
 	Tristate IncludeInlayEnumMemberValueHints = Tristate::Unknown;                       // raw:"includeInlayEnumMemberValueHints" config:"inlayHints.enumMemberValues.enabled"
+
+	// operator== — Go's reflect.DeepEqual comparisons (project/session
+	// slices compare whole preference structs).
+	friend bool operator==(const InlayHintsPreferences&,
+	                       const InlayHintsPreferences&) = default;
 };
 
 // CodeLensUserPreferences — userpreferences.go:220
@@ -391,6 +589,10 @@ struct CodeLensUserPreferences {
 	Tristate ReferencesCodeLensShowOnAllFunctions = Tristate::Unknown;          // raw:"referencesCodeLensShowOnAllFunctions" config:"referencesCodeLens.showOnAllFunctions"
 	Tristate ImplementationsCodeLensShowOnInterfaceMethods = Tristate::Unknown; // raw:"implementationsCodeLensShowOnInterfaceMethods" config:"implementationsCodeLens.showOnInterfaceMethods"
 	Tristate ImplementationsCodeLensShowOnAllClassMethods = Tristate::Unknown;  // raw:"implementationsCodeLensShowOnAllClassMethods" config:"implementationsCodeLens.showOnAllClassMethods"
+
+	// operator== — Go's reflect.DeepEqual comparisons.
+	friend bool operator==(const CodeLensUserPreferences&,
+	                       const CodeLensUserPreferences&) = default;
 };
 
 // UserPreferences — userpreferences.go:47. Field tags preserved as comments;

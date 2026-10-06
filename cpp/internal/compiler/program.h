@@ -39,6 +39,12 @@ class Tracing;
 namespace tsc::compiler {
 
 class SimpleProgram;
+// === slice: project ===
+// fileloader.go:89 DuplicateSourceFile — the full struct is
+// dep-declared in project/parsecache.h (which needs its fields); this
+// fwd decl lets SimpleProgram::DuplicateSourceFiles name the type.
+struct DuplicateSourceFile;
+// === end slice: project ===
 
 // === slice: incremental ===
 // program.go:1957 ProgramLike — implemented by SimpleProgram and by
@@ -890,6 +896,71 @@ public:
 	void ForEachCheckerParallel(
 	    const std::function<void(int, checker::Checker*)>& cb);
 	// === end slice: testrunner ===
+
+	// === slice: project ===
+	// program.go:450 GetCheckerPool — Go stores the pool opts
+	// .CreateCheckerPool built during initCheckerPool. The port keeps
+	// it as an opaque slot the project's createCheckerPool closure
+	// fills (NewProgram only invokes the closure when non-nil — the
+	// compiler's own checkerPool machinery is unported).
+	void* checkerPool_ = nullptr;
+	void* GetCheckerPool() { return checkerPool_; }
+	// program.go:305 UpdateProgram — ReuseProgram fast path, else a
+	// fresh program with the updated host/factories.
+	std::tuple<SimpleProgram*, SourceFile*, bool> UpdateProgram(
+	    const tspath::Path& changedFilePath, CompilerHost* newHost,
+	    const std::function<void*(SimpleProgram*)>& createCheckerPool,
+	    const std::function<module::Resolver*(
+	        const module::ResolverOptions&)>& createModuleResolver);
+	// program.go:2095 HasSameFileNames — FileName equality over
+	// filesByPath plus redirectFilesByPath equality.
+	bool HasSameFileNames(SimpleProgram* other);
+	// program.go:512 DuplicateSourceFiles — the filesparser dedup
+	// bookkeeping that fills duplicateSourceFiles rides on the
+	// updateProgram/reuse machinery, which is not ported.
+	// dep-stub — owned by compiler.
+	std::vector<DuplicateSourceFile*> DuplicateSourceFiles() {
+		TSC_UNREACHABLE(
+		    "SimpleProgram::DuplicateSourceFiles — owned by compiler");
+	}
+	// program.go:538 GetUnresolvedImports — the lazyValue
+	// unresolvedImports set rides on the same unported machinery.
+	// dep-stub — owned by compiler.
+	collections::Set<std::string>* GetUnresolvedImports() {
+		TSC_UNREACHABLE(
+		    "SimpleProgram::GetUnresolvedImports — owned by compiler");
+	}
+	// program.go:219 RangeResolvedProjectReference — the
+	// projectReferenceFileMapper is not ported.
+	// dep-stub — owned by compiler.
+	bool RangeResolvedProjectReference(
+	    const std::function<bool(tspath::Path,
+	                             tsoptions::ParsedCommandLine*,
+	                             tsoptions::ParsedCommandLine*, int)>& f) {
+		TSC_UNREACHABLE(
+		    "SimpleProgram::RangeResolvedProjectReference — owned by "
+		    "compiler");
+	}
+	// program.go:223 RangeResolvedProjectReferenceInChildConfig —
+	// same unported mapper.
+	// dep-stub — owned by compiler.
+	bool RangeResolvedProjectReferenceInChildConfig(
+	    tsoptions::ParsedCommandLine* childConfig,
+	    const std::function<bool(tspath::Path,
+	                             tsoptions::ParsedCommandLine*,
+	                             tsoptions::ParsedCommandLine*, int)>& f) {
+		TSC_UNREACHABLE(
+		    "SimpleProgram::RangeResolvedProjectReferenceInChildConfig "
+		    "— owned by compiler");
+	}
+	// program.go:644 ModuleResolutionError — the port's loader does
+	// not track a module-resolution error slot.
+	// dep-stub — owned by compiler.
+	gostd::Error ModuleResolutionError() {
+		TSC_UNREACHABLE(
+		    "SimpleProgram::ModuleResolutionError — owned by compiler");
+	}
+	// === end slice: project ===
 };
 
 // program.go: GetDiagnosticsOfAnyProgram — generalized to ProgramLike for

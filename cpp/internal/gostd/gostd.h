@@ -4,6 +4,7 @@
 // interfaces, sync.OnceFunc, and time helpers.
 #pragma once
 
+#include <any>
 #include <atomic>
 #include <cstdio>
 #include <chrono>
@@ -277,6 +278,16 @@ struct ContextImpl {
 	bool done = false;
 	Error err;
 	std::vector<std::function<void()>> afterFuncs;
+
+	// === slice: project === context.WithValue support (valueCtx chain) and
+	// Done()-nil detection. `parent` links value-children so ctxValue walks
+	// outward; `cancelable` mirrors Go ctx.Done() != nil (WithCancel /
+	// WithTimeout / a value-child of a cancelable parent). Cancellation of a
+	// parent is propagated to value-children via an AfterFunc so waiters wake.
+	std::shared_ptr<ContextImpl> parent;
+	const void* valueKey = nullptr;
+	std::any value;
+	bool cancelable = false;
 };
 
 using Context = std::shared_ptr<ContextImpl>;
@@ -306,8 +317,81 @@ inline void ctxCancel(const Context& c, const Error& err) {
 }
 
 inline Error ctxErr(const Context& c) {
-	std::lock_guard<std::mutex> lk(c->mu);
-	return c->err;
+	// Walk the valueCtx chain: the first canceled ancestor's error wins
+	// (mirrors Go where a value child's Err() delegates to its parent).
+	for (auto p = c.get(); p != nullptr; p = p->parent.get()) {
+		std::lock_guard<std::mutex> lk(p->mu);
+		if (p->done) {
+			return p->err;
+		}
+	}
+	return Error{};
+}
+
+// === slice: project ===
+// ctxDone — ctx.Done() closed-ness (chain-aware).
+inline bool ctxDone(const Context& c) {
+	for (auto p = c.get(); p != nullptr; p = p->parent.get()) {
+		std::lock_guard<std::mutex> lk(p->mu);
+		if (p->done) {
+			return true;
+		}
+	}
+	return false;
+}
+
+// ctxCancelable — Go `ctx.Done() == nil` is false for Background-derived
+// value contexts and true for WithCancel/WithTimeout descendants.
+inline bool ctxCancelable(const Context& c) {
+	for (auto p = c.get(); p != nullptr; p = p->parent.get()) {
+		if (p->cancelable) {
+			return true;
+		}
+	}
+	return false;
+}
+
+// ctxWaitDone — block until the context (or an ancestor) is done. The own-cv
+// fast path covers the common case; the periodic re-check catches ancestor
+// cancellation before a propagating AfterFunc runs.
+inline void ctxWaitDone(const Context& c) {
+	std::unique_lock<std::mutex> lk(c->mu);
+	while (!ctxDone(c)) {
+		c->cv.wait_for(lk, std::chrono::milliseconds(25));
+	}
+}
+
+// ctxValue — context.Value(key); walks the valueCtx chain.
+inline const std::any* ctxValue(const Context& c, const void* key) {
+	for (auto p = c.get(); p != nullptr; p = p->parent.get()) {
+		if (p->valueKey == key) {
+			return &p->value;
+		}
+	}
+	return nullptr;
+}
+
+// context.AfterFunc — returns the stop function (true if it stopped f before
+// it started; false if f already began). Definition below; declared here so
+// contextWithValue can use it.
+inline std::function<bool()> contextAfterFunc(const Context& c,
+                                              std::function<void()> f);
+
+// context.WithValue — child whose Done/Err track the parent (propagated via
+// AfterFunc for chain-aware helpers above).
+inline Context contextWithValue(const Context& parent, const void* key,
+                                std::any v) {
+	auto c = std::make_shared<ContextImpl>();
+	c->parent = parent;
+	c->valueKey = key;
+	c->value = std::move(v);
+	std::weak_ptr<ContextImpl> w = c;
+	contextAfterFunc(parent, [w, parent] {
+		if (auto s = w.lock()) {
+			ctxCancel(s, ctxErr(parent));
+		}
+	});
+	return c;
 }
 
 // context.AfterFunc — returns the stop function (true if it stopped f before
@@ -337,6 +421,7 @@ inline std::function<bool()> contextAfterFunc(const Context& c,
 // context.WithCancel — child cancels with errCanceled when the parent finishes.
 inline std::pair<Context, CancelFunc> contextWithCancel(const Context& parent) {
 	auto c = std::make_shared<ContextImpl>();
+	c->cancelable = true;
 	std::weak_ptr<ContextImpl> w = c;
 	contextAfterFunc(parent, [w] {
 		if (auto s = w.lock()) {
@@ -432,5 +517,176 @@ using Clock = std::chrono::steady_clock;
 inline Time now() { return Clock::now(); }
 inline Duration since(Time t) { return Clock::now() - t; }
 constexpr Duration second() { return Duration(std::chrono::seconds(1)); }
+
+// === slice: project ===
+// durationString — time.Duration.String(): "-", then largest units
+// h/m/s with a fractional-seconds tail, or sub-second units ms/µs/ns.
+// Faithful to Go's fmtInt/fmtFrac: the fraction keeps digits only up to the
+// last non-zero (trailing zeros trimmed, point omitted when zero).
+inline std::string durationString(Duration d) {
+	uint64_t u = (uint64_t)d.count();
+	bool neg = d.count() < 0;
+	if (neg) {
+		u = ~u + 1;
+	}
+	// fmtFrac — returns (".digits" or "", v with prec fractional digits
+	// consumed). digits are v's last `prec` digits with trailing zeros
+	// removed.
+	auto fmtFrac = [](uint64_t v, int prec) -> std::pair<std::string, uint64_t> {
+		std::string digits; // collected right-to-left
+		bool print = false;
+		for (int i = 0; i < prec; i++) {
+			char c = (char)('0' + v % 10);
+			if (c != '0') {
+				print = true;
+			}
+			if (print) {
+				digits += c;
+			}
+			v /= 10;
+		}
+		std::string out;
+		if (print) {
+			out += '.';
+			for (auto it = digits.rbegin(); it != digits.rend(); ++it) {
+				out += *it;
+			}
+		}
+		return {out, v};
+	};
+	std::string buf;
+	constexpr uint64_t kSecond = 1000000000ULL;
+	if (u < kSecond) {
+		if (u == 0) {
+			return "0s";
+		}
+		if (u < 1000) {
+			buf = std::to_string(u) + "ns";
+		} else if (u < 1000000) {
+			auto [frac, v] = fmtFrac(u, 3);
+			buf = std::to_string(v) + frac + "µs";
+		} else {
+			auto [frac, v] = fmtFrac(u, 6);
+			buf = std::to_string(v) + frac + "ms";
+		}
+	} else {
+		auto [frac, secsTotal] = fmtFrac(u, 9);
+		uint64_t secs = secsTotal % 60;
+		uint64_t rest = secsTotal / 60;
+		if (rest > 0) {
+			uint64_t mins = rest % 60;
+			uint64_t hours = rest / 60;
+			if (hours > 0) {
+				buf += std::to_string(hours) + "h";
+			}
+			buf += std::to_string(mins) + "m";
+		}
+		buf += std::to_string(secs) + frac + "s";
+	}
+	if (neg) {
+		return "-" + buf;
+	}
+	return buf;
+}
+
+// Timer — time.Timer / time.AfterFunc. The function runs on a detached
+// thread when the deadline passes; Stop/Reset mirror the Go semantics
+// (Reset returns whether the timer had not yet fired; Stop returns
+// whether the timer had not yet fired and was successfully stopped —
+// Go reports false when the timer already fired or was stopped).
+class Timer {
+	struct State {
+		std::mutex mu;
+		std::condition_variable cv;
+		bool fired = false;
+		bool stopped = false;
+		std::chrono::steady_clock::time_point deadline;
+		std::function<void()> fn;
+		std::thread worker;
+	};
+
+	std::shared_ptr<State> s;
+
+	static void run(std::shared_ptr<State> s) {
+		for (;;) {
+			std::function<void()> fn;
+			{
+				std::unique_lock<std::mutex> lock(s->mu);
+				s->cv.wait_until(lock, s->deadline,
+				                 [&] { return s->stopped || s->fired; });
+				if (s->stopped) {
+					return;
+				}
+				// Timers created via AfterFunc never need to re-wait after
+				// the deadline passes; Reset sets a new deadline and clears
+				// `fired`, so only fire when the deadline has arrived.
+				if (std::chrono::steady_clock::now() >= s->deadline) {
+					s->fired = true;
+					fn = s->fn;
+				}
+			}
+			if (fn) {
+				fn();
+				return;
+			}
+		}
+	}
+
+public:
+	Timer() = default;
+	Timer(std::chrono::nanoseconds d, std::function<void()> fn)
+	    : s(std::make_shared<State>()) {
+		s->deadline = std::chrono::steady_clock::now() + d;
+		s->fn = std::move(fn);
+		s->worker = std::thread(&Timer::run, s);
+	}
+	Timer(const Timer&) = delete;
+	Timer& operator=(const Timer&) = delete;
+	Timer(Timer&&) = delete;
+	Timer& operator=(Timer&&) = delete;
+
+	~Timer() { Stop(); }
+
+	// Stop — time.Timer.Stop. Does not join a function already running.
+	bool Stop() {
+		if (!s) return false;
+		bool ret;
+		{
+			std::lock_guard<std::mutex> lock(s->mu);
+			ret = !s->fired;
+			s->stopped = true;
+		}
+		s->cv.notify_all();
+		if (s->worker.joinable()) {
+			s->worker.join();
+		}
+		return ret;
+	}
+
+	// Reset — time.Timer.Reset.
+	bool Reset(std::chrono::nanoseconds d) {
+		if (!s) return false;
+		bool ret;
+		{
+			std::lock_guard<std::mutex> lock(s->mu);
+			ret = !s->fired;
+			s->deadline = std::chrono::steady_clock::now() + d;
+			s->fired = false;
+			s->stopped = false;
+			if (!s->worker.joinable()) {
+				// Worker already exited after firing; respawn it.
+				s->worker = std::thread(&Timer::run, s);
+			}
+		}
+		s->cv.notify_all();
+		return ret;
+	}
+};
+
+// time.AfterFunc — caller owns the returned Timer.
+inline Timer* afterFunc(std::chrono::nanoseconds d, std::function<void()> f) {
+	return new Timer(d, std::move(f));
+}
+// === end slice: project ===
 
 } // namespace tsc::gostd

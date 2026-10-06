@@ -1001,18 +1001,15 @@ std::string Locale::String() const {
     return tag.String();
 }
 
-namespace {
-// contextKey(0) — package-private context key identity.
-constexpr char kLocaleContextKey = 0;
-}
+
 
 ContextPtr withLocale(const ContextPtr& ctx, Locale locale) {
-    return withContextValue(ctx, &kLocaleContextKey, std::any(std::move(locale)));
+    return withContextValue(ctx, detail::localeContextKey(), std::any(std::move(locale)));
 }
 
 Locale fromContext(const ContextPtr& ctx) {
     if (ctx) {
-        if (const std::any* v = ctx->value(&kLocaleContextKey)) {
+        if (const std::any* v = ctx->value(detail::localeContextKey())) {
             if (const Locale* l = std::any_cast<Locale>(v)) {
                 return *l;
             }
@@ -1025,7 +1022,7 @@ bool hasLocale(const ContextPtr& ctx) {
     if (!ctx) {
         return false;
     }
-    const std::any* v = ctx->value(&kLocaleContextKey);
+    const std::any* v = ctx->value(detail::localeContextKey());
     return v != nullptr && std::any_cast<Locale>(v) != nullptr;
 }
 

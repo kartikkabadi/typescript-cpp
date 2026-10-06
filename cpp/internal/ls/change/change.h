@@ -15,6 +15,7 @@
 #include "internal/collections/collections.h"
 #include "internal/core/text.h"
 #include "internal/format/format.h"
+#include "internal/ls/lsconv/lsconv.h"
 #include "internal/ls/lsutil/lsutil.h"
 #include "internal/spanmap/spanmap.h"
 
@@ -33,23 +34,8 @@ namespace tsc::lsconv {
 // Minimal lsconv surface used by change.Tracker. The lsp slice owns the real
 // package; these declarations are replaced when it lands.
 
-// converters.go:30 — MappedSpan[T Script] (spanmap.MappedSpan fields are
-// flattened: Go promotes the embedded fields).
-template <class T>
-struct MappedSpan {
-	T* Script;
-	tsc::TextRange Span;
-	tsc::spanmap::Fidelity Fidelity;
-};
-
-// converters.go:35 — MappedPosition[T Script] (embedded spanmap.MappedPosition
-// flattened the same way).
-template <class T>
-struct MappedPosition {
-	T* Script;
-	tsc::TextPos Position;
-	tsc::spanmap::Fidelity Fidelity;
-};
+// MappedSpan/MappedPosition — converters.go:30/35. Canonical decls live
+// in lsconv/lsconv.h (included above).
 
 // converters.go:25 — the converter registry. A concrete dep-stub: the real
 // implementation lands with the lsp slice; every method is unreachable.

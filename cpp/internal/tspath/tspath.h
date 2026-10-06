@@ -4,9 +4,16 @@
 #include <functional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "internal/stringutil/stringutil.h"
+
+namespace tsc {
+// From ast/ast.h — re-declared so this header need not include ast.h.
+[[noreturn]] void tscUnreachable(const char* message);
+}
 
 namespace tsc::tspath {
 
@@ -1292,5 +1299,167 @@ inline std::string convertToRelativePath(
 	return getRelativePathToDirectoryOrUrl(
 	    options.currentDirectory, absoluteOrRelativePath, false, options);
 }
+
+// === slice: project ===
+
+// pathContainsPath — path.go:1088 `(p Path) ContainsPath(child Path)`. Both
+// paths are canonicalized tspath.Path values (from toPath).
+inline bool pathContainsPath(const Path& p, const Path& child) {
+	if (p.empty()) {
+		return false;
+	}
+	return p == child ||
+	       (child.size() > p.size() && child.compare(0, p.size(), p) == 0 &&
+	        (p.back() == '/' || child[p.size()] == '/'));
+}
+
+
+// getCommonParentsWorker — path.go. Recursive core of GetCommonParents:
+// walks component groups left to right, fanning out into per-head groups
+// whenever the groups diverge before minComponents.
+inline std::vector<std::vector<std::string>> getCommonParentsWorker(
+    const std::vector<std::vector<std::string>>& componentGroups,
+    int minComponents, const ComparePathsOptions& options) {
+	if (componentGroups.empty()) {
+		return {};
+	}
+	// Determine the maximum depth we can consider
+	size_t maxDepth = componentGroups[0].size();
+	for (size_t i = 1; i < componentGroups.size(); i++) {
+		if (componentGroups[i].size() < maxDepth) {
+			maxDepth = componentGroups[i].size();
+		}
+	}
+
+	auto equality = options.equalityComparer();
+	for (size_t lastCommonIndex = 0; lastCommonIndex < maxDepth;
+	     lastCommonIndex++) {
+		const std::string& candidate = componentGroups[0][lastCommonIndex];
+		for (size_t j = 1; j < componentGroups.size(); j++) {
+			const auto& comps = componentGroups[j];
+			if (!equality(candidate, comps[lastCommonIndex])) { // divergence
+				if (static_cast<int>(lastCommonIndex) < minComponents) {
+					// Not enough components, we need to fan out
+					struct Group {
+						std::vector<std::string> head;
+						std::vector<std::vector<std::string>> tails;
+					};
+					std::vector<Path> orderedGroups;
+					std::unordered_map<Path, Group> newGroups;
+					for (const auto& g : componentGroups) {
+						Path key = toPath(g[lastCommonIndex],
+						                  options.currentDirectory,
+						                  options.useCaseSensitiveFileNames);
+						if (newGroups.find(key) == newGroups.end()) {
+							orderedGroups.push_back(key);
+						}
+						auto& group = newGroups[key];
+						group.head.assign(
+						    g.begin(),
+						    g.begin() + lastCommonIndex + 1);
+						group.tails.emplace_back(
+						    g.begin() + lastCommonIndex + 1, g.end());
+					}
+					std::sort(orderedGroups.begin(), orderedGroups.end());
+					std::vector<std::vector<std::string>> result;
+					result.reserve(newGroups.size());
+					for (const auto& key : orderedGroups) {
+						const auto& group = newGroups[key];
+						auto subResults = getCommonParentsWorker(
+						    group.tails,
+						    minComponents -
+						        static_cast<int>(lastCommonIndex + 1),
+						    options);
+						for (const auto& sr : subResults) {
+							if (sr.empty()) {
+								result.push_back(group.head);
+							} else {
+								std::vector<std::string> concat =
+								    group.head;
+								concat.insert(concat.end(), sr.begin(),
+								              sr.end());
+								result.push_back(std::move(concat));
+							}
+						}
+					}
+					return result;
+				}
+				return {std::vector<std::string>(
+				    componentGroups[0].begin(),
+				    componentGroups[0].begin() + lastCommonIndex)};
+			}
+		}
+	}
+
+	return {std::vector<std::string>(componentGroups[0].begin(),
+	                                 componentGroups[0].begin() + maxDepth)};
+}
+
+// getCommonParents — path.go:1158.
+//	/a/b/c/d, /a/b/c/e, /a/b/f/g, /x/y  =>  /
+//	/a/b/c/d, /a/b/c/e, /a/b/f/g, /x/y  (minComponents: 2)  =>  /a/b, /x/y
+//	c:/a/b/c/d, d:/a/b/c/d =>  c:/a/b/c/d, d:/a/b/c/d
+inline std::pair<std::vector<std::string>,
+               std::unordered_set<std::string>>
+getCommonParents(
+    const std::vector<std::string>& paths, int minComponents,
+    const std::function<std::vector<std::string>(std::string_view,
+                                                 std::string_view)>&
+        getPathComponents,
+    const ComparePathsOptions& options) {
+	if (minComponents < 1) {
+		tscUnreachable("minComponents must be at least 1");
+	}
+	if (paths.empty()) {
+		return {{}, {}};
+	}
+	if (paths.size() == 1) {
+		if (reducePathComponents(
+		        getPathComponents(paths[0], options.currentDirectory))
+		        .size() < static_cast<size_t>(minComponents)) {
+			return {{}, {paths[0]}};
+		}
+		return {paths, {}};
+	}
+
+	std::unordered_set<std::string> ignored;
+	std::vector<std::vector<std::string>> pathComponents;
+	pathComponents.reserve(paths.size());
+	for (const auto& path : paths) {
+		auto components = reducePathComponents(
+		    getPathComponents(path, options.currentDirectory));
+		if (components.size() < static_cast<size_t>(minComponents)) {
+			ignored.insert(path);
+		} else {
+			pathComponents.push_back(std::move(components));
+		}
+	}
+
+	auto results = getCommonParentsWorker(pathComponents, minComponents,
+	                                      options);
+	std::vector<std::string> resultPaths(results.size());
+	for (size_t i = 0; i < results.size(); i++) {
+		std::vector<std::string_view> views(results[i].begin(),
+		                                    results[i].end());
+		resultPaths[i] = getPathFromPathComponents(views);
+	}
+
+	return {resultPaths, ignored};
+}
+
+// === slice: project ===
+// ContainsIgnoredPath — ignoredpaths.go:11.
+inline bool containsIgnoredPath(std::string_view path) {
+	static const std::vector<std::string_view> ignoredPaths = {
+	    "/node_modules/.", "/.git", ".#",
+	};
+	for (auto pattern : ignoredPaths) {
+		if (path.find(pattern) != std::string_view::npos) {
+			return true;
+		}
+	}
+	return false;
+}
+// === end slice: project ===
 
 }  // namespace tsc::tspath

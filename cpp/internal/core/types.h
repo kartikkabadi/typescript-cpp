@@ -9,6 +9,16 @@
 
 #include "internal/tspath/tspath.h"
 
+// Declaration of ast.h's unreachable hook so this leaf header need not
+// include gostd.h; the definition lives in ast.h and is emitted by TUs
+// that include it.
+namespace tsc {
+[[noreturn]] void tscUnreachable(const char* msg);
+} // namespace tsc
+#ifndef TSC_UNREACHABLE
+#define TSC_UNREACHABLE(msg) ::tsc::tscUnreachable(msg)
+#endif
+
 namespace tsc {
 
 enum class LanguageVariant : int32_t {
@@ -579,5 +589,112 @@ inline std::string ResolveConfigFileNameOfProjectReference(std::string_view path
 inline std::string ResolveProjectReferencePath(const ProjectReference& ref) {
 	return ResolveConfigFileNameOfProjectReference(ref.Path);
 }
+
+// === slice: project ===
+// reflect.DeepEqual helpers shared by execute/watcher.cpp and the
+// project collection builder (defined in compileroptions.cpp).
+bool intPtrEqual(const int* a, const int* b);
+bool pathsEqual(
+    const std::vector<std::pair<std::string, std::vector<std::string>>>& a,
+    const std::vector<std::pair<std::string, std::vector<std::string>>>& b);
+bool pluginsEqual(const std::vector<PluginImport>& a,
+                  const std::vector<PluginImport>& b);
+// compilerOptionsDeepEqual — reflect.DeepEqual on *CompilerOptions:
+// every field of the struct, in declaration order.
+bool compilerOptionsDeepEqual(const CompilerOptions* a,
+                              const CompilerOptions* b);
+// === end slice: project ===
+// === slice: project ===
+// String() equivalents for the Go stringer-generated enums used by
+// session telemetry (collectProjectInfoTelemetry).
+
+// scriptTargetString — scripttarget_stringer_generated.go:37.
+inline std::string scriptTargetDisplay(ScriptTarget i) {
+	static const char* names0[] = {
+	    "None",   "ES5",    "ES2015", "ES2016", "ES2017",
+	    "ES2018", "ES2019", "ES2020", "ES2021", "ES2022",
+	    "ES2023", "ES2024", "ES2025", "ES2026",
+	};
+	auto v = static_cast<int>(i);
+	if (0 <= v && v <= 13) {
+		return names0[v];
+	}
+	if (i == ScriptTarget::ESNext) {
+		return "ESNext";
+	}
+	if (i == ScriptTarget::JSON) {
+		return "JSON";
+	}
+	return "ScriptTarget(" + std::to_string(v) + ")";
+}
+
+// moduleKindString — modulekind_stringer_generated.go:35.
+inline std::string moduleKindDisplay(ModuleKind i) {
+	static const char* names0[] = {
+	    "None", "CommonJS", "AMD", "UMD", "System", "ES2015",
+	    "ES2020", "ES2022",
+	};
+	auto v = static_cast<int>(i);
+	if (0 <= v && v <= 7) {
+		return names0[v];
+	}
+	switch (i) {
+	case ModuleKind::ESNext:
+		return "ESNext";
+	case ModuleKind::Node16:
+		return "Node16";
+	case ModuleKind::Node18:
+		return "Node18";
+	case ModuleKind::Node20:
+		return "Node20";
+	case ModuleKind::NodeNext:
+		return "NodeNext";
+	case ModuleKind::Preserve:
+		return "Preserve";
+	default:
+		return "ModuleKind(" + std::to_string(v) + ")";
+	}
+}
+
+// moduleResolutionKindString — compileroptions.go:463.
+inline std::string moduleResolutionKindDisplay(
+    ModuleResolutionKind m) {
+	switch (m) {
+	case ModuleResolutionKind::Unknown:
+		TSC_UNREACHABLE(
+		    "should not use zero value of ModuleResolutionKind");
+	case ModuleResolutionKind::Classic:
+		return "Classic";
+	case ModuleResolutionKind::Node10:
+		return "Node10";
+	case ModuleResolutionKind::Node16:
+		return "Node16";
+	case ModuleResolutionKind::NodeNext:
+		return "NodeNext";
+	case ModuleResolutionKind::Bundler:
+		return "Bundler";
+	}
+	TSC_UNREACHABLE("unhandled case in ModuleResolutionKind.String");
+}
+
+// jsxEmitString — compileroptions.go:545.
+inline std::string jsxEmitDisplay(JsxEmit j) {
+	switch (j) {
+	case JsxEmit::None:
+		TSC_UNREACHABLE("should not use zero value of JsxEmit");
+	case JsxEmit::Preserve:
+		return "preserve";
+	case JsxEmit::ReactNative:
+		return "react-native";
+	case JsxEmit::React:
+		return "react";
+	case JsxEmit::ReactJSX:
+		return "react-jsx";
+	case JsxEmit::ReactJSXDev:
+		return "react-jsxdev";
+	}
+	TSC_UNREACHABLE("unhandled case in JsxEmit.String");
+}
+// === end slice: project ===
 
 }  // namespace tsc

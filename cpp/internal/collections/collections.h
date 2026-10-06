@@ -83,6 +83,16 @@ struct OrderedMap {
 	// during iteration; index-based loops reproduce that.
 	const std::vector<K>& Keys() const { return keys; }
 
+	// Entries — ordered (key, value) pairs, Go map-order semantics.
+	std::vector<std::pair<K, V>> Entries() const {
+		std::vector<std::pair<K, V>> out;
+		out.reserve(keys.size());
+		for (auto& k : keys) {
+			out.emplace_back(k, mp.at(k));
+		}
+		return out;
+	}
+
 	OrderedMap Clone() const { return *this; }
 };
 

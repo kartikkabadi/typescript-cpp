@@ -14,6 +14,7 @@
 #include <utility>
 
 #include "internal/core/context.h"
+#include "internal/gostd/gostd.h"
 #include "internal/locale/localetags.h"
 
 namespace tsc::locale {
@@ -50,6 +51,15 @@ public:
 // Default is the default Locale; it is equivalent to an unset locale.
 inline const Locale Default = Locale();
 
+namespace detail {
+// contextKey(0) — package-private context key identity (shared by the
+// ContextPtr and gostd::Context overloads).
+inline const void* localeContextKey() {
+	static const char k = 0;
+	return &k;
+}
+} // namespace detail
+
 // WithLocale returns a Context with `locale` attached.
 ContextPtr withLocale(const ContextPtr& ctx, Locale locale);
 
@@ -58,6 +68,35 @@ Locale fromContext(const ContextPtr& ctx);
 
 // HasLocale reports whether ctx carries a Locale.
 bool hasLocale(const ContextPtr& ctx);
+
+// === slice: project === gostd::Context overloads — same Go
+// context.Context role when the caller holds a gostd context (the
+// project/session slice's cancellation-aware context type).
+inline gostd::Context withLocale(const gostd::Context& ctx,
+                                 Locale locale) {
+	return gostd::contextWithValue(
+	    ctx, detail::localeContextKey(),
+	    std::any(std::move(locale)));
+}
+inline Locale fromContext(const gostd::Context& ctx) {
+	if (ctx) {
+		if (const std::any* v = gostd::ctxValue(
+		        ctx, detail::localeContextKey())) {
+			if (const Locale* l = std::any_cast<Locale>(v)) {
+				return *l;
+			}
+		}
+	}
+	return Default;
+}
+inline bool hasLocale(const gostd::Context& ctx) {
+	if (!ctx) {
+		return false;
+	}
+	const std::any* v =
+	    gostd::ctxValue(ctx, detail::localeContextKey());
+	return v != nullptr && std::any_cast<Locale>(v) != nullptr;
+}
 
 // Parse parses a BCP 47 language tag into a Locale, e.g. "en-US".
 // It returns ok=false if the tag is not well-formed or contains an
