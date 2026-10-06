@@ -278,10 +278,40 @@ Diagnostic* FileIncludeReason::computeDiagnostic(
 		return computeReferenceFileDiagnostic(program, toFileName);
 	}
 	switch (kind) {
-		case FileIncludeKind::RootFile:
-			// No config file in this slice.
+		case FileIncludeKind::RootFile: {
+			// fileInclude.go:174 — when a config file drove the file list,
+			// report which spec matched instead of the generic reason.
+			if (program->opts_.Config != nullptr &&
+			    program->opts_.Config->ConfigFile != nullptr) {
+				auto* config = program->opts_.Config;
+				std::string fileName =
+				    tspath::getNormalizedAbsolutePath(
+				        config->FileNames()[std::get<int>(data)],
+				        program->GetCurrentDirectory());
+				if (std::string matchedFileSpec =
+				        config->GetMatchedFileSpec(fileName);
+				    !matchedFileSpec.empty()) {
+					return tsoptions::newCompilerDiagnostic(
+					    Part_of_files_list_in_tsconfig_json,
+					    {matchedFileSpec, toFileName(fileName)});
+				}
+				if (auto [matchedIncludeSpec, isDefaultIncludeSpec] =
+				        config->GetMatchedIncludeSpec(fileName);
+				    !matchedIncludeSpec.empty()) {
+					if (isDefaultIncludeSpec) {
+						return tsoptions::newCompilerDiagnostic(
+						    
+						        Matched_by_default_include_pattern_Asterisk_Asterisk_Slash_Asterisk);
+					}
+					return tsoptions::newCompilerDiagnostic(
+					    Matched_by_include_pattern_0_in_1,
+					    {matchedIncludeSpec,
+					     toFileName(config->ConfigName())});
+				}
+			}
 			return tsoptions::newCompilerDiagnostic(
 			    Root_file_specified_for_compilation);
+		}
 		case FileIncludeKind::AutomaticTypeDirectiveFile: {
 			auto* data =
 			    std::get_if<automaticTypeDirectiveFileData>(&this->data);

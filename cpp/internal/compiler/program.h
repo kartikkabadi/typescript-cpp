@@ -1033,7 +1033,13 @@ public:
 
 	// --- program.go methods beyond the interface ---
 	checker::Checker* getChecker(); // lazily created after bind
+	// program.go:532 — read live off opts.Config (the C++ field was never
+	// populated for fresh programs, silently dropping config-file
+	// diagnostics like TS5023/TS6046/TS18002/TS5083).
 	std::vector<Diagnostic*> GetConfigFileParsingDiagnostics() {
+		if (commandLine_ != nullptr) {
+			return commandLine_->GetConfigFileParsingDiagnostics();
+		}
 		return configFileParsingDiagnostics;
 	}
 	// program.go:828 collectContentMapperOptionDiagnostics.
