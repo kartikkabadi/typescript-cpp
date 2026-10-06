@@ -494,7 +494,10 @@ NodeFactory::splitStandardPrologue(const std::vector<Node*>& source) {
 std::pair<std::vector<Node*>, std::vector<Node*>>
 NodeFactory::splitCustomPrologue(const std::vector<Node*>& source) {
 	for (size_t i = 0; i < source.size(); i++) {
-		if (!isPrologueDirective(source[i]) ||
+		// Custom prologue = non-directive statement with EFCustomPrologue;
+		// Go stops at IsPrologueDirective(stmt) || flags==0 — the first
+		// predicate must NOT be negated.
+		if (isPrologueDirective(source[i]) ||
 		    (emitContext->emitFlags(source[i]) & EFCustomPrologue) == 0) {
 			return {std::vector<Node*>(source.begin(), source.begin() + i),
 			        std::vector<Node*>(source.begin() + i, source.end())};

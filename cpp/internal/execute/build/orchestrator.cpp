@@ -249,7 +249,9 @@ void Orchestrator::createBuildTasks(
     collections::SyncMap<tspath::Path, BuildTask*>* oldTasks,
     const std::vector<std::string>& configs, workGroup* wg) {
 	for (auto& config : configs) {
-		wg->Queue([this, &config, oldTasks, wg]() {
+		// Capture config by value: the queued closure runs on a worker
+		// thread after the loop advances (Go has per-iteration loop vars).
+		wg->Queue([this, config, oldTasks, wg]() {
 			auto path = toPath(config);
 			BuildTask* task = nullptr;
 			buildInfoEntry* buildInfo = nullptr;

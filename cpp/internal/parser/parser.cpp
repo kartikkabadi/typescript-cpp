@@ -40,6 +40,13 @@ namespace tsc {
 
 namespace {
 thread_local std::vector<Parser*> g_parserPool;
+
+// Arenas retained by parseIsolatedEntityName so pooled-parser ASTs outlive
+// the parser. (No SourceFile exists to own them there.)
+std::vector<Arena>& isolatedEntityNameArenas() {
+	thread_local std::vector<Arena> arenas;
+	return arenas;
+}
 } // namespace
 
 Parser* getParser() {
@@ -303,6 +310,14 @@ Node* parseIsolatedEntityName(std::string_view text) {
 	p->nextToken();
 	Node* entityName = p->parseEntityName(true, false, nullptr);
 	bool ok = p->token == Kind::EndOfFile && p->diagnostics.empty();
+	if (ok) {
+		// The returned AST lives in the parser's arena, which putParser()
+		// recycles. There is no SourceFile to own it (unlike
+		// parseSourceFile, which hands the arena to the SourceFile), so
+		// retain it thread-locally for the life of the process — entity
+		// names are tiny and rarely parsed.
+		isolatedEntityNameArenas().push_back(std::move(p->factory.arena()));
+	}
 	putParser(p);
 	return ok ? entityName : nullptr;
 }

@@ -118,17 +118,9 @@ def gen_diagnostics():
     print(f"parsed {len(entries)} diagnostics")
 
     def cxxstr(s):
-        s = s.replace("\\", "\\\\").replace('"', '\\"')
-        s = s.replace("\n", "\\n").replace("\t", "\\t").replace("\r", "\\r")
-        out = []
-        for ch in s:
-            o = ord(ch)
-            if o < 32 or o > 126:
-                out.append(f"\\x{o:02x}\\x{0:02x}"[:0] or f'\\u{o:04x}' if False else ch)
-            else:
-                out.append(ch)
-        # safer: encode as UTF-8 with \xNN pairs terminated properly — use \u literals? Go text is
-        # unicode; emit UTF-8 bytes escaped
+        # Escape raw text for a C++ string literal in ONE pass over UTF-8
+        # bytes. (The earlier pre-escaping pass double-escaped quotes, so e.g.
+        # TS6306 printed \"composite\" with literal backslashes.)
         enc = []
         for b in s.encode("utf-8"):
             if 32 <= b < 127 and b not in (34, 92):
@@ -141,8 +133,11 @@ def gen_diagnostics():
                 enc.append("\\n")
             elif b == 9:
                 enc.append("\\t")
+            elif b == 13:
+                enc.append("\\r")
             else:
-                enc.append(f"\\x{b:02x}")
+                # 3-digit octal: \xNN would merge with a following hex char.
+                enc.append(f"\\{b:03o}")
         return "".join(enc)
 
     lines = [HEADER]

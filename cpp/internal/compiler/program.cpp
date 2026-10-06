@@ -16,6 +16,7 @@
 #include "internal/module/util.h" // === slice: ls-autoimport ===
 #include "internal/modulespecifiers/types.h" // === slice: ls-autoimport ===
 #include "internal/diagnostics/messages_generated.h"
+#include "internal/json/json.h"
 #include "internal/outputpaths/outputpaths.h"
 #include "internal/scanner/scanner.h"
 
@@ -1485,30 +1486,103 @@ EmitResult* HandleNoEmitOptions(
 
 // ==== verifyCompilerOptions ====  program.go:866+
 void SimpleProgram::verifyCompilerOptions() {
-	// Config-file syntax accessors: no config file in this mode, so
-	// sourceFile()/getCompilerOptionsPropertySyntax()/
-	// getCompilerOptionsObjectLiteralSyntax() are all nil — matching Go's
+	// program.go:883 — memoized config-file syntax accessors. Without a
+	// config file they all evaluate to nullptr, matching Go's
 	// ForEachTsConfigPropArray(nil)/ForEachPropertyAssignment(nil) no-ops.
+	SourceFile* sourceFile_ = nullptr;
+	bool sourceFileComputed = false;
+	auto sourceFile = [&]() -> SourceFile* {
+		if (!sourceFileComputed) {
+			sourceFileComputed = true;
+			if (opts_.Config != nullptr && opts_.Config->ConfigFile != nullptr) {
+				sourceFile_ = opts_.Config->ConfigFile->SourceFile;
+			}
+		}
+		return sourceFile_;
+	};
+
+	std::string configFilePath_;
+	bool configFilePathComputed = false;
+	auto configFilePath = [&]() -> const std::string& {
+		if (!configFilePathComputed) {
+			configFilePathComputed = true;
+			if (SourceFile* file = sourceFile(); file != nullptr) {
+				configFilePath_ = file->FileName();
+			}
+		}
+		return configFilePath_;
+	};
+
+	PropertyAssignment* compilerOptionsProperty_ = nullptr;
+	bool compilerOptionsPropertyComputed = false;
+	auto getCompilerOptionsPropertySyntax = [&]() -> PropertyAssignment* {
+		if (!compilerOptionsPropertyComputed) {
+			compilerOptionsPropertyComputed = true;
+			compilerOptionsProperty_ =
+			    tsoptions::ForEachTsConfigPropArray<PropertyAssignment>(
+			        sourceFile(), "compilerOptions",
+			        [](PropertyAssignment* prop) { return prop; });
+		}
+		return compilerOptionsProperty_;
+	};
+
+	ObjectLiteralExpression* compilerOptionsObjectLiteral_ = nullptr;
+	bool compilerOptionsObjectLiteralComputed = false;
+	auto getCompilerOptionsObjectLiteralSyntax =
+	    [&]() -> ObjectLiteralExpression* {
+		if (!compilerOptionsObjectLiteralComputed) {
+			compilerOptionsObjectLiteralComputed = true;
+			PropertyAssignment* compilerOptionsProperty =
+			    getCompilerOptionsPropertySyntax();
+			if (compilerOptionsProperty != nullptr &&
+			    compilerOptionsProperty->Initializer != nullptr &&
+			    isObjectLiteralExpression(
+			        compilerOptionsProperty->Initializer)) {
+				compilerOptionsObjectLiteral_ =
+				    compilerOptionsProperty->Initializer
+				        ->as<ObjectLiteralExpression>();
+			}
+		}
+		return compilerOptionsObjectLiteral_;
+	};
 
 	auto createCompilerOptionsDiagnostic =
 	    [&](const DiagnosticMessage* message,
 	        std::vector<std::string> args = {}) -> Diagnostic* {
-		// compilerOptionsProperty is nil (no config file) →
-		// NewCompilerDiagnostic
-		auto* diag = tsoptions::newCompilerDiagnostic(message,
-		                                              std::move(args));
+		PropertyAssignment* compilerOptionsProperty =
+		    getCompilerOptionsPropertySyntax();
+		Diagnostic* diag;
+		if (compilerOptionsProperty != nullptr) {
+			diag = tsoptions::createDiagnosticForNodeInSourceFile(
+			    sourceFile(), compilerOptionsProperty->name, message,
+			    std::move(args));
+		} else {
+			diag = tsoptions::newCompilerDiagnostic(message,
+			                                        std::move(args));
+		}
 		programDiagnostics.push_back(diag);
 		return diag;
 	};
 
-	// createOptionDiagnosticInObjectLiteralSyntax — objectLiteral is always
-	// nil here, so it always returns nil (Go: ForEachPropertyAssignment(nil)
-	// → nil).
+	// createOptionDiagnosticInObjectLiteralSyntax — program.go:918.
 	auto createOptionDiagnosticInObjectLiteralSyntax =
-	    [&](void* objectLiteral, bool onKey, const std::string& key1,
-	        const std::string& key2, const DiagnosticMessage* message,
+	    [&](ObjectLiteralExpression* objectLiteral, bool onKey,
+	        const std::string& key1, const std::string& key2,
+	        const DiagnosticMessage* message,
 	        std::vector<std::string> args = {}) -> Diagnostic* {
-		return nullptr; // no config file
+		Diagnostic* diag = tsoptions::ForEachPropertyAssignment<Diagnostic>(
+		    objectLiteral, key1,
+		    [&](PropertyAssignment* property) -> Diagnostic* {
+			    return tsoptions::createDiagnosticForNodeInSourceFile(
+			        sourceFile(),
+			        onKey ? property->name : property->Initializer, message,
+			        args);
+		    },
+		    key2);
+		if (diag != nullptr) {
+			programDiagnostics.push_back(diag);
+		}
+		return diag;
 	};
 
 	auto createDiagnosticForOption =
@@ -1516,7 +1590,8 @@ void SimpleProgram::verifyCompilerOptions() {
 	        const DiagnosticMessage* message,
 	        std::vector<std::string> args = {}) -> Diagnostic* {
 		Diagnostic* diag = createOptionDiagnosticInObjectLiteralSyntax(
-		    nullptr, onKey, option1, option2, message, args);
+		    getCompilerOptionsObjectLiteralSyntax(), onKey, option1,
+		    option2, message, args);
 		if (diag == nullptr) {
 			diag = createCompilerOptionsDiagnostic(message,
 			                                     std::move(args));
@@ -1570,8 +1645,21 @@ void SimpleProgram::verifyCompilerOptions() {
 	// Removed in TS7
 
 	if (!options.BaseUrl.empty()) {
+		// BaseUrl will have been turned absolute by this point.
 		std::string useInstead;
-		// configFilePath() is "" without a config file → suggestion skipped.
+		if (!configFilePath().empty()) {
+			std::string relative = tspath::getRelativePathFromFile(
+			    configFilePath(), options.BaseUrl, comparePathsOptions());
+			if (!(relative.starts_with("./") ||
+			      relative.starts_with("../"))) {
+				relative = "./" + relative;
+			}
+			std::string suggestion =
+			    tspath::combinePaths(relative, {"*"});
+			useInstead = "\"paths\": {\"*\": [" +
+			           std::string(json::marshalString(suggestion)) +
+			           "]}";
+		}
 		createRemovedOptionDiagnostic("baseUrl", "", useInstead);
 	}
 
@@ -1708,19 +1796,28 @@ void SimpleProgram::verifyCompilerOptions() {
 	}
 
 	// forEachOptionPathsSyntax / createDiagnosticForOptionPaths /
-	// createDiagnosticForOptionPathKeyValue — getCompilerOptionsObjectLiteralSyntax
-	// is nil → ForEachPropertyAssignment(nil) → nil → falls through to
-	// createCompilerOptionsDiagnostic.
+	// createDiagnosticForOptionPathKeyValue — program.go:1097-1134.
 	auto forEachOptionPathsSyntax =
-	    [&](const std::function<Diagnostic*(void*)>& callback)
-	    -> Diagnostic* { return nullptr; };
+	    [&](const std::function<Diagnostic*(PropertyAssignment*)>& callback)
+	    -> Diagnostic* {
+		return tsoptions::ForEachPropertyAssignment<Diagnostic>(
+		    getCompilerOptionsObjectLiteralSyntax(), "paths", callback);
+	};
 
 	auto createDiagnosticForOptionPaths =
 	    [&](bool onKey, const std::string& key,
 	        const DiagnosticMessage* message,
 	        std::vector<std::string> args = {}) -> Diagnostic* {
 		Diagnostic* diag = forEachOptionPathsSyntax(
-		    [&](void* pathProp) -> Diagnostic* { return nullptr; });
+		    [&](PropertyAssignment* pathProp) -> Diagnostic* {
+			    if (isObjectLiteralExpression(pathProp->Initializer)) {
+				    return createOptionDiagnosticInObjectLiteralSyntax(
+				        pathProp->Initializer
+				            ->as<ObjectLiteralExpression>(),
+				        onKey, key, "", message, args);
+			    }
+			    return nullptr;
+		    });
 		if (diag == nullptr) {
 			diag = createCompilerOptionsDiagnostic(message,
 			                                     std::move(args));
@@ -1733,7 +1830,47 @@ void SimpleProgram::verifyCompilerOptions() {
 	        const DiagnosticMessage* message,
 	        std::vector<std::string> args = {}) -> Diagnostic* {
 		Diagnostic* diag = forEachOptionPathsSyntax(
-		    [&](void* pathProp) -> Diagnostic* { return nullptr; });
+		    [&](PropertyAssignment* pathProp) -> Diagnostic* {
+			    if (isObjectLiteralExpression(pathProp->Initializer)) {
+				    return tsoptions::
+				        ForEachPropertyAssignment<Diagnostic>(
+				            pathProp->Initializer
+				                ->as<ObjectLiteralExpression>(),
+				            key,
+				            [&](PropertyAssignment* keyProps)
+				                -> Diagnostic* {
+					            Node* initializer =
+					                keyProps->Initializer;
+					            if (isArrayLiteralExpression(
+					                    initializer)) {
+						            NodeList* elements =
+						                initializer
+						                    ->as<ArrayLiteralExpression>()
+						                    ->Elements;
+						            if (elements != nullptr &&
+						                valueIndex >= 0 &&
+						                static_cast<size_t>(
+						                    valueIndex) <
+						                    elements->nodes.size()) {
+							            Diagnostic* diag =
+							                tsoptions::
+							                    createDiagnosticForNodeInSourceFile(
+							                        sourceFile(),
+							                        elements
+							                            ->nodes
+							                                [valueIndex],
+							                        message,
+							                        args);
+							            programDiagnostics
+							                .push_back(diag);
+							            return diag;
+						            }
+					            }
+					            return nullptr;
+				            });
+			    }
+			    return nullptr;
+		    });
 		if (diag == nullptr) {
 			diag = createCompilerOptionsDiagnostic(message,
 			                                     std::move(args));
