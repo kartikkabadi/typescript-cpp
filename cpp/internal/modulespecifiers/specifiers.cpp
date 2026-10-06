@@ -33,28 +33,6 @@ namespace {
 
 // --- file-local helpers ------------------------------------------------------
 
-// ast/utilities.go:3620 — ast.GetNonAugmentationDeclaration.
-// (deduped: replicated in checker_nodebuilder.cpp / checker_moduletarget.cpp)
-Node* getNonAugmentationDeclaration(Symbol* symbol) {
-	for (Node* d : symbol->declarations) {
-		if (!isExternalModuleAugmentation(d) &&
-		    !isGlobalScopeAugmentation(d)) {
-			return d;
-		}
-	}
-	return nullptr;
-}
-
-// ast/utilities.go:3613 — ast.GetSourceFileOfModule.
-// (deduped: replicated in checker_nodebuilder.cpp / checker_moduletarget.cpp)
-SourceFile* getSourceFileOfModule(Symbol* module) {
-	Node* declaration = module->valueDeclaration;
-	if (declaration == nullptr) {
-		declaration = getNonAugmentationDeclaration(module);
-	}
-	return getSourceFileOfNode(declaration);
-}
-
 // path.go:1257 — tspath.StartsWithDirectory.
 // (deduped: replicated file-locally until a tspath slice lands)
 bool startsWithDirectory(std::string_view fileName,

@@ -16,6 +16,11 @@
 #include "internal/ast/ast.h" // tscUnreachable
 #include "internal/ast/kind.h"
 
+// <cassert> (pulled in via ast.h) defines `assert` as a macro, which would
+// collide with the `debug::assert` declaration below. Translation units that
+// include this header must not use the C `assert` macro or TSC_ASSERT.
+#undef assert
+
 namespace tsc::debug {
 
 namespace detail {

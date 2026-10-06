@@ -2586,4 +2586,67 @@ bool sourceFileHasIdentifier(SourceFile* file, const std::string& name) {
 	return file->identifiers.count(name) != 0;
 }
 
+// === slice: ls-autoimport ===
+
+// utilities.go:2811 IsRequireVariableStatement
+bool isRequireVariableStatement(Node* node) {
+	if (isVariableStatement(node)) {
+		auto* declList = node->as<VariableStatement>()->DeclarationList;
+		auto* declarations = declList->as<VariableDeclarationList>()->Declarations;
+		if (declarations != nullptr && !declarations->nodes.empty()) {
+			return std::all_of(declarations->nodes.begin(),
+			                   declarations->nodes.end(),
+			                   isVariableDeclarationInitializedToRequire);
+		}
+	}
+	return false;
+}
+
+// utilities.go:3618 GetNonAugmentationDeclaration
+Node* getNonAugmentationDeclaration(Symbol* symbol) {
+	for (Node* d : symbol->declarations) {
+		if (!isExternalModuleAugmentation(d) && !isGlobalScopeAugmentation(d)) {
+			return d;
+		}
+	}
+	return nullptr;
+}
+
+// utilities.go:3613 GetSourceFileOfModule
+SourceFile* getSourceFileOfModule(Symbol* module) {
+	Node* declaration = module->valueDeclaration;
+	if (declaration == nullptr) {
+		declaration = getNonAugmentationDeclaration(module);
+	}
+	return getSourceFileOfNode(declaration);
+}
+
+// utilities.go:4203 TryGetImportFromModuleSpecifier
+Node* tryGetImportFromModuleSpecifier(Node* node) {
+	switch (node->parent->kind) {
+		case Kind::ImportDeclaration:
+		case Kind::JSImportDeclaration:
+		case Kind::ExportDeclaration:
+			return node->parent;
+		case Kind::ExternalModuleReference:
+			return node->parent->parent;
+		case Kind::CallExpression:
+			if (isImportCall(node->parent) ||
+			    isRequireCall(node->parent,
+			                  false /*requireStringLiteralLikeArgument*/)) {
+				return node->parent;
+			}
+			return nullptr;
+		case Kind::LiteralType:
+			if (!isStringLiteral(node)) {
+				return nullptr;
+			}
+			if (isImportTypeNode(node->parent->parent)) {
+				return node->parent->parent;
+			}
+			return nullptr;
+	}
+	return nullptr;
+}
+
 } // namespace tsc

@@ -98,25 +98,6 @@ Node* getNamespaceDeclarationNode(Node* node) {
 	return nullptr;
 }
 
-// ast/utilities.go — GetNonAugmentationDeclaration
-Node* getNonAugmentationDeclaration(Symbol* symbol) {
-	for (Node* d : symbol->declarations) {
-		if (!isExternalModuleAugmentation(d) && !isGlobalScopeAugmentation(d)) {
-			return d;
-		}
-	}
-	return nullptr;
-}
-
-// ast/utilities.go:3613 — GetSourceFileOfModule
-SourceFile* getSourceFileOfModule(Symbol* moduleSymbol) {
-	Node* declaration = moduleSymbol->valueDeclaration;
-	if (declaration == nullptr) {
-		declaration = getNonAugmentationDeclaration(moduleSymbol);
-	}
-	return getSourceFileOfNode(declaration);
-}
-
 // ast/utilities.go:1223 — GetJSDocDeprecatedTag
 Node* getJSDocDeprecatedTag(Node* node) {
 	for (Node* jsdoc : node->jsDoc(nullptr)) {

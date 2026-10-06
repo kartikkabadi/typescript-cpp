@@ -21,6 +21,7 @@
 #include "internal/ast/ast.h"
 #include "internal/ast/diagnostics_util.h"
 #include "internal/checker/checker.h"
+#include "internal/collections/collections.h" // === slice: ls-autoimport ===
 #include "internal/core/types.h"
 #include "internal/module/resolver.h"
 #include "internal/module/types.h"
@@ -824,6 +825,45 @@ public:
 	GetSemanticDiagnosticsForIncremental(
 	    const std::vector<SourceFile*>& sourceFiles);
 	// === end slice: incremental ===
+
+	// === slice: ls-autoimport ===
+	// program.go:79 packageNamesInfo + collectPackageNames (:2226) —
+	// computed lazily like Go's lazyValue: packageNames_ holds the result
+	// after first call.
+	struct packageNamesInfo {
+		collections::Set<std::string> resolved;
+		collections::Set<std::string> unresolved;
+		collections::Set<std::string> deepImportPackages;
+	};
+	std::optional<packageNamesInfo> packageNames_;
+	packageNamesInfo* collectPackageNames();
+	collections::Set<std::string>* ResolvedPackageNames() {
+		return &collectPackageNames()->resolved;
+	}
+	collections::Set<std::string>* UnresolvedPackageNames() {
+		return &collectPackageNames()->unresolved;
+	}
+	collections::Set<std::string>* DeepImportPackageNames() {
+		return &collectPackageNames()->deepImportPackages;
+	}
+	// program.go:1785 IsGlobalTypingsFile.
+	bool IsGlobalTypingsFile(const std::string& fileName) const;
+	// program.go:143 GetGlobalTypingsCacheLocation — opts.TypingsLocation.
+	std::string GetGlobalTypingsCacheLocation() override {
+		return opts_.TypingsLocation;
+	}
+	// program.go:215 GetResolvedProjectReferences — SimpleProgram has no
+	// projectReferenceFileMapper; the resolved list is empty.
+	std::vector<tsoptions::ParsedCommandLine*>
+	GetResolvedProjectReferences() {
+		return {};
+	}
+	// program.go:590 GetTypeChecker — the port's checkerPool equivalent is
+	// the lazy single checker (getChecker); the release callback is a
+	// no-op, matching a shared single checker.
+	std::pair<checker::Checker*, std::function<void()>> GetTypeChecker(
+		gostd::Context ctx);
+	// === end slice: ls-autoimport ===
 };
 
 // program.go: GetDiagnosticsOfAnyProgram — generalized to ProgramLike for
