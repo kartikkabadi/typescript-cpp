@@ -26,7 +26,7 @@ oracle.
 | Transformers | `transformers/` | `cpp/internal/transformers` | complete — root package (transformer/chain/modifiervisitor/utilities/destructuring) + all sub-packages: estransforms (17 files incl. classfields 4k, esdecorator, namedevaluation, classthis, async family), jsxtransforms, moduletransforms, inliners, tstransforms (6 files), declarations (transform/diagnostics/tracker/supplementalreferences/util) |
 | Emitter | `printer/`, `compiler/emitter.go`, `compiler/emitHost.go` | `cpp/internal/printer`, `cpp/internal/compiler/emitter.cpp` | emitter + emitHost + `Program::Emit` ported; `tscpp emit`/`tscpp emitdump` byte-identical to the Go `emitdump` oracle on the full corpus (12,734/12,734); sourcemap/spanmap/contentmapper/incremental landed |
 | Stage-5 | `tsoptions`, `format`, `contentmapper`+`spanmap`, `execute/incremental`, `vfs`, `locale`, `json`, `jsonrpc`, `xxh3`, `gostd`, `transpile` | `cpp/internal/{tsoptions,format,contentmapper,spanmap,execute/incremental,vfs,locale,json,jsonrpc,xxh3,gostd,transpile}` | complete — incl. `tsoptions::ParseCommandLine` CLI wiring (real flag parsing in tscpp), contentmapper→fileloader seam (`parseContentMappedFile` + host mapping + program diagnostics), transpile API (byte-identical to `transpiledump` oracle) |
-| Stage-5 (in flight) | `fswatch`, `ipc`, `execute/tsc`+`build`+`watchmanager`, `ls`, `api`, `project`, `lsp`, `fourslash` | `cpp/internal/...` | ports in flight via parallel slices |
+| Stage-5 (merged) | `fswatch`, `ipc`, `execute/tsc`+`build`, `watchmanager`, `ls`, `api`, `project`, `lsp`, `fourslash`, `tsctests`, `lsconv`, `lspwatcher`, `collections`, `testutil/*` | `cpp/internal/...` | ports merged (function-by-function); `lsp` server + `proto.go` tail in flight |
 
 ## Conformance
 
@@ -60,10 +60,17 @@ dump — `tsc/cmd/checkdump` is the matching Go oracle (`tsc --noEmit`).
 sections for every emitted file — `tsc/cmd/emitdump` is the matching Go
 oracle (`tsc`).
 
-**Result: 12,734 / 12,734 files (100%) produce byte-identical emit output;**
-**12,697 / 12,734 (99.7%) with `--declaration`** (37 divergent files remain —
-member serialization, default-export aliasing, elided-depth, extra
-diagnostics, numeric formatting; fixes in flight).
+**Result: 12,734 / 12,734 files (100%) produce byte-identical emit output,
+including `--declaration` (all member-serialization/aliasing/formatting
+divergences fixed).**
+
+`tscpp transpiledump` ports `tsc/cmd/transpiledump` — stdin-driven transpile
+(module or `-decl` declaration) dump: output text + `diags:` list. Verified
+byte-identical on a 200-file sample (both modes).
+
+Dump surfaces certified vs their Go oracles (500-file samples, byte-identical):
+`parse` vs `parsedump`, `bind` vs `bindump`, `lex-json` vs `lexdump` (all
+500/500).
 
 ```sh
 # single file
@@ -86,7 +93,7 @@ performs no per-node refcount/GC work.
 ```
 cpp/
   CMakeLists.txt          cmake+ninja build (Apple clang / GCC / MSVC)
-  cmd/tscpp/main.cpp      lex|lex-json|bench|parse|bench-parse|parse-all|bind|check|emit|emitdump driver
+  cmd/tscpp/main.cpp      lex|lex-json|bench|parse|bench-parse|parse-all|bind|check|emit|emitdump|transpiledump driver
   internal/
     ast/                  Node model; nodes_generated.h is generated
     binder/               binder + referenceresolver + exports
