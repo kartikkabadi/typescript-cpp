@@ -202,6 +202,7 @@ DiagnosticReporter CreateBuilderStatusReporter(System* sys, std::ostream* w,
 		writeStatus(*w, formatGoTime(sys->Now()), *writerDiagnostic,
 		            &formatOpts);
 		*w << formatOpts.newLine << formatOpts.newLine;
+		w->flush();  // Go os.Stdout is unbuffered; status must reach a pipe immediately
 		if (testing != nullptr) {
 			testing->OnBuildStatusReportEnd(w);
 		}
@@ -231,6 +232,7 @@ DiagnosticReporter CreateWatchStatusReporter(System* sys,
 		writeStatus(*writer, formatGoTime(sys->Now()), *writerDiagnostic,
 		            &formatOpts);
 		*writer << formatOpts.newLine << formatOpts.newLine;
+		writer->flush();  // Go os.Stdout is unbuffered; status must reach a pipe immediately
 		if (testing != nullptr) {
 			testing->OnWatchStatusReportEnd();
 		}
