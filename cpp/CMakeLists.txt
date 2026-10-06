@@ -205,6 +205,18 @@ add_library(tsc STATIC
 	internal/execute/incremental/referencemap.cpp
 	internal/execute/incremental/snapshot.cpp
 	internal/execute/incremental/snapshottobuildinfo.cpp
+	# === slice: execute-tsc ===
+	internal/execute/execute.cpp
+	internal/execute/watcher.cpp
+	internal/execute/tsc/compile.cpp
+	internal/execute/tsc/diagnostics.cpp
+	internal/execute/tsc/emit.cpp
+	internal/execute/tsc/extendedconfigcache.cpp
+	internal/execute/tsc/help.cpp
+	internal/execute/tsc/init.cpp
+	internal/execute/tsc/statistics.cpp
+	internal/execute/watchmanager/watchbackend.cpp
+	internal/execute/watchmanager/watchmanager.cpp
 	# === slice: bundled ===
 	internal/bundled/bundled.cpp
 	internal/bundled/bundled_generated.cpp

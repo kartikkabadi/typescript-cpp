@@ -6,8 +6,10 @@
 #include <atomic>
 #include <deque>
 #include <functional>
+#include <iosfwd>
 #include <memory>
 #include <optional>
+#include <tuple>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -104,10 +106,40 @@ public:
 	                          SourceFileMetaData metaData);
 
 	// === slice: incremental ===
-	// host.go ContentMapperProject — no content mappers in this port;
-	// always nullptr.
-	contentmapper::Project* ContentMapperProject() const { return nullptr; }
+	// host.go GetSourceFile — ReadFile + ParseSourceFile + EnsureScriptKind.
+	// Virtual so execute/watcher's watchCompilerHost can intercept every
+	// load with its mtime cache (watcher.go watchCompilerHost).
+	virtual SourceFile* GetSourceFile(const SourceFileParseOptions& opts);
 	// === end slice: incremental ===
+	// host.go ContentMapperProject — returns the field installed by
+	// execute/tsc when the command line has content mappers.
+	contentmapper::Project* ContentMapperProject() const {
+		return contentMapperProject.get();
+	}
+	// === end slice: incremental ===
+
+	// === slice: execute-tsc ===
+	// host.go:38 — the remaining compilerHost fields and methods.
+	tsoptions::ExtendedConfigCache* extendedConfigCache = nullptr;
+	// host.go:38 trace — Go `func(msg *diagnostics.Message, args ...any)`.
+	std::function<void(const DiagnosticMessage*,
+	                   const std::vector<std::string>&)>
+	    trace;
+	std::shared_ptr<contentmapper::Project> contentMapperProject;
+
+	// host.go FS() — Go returns the vfs.FS itself.
+	std::shared_ptr<vfs::FS> FS() { return fs; }
+	// host.go Trace.
+	void Trace(const DiagnosticMessage* msg,
+	           const std::vector<std::string>& args);
+	// host.go GetContentMappedSourceFiles.
+	std::pair<contentmapper::SourceFiles, gostd::Error>
+	GetContentMappedSourceFiles(const SourceFileParseOptions& parseOptions,
+	                            contentmapper::Mapper* mapper);
+	// host.go GetResolvedProjectReference.
+	tsoptions::ParsedCommandLine* GetResolvedProjectReference(
+	    const std::string& fileName, const tspath::Path& path);
+	// === end slice: execute-tsc ===
 };
 
 // --- program.go: LibFile / redirectsFile ---
@@ -438,6 +470,33 @@ struct filesLoader {
 	includeProcessor* ip{};
 };
 
+// === slice: execute-tsc ===
+// program.go:37 ProgramOptions.
+struct ProgramOptions {
+	CompilerHost* Host = nullptr;
+	tsoptions::ParsedCommandLine* Config = nullptr;
+	bool UseSourceOfProjectReference = false;
+	Tristate SingleThreaded;
+	// CreateCheckerPool — Go `func(*Program) CheckerPool`; the pool type is
+	// unported (single-threaded port creates one checker lazily in
+	// getChecker).
+	std::function<void*(SimpleProgram*)> CreateCheckerPool;
+	std::string TypingsLocation;
+	std::string ProjectName;
+	tracing::Tracing* Tracing = nullptr;
+	// CreateModuleResolver — Go `func(module.ResolverOptions) module.Resolver`.
+	std::function<module::Resolver*(const module::ResolverOptions&)>
+	    CreateModuleResolver;
+	// SkipModuleResolution avoids all module and type reference resolution while
+	// still collecting import metadata needed for emit.
+	bool SkipModuleResolution = false;
+};
+
+// program.go:285 NewProgram — creates a SimpleProgram after running the
+// PhaseProgram trace span.
+SimpleProgram* NewProgram(const ProgramOptions& opts);
+// === end slice: execute-tsc ===
+
 // === class SimpleProgram — checker.h `Program` + program.go ===
 class SimpleProgram : public checker::Program, public ProgramLike {
 public:
@@ -488,6 +547,13 @@ public:
 	std::unique_ptr<tsoptions::ParsedCommandLine> commandLine_;
 	tracing::Tracing* tr_ = nullptr;
 	// === end slice: incremental ===
+
+	// === slice: execute-tsc ===
+	// program.go — the options the program was created with (opts_). Empty
+	// when the program was built through the plain ctor (CommandLine() then
+	// falls back to the synthesized commandLine_).
+	ProgramOptions opts_;
+	// === end slice: execute-tsc ===
 
 	// program.go: hasEmitBlockingDiagnostics / sourceFilesToEmit (+Once).
 	std::unordered_set<tspath::Path> hasEmitBlockingDiagnostics;
@@ -665,7 +731,9 @@ public:
 	    module::ModeAwareCache<module::ResolvedTypeReferenceDirective*>>&
 	GetResolvedTypeReferenceDirectives() { return typeResolutionsInFile; }
 	// program.go — opts.Config / opts.Tracing accessors.
-	tsoptions::ParsedCommandLine* CommandLine() { return commandLine_.get(); }
+	tsoptions::ParsedCommandLine* CommandLine() {
+		return opts_.Config != nullptr ? opts_.Config : commandLine_.get();
+	}
 	tracing::Tracing* Tracing() { return tr_; }
 	void SetTracing(tracing::Tracing* t) { tr_ = t; }
 	// program.go PackageJsonCacheEntries — delegates to the resolver's
@@ -674,8 +742,37 @@ public:
 	    const std::function<bool(
 	        tspath::Path,
 	        const std::shared_ptr<packagejson::InfoCacheEntry>&)>& f);
-	// host.go:115 — no content mappers in this port; always nullptr.
-	contentmapper::Project* ContentMapperProject() { return nullptr; }
+	// host.go ContentMapperProject — delegates to the host's project.
+	contentmapper::Project* ContentMapperProject() {
+		return host->ContentMapperProject();
+	}
+	// === slice: execute-tsc ===
+	// program.go FilesByPath — the live path→file map (watch-mode fast
+	// path + explainFiles).
+	const std::unordered_map<tspath::Path, SourceFile*>& FilesByPath()
+	    const {
+		return filesByPath;
+	}
+	// program.go:2120 ExplainFiles.
+	void ExplainFiles(std::ostream& w, const locale::Locale& locale);
+	// program.go:332 ReuseProgram — the UpdateProgram single-file fast
+	// path. The reuse machinery (processedFiles replay, lazyValue
+	// program state, updateFileIncludeProcessor, checker pool) is not
+	// ported; reaching it is a dep-stub.
+	// dep-stub — owned by compiler.
+	std::tuple<SimpleProgram*, SourceFile*, bool> ReuseProgram(
+	    const tspath::Path& changedFilePath, CompilerHost* newHost,
+	    const std::function<void*(SimpleProgram*)>& createCheckerPool,
+	    const std::function<module::Resolver*(const module::ResolverOptions&)>&
+	        createModuleResolver);
+	// program.go statistics helpers — aggregate counts across files.
+	// LineCount — program.go (statistics.go statisticsFromProgram).
+	int LineCount() const;
+	int IdentifierCount() const;
+	int SymbolCount() const;
+	uint32_t TypeCount();
+	uint64_t InstantiationCount();
+	// === end slice: execute-tsc ===
 	// program.go SingleThreaded — options.SingleThreaded == TS true.
 	bool SingleThreaded() { return options.SingleThreaded == Tristate::True; }
 	// program.go:804 GetSemanticDiagnosticsForIncremental — per-file
@@ -687,10 +784,38 @@ public:
 };
 
 // program.go: GetDiagnosticsOfAnyProgram — generalized to ProgramLike for
-// the incremental Program (execute/incremental).
+// the incremental Program (execute/incremental). The bind/check callbacks
+// default to the program's own methods when nullptr (Go callers pass them
+// explicitly; nullptr preserves those semantics here).
 std::vector<Diagnostic*> getDiagnosticsOfAnyProgram(
     ProgramLike* program, const std::vector<SourceFile*>& files,
-    bool skipNoEmitCheckForDtsDiagnostics);
+    bool skipNoEmitCheckForDtsDiagnostics,
+    std::function<std::vector<Diagnostic*>(SourceFile*)>
+        getBindDiagnostics = nullptr,
+    std::function<std::vector<Diagnostic*>(SourceFile*)>
+        getSemanticDiagnostics = nullptr);
+
+// === slice: execute-tsc ===
+// host.go:45 NewCachedFSCompilerHost — wraps fs in cachedvfs.From.
+CompilerHost* NewCachedFSCompilerHost(
+    std::string currentDirectory, const std::shared_ptr<vfs::FS>& fs,
+    std::string defaultLibraryPath,
+    tsoptions::ExtendedConfigCache* extendedConfigCache,
+    std::function<void(const DiagnosticMessage*,
+                       const std::vector<std::string>&)>
+        trace,
+    const std::shared_ptr<contentmapper::Project>& contentMapperProject);
+
+// host.go:57 NewCompilerHost.
+CompilerHost* NewCompilerHost(
+    std::string currentDirectory, const std::shared_ptr<vfs::FS>& fs,
+    std::string defaultLibraryPath,
+    tsoptions::ExtendedConfigCache* extendedConfigCache,
+    std::function<void(const DiagnosticMessage*,
+                       const std::vector<std::string>&)>
+        trace,
+    const std::shared_ptr<contentmapper::Project>& contentMapperProject);
+// === end slice: execute-tsc ===
 
 std::vector<Diagnostic*> sortAndDeduplicateDiagnostics(
     std::vector<Diagnostic*> diagnostics);
