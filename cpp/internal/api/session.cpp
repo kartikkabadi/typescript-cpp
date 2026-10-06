@@ -6661,13 +6661,15 @@ Session::handleGetImportAdderEdits(
 
 std::vector<std::unique_ptr<TextEdit>> toAPITextEdits(
     SourceFile* sourceFile,
-    const std::vector<lsp::lsproto::TextEdit*>& edits) {
+    const lsp::lsproto::Slice<
+        std::shared_ptr<lsp::lsproto::TextEdit>>& edits) {
 	auto originalText = sourceFile->OriginalText();
 	auto* lineMap = lsconv::ComputeLSPLineStarts(originalText);
 	auto* positionMap = computePositionMap(originalText);
-	std::vector<std::unique_ptr<TextEdit>> result(edits.size());
-	for (size_t i = 0; i < edits.size(); i++) {
-		const auto* edit = edits[i];
+	std::vector<std::unique_ptr<TextEdit>> result(
+	    edits.has_value() ? edits->size() : 0);
+	for (size_t i = 0; i < result.size(); i++) {
+		const auto& edit = (*edits)[i];
 		auto [start, ok] =
 		    originalTextOffset(lineMap, edit->Range.Start,
 		                       int(originalText.size()));
@@ -6860,16 +6862,16 @@ Session::handleGetCompletionsAtPosition(
 		const auto* ci = item->completionItem;
 		auto entry = std::make_shared<CompletionEntryResponse>();
 		entry->Name = ci->Label;
-		if (ci->SortText != nullptr) {
+		if (ci->SortText.has_value()) {
 			entry->SortText = *ci->SortText;
 		}
-		if (ci->InsertText != nullptr) {
+		if (ci->InsertText.has_value()) {
 			entry->InsertText = *ci->InsertText;
 		}
-		if (ci->FilterText != nullptr) {
+		if (ci->FilterText.has_value()) {
 			entry->FilterText = *ci->FilterText;
 		}
-		if (ci->Detail != nullptr) {
+		if (ci->Detail.has_value()) {
 			entry->Detail = *ci->Detail;
 		}
 		if (ci->Kind != nullptr) {
@@ -6877,10 +6879,10 @@ Session::handleGetCompletionsAtPosition(
 		}
 		if (ci->LabelDetails != nullptr) {
 			auto ld = std::make_shared<CompletionEntryLabelDetailsResponse>();
-			if (ci->LabelDetails->Detail != nullptr) {
+			if (ci->LabelDetails->Detail.has_value()) {
 				ld->Detail = *ci->LabelDetails->Detail;
 			}
-			if (ci->LabelDetails->Description != nullptr &&
+			if (ci->LabelDetails->Description.has_value() &&
 			    !ci->LabelDetails->Description->empty()) {
 				ld->Description = *ci->LabelDetails->Description;
 			}

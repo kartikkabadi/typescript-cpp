@@ -824,25 +824,29 @@ CompletionList* LanguageService::getJSDocSnippetCompletion(
 	}
 
 	std::string insertText = tmpl->newText;
-	lsproto::InsertTextFormat* insertTextFormat = nullptr;
+	std::shared_ptr<lsproto::InsertTextFormat> insertTextFormat;
 	if (clientSupportsItemSnippet(ctx)) {
 		insertText = templateToSnippet(insertText, newLine);
-		insertTextFormat = newPtr(lsproto::InsertTextFormatSnippet);
+		insertTextFormat =
+		    std::make_shared<lsproto::InsertTextFormat>(
+		        lsproto::InsertTextFormatSnippet);
 	}
 
-	lsproto::TextEditOrInsertReplaceEdit* editRange =
+	std::shared_ptr<lsproto::TextEditOrInsertReplaceEdit> editRange =
 	    getJSDocSnippetCompletionRange(ctx, file, position, insertText);
-	std::vector<std::string>* commitCharacters = nullptr;
+	std::shared_ptr<lsproto::Slice<std::string>> commitCharacters;
 	if (clientSupportsItemCommitCharacters(ctx)) {
-		commitCharacters = new std::vector<std::string>();
+		commitCharacters = std::make_shared<lsproto::Slice<std::string>>(
+		    std::vector<std::string>{});
 	}
 	CompletionItem* item = new CompletionItem{
 	    .completionItem = new lsproto::CompletionItem{
 	        .Label = "/** */",
-	        .Kind = newPtr(lsproto::CompletionItemKindText),
-	        .Detail = newPtr(localize(locale::fromContext(ctx), JSDoc_comment,
-	                                  JSDoc_comment->key, {})),
-	        .SortText = newPtr(std::string("\x00", 1)),
+	        .Kind = std::make_shared<lsproto::CompletionItemKind>(
+	            lsproto::CompletionItemKindText),
+	        .Detail = localize(locale::fromContext(ctx), JSDoc_comment,
+	                           JSDoc_comment->key, {}),
+	        .SortText = std::string("\x00", 1),
 	        .InsertTextFormat = insertTextFormat,
 	        .TextEdit = editRange,
 	        .CommitCharacters = commitCharacters,
@@ -855,7 +859,7 @@ CompletionList* LanguageService::getJSDocSnippetCompletion(
 
 // --- jsdoc_snippet.go:87 getJSDocSnippetCompletionRange ---
 
-lsproto::TextEditOrInsertReplaceEdit*
+std::shared_ptr<lsproto::TextEditOrInsertReplaceEdit>
 LanguageService::getJSDocSnippetCompletionRange(const ContextPtr& ctx,
                                                 SourceFile* file,
                                                 int position,
@@ -883,18 +887,23 @@ LanguageService::getJSDocSnippetCompletionRange(const ContextPtr& ctx,
 		return nullptr;
 	}
 	if (clientSupportsItemInsertReplace(ctx)) {
-		return new lsproto::TextEditOrInsertReplaceEdit{
-		    .InsertReplaceEdit = new lsproto::InsertReplaceEdit{
-		        .NewText = newText,
-		        .Insert = replacementRange,
-		        .Replace = replacementRange,
-		    }};
+		return std::make_shared<lsproto::TextEditOrInsertReplaceEdit>(
+		    lsproto::TextEditOrInsertReplaceEdit{
+		        .InsertReplaceEdit =
+		            std::make_shared<lsproto::InsertReplaceEdit>(
+		                lsproto::InsertReplaceEdit{
+		                    .NewText = newText,
+		                    .Insert = replacementRange,
+		                    .Replace = replacementRange,
+		                })});
 	}
-	return new lsproto::TextEditOrInsertReplaceEdit{
-	    .TextEdit = new lsproto::TextEdit{
-	        .NewText = newText,
-	        .Range = replacementRange,
-	    }};
+	return std::make_shared<lsproto::TextEditOrInsertReplaceEdit>(
+	    lsproto::TextEditOrInsertReplaceEdit{
+	        .TextEdit = std::make_shared<lsproto::TextEdit>(
+	            lsproto::TextEdit{
+	                .NewText = newText,
+	                .Range = replacementRange,
+	            })});
 }
 
 } // namespace tsc::ls

@@ -64,7 +64,8 @@ void importAdder::AddImportFromExportedSymbol(Symbol* exportedSymbol,
 }
 
 // importAdder::Edits — import_adder.go:118
-std::vector<lsp::lsproto::TextEdit*> importAdder::Edits() {
+lsp::lsproto::Slice<std::shared_ptr<lsp::lsproto::TextEdit>>
+importAdder::Edits() {
 	// !!! organize imports?
 	std::unique_ptr<ls::change::Tracker> tracker =
 	    std::make_unique<ls::change::Tracker>(
@@ -123,10 +124,12 @@ std::vector<lsp::lsproto::TextEdit*> importAdder::Edits() {
 	}
 	// Go shares heap []*lsproto.TextEdit (GC lifetime); materialize the same
 	// ownership here — the tracker is discarded after GetChanges.
-	std::vector<lsp::lsproto::TextEdit*> edits;
-	edits.reserve(it->second.size());
+	lsp::lsproto::Slice<std::shared_ptr<lsp::lsproto::TextEdit>> edits;
+	edits.emplace();
+	edits->reserve(it->second.size());
 	for (auto& e : it->second) {
-		edits.push_back(new lsp::lsproto::TextEdit(std::move(e)));
+		edits->push_back(
+		    std::make_shared<lsp::lsproto::TextEdit>(std::move(e)));
 	}
 	return edits;
 }

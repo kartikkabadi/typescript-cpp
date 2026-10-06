@@ -939,7 +939,8 @@ std::vector<std::shared_ptr<DiagnosticResponse>> nonNilDiagnostics(
     const std::vector<Diagnostic*>& diags);
 std::vector<std::unique_ptr<TextEdit>> toAPITextEdits(
     SourceFile* sourceFile,
-    const std::vector<lsp::lsproto::TextEdit*>& edits);
+    const lsp::lsproto::Slice<
+        std::shared_ptr<lsp::lsproto::TextEdit>>& edits);
 std::pair<int, bool> originalTextOffset(lsconv::LSPLineMap* lineMap,
                                         lsp::lsproto::Position position,
                                         int textLength);

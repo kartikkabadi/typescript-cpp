@@ -605,7 +605,9 @@ struct Fix {
 	Node* TypeOnlyAliasDeclaration = nullptr;
 
 	// Edits — fix.go:56. Returns (edits, description, safe).
-	std::tuple<std::vector<lsp::lsproto::TextEdit*>, std::string, bool> Edits(
+	std::tuple<lsp::lsproto::Slice<std::shared_ptr<lsp::lsproto::TextEdit>>,
+	           std::string, bool>
+	Edits(
 	    gostd::Context ctx, SourceFile* file, const CompilerOptions* compilerOptions,
 	    const lsutil::FormatCodeSettings& formatOptions,
 	    lsconv::Converters* converters,
@@ -621,7 +623,8 @@ struct addToExistingImportFix {
 };
 
 // fileEdits — fix.go:133
-std::pair<std::vector<lsp::lsproto::TextEdit*>, bool> fileEdits(
+std::pair<lsp::lsproto::Slice<std::shared_ptr<lsp::lsproto::TextEdit>>, bool>
+fileEdits(
     change::Tracker* tracker, SourceFile* file);
 
 // addImportType — fix.go:138
@@ -760,7 +763,8 @@ struct ImportAdder {
 	virtual void AddImportFromExportedSymbol(Symbol* symbol,
 	                                         bool isValidTypeOnlyUseSite) = 0;
 	virtual void AddImportFix(std::unique_ptr<Fix> fix) = 0;
-	virtual std::vector<lsp::lsproto::TextEdit*> Edits() = 0;
+	virtual lsp::lsproto::Slice<std::shared_ptr<lsp::lsproto::TextEdit>>
+	Edits() = 0;
 };
 
 // addToExistingState — import_adder.go:32
@@ -807,7 +811,8 @@ struct importAdder : ImportAdder {
 	void AddImportFromExportedSymbol(Symbol* exportedSymbol,
 	                                 bool isValidTypeOnlyUseSite) override;
 	// Edits — import_adder.go:118
-	std::vector<lsp::lsproto::TextEdit*> Edits() override;
+	lsp::lsproto::Slice<std::shared_ptr<lsp::lsproto::TextEdit>> Edits()
+	    override;
 	// AddImportFix — import_adder.go:189
 	void AddImportFix(std::unique_ptr<Fix> fix) override;
 	// getNewImportEntry — import_adder.go:337

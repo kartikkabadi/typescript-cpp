@@ -618,8 +618,8 @@ LanguageService::ProvideCompletion(const ContextPtr& ctx,
                                    lsproto::CompletionContext* context) {
 	auto [program, file] = getProgramAndFile(documentURI);
 	std::string* triggerCharacter = nullptr;
-	if (context != nullptr) {
-		triggerCharacter = context->TriggerCharacter;
+	if (context != nullptr && context->TriggerCharacter.has_value()) {
+		triggerCharacter = &*context->TriggerCharacter;
 	}
 	format::FormatRequestContext formatCtx = format::WithFormatCodeSettings(
 	    format::FormatRequestContext{}, FormatOptions(),
@@ -646,7 +646,7 @@ LanguageService::ProvideCompletion(const ContextPtr& ctx,
 		filterContentMappedAutoImports(ctx, program, file, completionList);
 	}
 	lsproto::CompletionItemsOrListOrNull resp;
-	resp.List = completionList;
+	resp.List = std::shared_ptr<lsproto::CompletionList>(completionList);
 	return {resp, nullptr};
 }
 
@@ -658,15 +658,16 @@ void LanguageService::filterContentMappedAutoImports(
 	if (list == nullptr) {
 		return;
 	}
-	std::vector<lsproto::CompletionItem*> filtered;
-	filtered.reserve(list->Items.size());
-	for (auto* item : list->Items) {
+	std::vector<std::shared_ptr<lsproto::CompletionItem>> filtered;
+	filtered.reserve(list->Items ? list->Items->size() : 0);
+	for (auto& item : list->Items.value_or(
+	         std::vector<std::shared_ptr<lsproto::CompletionItem>>{})) {
 		if (item->Data == nullptr || item->Data->AutoImport == nullptr) {
 			filtered.push_back(item);
 			continue;
 		}
 		autoimport::Fix fix;
-		fix.AutoImportFix = item->Data->AutoImport;
+		fix.AutoImportFix = item->Data->AutoImport.get();
 		auto [edits, description, ok] =
 		    fix.Edits(gostd::contextBackground(), file, program->Options(),
 		              FormatOptions(), converters, UserPreferences());
@@ -674,8 +675,9 @@ void LanguageService::filterContentMappedAutoImports(
 			continue;
 		}
 		item->AdditionalTextEdits =
-		    new std::vector<lsproto::TextEdit*>(edits);
-		item->Detail = strPtrTo(description);
+		    std::make_shared<lsproto::Slice<std::shared_ptr<lsproto::TextEdit>>>(
+		        edits);
+		item->Detail = description;
 		filtered.push_back(item);
 	}
 	list->Items = std::move(filtered);
@@ -700,14 +702,16 @@ lsproto::CompletionList* ensureItemData(SourceFile* file, int pos,
 	if (list == nullptr) {
 		return nullptr;
 	}
-	for (auto* item : list->Items) {
+	for (auto& item : list->Items.value_or(
+	         std::vector<std::shared_ptr<lsproto::CompletionItem>>{})) {
 		if (item->Data == nullptr) {
-			item->Data = new lsproto::CompletionItemData{
-			    .FileName = file->OriginalFileName(),
-			    .Position = int32_t(pos),
-			    .SupplementalFileIndex = supplementalFileIndex(file),
-			    .Name = item->Label,
-			};
+			item->Data = std::make_shared<lsproto::CompletionItemData>(
+			    lsproto::CompletionItemData{
+			        .FileName = file->OriginalFileName(),
+			        .Position = int32_t(pos),
+			        .SupplementalFileIndex = supplementalFileIndex(file),
+			        .Name = item->Label,
+			    });
 		}
 	}
 	return list;
@@ -715,15 +719,15 @@ lsproto::CompletionList* ensureItemData(SourceFile* file, int pos,
 
 // completions.go:139 supplementalFileIndex.
 
-int32_t* supplementalFileIndex(SourceFile* file) {
+std::optional<int32_t> supplementalFileIndex(SourceFile* file) {
 	SourceFile* canonical = file->CanonicalSourceFile();
 	if (canonical == nullptr) {
-		return nullptr;
+		return std::nullopt;
 	}
 	auto* supplemental = canonical->SupplementalSourceFiles();
 	for (size_t i = 0; i < supplemental->size(); i++) {
 		if ((*supplemental)[i] == file) {
-			return new int32_t(i);
+			return int32_t(i);
 		}
 	}
 	TSC_UNREACHABLE(
@@ -732,9 +736,9 @@ int32_t* supplementalFileIndex(SourceFile* file) {
 
 // completions.go:152 sourceFileForSupplementalFileIndex.
 
-SourceFile* sourceFileForSupplementalFileIndex(SourceFile* file,
-                                               int32_t* index) {
-	if (index == nullptr) {
+SourceFile* sourceFileForSupplementalFileIndex(
+    SourceFile* file, const std::optional<int32_t>& index) {
+	if (!index.has_value()) {
 		return file;
 	}
 	auto* supplemental = file->SupplementalSourceFiles();
@@ -793,12 +797,14 @@ lsproto::CompletionList* CompletionList::toLSP() const {
 	}
 	auto* items = new lsproto::CompletionList();
 	items->IsIncomplete = IsIncomplete;
-	items->ItemDefaults = ItemDefaults;
-	items->ApplyKind = ApplyKind;
-	items->Items.reserve(Items.size());
+	items->ItemDefaults = std::shared_ptr<lsproto::CompletionItemDefaults>(ItemDefaults);
+	items->ApplyKind = std::shared_ptr<lsproto::CompletionItemApplyKinds>(ApplyKind);
+	items->Items.emplace();
+	items->Items->reserve(Items.size());
 	for (auto* entry : Items) {
 		if (entry != nullptr && entry->completionItem != nullptr) {
-			items->Items.push_back(entry->completionItem);
+			items->Items->push_back(std::shared_ptr<lsproto::CompletionItem>(
+			    entry->completionItem));
 		}
 	}
 	return items;
@@ -1065,9 +1071,9 @@ std::pair<completionData, gostd::Error> LanguageService::getCompletionData(
 				auto* ci = new CompletionItem{};
 				ci->completionItem = new lsproto::CompletionItem{
 				    .Label = std::string(tokenToString(iscInfo.keywordCompletion)),
-				    .Kind = newPtr(lsproto::CompletionItemKindKeyword),
-				    .SortText =
-				        newPtr(std::string(SortTextGlobalsOrKeywords)),
+				    .Kind = std::make_shared<lsproto::CompletionItemKind>(
+				        lsproto::CompletionItemKindKeyword),
+				    .SortText = std::string(SortTextGlobalsOrKeywords),
 				};
 				auto* data = new completionDataKeyword{};
 				data->keywordCompletions = {ci};
@@ -2848,7 +2854,7 @@ LanguageService::getCompletionEntriesFromSymbols(
 
 		auto* labelDetails = new lsproto::CompletionItemLabelDetails{};
 		labelDetails->Description =
-		    newPtr(autoImport->Fix->AutoImportFix->ModuleSpecifier);
+		    autoImport->Fix->AutoImportFix->ModuleSpecifier;
 		lsproto::CompletionItem* entry = createLSPCompletionItem(
 		    ctx, autoImport->Fix->AutoImportFix->Name, insertText,
 		    filterText, sortText,
@@ -2953,9 +2959,12 @@ lsproto::CompletionItem* createCompletionItemForLiteral(
     const literalValue& literal) {
 	auto* item = new lsproto::CompletionItem{};
 	item->Label = completionNameForLiteral(file, preferences, literal);
-	item->Kind = newPtr(lsproto::CompletionItemKindConstant);
-	item->SortText = newPtr(std::string(SortTextLocationPriority));
-	item->CommitCharacters = newPtr(std::vector<std::string>{});
+	item->Kind = std::make_shared<lsproto::CompletionItemKind>(
+	    lsproto::CompletionItemKindConstant);
+	item->SortText = std::string(SortTextLocationPriority);
+	item->CommitCharacters =
+	    std::make_shared<lsproto::Slice<std::string>>(
+	        std::vector<std::string>{});
 	return item;
 }
 
@@ -3137,7 +3146,8 @@ LanguageService::createCompletionItem(
 		}
 	}
 
-	std::vector<lsproto::TextEdit*>* additionalTextEdits = nullptr;
+	std::vector<std::shared_ptr<lsproto::TextEdit>>* additionalTextEdits =
+	    nullptr;
 	if (tristateIsTrue(
 	        preferences.IncludeCompletionsWithClassMemberSnippets) &&
 	    data->completionKind == CompletionKindMemberLike &&
@@ -3313,8 +3323,8 @@ LanguageService::getEntryForObjectLiteralMethodCompletion(
 	auto* entry = new symbolOriginInfoObjectLiteralMethod{};
 	entry->insertText = insertText;
 	entry->labelDetails = new lsproto::CompletionItemLabelDetails{
-	    .Detail = newPtr(printObjectLiteralMethodLabelDetail(
-	        method, file, snippetPrinter->factory))};
+	    .Detail = printObjectLiteralMethodLabelDetail(
+	        method, file, snippetPrinter->factory)};
 	entry->isSnippet = isSnippet;
 	return entry;
 }
@@ -3524,12 +3534,14 @@ LanguageService::getEntryForMemberCompletion(
 	std::vector<Node*> nodes = fixer->createMemberFromSymbol(
 	    symbol, classLikeDeclaration, file, body,
 	    preserveOptionalFlagsProperty, abstract);
-	std::vector<lsproto::TextEdit*> additionalTextEdits;
+	std::vector<std::shared_ptr<lsproto::TextEdit>> additionalTextEdits;
 	if (importAdder != nullptr && importAdder->HasFixes()) {
-		additionalTextEdits = importAdder->Edits();
+		additionalTextEdits =
+		    importAdder->Edits().value_or(
+		        std::vector<std::shared_ptr<lsproto::TextEdit>>{});
 	}
 	if (presentModifiers.eraseRange != nullptr) {
-		auto* edit = new lsproto::TextEdit{};
+		auto edit = std::make_shared<lsproto::TextEdit>();
 		edit->Range = *presentModifiers.eraseRange;
 		edit->NewText = "";
 		additionalTextEdits.push_back(edit);
@@ -5123,11 +5135,9 @@ const std::vector<lsproto::CompletionItem*>& allKeywordCompletions() {
 		         i++) {
 			    r->push_back(new lsproto::CompletionItem{
 			        .Label = std::string(tokenToString(static_cast<Kind>(i))),
-			        .Kind =
-			            new lsproto::CompletionItemKind(
-			                lsproto::CompletionItemKindKeyword),
-			        .SortText = new std::string(
-			            SortTextGlobalsOrKeywords),
+			        .Kind = std::make_shared<lsproto::CompletionItemKind>(
+			            lsproto::CompletionItemKindKeyword),
+			        .SortText = std::string(SortTextGlobalsOrKeywords),
 			    });
 		    }
 		    return r;
@@ -5316,10 +5326,9 @@ std::vector<lsproto::CompletionItem*> getContextualKeywords(
 		    tokenLine == currentLine) {
 			entries.push_back(new lsproto::CompletionItem{
 			    .Label = std::string(tokenToString(Kind::AssertKeyword)),
-			    .Kind = new lsproto::CompletionItemKind(
+			    .Kind = std::make_shared<lsproto::CompletionItemKind>(
 			        lsproto::CompletionItemKindKeyword),
-			    .SortText =
-			        new std::string(SortTextGlobalsOrKeywords),
+			    .SortText = std::string(SortTextGlobalsOrKeywords),
 			});
 		}
 	}
@@ -5343,12 +5352,12 @@ std::vector<CompletionItem*> LanguageService::getJSCompletionEntries(
 			sortedEntries.push_back(new CompletionItem{
 			    .completionItem = new lsproto::CompletionItem{
 			        .Label = name,
-			        .Kind = new lsproto::CompletionItemKind(
+			        .Kind = std::make_shared<lsproto::CompletionItemKind>(
 			            lsproto::CompletionItemKindText),
-			        .SortText = new std::string(
-			            SortTextJavascriptIdentifiers),
-			        .CommitCharacters =
-			            new std::vector<std::string>(),
+			        .SortText =
+			            std::string(SortTextJavascriptIdentifiers),
+			        .CommitCharacters = std::make_shared<lsproto::Slice<std::string>>(
+			            std::vector<std::string>{}),
 			    },
 			});
 		}
@@ -6345,15 +6354,16 @@ lsproto::CompletionItemDefaults* LanguageService::setItemDefaults(
 		if (clientSupportsDefaultCommitCharacters(ctx) &&
 		    supportsItemCommitCharacters) {
 			itemDefaults = new lsproto::CompletionItemDefaults{
-			    .CommitCharacters = defaultCommitCharacters,
+			    .CommitCharacters = std::make_shared<lsproto::Slice<std::string>>(
+			        *defaultCommitCharacters),
 			};
 		} else if (supportsItemCommitCharacters) {
 			for (CompletionItem* item : items) {
 				if (item->completionItem->CommitCharacters ==
 				    nullptr) {
 					item->completionItem->CommitCharacters =
-					    const_cast<std::vector<std::string>*>(
-					        defaultCommitCharacters);
+					    std::make_shared<lsproto::Slice<std::string>>(
+					        *defaultCommitCharacters);
 				}
 			}
 		}
@@ -6373,49 +6383,55 @@ lsproto::CompletionItemDefaults* LanguageService::setItemDefaults(
 				itemDefaults = new lsproto::CompletionItemDefaults();
 			}
 			itemDefaults->EditRange =
-			    new lsproto::RangeOrEditRangeWithInsertReplace{
-			        .EditRangeWithInsertReplace =
-			            new lsproto::EditRangeWithInsertReplace{
-			                .Insert = insertRange,
-			                .Replace = *optionalReplacementSpan,
-			            },
-			    };
+			    std::make_shared<lsproto::RangeOrEditRangeWithInsertReplace>(
+			        lsproto::RangeOrEditRangeWithInsertReplace{
+			            .EditRangeWithInsertReplace =
+			                std::make_shared<lsproto::EditRangeWithInsertReplace>(
+			                    lsproto::EditRangeWithInsertReplace{
+			                        .Insert = insertRange,
+			                        .Replace = *optionalReplacementSpan,
+			                    }),
+			        });
 			for (CompletionItem* item : items) {
 				// If `editRange` is set, `insertText` is ignored by the
 				// client, so we need to provide `textEdit` instead.
-				if (item->completionItem->InsertText != nullptr &&
+				if (item->completionItem->InsertText.has_value() &&
 				    item->completionItem->TextEdit == nullptr) {
 					item->completionItem->TextEdit =
-					    new lsproto::TextEditOrInsertReplaceEdit{
-					        .InsertReplaceEdit =
-					            new lsproto::InsertReplaceEdit{
-					                .NewText = *item->completionItem
-					                               ->InsertText,
-					                .Insert = insertRange,
-					                .Replace =
-					                    *optionalReplacementSpan,
-					            },
-					    };
-					item->completionItem->InsertText = nullptr;
+					    std::make_shared<lsproto::TextEditOrInsertReplaceEdit>(
+					        lsproto::TextEditOrInsertReplaceEdit{
+					            .InsertReplaceEdit =
+					                std::make_shared<lsproto::InsertReplaceEdit>(
+					                    lsproto::InsertReplaceEdit{
+					                        .NewText = *item->completionItem
+					                                       ->InsertText,
+					                        .Insert = insertRange,
+					                        .Replace =
+					                            *optionalReplacementSpan,
+					                    }),
+					        });
+					item->completionItem->InsertText = std::nullopt;
 				}
 			}
 		} else if (clientSupportsItemInsertReplace(ctx)) {
 			for (CompletionItem* item : items) {
 				if (item->completionItem->TextEdit == nullptr) {
 					std::string newText =
-					    item->completionItem->InsertText != nullptr
+					    item->completionItem->InsertText.has_value()
 					        ? *item->completionItem->InsertText
 					        : item->completionItem->Label;
 					item->completionItem->TextEdit =
-					    new lsproto::TextEditOrInsertReplaceEdit{
-					        .InsertReplaceEdit =
-					            new lsproto::InsertReplaceEdit{
-					                .NewText = newText,
-					                .Insert = insertRange,
-					                .Replace =
-					                    *optionalReplacementSpan,
-					            },
-					    };
+					    std::make_shared<lsproto::TextEditOrInsertReplaceEdit>(
+					        lsproto::TextEditOrInsertReplaceEdit{
+					            .InsertReplaceEdit =
+					                std::make_shared<lsproto::InsertReplaceEdit>(
+					                    lsproto::InsertReplaceEdit{
+					                        .NewText = newText,
+					                        .Insert = insertRange,
+					                        .Replace =
+					                            *optionalReplacementSpan,
+					                    }),
+					        });
 				}
 			}
 		}
@@ -6544,28 +6560,35 @@ lsproto::CompletionItem* LanguageService::createLSPCompletionItem(
     int position, bool isMemberCompletion, bool isSnippet, bool hasAction,
     bool preselect, const std::string& source,
     lsproto::AutoImportFix* autoImportFix,
-    std::vector<lsproto::TextEdit*>* additionalTextEdits,
+    std::vector<std::shared_ptr<lsproto::TextEdit>>* additionalTextEdits,
     std::string* detail) {
 	lsproto::CompletionItemKind kind = getCompletionsSymbolKind(elementKind);
-	auto* data = new lsproto::CompletionItemData{
-	    .FileName = file->OriginalFileName(),
-	    .Position = int32_t(position),
-	    .SupplementalFileIndex = supplementalFileIndex(file),
-	    .Source = source,
-	    .Name = name,
-	    .AutoImport = autoImportFix,
-	};
+	// Go stores `AutoImportFix` by pointer on the item data; the canonical
+	// field is shared_ptr, so copy the caller-owned fix (borrowed).
+	auto data = std::make_shared<lsproto::CompletionItemData>(
+	    lsproto::CompletionItemData{
+	        .FileName = file->OriginalFileName(),
+	        .Position = int32_t(position),
+	        .SupplementalFileIndex = supplementalFileIndex(file),
+	        .Source = source,
+	        .Name = name,
+	        .AutoImport = autoImportFix != nullptr
+	            ? std::make_shared<lsproto::AutoImportFix>(*autoImportFix)
+	            : nullptr,
+	    });
 
 	// Text edit
-	lsproto::TextEditOrInsertReplaceEdit* textEdit = nullptr;
+	std::shared_ptr<lsproto::TextEditOrInsertReplaceEdit> textEdit;
 	if (replacementSpan != nullptr) {
-		textEdit = new lsproto::TextEditOrInsertReplaceEdit{
-		    .TextEdit = new lsproto::TextEdit{
-		        .NewText =
-		            insertText.empty() ? name : insertText,
-		        .Range = *replacementSpan,
-		    },
-		};
+		textEdit = std::make_shared<lsproto::TextEditOrInsertReplaceEdit>(
+		    lsproto::TextEditOrInsertReplaceEdit{
+		        .TextEdit = std::make_shared<lsproto::TextEdit>(
+		            lsproto::TextEdit{
+		                .NewText =
+		                    insertText.empty() ? name : insertText,
+		                .Range = *replacementSpan,
+		            }),
+		    });
 	}
 
 	// Filter text
@@ -6583,7 +6606,7 @@ lsproto::CompletionItem* LanguageService::createLSPCompletionItem(
 	}
 
 	// Adjustements based on kind modifiers.
-	std::vector<lsproto::CompletionItemTag>* tags = nullptr;
+	std::shared_ptr<lsproto::Slice<lsproto::CompletionItemTag>> tags;
 	// Copied from vscode ts extension: `MyCompletionItem.constructor`.
 	if (isMemberCompletion &&
 	    (kindModifiers & lsutil::ScriptElementKindModifierOptional) !=
@@ -6598,8 +6621,9 @@ lsproto::CompletionItem* LanguageService::createLSPCompletionItem(
 	}
 	if ((kindModifiers & lsutil::ScriptElementKindModifierDeprecated) !=
 	    lsutil::ScriptElementKindModifierNone) {
-		tags = new std::vector<lsproto::CompletionItemTag>{
-		    lsproto::CompletionItemTagDeprecated};
+		tags = std::make_shared<lsproto::Slice<lsproto::CompletionItemTag>>(
+		    std::vector<lsproto::CompletionItemTag>{
+		        lsproto::CompletionItemTagDeprecated});
 	}
 
 	if (hasAction && !source.empty()) {
@@ -6607,29 +6631,34 @@ lsproto::CompletionItem* LanguageService::createLSPCompletionItem(
 	}
 
 	// Client assumes plain text by default.
-	lsproto::InsertTextFormat* insertTextFormat = nullptr;
+	std::shared_ptr<lsproto::InsertTextFormat> insertTextFormat;
 	if (isSnippet) {
-		insertTextFormat = new lsproto::InsertTextFormat(
+		insertTextFormat = std::make_shared<lsproto::InsertTextFormat>(
 		    lsproto::InsertTextFormatSnippet);
 	}
 
 	return new lsproto::CompletionItem{
 	    .Label = nameMut,
-	    .LabelDetails = labelDetails,
-	    .Kind = new lsproto::CompletionItemKind(kind),
+	    .LabelDetails = labelDetails != nullptr
+	        ? std::make_shared<lsproto::CompletionItemLabelDetails>(
+	            *labelDetails)
+	        : nullptr,
+	    .Kind = std::make_shared<lsproto::CompletionItemKind>(kind),
 	    .Tags = tags,
-	    .Detail = detail,
-	    .Preselect = boolToPtr(preselect),
-	    .SortText = new std::string(sortText),
-	    .FilterText = strPtrTo(filterTextMut),
-	    .InsertText = strPtrTo(insertTextMut),
+	    .Detail = detail != nullptr ? std::optional<std::string>(*detail)
+	                                : std::nullopt,
+	    .Preselect = preselect,
+	    .SortText = std::string(sortText),
+	    .FilterText = filterTextMut,
+	    .InsertText = insertTextMut,
 	    .InsertTextFormat = insertTextFormat,
 	    .TextEdit = textEdit,
 	    .CommitCharacters = commitCharacters != nullptr
-	        ? new std::vector<std::string>(*commitCharacters)
+	        ? std::make_shared<lsproto::Slice<std::string>>(*commitCharacters)
 	        : nullptr,
 	    .AdditionalTextEdits = additionalTextEdits != nullptr
-	        ? new std::vector<lsproto::TextEdit*>(*additionalTextEdits)
+	        ? std::make_shared<lsproto::Slice<std::shared_ptr<lsproto::TextEdit>>>(
+	            *additionalTextEdits)
 	        : nullptr,
 	    .Data = data,
 	};
@@ -6991,37 +7020,48 @@ bool isInJsxText(Node* contextToken, Node* location) {
 	return false;
 }
 
+// Canonical capabilities live on a gostd::Context value populated by
+// `lsproto::withClientCapabilities`; the ContextPtr chain never carries
+// them (the Go server layer that would is unported), so resolved defaults
+// apply. ctx is kept in the signatures to mirror Go.
+static std::shared_ptr<lsp::lsproto::ResolvedClientCapabilities>
+resolvedCaps(const ContextPtr& ctx) {
+	(void)ctx;
+	return lsp::lsproto::getClientCapabilities(gostd::contextBackground());
+}
+
 // completions.go:5417
 bool clientSupportsItemLabelDetails(const ContextPtr& ctx) {
-	return lsproto::GetClientCapabilities(ctx)
+	return resolvedCaps(ctx)
 	    ->TextDocument.Completion.CompletionItem.LabelDetailsSupport;
 }
 
 // completions.go:5421
 bool clientSupportsItemSnippet(const ContextPtr& ctx) {
-	return lsproto::GetClientCapabilities(ctx)
+	return resolvedCaps(ctx)
 	    ->TextDocument.Completion.CompletionItem.SnippetSupport;
 }
 
 // completions.go:5425
 bool clientSupportsItemCommitCharacters(const ContextPtr& ctx) {
-	return lsproto::GetClientCapabilities(ctx)
+	return resolvedCaps(ctx)
 	    ->TextDocument.Completion.CompletionItem.CommitCharactersSupport;
 }
 
 // completions.go:5429
 bool clientSupportsItemInsertReplace(const ContextPtr& ctx) {
-	return lsproto::GetClientCapabilities(ctx)
+	return resolvedCaps(ctx)
 	    ->TextDocument.Completion.CompletionItem.InsertReplaceSupport;
 }
 
 namespace {
 bool capsHasItemDefault(const ContextPtr& ctx, const std::string& key) {
-	const auto& defaults = lsproto::GetClientCapabilities(ctx)
+	const auto& defaults = resolvedCaps(ctx)
 	                           ->TextDocument.Completion.CompletionList
 	                           .ItemDefaults;
-	return std::find(defaults.begin(), defaults.end(), key) !=
-	    defaults.end();
+	return defaults.has_value() &&
+	    std::find(defaults->begin(), defaults->end(), key) !=
+	        defaults->end();
 }
 } // namespace
 
@@ -7092,7 +7132,7 @@ LanguageService::ResolveCompletionItem(const ContextPtr& ctx,
 lsproto::MarkupKind getCompletionDocumentationFormat(
     const ContextPtr& ctx) {
 	return lsproto::PreferredMarkupKind(
-	    lsproto::GetClientCapabilities(ctx)
+	    resolvedCaps(ctx)
 	        ->TextDocument.Completion.CompletionItem.DocumentationFormat);
 }
 
@@ -7120,14 +7160,15 @@ lsproto::CompletionItem* LanguageService::getCompletionItemDetails(
 		// to be filtered out entirely. Only real files take this code
 		// path, so the final Edits() is guaranteed ok.
 		auto* fix = new autoimport::Fix{
-		    .AutoImportFix = data->AutoImport,
+		    .AutoImportFix = data->AutoImport.get(),
 		};
 		auto [edits, description, ok] = fix->Edits(
 		    gostd::contextBackground(), file, program->Options(), FormatOptions(), converters,
 		    UserPreferences());
 		item->AdditionalTextEdits =
-		    new std::vector<lsproto::TextEdit*>(edits);
-		item->Detail = strPtrTo(description);
+		    std::make_shared<lsproto::Slice<std::shared_ptr<lsproto::TextEdit>>>(
+		        edits);
+		item->Detail = description;
 		return item;
 	}
 
@@ -7288,16 +7329,19 @@ lsproto::CompletionItem* createCompletionDetails(
     lsproto::CompletionItem* item, const std::string& detail,
     const std::string& documentation, lsproto::MarkupKind docFormat) {
 	// !!! fill in additionalTextEdits from code actions
-	if (item->Detail == nullptr && !detail.empty()) {
-		item->Detail = new std::string(detail);
+	if (!item->Detail.has_value() && !detail.empty()) {
+		item->Detail = detail;
 	}
 	if (!documentation.empty()) {
-		item->Documentation = new lsproto::StringOrMarkupContent{
-		    .MarkupContent = new lsproto::MarkupContent{
-		        .Kind = docFormat,
-		        .Value = documentation,
-		    },
-		};
+		item->Documentation =
+		    std::make_shared<lsproto::StringOrMarkupContent>(
+		        lsproto::StringOrMarkupContent{
+		            .MarkupContent = std::make_shared<lsproto::MarkupContent>(
+		                lsproto::MarkupContent{
+		                    .Kind = docFormat,
+		                    .Value = documentation,
+		                }),
+		        });
 	}
 	return item;
 }
@@ -7679,10 +7723,9 @@ const std::vector<lsproto::CompletionItem*>& jsDocTagNameCompletionItems() {
 		    for (const std::string& tagName : jsDocTagNames) {
 			    r->push_back(new lsproto::CompletionItem{
 			        .Label = tagName,
-			        .Kind = new lsproto::CompletionItemKind(
+			        .Kind = std::make_shared<lsproto::CompletionItemKind>(
 			            lsproto::CompletionItemKindKeyword),
-			        .SortText =
-			            new std::string(SortTextLocationPriority),
+			        .SortText = std::string(SortTextLocationPriority),
 			    });
 		    }
 		    return r;
@@ -7699,10 +7742,9 @@ const std::vector<lsproto::CompletionItem*>& jsDocTagCompletionItems() {
 		    for (const std::string& tagName : jsDocTagNames) {
 			    r->push_back(new lsproto::CompletionItem{
 			        .Label = "@" + tagName,
-			        .Kind = new lsproto::CompletionItemKind(
+			        .Kind = std::make_shared<lsproto::CompletionItemKind>(
 			            lsproto::CompletionItemKindKeyword),
-			        .SortText =
-			            new std::string(SortTextLocationPriority),
+			        .SortText = std::string(SortTextLocationPriority),
 			    });
 		    }
 		    return r;
@@ -7836,14 +7878,13 @@ std::vector<CompletionItem*> getJSDocParameterCompletions(
 			return new CompletionItem{
 			    .completionItem = new lsproto::CompletionItem{
 			        .Label = displayText,
-			        .Kind = new lsproto::CompletionItemKind(
+			        .Kind = std::make_shared<lsproto::CompletionItemKind>(
 			            lsproto::CompletionItemKindVariable),
-			        .SortText =
-			            new std::string(SortTextLocationPriority),
-			        .InsertText = strPtrTo(snippetText),
+			        .SortText = std::string(SortTextLocationPriority),
+			        .InsertText = snippetText,
 			        .InsertTextFormat =
 			            isSnippet
-			                ? new lsproto::InsertTextFormat(
+			                ? std::make_shared<lsproto::InsertTextFormat>(
 			                      lsproto::InsertTextFormatSnippet)
 			                : nullptr,
 			    },
@@ -7891,14 +7932,13 @@ std::vector<CompletionItem*> getJSDocParameterCompletions(
 			return new CompletionItem{
 			    .completionItem = new lsproto::CompletionItem{
 			        .Label = displayText,
-			        .Kind = new lsproto::CompletionItemKind(
+			        .Kind = std::make_shared<lsproto::CompletionItemKind>(
 			            lsproto::CompletionItemKindVariable),
-			        .SortText =
-			            new std::string(SortTextLocationPriority),
-			        .InsertText = strPtrTo(snippetText),
+			        .SortText = std::string(SortTextLocationPriority),
+			        .InsertText = snippetText,
 			        .InsertTextFormat =
 			            isSnippet
-			                ? new lsproto::InsertTextFormat(
+			                ? std::make_shared<lsproto::InsertTextFormat>(
 			                      lsproto::InsertTextFormatSnippet)
 			                : nullptr,
 			    },
@@ -8159,10 +8199,9 @@ std::vector<CompletionItem*> getJSDocParameterNameCompletions(Node* tag) {
 		return new CompletionItem{
 		    .completionItem = new lsproto::CompletionItem{
 		        .Label = name,
-		        .Kind = new lsproto::CompletionItemKind(
+		        .Kind = std::make_shared<lsproto::CompletionItemKind>(
 		            lsproto::CompletionItemKindVariable),
-		        .SortText =
-		            new std::string(SortTextLocationPriority),
+		        .SortText = std::string(SortTextLocationPriority),
 		    },
 		};
 	});
@@ -8318,38 +8357,40 @@ LanguageService::getExhaustiveCaseSnippets(
 		    printer->printUnescapedNode(newClauses[0]);
 		std::string name = firstClause + " ...";
 
-		std::vector<lsproto::TextEdit*>* additionalTextEdits = nullptr;
+		std::shared_ptr<lsproto::Slice<std::shared_ptr<lsproto::TextEdit>>>
+		    additionalTextEdits;
 		if (importAdder != nullptr) {
-			std::vector<lsproto::TextEdit*> edits =
-			    importAdder->Edits();
-			if (!edits.empty()) {
-				additionalTextEdits =
-				    new std::vector<lsproto::TextEdit*>(edits);
+			auto edits = importAdder->Edits();
+			if (edits.has_value() && !edits->empty()) {
+				additionalTextEdits = std::make_shared<
+				    lsproto::Slice<std::shared_ptr<lsproto::TextEdit>>>(
+				    std::move(*edits));
 			}
 		}
 
 		return {new lsproto::CompletionItem{
 		            .Label = name,
-		            .Kind = new lsproto::CompletionItemKind(
+		            .Kind = std::make_shared<lsproto::CompletionItemKind>(
 		                lsproto::CompletionItemKindSnippet),
 		            .SortText =
-		                new std::string(SortTextGlobalsOrKeywords),
-		            .InsertText = strPtrTo(insertText),
+		                std::string(SortTextGlobalsOrKeywords),
+		            .InsertText = insertText,
 		            .AdditionalTextEdits = additionalTextEdits,
 		            .InsertTextFormat =
 		                clientSupportsItemSnippet(ctx)
-		                    ? new lsproto::InsertTextFormat(
+		                    ? std::make_shared<lsproto::InsertTextFormat>(
 		                          lsproto::InsertTextFormatSnippet)
 		                    : nullptr,
-		            .Data = new lsproto::CompletionItemData{
-		                .FileName = file->OriginalFileName(),
-		                .Position = int32_t(position),
-		                .SupplementalFileIndex =
-		                    supplementalFileIndex(file),
-		                .Source =
-		                    std::string(completionSourceSwitchCases),
-		                .Name = name,
-		            },
+		            .Data = std::make_shared<lsproto::CompletionItemData>(
+		                lsproto::CompletionItemData{
+		                    .FileName = file->OriginalFileName(),
+		                    .Position = int32_t(position),
+		                    .SupplementalFileIndex =
+		                        supplementalFileIndex(file),
+		                    .Source =
+		                        std::string(completionSourceSwitchCases),
+		                    .Name = name,
+		                }),
 		        },
 		        nullptr};
 	}
