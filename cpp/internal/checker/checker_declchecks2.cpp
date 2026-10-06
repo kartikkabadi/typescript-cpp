@@ -2689,11 +2689,13 @@ void Checker::checkTypeAliasDeclaration(Node* node) {
 void Checker::checkTypeNameIsReserved(Node* name, const DiagnosticMessage* message) {
 	// TS 1.0 spec (April 2014): 3.6.1
 	// The predefined type keywords are reserved and cannot be used as names of user defined types.
-	const std::string& text = name->text();
-	if (text == "any" || text == "unknown" || text == "never" || text == "number" ||
-		text == "bigint" || text == "boolean" || text == "string" || text == "symbol" ||
-		text == "void" || text == "object" || text == "undefined") {
-		error(name, message, text);
+	std::string scratch;
+	std::string_view text = name->textView(scratch);
+	using namespace std::literals;
+	if (text == "any"sv || text == "unknown"sv || text == "never"sv || text == "number"sv ||
+		text == "bigint"sv || text == "boolean"sv || text == "string"sv || text == "symbol"sv ||
+		text == "void"sv || text == "object"sv || text == "undefined"sv) {
+		error(name, message, std::string(text));
 	}
 }
 

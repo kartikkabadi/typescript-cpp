@@ -196,6 +196,38 @@ std::string Node::text() const {
 	TSC_UNREACHABLE("Unhandled case in Node::text");
 }
 
+// textView — non-allocating text() for the kinds backed by a stored string
+// member (Go's node.Text() is a view into source). Composed names fall back
+// to text() built into scratch; the returned view is valid while scratch
+// (or the node) outlives it.
+std::string_view Node::textView(std::string& scratch) const {
+	switch (kind) {
+	case Kind::Identifier:
+		return as<Identifier>()->Text;
+	case Kind::PrivateIdentifier:
+		return as<PrivateIdentifier>()->Text;
+	case Kind::StringLiteral:
+		return as<StringLiteral>()->Text;
+	case Kind::NumericLiteral:
+		return as<NumericLiteral>()->Text;
+	case Kind::BigIntLiteral:
+		return as<BigIntLiteral>()->Text;
+	case Kind::MetaProperty:
+		return as<MetaProperty>()->name->textView(scratch);
+	case Kind::NoSubstitutionTemplateLiteral:
+		return as<NoSubstitutionTemplateLiteral>()->Text;
+	case Kind::TemplateHead:
+		return as<TemplateHead>()->Text;
+	case Kind::TemplateMiddle:
+		return as<TemplateMiddle>()->Text;
+	case Kind::TemplateTail:
+		return as<TemplateTail>()->Text;
+	default:
+		scratch = text();
+		return scratch;
+	}
+}
+
 std::string Node::rawText() const {
 	switch (kind) {
 	case Kind::TemplateHead:

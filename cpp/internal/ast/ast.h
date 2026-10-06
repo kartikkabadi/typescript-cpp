@@ -163,6 +163,9 @@ struct Node {
 	SymbolTable* locals() const;
 	Node* nextContainer() const;
 	std::string text() const;
+	// Non-allocating text(): returns a view into the node's stored string for
+	// name-bearing kinds; composed names are built into scratch (view of it).
+	std::string_view textView(std::string& scratch) const;
 	std::string rawText() const;
 	Node* body() const;
 	Node* expression() const;
