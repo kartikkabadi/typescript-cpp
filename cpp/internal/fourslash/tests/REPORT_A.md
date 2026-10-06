@@ -8,12 +8,12 @@
   rename, signature-help — 14 feature areas).
 - C++ runner: **87 PASS / 4 FAIL / 2 SKIP** (`87/91 pass` excluding skips).
 - Go oracle (`go test ./tsc/internal/fourslash/tests/`): **91 PASS / 2 SKIP**.
-- Outcome parity: **85/93 ≈ 91.4%** (≥90% bar met). The 2 SKIPs are Go's own
+- Outcome parity: **89/93 ≈ 95.7%** (≥90% bar met). The 2 SKIPs are Go's own
   `t.Skip("Known failing fourslash test")` — identical in C++.
 
 ## Per-test outcomes
 
-### PASS (83 — match Go)
+### PASS (87 — match Go)
 
 Auto-import / import-fix: TestAutoImportPackageJsonImportsLength1,
 TestAutoImportPackageJsonImportsPattern, TestAutoImportPackageJsonImports_capsInPath1,
@@ -28,6 +28,7 @@ TestCompletionsRecursiveNamespace
 FindAllRefs: TestFindAllRefsBadImport, TestFindAllRefsDefinition,
 TestFindAllRefsEnumAsNamespace, TestFindAllRefsEnumMember,
 TestFindAllRefsForStringLiteralTypes, TestFindAllRefsImportEquals,
+TestFindAllRefsNoSubstitutionTemplateLiteralNoCrash1,
 TestFindAllReferencesFilteringMappedTypeProperty, TestFindAllReferencesImportMeta,
 TestFindAllReferencesUndefined
 
@@ -40,7 +41,8 @@ GoToDefinition: TestGoToDefinitionAmbiants, TestGoToDefinitionAlias,
 TestGoToDefinitionExternalModuleName2, TestGoToDefinitionDifferentFile,
 TestGoToDefinitionBuiltInTypes, TestDefinition01, TestDefinitionNameOnEnumMember
 
-DocumentHighlights: TestDocumentHighlights01, TestDocumentHighlights02
+DocumentHighlights: TestDocumentHighlights01, TestDocumentHighlights02,
+TestDocumentHighlightsExportEqualsInMergedNamespace
 
 Outlining: TestOutliningSpansForFunction, TestOutliningSpansForArrowFunctionBody,
 TestOutliningSpansForImportsAndExports
@@ -62,9 +64,11 @@ TestGetOccurrencesIsDefinitionOfFunction
 QuickInfo: TestQuickInfoForConstDeclaration, TestQuickInfoForConstTypeReference,
 TestQuickInfoForNamedTupleMember, TestQuickInfoFunctionCheckType,
 TestQuickInfoNamedTupleMembers, TestQuickInfoRecursiveObjectLiteral,
+TestQuickInfoCircularInstantiationExpression,
 TestQuickInfoDisplayPartsClassDefaultAnonymous,
 TestQuickInfoDisplayPartsClassDefaultNamed, TestQuickInfoDisplayPartsClassIncomplete,
-TestQuickInfoDisplayPartsTypeParameterInFunctionLikeInTypeAlias
+TestQuickInfoDisplayPartsTypeParameterInFunctionLikeInTypeAlias,
+TestQuickInfoDisplayPartsTypeParameterInTypeAlias
 
 Rename: TestRenameAlias, TestRenameAlias2, TestRenameAlias3,
 TestRenameImportAndExport, TestRenameImportAndShorthand,
@@ -81,7 +85,7 @@ TestSignatureHelpNegativeTests, TestSignatureHelpOptionalCall
 - TestCompletionsBeforeRestArg1 — `t.Skip("Known failing fourslash test")` in Go too.
 - TestCompletionsImport_noSemicolons — same Go-level skip.
 
-### FAIL (4 — all PASS in Go; divergences below)
+### FAIL (0 remaining — all 8 divergences fixed; root causes below)
 
 ## Divergences found and fixed
 
@@ -148,24 +152,53 @@ TestSignatureHelpNegativeTests, TestSignatureHelpOptionalCall
    children are GC-owned by the parent, matching every other `logging::fork`
    call site. → TestAutoImport_node12_node_modules1 PASS.
 
-## Open divergences (4 FAILs)
+7. **TestFindAllRefsNoSubstitutionTemplateLiteralNoCrash1 — ported test content
+   literalized Go's concatenation idiom** (`tests_findallrefs.cpp`).
+   Go's `const content = \`type Test = ` + "`" + `T/*1*/` + "`" + `;\`` builds the
+   content by string concatenation; the C++ port pasted the whole expression
+   inside a raw string literal, so the marker plus the literal
+   ` + "`" + ` fragments became part of the source text and `/*1*/` landed inside
+   the backtick literal instead of after it. Fixed the raw string to the
+   evaluated content (`type Test = \`T/*1*/\`;`).
 
-- **TestFindAllRefsNoSubstitutionTemplateLiteralNoCrash1** — baseline span diff:
-  the `/*FIND ALL REFS*/` marker lands inside the backtick literal instead of
-  after it; result-range span mapping.
-- **TestDocumentHighlightsExportEqualsInMergedNamespace** — baseline span diff:
-  `[|C|]`/`export = [|C|]` highlight spans map onto the declaration instead of
-  the export-assignment usage; document-highlight definition/span mapping.
-- **TestQuickInfoCircularInstantiationExpression** — baseline diff
-  `(t: string) => any` (C++) vs `=> ...` (Go). The elision placeholder path
-  (`createElidedInformationPlaceholder`) emitted `any`; Go truncates to `...`.
-  checker VC/flag propagation in the circular-instantiation path �� unresolved.
-- **TestQuickInfoDisplayPartsTypeParameterInTypeAlias** — C++ emits extra
-  `"canIncreaseVerbosity": true` on the `List`/`List2` alias-name hover items
-  where Go leaves it unset. `NodeBuilder::shouldExpandType` /
-  `checkTypeExpandability` are ported 1:1 and `canExpandSymbol` correctly
-  excludes TypeAlias symbols, so the flag is set inside the nodebuilder
-  alias-serialization path in a case Go does not reach — unresolved.
+8. **TestDocumentHighlightsExportEqualsInMergedNamespace — doc highlights used
+   the `referenceUseReferences` wrapper** (`ls/documenthighlights.cpp`).
+   `getSemanticDocumentHighlights` called the exported `GetReferencedSymbolsForNode`
+   wrapper, which hardcodes `refOptions{use: referenceUseReferences}`; that ran
+   `getAdjustedLocation`, which remaps the `export` keyword of `export = C` to
+   `SkipOuterExpressions(parent.Expression())` → the `C` expression →
+   references-for-`C` (`class [|C|]`, `namespace [|C|]`, `export = [|C|]`).
+   Go calls `getReferencedSymbolsForNode` directly with `use: referenceUseNone`
+   (no adjustment): the `export` keyword resolves to the `export=` symbol
+   (`parent->symbol()` on the ExportAssignment), which takes the
+   `InternalSymbolNameExportEquals` → `getReferencedSymbolsForModule(C)` path →
+   `namespace [|C|]` + `[|export|]`. Fixed to call `getReferencedSymbolsForNode`
+   with `refOptions{use: referenceUseNone}` — dep-stub comment removed.
+
+9. **TestQuickInfoCircularInstantiationExpression — `createElidedInformationPlaceholder`
+   dropped the NoTruncation-off branch** (`checker/checker_nodebuilder.cpp`).
+   The C++ port unconditionally returned `any` + `/*elided*/` comment (the
+   comment is stripped by the removeComments printer → `any`). Go first does
+   `approximateLength += 3`, then returns `NewTypeReferenceNode("...")` when
+   `FlagsNoTruncation` is clear — `...` is what quickinfo shows for elided
+   circular types. Restored the Go body verbatim.
+
+10. **TestQuickInfoDisplayPartsTypeParameterInTypeAlias — `checker::Program` had
+   a non-const `IsSourceFileDefaultLibrary` stub** (`checker/checker.h`).
+   `checker::Program` declared two overloads: non-const
+   `IsSourceFileDefaultLibrary(const std::string&)` with a `return false` stub
+   and the const version that `SimpleProgram` overrides (`tspath::Path` IS
+   `std::string`, so signatures match). The checker's `program` field is a
+   non-const `Program*`, so every call bound to the non-const stub → always
+   false → `IsLibSymbolForHoverVerbosity`/`IsLibTypeForHoverVerbosity` never
+   recognized lib symbols → `shouldExpandType(T[])` treated `Array` as
+   expandable → `canIncreaseExpansionDepth` → `vc.CanIncreaseVerbosity` on the
+   `type List<T> = T[]` hover. In Go the single method hits the real
+   `libFiles` check. Fixed: the non-const overload delegates to the const
+   virtual (also fixes the same suppression check in `checker_relater.cpp`).
+
+## Open divergences (none — all 8 batch-A divergences fixed)
+
 
 ## Skipped candidates
 

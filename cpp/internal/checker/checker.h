@@ -1098,9 +1098,11 @@ public:
 	virtual ModuleKind GetImpliedNodeFormatForEmit(SourceFile* sourceFile) = 0;
 	virtual bool SourceFileMayBeEmitted(SourceFile* sourceFile, bool forceDtsEmit) = 0;
 	// program.go IsSourceFileDefaultLibrary (relater.go uses it to suppress
-	// elaboration diagnostics on library files).
-	virtual bool IsSourceFileDefaultLibrary(const std::string& /*path*/) {
-		return false;
+	// elaboration diagnostics on library files). Delegates to the const
+	// overload so non-const callers see the same result.
+	virtual bool IsSourceFileDefaultLibrary(const std::string& path) {
+		return static_cast<const Program*>(this)->IsSourceFileDefaultLibrary(
+		    path);
 	}
 	virtual std::string CommonSourceDirectory() = 0;
 	// Module resolution (checker.go resolveExternalModule). A program without

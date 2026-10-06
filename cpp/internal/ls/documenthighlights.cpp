@@ -847,10 +847,10 @@ LanguageService::getSemanticDocumentHighlights(
 	gostd::Context ctx, int position, ::tsc::Node* node,
 	compiler::SimpleProgram* program,
 	std::vector<SourceFile*> sourceFiles) {
-	// findallreferences.go — refOptions{use: referenceUseNone} (dep stub:
-	// GetReferencedSymbolsForNode is owned by ls-coreB)
-	auto referenceEntries =
-		GetReferencedSymbolsForNode(ctx, position, node, sourceFiles);
+	refOptions options;
+	options.use = referenceUseNone;
+	auto referenceEntries = getReferencedSymbolsForNode(
+	    ctx, position, node, program, sourceFiles, options);
 	if (referenceEntries.empty()) {
 		return {};
 	}
