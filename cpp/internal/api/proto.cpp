@@ -2377,6 +2377,26 @@ std::string FileNotifications::marshalJSONTo(json::Encoder& enc) const {
 	return w.end();
 }
 
+// DocumentIdentifier::marshalJSONTo — proto.go:284 struct fields (no custom
+// marshaler in Go): {"fileName": ..., "uri": ...} with omitempty on both.
+std::string DocumentIdentifier::marshalJSONTo(json::Encoder& enc) const {
+	objWriter w{enc};
+	w.begin();
+	if (!FileName.empty()) w.member("fileName", FileName);
+	if (!URI.empty()) w.member("uri", URI);
+	return w.end();
+}
+
+// EnsurePrograms::marshalJSONTo — proto.go:398. Fields carry no json tags, so
+// Go emits capitalized names unconditionally: {"All": ..., "Projects": ...}.
+std::string EnsurePrograms::marshalJSONTo(json::Encoder& enc) const {
+	objWriter w{enc};
+	w.begin();
+	w.member("All", All);
+	w.member("Projects", Projects);
+	return w.end();
+}
+
 std::string SnapshotRequestChangesParams::marshalJSONTo(json::Encoder& enc) const {
 	objWriter w{enc};
 	w.begin();

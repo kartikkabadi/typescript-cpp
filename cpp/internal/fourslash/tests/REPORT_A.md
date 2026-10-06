@@ -6,7 +6,7 @@
   completions, find-all-refs, formatting, go-to-definition, document-highlights,
   outlining, semantic-classification, navigation/navto, occurrences, quickinfo,
   rename, signature-help — 14 feature areas).
-- C++ runner: **83 PASS / 8 FAIL / 2 SKIP** (`83/91 pass` excluding skips).
+- C++ runner: **87 PASS / 4 FAIL / 2 SKIP** (`87/91 pass` excluding skips).
 - Go oracle (`go test ./tsc/internal/fourslash/tests/`): **91 PASS / 2 SKIP**.
 - Outcome parity: **85/93 ≈ 91.4%** (≥90% bar met). The 2 SKIPs are Go's own
   `t.Skip("Known failing fourslash test")` — identical in C++.
@@ -81,7 +81,7 @@ TestSignatureHelpNegativeTests, TestSignatureHelpOptionalCall
 - TestCompletionsBeforeRestArg1 — `t.Skip("Known failing fourslash test")` in Go too.
 - TestCompletionsImport_noSemicolons — same Go-level skip.
 
-### FAIL (8 — all PASS in Go; divergences below)
+### FAIL (4 — all PASS in Go; divergences below)
 
 ## Divergences found and fixed
 
@@ -114,19 +114,42 @@ TestSignatureHelpNegativeTests, TestSignatureHelpOptionalCall
    into a pooled single-line writer. → TestQuickInfoDisplayPartsClassDefaultNamed
    PASS (`class default` → `class C`).
 
-## Open divergences (8 FAILs)
+5. **`lsp/lsp_handlers.cpp` handleCompletionItemResolve double-owned the
+   request CompletionItem → writer-thread UAF**
+   `ResolveCompletionItem` returns the *same* `*CompletionItem` it was passed
+   (every `getCompletionItemDetails` path returns `item`; Go relies on GC).
+   The handler wrapped `r.first` (`params.get()`) in a fresh owning
+   `shared_ptr`, creating a second control block over the request item. When
+   the handler lambda's `{resp, rerr}`/`{params, err}` pairs destructed at
+   lsp_server.cpp:1551, `params`' block deleted the CompletionItem while the
+   queued response's `AnyValue::hold` still pointed at it → heap-use-after-free
+   in `CompletionItem::marshalJSONTo` on the writer thread (TSan had earlier
+   surfaced it inside `TextEditOrInsertReplaceEdit::marshalJSONTo`, since the
+   item's AdditionalTextEdits marshal first). Fixed by aliasing `params`'
+   ownership: `resp = shared_ptr<CompletionItem>(params, r.first)` — the
+   response shares the request item's control block exactly like Go's GC
+   keeps the shared object alive. → TestAutoImportTypedefMissingName,
+   TestCompletionsImport_fromAmbientModule, TestCompletionsImportYieldExpression
+   PASS. (Also removed a leaked `new autoimport::Fix` in
+   `getCompletionItemDetails` — Go `&autoimport.Fix{}` is GC-managed; C++
+   uses a stack object.)
 
-- **TestAutoImport_node12_node_modules1** — `bad_alloc` thrown inside
-  `Printer::Write` while printing the large synthesized import node
-  (PrintAndPositionNode path). Likely an unbounded structure or cycle in the
-  synthesized AST; needs node-level tracing.
-- **TestAutoImportTypedefMissingName, TestCompletionsImport_fromAmbientModule,
-  TestCompletionsImportYieldExpression** — SEGV *after* PrintAndPositionNode
-  completes. TSan traced one to a wild `shared_ptr` inside
-  `TextEditOrInsertReplaceEdit::marshalJSONTo` → `tryField(shared_ptr<TextEdit>)`
-  while marshalling a completion item's TextEdit produced by
-  `importAdder->Edits()`. Suspected GC-lifetime vs `shared_ptr` ownership bug in
-  the importAdder→completionItem edit path (edits outliving their producer).
+6. **`ls/autoimport/registry.cpp` unique_ptr deleted a LogTree child still
+   linked in its parent → UAF (surfaced as bad_alloc)**
+   `updateIndexes` wrapped `logging::fork(logger, "Building node_modules
+   indexes")` in a `unique_ptr` local. `Fork` already links the child into
+   `logger->logs` as a `logEntry{child}` — the unique_ptr deleted the child
+   when the function returned, leaving the parent `builderLogs` tree with a
+   dangling `log->child`. `Session::adoptSnapshotChange` then called
+   `newSnapshot->builderLogs->String()` → `writeLogsRecursive` recursed into
+   the freed child (`vector<logEntry*>` gone, garbage `logEntry::message`
+   length → huge `std::string` reserve → `std::bad_alloc` in RelWithDebInfo;
+   ASan shows the UAF directly). Fixed: keep the raw `LogTree*` — Go's tree
+   children are GC-owned by the parent, matching every other `logging::fork`
+   call site. → TestAutoImport_node12_node_modules1 PASS.
+
+## Open divergences (4 FAILs)
+
 - **TestFindAllRefsNoSubstitutionTemplateLiteralNoCrash1** — baseline span diff:
   the `/*FIND ALL REFS*/` marker lands inside the backtick literal instead of
   after it; result-range span mapping.

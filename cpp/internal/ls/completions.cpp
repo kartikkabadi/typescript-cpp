@@ -7170,10 +7170,10 @@ lsproto::CompletionItem* LanguageService::getCompletionItemDetails(
 		// edits outside of verbatim spans can cause the completion item
 		// to be filtered out entirely. Only real files take this code
 		// path, so the final Edits() is guaranteed ok.
-		auto* fix = new autoimport::Fix{
+		autoimport::Fix fix{
 		    .AutoImportFix = data->AutoImport.get(),
 		};
-		auto [edits, description, ok] = fix->Edits(
+		auto [edits, description, ok] = fix.Edits(
 		    gostd::contextBackground(), file, program->Options(), FormatOptions(), converters,
 		    UserPreferences());
 		item->AdditionalTextEdits =
