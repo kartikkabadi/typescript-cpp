@@ -321,7 +321,7 @@ std::pair<std::unique_ptr<Registry>, gostd::Error> Registry::Clone(
     logging::LogTree* logger) {
 	auto start = std::chrono::steady_clock::now();
 	if (logger != nullptr) {
-		logger = logger->Fork();
+		logger = logging::fork(logger, "Building autoimport registry");
 	}
 	auto builder = newRegistryBuilder(this, host);
 	if (change.UserPreferences != nullptr) {
@@ -338,8 +338,8 @@ std::pair<std::unique_ptr<Registry>, gostd::Error> Registry::Clone(
 		builder->updateIndexes(ctx, change, logger);
 	}
 	if (logger != nullptr) {
-		logger->Logf("Built autoimport registry in %v",
-		             std::chrono::steady_clock::now() - start);
+		logging::logf(logger, "Built autoimport registry in %v",
+		             gostd::durationString(std::chrono::steady_clock::now() - start));
 	}
 	Registry* registry = builder->Build();
 	return {std::unique_ptr<Registry>(registry), {}};
@@ -526,10 +526,10 @@ void registryBuilder::updateBucketAndDirectoryExistence(RegistryChange& change,
 	}
 	if (logger != nullptr) {
 		for (ProjectID* projectID : addedProjects) {
-			logger->Logf("Added project: %s", projectID->String());
+			logging::logf(logger, "Added project: %s", projectID->String());
 		}
 		for (ProjectID* projectID : removedProjects) {
-			logger->Logf("Removed project: %s", projectID->String());
+			logging::logf(logger, "Removed project: %s", projectID->String());
 		}
 	}
 
@@ -590,7 +590,7 @@ void registryBuilder::updateBucketAndDirectoryExistence(RegistryChange& change,
 			    base->nodeModules[dirPath] != nullptr;
 			updateDirectory(dirPath, dirName, false);
 			if (logger != nullptr) {
-				logger->Logf("Added directory: %s", dirPath);
+				logging::logf(logger, "Added directory: %s", dirPath);
 			}
 			if (nodeModules->Get(dirPath).second && !hadNodeModules) {
 				addedNodeModulesDirs.push_back(dirPath);
@@ -606,7 +606,7 @@ void registryBuilder::updateBucketAndDirectoryExistence(RegistryChange& change,
 			directories->Delete(dirPath);
 			nodeModules->TryDelete(dirPath);
 			if (logger != nullptr) {
-				logger->Logf("Removed directory: %s", dirPath);
+				logging::logf(logger, "Removed directory: %s", dirPath);
 			}
 			if (hadNodeModules) {
 				removedNodeModulesDirs.push_back(dirPath);
@@ -624,7 +624,7 @@ void registryBuilder::updateBucketAndDirectoryExistence(RegistryChange& change,
 				updateDirectory(dirPath, dirName,
 				                packageJsonChanged(dirName));
 				if (logger != nullptr) {
-					logger->Logf("Changed directory: %s", dirPath);
+					logging::logf(logger, "Changed directory: %s", dirPath);
 				}
 			}
 		}
@@ -632,13 +632,13 @@ void registryBuilder::updateBucketAndDirectoryExistence(RegistryChange& change,
 
 	if (logger != nullptr) {
 		for (auto& dirPath : addedNodeModulesDirs) {
-			logger->Logf("Added node_modules bucket: %s", dirPath);
+			logging::logf(logger, "Added node_modules bucket: %s", dirPath);
 		}
 		for (auto& dirPath : removedNodeModulesDirs) {
-			logger->Logf("Removed node_modules bucket: %s", dirPath);
+			logging::logf(logger, "Removed node_modules bucket: %s", dirPath);
 		}
-		logger->Logf("Updated buckets and directories in %v",
-		             std::chrono::steady_clock::now() - start);
+		logging::logf(logger, "Updated buckets and directories in %v",
+		             gostd::durationString(std::chrono::steady_clock::now() - start));
 	}
 }
 
@@ -894,10 +894,10 @@ void registryBuilder::updateIndexes(gostd::Context ctx, RegistryChange& change,
 
 	logging::LogTree* nodeModulesLogger = nullptr;
 	std::vector<std::unique_ptr<logging::LogTree>> nodeModulesLoggerOwned;
-	// dep-stub Fork() takes no name arg in C++.
 	if (logger != nullptr && !nodeModulesTasks.empty()) {
 		nodeModulesLoggerOwned.push_back(
-		    std::unique_ptr<logging::LogTree>(logger->Fork()));
+		    std::unique_ptr<logging::LogTree>(logging::fork(
+		        logger, "Building node_modules indexes")));
 		nodeModulesLogger = nodeModulesLoggerOwned.back().get();
 	}
 
@@ -922,9 +922,9 @@ void registryBuilder::updateIndexes(gostd::Context ctx, RegistryChange& change,
 		                                          task->dirPath);
 	}
 	if (nodeModulesLogger != nullptr) {
-		nodeModulesLogger->Logf(
+		logging::logf(nodeModulesLogger, 
 		    "Discovered packages: %v",
-		    std::chrono::steady_clock::now() - discoveryStart);
+		    gostd::durationString(std::chrono::steady_clock::now() - discoveryStart));
 	}
 
 	// --- Phase 2: Extraction (parallel per unique realpath) ---
@@ -1022,9 +1022,10 @@ void registryBuilder::updateIndexes(gostd::Context ctx, RegistryChange& change,
 		}
 	}
 	if (nodeModulesLogger != nullptr) {
-		nodeModulesLogger->Logf("Extracted exports: %v (%d packages)",
-		                        std::chrono::steady_clock::now() -
-		                            extractionStart,
+		logging::logf(nodeModulesLogger, "Extracted exports: %v (%d packages)",
+		                        gostd::durationString(
+		                            std::chrono::steady_clock::now() -
+		                            extractionStart),
 		                        seen.size());
 	}
 	uniquePackageCount = static_cast<int>(seen.size());
@@ -1050,7 +1051,7 @@ void registryBuilder::updateIndexes(gostd::Context ctx, RegistryChange& change,
 			    task->discovered, extractionCache,
 			    targetRecursivePackages,
 			    nodeModulesLogger != nullptr
-			        ? nodeModulesLogger->Fork()
+			        ? logging::fork(nodeModulesLogger, task->dirName)
 			        : nullptr);
 		} else {
 			buildNodeModulesBucket(
@@ -1058,7 +1059,7 @@ void registryBuilder::updateIndexes(gostd::Context ctx, RegistryChange& change,
 			    task->discovered, task->directoryPackageNames.get(),
 			    extractionCache, targetRecursivePackages,
 			    nodeModulesLogger != nullptr
-			        ? nodeModulesLogger->Fork()
+			        ? logging::fork(nodeModulesLogger, task->dirName)
 			        : nullptr);
 		}
 	}
@@ -1106,7 +1107,8 @@ void registryBuilder::updateIndexes(gostd::Context ctx, RegistryChange& change,
 			buildProjectBucket(
 			    ctx, brp, projectID, resolvedPackageNames,
 			    logger != nullptr
-			        ? logger->Fork()
+			        ? logging::fork(logger,
+			            "Building project bucket " + projectID->String())
 			        : nullptr);
 		}
 	}
@@ -1204,14 +1206,15 @@ void registryBuilder::updateIndexes(gostd::Context ctx, RegistryChange& change,
 
 	if (nodeModulesLogger != nullptr) {
 		if (secondPassFileCount > 0) {
-			nodeModulesLogger->Logf(
+			logging::logf(nodeModulesLogger, 
 			    "%d files required second pass, took %v",
 			    secondPassFileCount,
-			    std::chrono::steady_clock::now() - secondPassStart);
+			    gostd::durationString(std::chrono::steady_clock::now() - secondPassStart));
 		}
-		nodeModulesLogger->Logf("Total: %v",
-		                        std::chrono::steady_clock::now() -
-		                            discoveryStart);
+		logging::logf(nodeModulesLogger, "Total: %v",
+		                        gostd::durationString(
+		                            std::chrono::steady_clock::now() -
+		                            discoveryStart));
 	}
 }
 
@@ -1395,19 +1398,19 @@ void registryBuilder::buildProjectBucket(
 	    bucketBuildPreferencesFromUserPreferences(userPreferences);
 
 	if (logger != nullptr) {
-		logger->Logf(
+		logging::logf(logger, 
 		    "Extracted exports: %v (%d exports, %d used checker, %d "
 		    "created checkers)",
-		    indexStart - start, combinedStats.exports.load(),
+		    gostd::durationString(indexStart - start), combinedStats.exports.load(),
 		    combinedStats.usedChecker.load(), pool->getCreatedCount());
 		if (skippedFileCount > 0) {
-			logger->Logf("Skipped %d files due to exclude patterns",
+			logging::logf(logger, "Skipped %d files due to exclude patterns",
 			             skippedFileCount);
 		}
-		logger->Logf("Built index: %v",
-		             std::chrono::steady_clock::now() - indexStart);
-		logger->Logf("Bucket total: %v",
-		             std::chrono::steady_clock::now() - start);
+		logging::logf(logger, "Built index: %v",
+		             gostd::durationString(std::chrono::steady_clock::now() - indexStart));
+		logging::logf(logger, "Bucket total: %v",
+		             gostd::durationString(std::chrono::steady_clock::now() - start));
 	}
 }
 
@@ -1840,15 +1843,15 @@ void registryBuilder::buildNodeModulesBucket(
 	}
 
 	if (logger != nullptr) {
-		logger->Logf("Installed %d exports (%d used checker)",
+		logging::logf(logger, "Installed %d exports (%d used checker)",
 		             extraction->stats.exports.load(),
 		             extraction->stats.usedChecker.load());
 		if (extraction->skippedEntrypointsCount > 0) {
-			logger->Logf("Skipped %d entrypoints due to exclude patterns",
+			logging::logf(logger, "Skipped %d entrypoints due to exclude patterns",
 			             extraction->skippedEntrypointsCount);
 		}
-		logger->Logf("Built index: %v",
-		             std::chrono::steady_clock::now() - indexStart);
+		logging::logf(logger, "Built index: %v",
+		             gostd::durationString(std::chrono::steady_clock::now() - indexStart));
 	}
 
 	result->err = gostd::ctxErr(ctx);
@@ -1994,12 +1997,12 @@ void registryBuilder::updateNodeModulesBucket(
 	        std::move(extraction->possibleFailedAmbientModuleLookupTargets));
 
 	if (logger != nullptr) {
-		logger->Logf("Granular update of %d packages: %v (%d exports)",
+		logging::logf(logger, "Granular update of %d packages: %v (%d exports)",
 		             dirtyPackages != nullptr ? dirtyPackages->Len() : 0,
-		             indexStart - start,
+		             gostd::durationString(indexStart - start),
 		             extraction->stats.exports.load());
-		logger->Logf("Built index: %v",
-		             std::chrono::steady_clock::now() - indexStart);
+		logging::logf(logger, "Built index: %v",
+		             gostd::durationString(std::chrono::steady_clock::now() - indexStart));
 	}
 
 	result->err = gostd::ctxErr(ctx);

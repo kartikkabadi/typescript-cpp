@@ -1,471 +1,451 @@
-// === dep decls — owned by project ===
-// Decls the api slice needs from tsc/internal/project (project.go, session.go,
-// snapshot.go, snapshothost.go, projectcollection.go, filechange.go,
-// overlayfs.go, api.go). Pure ID types and data-only request/summary structs
-// are ported faithfully; all stateful machinery (Session, Snapshot,
-// SnapshotHost, ProjectCollection, overlays) is stubbed in project.cpp with
-// TSC_UNREACHABLE. The project slice should replace this file when it lands.
+// project.go — Project + ID types + Kind/ProgramUpdateKind/PendingReload.
+//
+// project.h
 #pragma once
 
-#include <cstdint>
 #include <functional>
-#include <map>
 #include <memory>
+#include <mutex>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "internal/collections/collections.h"
+#include "internal/compiler/program.h"
+#include "internal/contentmapper/contentmapper.h"
+#include "internal/core/types.h"
+#include "internal/core/utilities.h"
 #include "internal/gostd/gostd.h"
-#include "internal/lsp/lsproto/lsproto.h"
+#include "internal/json/json.h"
+#include "internal/module/resolver.h"
+#include "internal/project/ata/ata.h"
+#include "internal/project/checkerpool.h"
+#include "internal/project/watch.h"
+#include "internal/tsoptions/tsoptions.h"
 #include "internal/tspath/tspath.h"
-#include "internal/vfs/vfs.h"
 
-namespace tsc {
-enum class ScriptKind : int32_t; struct CompilerOptions; struct ProjectReference; struct DiagnosticMessage;
-struct SourceFile; struct SourceFileParseOptions; struct Diagnostic;
-namespace compiler { struct SimpleProgram; }
-namespace tsoptions { struct ParsedCommandLine; }
-namespace module { struct ResolverOptions; struct Resolver; }
-namespace lsconv { struct Converters; struct LSPLineMap; }
-namespace ls {
-namespace lsutil { struct UserPreferences; }
-namespace autoimport { struct Registry; }
-}
-namespace sourcemap { struct ECMALineInfo; }
-namespace json { struct Dom; class Decoder; class Encoder; }
-// === slice: api === — Logger is a std::function alias in contentmapper.h;
-// an alias re-declaration is legal where a struct fwd-decl was not.
-namespace contentmapper { struct Spawner; using Logger = std::function<void(std::string_view)>; struct Host; }
-namespace logging { struct Logger; }
-} // namespace tsc
+namespace tsc::logging {
+struct Logger;
+struct LogTree;
+} // namespace tsc::logging
+
+namespace tsc::ls {
+
+// dep decl — ls.Project interface (crossproject.go:17) — owned by ls
+// slice.
+struct Project {
+	virtual ~Project() = default;
+	virtual std::string Id() const = 0;
+	virtual compiler::SimpleProgram* GetProgram() const = 0;
+	virtual bool HasFile(const std::string& fileName) const = 0;
+};
+
+} // namespace tsc::ls
 
 namespace tsc::project {
 
-struct ID;
-struct Session;
-struct Snapshot;
-struct SnapshotHost;
-struct Project;
-struct ProjectCollection;
-struct SourceFileLease;
-struct ModuleResolverFactory;
-struct APICreateProgramRequest;
-struct APIReconfigureProgramRequest;
-struct APISnapshotRequest;
+// project.go:27-30 consts.
+inline constexpr const char* inferredProjectName =
+    "/dev/null/inferred"; // lowercase so toPath is a no-op regardless
+                          // of settings
+inline constexpr std::string_view syntheticProjectPrefix =
+    "/dev/null/synthetic/";
+inline constexpr const char* hr =
+    "-----------------------------------------------";
 
-// project.go:32-96 — project ID types.
-using ConfiguredProjectID = tspath::Path;
-using InferredProjectID = std::string;
-using SyntheticProjectID = std::string;
-
-inline const std::string_view inferredProjectName = "/dev/null/inferredproject*";
-inline const std::string_view syntheticProjectPrefix = "/dev/null/syntheticproject*";
-
-struct ID {
-	std::string v;
-
+// ID — project.go:32.
+struct ID : std::string {
+	using std::string::string;
 	ID() = default;
-	ID(const char* s) : v(s) {}
-	// tspath::Path / ConfiguredProjectID / InferredProjectID /
-	// SyntheticProjectID are all std::string aliases — this covers them.
-	ID(std::string s) : v(std::move(s)) {}
-
-	const std::string& str() const { return v; }
-	bool empty() const { return v.empty(); }
-	operator const std::string&() const { return v; }
-	bool operator==(const ID&) const = default;
-	bool operator<(const ID& o) const { return v < o.v; }
-
-	// ID.String (project.go:52).
-	std::string String() const { return v; }
-
-	// === slice: api === — project IDs marshal to/from JSON strings.
-	std::string unmarshalJSONFrom(json::Decoder& dec);
-	std::string marshalJSONTo(json::Encoder& enc) const;
-
-	// ID.Configured (project.go:57).
-	std::pair<ConfiguredProjectID, bool> Configured() const;
-	// ID.Inferred (project.go:68).
-	std::pair<InferredProjectID, bool> Inferred() const;
-	// ID.Synthetic (project.go:72).
-	std::pair<SyntheticProjectID, bool> Synthetic() const;
+	ID(const std::string& s) : std::string(s) {}
+	ID(std::string_view s) : std::string(s) {}
 };
 
-// ParseConfiguredProjectID (project.go:61).
-std::pair<ConfiguredProjectID, bool> ParseConfiguredProjectID(tspath::Path value);
-// ParseSyntheticProjectID (project.go:89).
-std::pair<SyntheticProjectID, bool> ParseSyntheticProjectID(const std::string& value);
-// NewSyntheticProjectID (project.go:45) — panics (TSC_UNREACHABLE) on id <= 0.
-SyntheticProjectID NewSyntheticProjectID(int id);
-// SyntheticProjectID.UnmarshalJSONFrom (project.go:76).
-gostd::Error syntheticProjectIDUnmarshalJSONFrom(const json::Dom& v,
-                                                SyntheticProjectID* out);
+// idString — (id ID) String(), project.go:53 (fmt.Stringer).
+inline const std::string& idString(const ID& id) { return id; }
 
-// Kind (project.go:104).
-using Kind = int;
-inline constexpr Kind KindInferred = 0;
-inline constexpr Kind KindConfigured = 1;
-inline constexpr Kind KindSynthetic = 2;
+// ConfiguredProjectID — project.go:34.
+struct ConfiguredProjectID : tspath::Path {
+	using tspath::Path::Path;
+	ConfiguredProjectID() = default;
+	ConfiguredProjectID(const tspath::Path& p) : tspath::Path(p) {}
 
-// ProgramUpdateKind (project.go:113).
-using ProgramUpdateKind = int;
-inline constexpr ProgramUpdateKind ProgramUpdateKindNone = 0;
-inline constexpr ProgramUpdateKind ProgramUpdateKindCloned = 1;
-inline constexpr ProgramUpdateKind ProgramUpdateKindSameFileNames = 2;
-inline constexpr ProgramUpdateKind ProgramUpdateKindNewFiles = 3;
+	// Path — project.go:36.
+	tspath::Path Path() const { return *this; }
+	// AsID — project.go:54.
+	ID AsID() const { return ID(*this); }
+};
 
-// --- filechange.go --------------------------------------------------------
+// InferredProjectID — project.go:40.
+struct InferredProjectID : std::string {
+	using std::string::string;
+	InferredProjectID() = default;
+	InferredProjectID(const std::string& s) : std::string(s) {}
+	InferredProjectID(std::string_view s) : std::string(s) {}
 
-// FileChangeKind (filechange.go:14).
-using FileChangeKind = int;
-inline constexpr FileChangeKind FileChangeKindOpen = 0;
-inline constexpr FileChangeKind FileChangeKindClose = 1;
-inline constexpr FileChangeKind FileChangeKindChange = 2;
-inline constexpr FileChangeKind FileChangeKindSave = 3;
-inline constexpr FileChangeKind FileChangeKindWatchCreate = 4;
-inline constexpr FileChangeKind FileChangeKindWatchChange = 5;
-inline constexpr FileChangeKind FileChangeKindWatchDelete = 6;
+	// AsID — project.go:55.
+	ID AsID() const { return ID(*this); }
+};
 
-// FileChangeKind.IsWatchKind (filechange.go:26).
-inline bool fileChangeKindIsWatchKind(FileChangeKind k) {
-	return k == FileChangeKindWatchCreate || k == FileChangeKindWatchChange ||
-	       k == FileChangeKindWatchDelete;
+// inferredProjectID — project.go:42.
+inline const InferredProjectID inferredProjectID{inferredProjectName};
+
+// SyntheticProjectID — project.go:44.
+struct SyntheticProjectID : std::string {
+	using std::string::string;
+	SyntheticProjectID() = default;
+	SyntheticProjectID(const std::string& s) : std::string(s) {}
+	SyntheticProjectID(std::string_view s) : std::string(s) {}
+
+	// AsID — project.go:56.
+	ID AsID() const { return ID(*this); }
+
+	// UnmarshalJSONFrom — project.go:84.
+	gostd::Error UnmarshalJSONFrom(json::Decoder* dec);
+};
+
+// NewSyntheticProjectID — project.go:46.
+inline SyntheticProjectID NewSyntheticProjectID(int id) {
+	if (id <= 0) {
+		TSC_UNREACHABLE("invalid synthetic project ID");
+	}
+	return SyntheticProjectID(std::string(syntheticProjectPrefix) +
+	                          std::to_string(id));
 }
 
-// FileChange (filechange.go:30).
-struct FileChange {
-	FileChangeKind Kind{};
-	lsproto::DocumentUri URI;
-	int32_t Version{};                                    // Only set for Open/Change
-	std::string Content;                                  // Only set for Open
-	lsproto::LanguageKind LanguageKind;                   // Only set for Open
-	std::vector<lsproto::TextDocumentContentChangePartialOrWholeDocument> Changes; // Only set for Change
-};
-
-// FileChangeSummary (filechange.go:39).
-struct FileChangeSummary {
-	// Only one file can be opened at a time per request
-	lsproto::DocumentUri Opened;
-	// Reopened is set if a close and open occurred for the same file in a single batch of changes.
-	lsproto::DocumentUri Reopened;
-	collections::Set<lsproto::DocumentUri> Closed;
-	collections::Set<lsproto::DocumentUri> Changed;
-	// Only set when file watching is enabled
-	collections::Set<lsproto::DocumentUri> Created;
-	// Only set when file watching is enabled
-	collections::Set<lsproto::DocumentUri> Deleted;
-
-	// IncludesWatchChangeOutsideNodeModules is true if the summary includes a create, change, or delete watch
-	// event of a file outside a node_modules directory.
-	bool IncludesWatchChangeOutsideNodeModules{};
-	// InvalidateAll indicates that all cached file state should be discarded.
-	bool InvalidateAll{};
-
-	// Clone (filechange.go:56).
-	FileChangeSummary Clone() const;
-	// IsEmpty (filechange.go:66).
-	bool IsEmpty() const {
-		return !InvalidateAll && Opened.empty() && Reopened.empty() &&
-		       Closed.Size() == 0 && Changed.Size() == 0 && Created.Size() == 0 &&
-		       Deleted.Size() == 0;
+// ParseSyntheticProjectID — project.go:97.
+inline std::pair<SyntheticProjectID, bool>
+ParseSyntheticProjectID(const std::string& value) {
+	if (value.substr(0, syntheticProjectPrefix.size()) !=
+	    syntheticProjectPrefix) {
+		return {SyntheticProjectID(), false};
 	}
-	// HasExcessiveWatchEvents (filechange.go:70).
-	bool HasExcessiveWatchEvents() const {
-		return InvalidateAll || Created.Size() + Deleted.Size() + Changed.Size() >
-		                          excessiveChangeThreshold;
+	std::string suffix{value.substr(syntheticProjectPrefix.size())};
+	int id = 0;
+	try {
+		size_t consumed = 0;
+		id = std::stoi(suffix, &consumed);
+		if (consumed != suffix.size()) {
+			return {SyntheticProjectID(), false};
+		}
+	} catch (...) {
+		return {SyntheticProjectID(), false};
 	}
-	// HasExcessiveNonCreateWatchEvents (filechange.go:74).
-	bool HasExcessiveNonCreateWatchEvents() const {
-		return InvalidateAll || Deleted.Size() + Changed.Size() > excessiveChangeThreshold;
+	if (id <= 0) {
+		return {SyntheticProjectID(), false};
 	}
+	return {NewSyntheticProjectID(id), true};
+}
 
-	inline static constexpr int excessiveChangeThreshold = 1000;
+// ParseConfiguredProjectID — project.go:62.
+inline std::pair<ConfiguredProjectID, bool>
+ParseConfiguredProjectID(const tspath::Path& value) {
+	ID id{std::string(value)};
+	if (id.empty()) {
+		return {ConfiguredProjectID(), false};
+	}
+	if (id == inferredProjectID.AsID()) {
+		return {ConfiguredProjectID(), false};
+	}
+	if (ParseSyntheticProjectID(id).second) {
+		return {ConfiguredProjectID(), false};
+	}
+	return {ConfiguredProjectID(value), true};
+}
+
+// ID methods — project.go:58/76/80. Free functions to avoid the
+// type-name/member-name shadow problem inside `struct ID`.
+inline std::pair<ConfiguredProjectID, bool>
+idConfigured(const ID& id) {
+	return ParseConfiguredProjectID(tspath::Path(id));
+}
+inline std::pair<InferredProjectID, bool> idInferred(const ID& id) {
+	return {inferredProjectID, id == inferredProjectID.AsID()};
+}
+inline std::pair<SyntheticProjectID, bool> idSynthetic(const ID& id) {
+	return ParseSyntheticProjectID(id);
+}
+
+// Kind — project.go:111.
+enum class Kind : int {
+	Inferred = 0,
+	Configured,
+	Synthetic,
 };
+inline constexpr Kind KindInferred = Kind::Inferred;
+inline constexpr Kind KindConfigured = Kind::Configured;
+inline constexpr Kind KindSynthetic = Kind::Synthetic;
 
-// --- overlayfs.go ---------------------------------------------------------
+// Kind.String — project_stringer.go (generated by stringer).
+inline std::string kindString(Kind k) {
+	switch (k) {
+	case Kind::Inferred:
+		return "Inferred";
+	case Kind::Configured:
+		return "Configured";
+	case Kind::Synthetic:
+		return "Synthetic";
+	}
+	return "Kind(" + std::to_string(int(k)) + ")";
+}
 
-// FileHandle (overlayfs.go:27).
-struct FileHandle {
-	virtual ~FileHandle() = default;
-	virtual std::string FileName() const = 0;
-	virtual std::string Text() const = 0;
-	virtual std::string OriginalText() const = 0;
-	virtual int32_t Version() const = 0;
-	virtual bool MatchesDiskText() const = 0;
-	virtual bool IsOverlay() const = 0;
-	virtual lsconv::LSPLineMap* LSPLineMap() = 0;
-	virtual sourcemap::ECMALineInfo* ECMALineInfo() = 0;
-	virtual int Kind() const = 0; // core.ScriptKind
+// ProgramUpdateKind — project.go:119.
+enum class ProgramUpdateKind : int {
+	None = 0,
+	Cloned,
+	SameFileNames,
+	NewFiles,
 };
+inline constexpr ProgramUpdateKind ProgramUpdateKindNone =
+    ProgramUpdateKind::None;
+inline constexpr ProgramUpdateKind ProgramUpdateKindCloned =
+    ProgramUpdateKind::Cloned;
+inline constexpr ProgramUpdateKind ProgramUpdateKindSameFileNames =
+    ProgramUpdateKind::SameFileNames;
+inline constexpr ProgramUpdateKind ProgramUpdateKindNewFiles =
+    ProgramUpdateKind::NewFiles;
 
-// FileHandleSource (snapshotfs.go:21).
-struct FileHandleSource {
-	virtual ~FileHandleSource() = default;
-	virtual std::shared_ptr<FileHandle> GetFile(const std::string& fileName) = 0;
-	virtual std::shared_ptr<FileHandle> GetFileByPath(const std::string& fileName,
-	                                                 tspath::Path path) = 0;
+// PendingReload — project.go:128.
+enum class PendingReload : int {
+	None = 0,
+	FileNames,
+	Full,
 };
+inline constexpr PendingReload PendingReloadNone = PendingReload::None;
+inline constexpr PendingReload PendingReloadFileNames =
+    PendingReload::FileNames;
+inline constexpr PendingReload PendingReloadFull = PendingReload::Full;
 
-// Overlay (overlayfs.go:123).
-struct Overlay {
-	std::string fileName;
-	std::string content;
-	uint64_t hashHi{}, hashLo{}; // xxh3.Uint128
-	int32_t version{};
-	int kind{};                  // core.ScriptKind
-	bool matchesDiskText{};
+struct ProjectCollectionBuilder;
+struct compilerHost;
+struct ProjectTreeRequest;
+struct configuredProjectFactory;
 
-	std::string FileName() const { return fileName; }
-};
-
-// LayeredFileSystem (overlayfs.go:192).
-struct LayeredFileSystem : virtual vfs::FS, virtual FileHandleSource {
-	virtual std::map<tspath::Path, std::shared_ptr<Overlay>> Overlays() = 0;
-};
-
-// RebasableFileSystem (overlayfs.go:198).
-struct RebasableFileSystem {
-	virtual ~RebasableFileSystem() = default;
-	virtual std::shared_ptr<vfs::FS> BaseFileSystem() = 0;
-	virtual std::shared_ptr<LayeredFileSystem> WithBaseFileSystem(
-	    std::shared_ptr<vfs::FS> base) = 0;
-};
-
-// NewCachedFileHandle (overlayfs.go:90).
-std::shared_ptr<FileHandle> NewCachedFileHandle(std::string fileName,
-                                                std::string content);
-
-// --- session.go -----------------------------------------------------------
-
-// SessionOptions (session.go:68).
-struct SessionOptions {
-	std::string CurrentDirectory;
-	std::string DefaultLibraryPath;
-	std::string TypingsLocation;
-	lsproto::PositionEncodingKind PositionEncoding;
-	bool WatchEnabled{};
-	bool LoggingEnabled{};
-	bool TelemetryEnabled{};
-	bool PushDiagnosticsEnabled{};
-	// RunExternalCode allows configured content mappers to run their (external) processes,
-	// gated on workspace trust by the client. It corresponds to the --runExternalCode CLI flag.
-	bool RunExternalCode{};
-	gostd::Duration DebounceDelay{};
-	// CheckerPoolOptions omitted — owned by project (checker pool config).
-};
-
-// SessionInit (session.go:84).
-struct SessionInit {
-	gostd::Context BackgroundCtx;
-	std::shared_ptr<SessionOptions> Options;
-	std::shared_ptr<vfs::FS> FS;
-	// Client, Logger, NpmExecutor, Spawner, ContentMapperLogger, ParseCache,
-	// ContentMappedParseCache — owned by project.
-	std::shared_ptr<contentmapper::Spawner> Spawner;
-	std::shared_ptr<contentmapper::Logger> ContentMapperLogger;
-};
-
-// Session (session.go:111) — manages the state of an LSP session.
-struct Session {
-	virtual ~Session() = default;
-
-	// Owned by project — all stubbed.
-	virtual std::shared_ptr<vfs::FS> FS() = 0;
-	virtual std::string GetCurrentDirectory() = 0;
-	virtual std::string DefaultLibraryPath() = 0;
-	virtual gostd::Context WithCurrentLocale(gostd::Context ctx) = 0;
-	virtual gostd::Error DidOpenFile(gostd::Context ctx, lsproto::DocumentUri uri,
-	                                 int32_t version, const std::string& content,
-	                                 lsproto::LanguageKind languageKind) = 0;
-	virtual gostd::Error DidCloseFile(gostd::Context ctx, lsproto::DocumentUri uri) = 0;
-	virtual gostd::Error DidChangeFile(
-		gostd::Context ctx, lsproto::DocumentUri uri, int32_t version,
-		const std::vector<lsproto::TextDocumentContentChangePartialOrWholeDocument>& changes) = 0;
-	virtual gostd::Error DidSaveFile(gostd::Context ctx, lsproto::DocumentUri uri) = 0;
-	virtual gostd::Error DidChangeWatchedFiles(
-		gostd::Context ctx, const std::vector<lsproto::FileEvent>& changes) = 0;
-
-	// APIUpdate (api.go:18).
-	virtual std::pair<Snapshot*, gostd::Error> APIUpdate(
-		gostd::Context ctx, FileChangeSummary apiFileChanges,
-		APISnapshotRequest* apiRequest) = 0;
-	// TryAdoptSnapshotInBackground (api.go:59).
-	virtual void TryAdoptSnapshotInBackground(Snapshot* baseSnapshot,
-	                                          Snapshot* newSnapshot) = 0;
-
-	// session.go:264 — read-only after init.
-	virtual ls::lsutil::UserPreferences Config() = 0;
-
-	project::SnapshotHost* SnapshotHost_ = nullptr; // embedded field
-};
-
-// --- snapshot.go ----------------------------------------------------------
-
-// Snapshot (snapshot.go:31) — immutable project/session state.
-struct Snapshot {
-	virtual ~Snapshot() = default;
-
-	// All methods owned by project — stubbed.
-	virtual uint64_t ID() const = 0;
-	virtual void ref() = 0;
-	virtual bool tryRef() = 0;
-	virtual void Deref() = 0;
-	virtual std::shared_ptr<vfs::FS> FS() = 0;
-	virtual std::string GetCurrentDirectory() = 0;
-	virtual std::pair<std::string, bool> ReadFile(const std::string& fileName) = 0;
-	virtual bool DirectoryExists(const std::string& path) = 0;
-	virtual bool FileExists(const std::string& path) = 0;
-	virtual std::vector<std::string> GetDirectories(const std::string& path) = 0;
-	virtual std::vector<std::string> ReadDirectory(
-		const std::string& currentDir, const std::string& path,
-		const std::vector<std::string>& extensions,
-		const std::vector<std::string>& excludes,
-		const std::vector<std::string>& includes, int depth) = 0;
-	virtual bool HasFileSystemOverride() const = 0;
-	virtual std::vector<std::string> ContentMapperExtensions() = 0;
-	virtual std::vector<Project*> CreatedPrograms() = 0;
-	virtual Project* GetDefaultProject(lsproto::DocumentUri uri) = 0;
-	virtual std::shared_ptr<FileHandle> GetFile(const std::string& fileName) = 0;
-	virtual lsconv::LSPLineMap* LSPLineMap(const std::string& fileName) = 0;
-	virtual sourcemap::ECMALineInfo* GetECMALineInfo(const std::string& fileName) = 0;
-	virtual ls::lsutil::UserPreferences GetPreferences(const std::string& activeFile) = 0;
-	virtual ls::lsutil::UserPreferences UserPreferences() = 0;
-	virtual lsconv::Converters* Converters() = 0;
-	virtual ls::autoimport::Registry* AutoImportRegistry() = 0;
-	virtual bool UseCaseSensitiveFileNames() = 0;
-	virtual bool isOpenFile(const std::string& fileName) = 0;
-	virtual tspath::Path toPath(const std::string& fileName) = 0;
-
-	project::ProjectCollection* ProjectCollection = nullptr;
-};
-
-// --- project.go (Project) -------------------------------------------------
-
-// Project (project.go) — a single TypeScript project.
-struct Project {
-	virtual ~Project() = default;
-
-	int Kind{};                    // project Kind enum
-	compiler::SimpleProgram* Program = nullptr;
-	tsoptions::ParsedCommandLine* CommandLine = nullptr;
-
-	// All methods owned by project — stubbed.
-	virtual std::string CurrentDirectory() = 0;
-	virtual std::string DisplayName(const std::string& cwd) = 0;
-	virtual project::ID ID() = 0;   // project.go:333
-	virtual std::string ConfigFileName() = 0;
-	virtual tspath::Path ConfigFilePath() = 0;
-	virtual std::string Id() = 0;
-	virtual compiler::SimpleProgram* GetProgram() = 0;
-	virtual bool IsDirty() = 0;
-	virtual std::vector<Diagnostic*> GetProjectDiagnostics(gostd::Context ctx) = 0;
-	virtual bool HasFile(const std::string& fileName) = 0;
-};
-
-// --- projectcollection.go -------------------------------------------------
-
-// ProjectCollection (projectcollection.go:15).
-struct ProjectCollection {
-	virtual ~ProjectCollection() = default;
-
-	virtual Project* ConfiguredProject(tspath::Path path) = 0;
-	virtual Project* GetProject(ID id) = 0;
-	virtual std::vector<Project*> ConfiguredProjects() = 0;
-	virtual std::vector<Project*> SyntheticProjects() = 0;
-	// ProjectsByID (projectcollection.go:120) — OrderedMap[ID]*Project.
-	virtual collections::OrderedMap<ID, Project*>* ProjectsByID() = 0;
-	virtual std::vector<Project*> Projects() = 0;
-	virtual std::vector<Project*> LanguageServiceProjects() = 0;
-	virtual Project* InferredProject() = 0;
-	virtual collections::Set<ConfiguredProjectID>* GetOpenConfiguredProjects() = 0;
-	virtual Project* GetDefaultProject(tspath::Path path) = 0;
-};
-
-// --- snapshothost.go ------------------------------------------------------
-
-// SourceFileLease (snapshothost.go:34) — ref-counted parse-cache lease.
-struct SourceFileLease {
-	virtual ~SourceFileLease() = default;
-	virtual SourceFile* SourceFile() = 0;
-	virtual void Release() = 0;
-};
-
-// SnapshotHost (snapshothost.go:20).
-struct SnapshotHost {
-	virtual ~SnapshotHost() = default;
-
-	virtual uint64_t nextSnapshotID() = 0;
-	virtual std::shared_ptr<SourceFileLease> AcquireSourceFile(
-		SourceFileParseOptions options, const std::string& text,
-		int scriptKind /* core.ScriptKind */) = 0;
-	virtual Snapshot* NewRootSnapshot() = 0;
-	virtual void RetainSnapshot(Snapshot* snapshot) = 0;
-	virtual std::pair<Snapshot*, gostd::Error> CloneSnapshot(
-		gostd::Context ctx, Snapshot* baseSnapshot,
-		FileChangeSummary fileChanges, APISnapshotRequest* apiRequest) = 0;
-	virtual Snapshot* CloneSnapshotWithAutoImports(
-		gostd::Context ctx, Snapshot* baseSnapshot,
-		lsproto::DocumentUri uri, ::tsc::logging::Logger* logger) = 0;
-	virtual std::shared_ptr<vfs::FS> FS() = 0;
-	virtual std::string GetCurrentDirectory() = 0;
-	virtual std::string DefaultLibraryPath() = 0;
-	virtual void Close() = 0;
-};
-
-// NewSnapshotHost (snapshothost.go:65) — owned by project (stub).
-SnapshotHost* NewSnapshotHost(SessionInit* init);
-
-// NewSession (session.go:214-ish) — owned by project (stub).
-Session* NewSession(SessionInit* init);
-
-// --- snapshot.go (api request structs) ------------------------------------
-
-// ModuleResolverFactory (snapshot.go:331).
+// ModuleResolverFactory — snapshot.go:49. A factory for creating
+// module resolvers along with a disposal function.
 struct ModuleResolverFactory {
 	virtual ~ModuleResolverFactory() = default;
-	virtual std::pair<module::Resolver*, std::function<void()>> NewResolver(
-		const module::ResolverOptions& options) = 0;
+	// NewResolver — returns (module.Resolver, dispose-func).
+	virtual std::pair<module::Resolver*, std::function<void()>>
+	NewResolver(const module::ResolverOptions& options) = 0;
 };
 
-// APICreateProgramRequest (snapshot.go:322).
-struct APICreateProgramRequest {
-	std::vector<std::string> RootFileNames;
-	CompilerOptions* CompilerOptions = nullptr;
-	std::vector<ProjectReference*> ProjectReferences;
-	std::vector<Diagnostic*> ConfigFileParsingDiagnostics;
-	std::shared_ptr<ModuleResolverFactory> ModuleResolverFactory;
-	uint64_t ModuleResolverID{};
+// Project — project.go:138. If changing struct fields, also update
+// the Clone method. Implements ls::Project (crossproject.go:17).
+struct Project : ls::Project {
+	project::Kind Kind = project::KindInferred;
+	ID id;
+	std::string currentDirectory;
+	std::string configFileName;
+	tspath::Path configFilePath;
+
+	bool dirty = false;
+	tspath::Path dirtyFilePath;
+
+	compilerHost* host = nullptr;
+	tsoptions::ParsedCommandLine* CommandLine = nullptr;
+	tsoptions::ParsedCommandLine* commandLineWithTypingsFiles =
+	    nullptr;
+	std::once_flag commandLineWithTypingsFilesOnce;
+	compiler::SimpleProgram* Program = nullptr;
+	// The kind of update that was performed on the program last time
+	// it was updated.
+	project::ProgramUpdateKind ProgramUpdateKind =
+	    project::ProgramUpdateKindNone;
+	// The ID of the snapshot that created the program stored in this
+	// project.
+	uint64_t ProgramLastUpdate = 0;
+	// Set of projects that this project could be referencing. Only
+	// set before actually loading config file to get actual project
+	// references.
+	collections::Set<tspath::Path>* potentialProjectReferences =
+	    nullptr;
+
+	WatchedFiles<collections::SyncSet<tspath::Path>*>*
+	    programFilesWatch = nullptr;
+	WatchedFiles<PatternsAndIgnored>* typingsWatch = nullptr;
+	WatchedFiles<std::vector<std::string>>* contentMapperWatch =
+	    nullptr;
+	collections::Set<tspath::Path>* contentMapperWatchedFiles =
+	    nullptr;
+
+	project::checkerPool* checkerPool = nullptr;
+
+	ModuleResolverFactory* moduleResolverFactory = nullptr;
+	uint64_t moduleResolverID = 0;
+
+	// installedTypingsInfo is the value of
+	// `project.ComputeTypingsInfo()` that was used during the most
+	// recently completed typings installation.
+	ata::TypingsInfo* installedTypingsInfo = nullptr;
+	// typingsFiles are the root files added by the typings installer.
+	std::vector<std::string> typingsFiles;
+
+	// -------------------------------------------------------------------
+	// project.go methods
+	// -------------------------------------------------------------------
+
+	// CurrentDirectory — project.go:312.
+	const std::string& CurrentDirectory() const {
+		return currentDirectory;
+	}
+
+	// DisplayName — project.go:320. A short, human-readable name for
+	// the project, relative to the given workspace root directory.
+	std::string DisplayName(const std::string& cwd) const;
+
+	// ID — project.go:333.
+	project::ID ID() const { return id; }
+	// Id — ls::Project (crossproject.go:18) — same return as
+	// project.go:353.
+	std::string Id() const override { return std::string(id); }
+
+	// ConfigFileName — project.go:338. Panics if not KindConfigured.
+	const std::string& ConfigFileName() const;
+	// ConfigFilePath — project.go:346. Panics if not KindConfigured.
+	const tspath::Path& ConfigFilePath() const;
+
+	// GetProgram — project.go:357.
+	compiler::SimpleProgram* GetProgram() const override {
+		return Program;
+	}
+	// IsDirty — project.go:361.
+	bool IsDirty() const { return dirty; }
+
+	// GetProjectDiagnostics — project.go:368. Program diagnostics
+	// combined with any global diagnostics discovered during checking.
+	// These are the diagnostics reported on the tsconfig.json file.
+	std::vector<Diagnostic*> GetProjectDiagnostics();
+
+	// HasFile — project.go:380.
+	bool HasFile(const std::string& fileName) const override {
+		return containsFile(toPath(fileName));
+	}
+	// containsFile — project.go:384.
+	bool containsFile(const tspath::Path& path) const {
+		return Program != nullptr &&
+		       Program->GetSourceFileByPath(path) != nullptr;
+	}
+	// IsSourceFromProjectReference — project.go:388.
+	bool IsSourceFromProjectReference(const tspath::Path& path) const {
+		return Program != nullptr &&
+		       Program->IsSourceFromProjectReference(path);
+	}
+
+	// Clone — project.go:392.
+	Project* Clone() const;
+
+	// SetCommandLine — project.go:433.
+	void SetCommandLine(tsoptions::ParsedCommandLine* commandLine);
+
+	// getCommandLineWithTypingsFiles — project.go:443. Returns the
+	// command line augmented with typing files if ATA is enabled.
+	tsoptions::ParsedCommandLine* getCommandLineWithTypingsFiles();
+
+	// setPotentialProjectReference — project.go:468.
+	void setPotentialProjectReference(const tspath::Path& configFilePath);
+	// hasPotentialProjectReference — project.go:477.
+	bool hasPotentialProjectReference(
+	    const ProjectTreeRequest* projectTreeRequest) const;
+
+	// CreateProgram — project.go:499.
+	struct CreateProgramResult {
+		compiler::SimpleProgram* Program = nullptr;
+		project::ProgramUpdateKind UpdateKind =
+		    project::ProgramUpdateKindNone;
+	};
+	CreateProgramResult CreateProgram();
+
+	// CloneWatchers — project.go:593.
+	WatchedFiles<collections::SyncSet<tspath::Path>*>* CloneWatchers();
+
+	// toPath — project.go:601.
+	tspath::Path toPath(const std::string& fileName) const;
+
+	// log — project.go:597 (!!! — no-op in Go).
+	void log(const std::string&) {}
+
+	// print — project.go:605.
+	std::string print(bool writeFileNames, bool writeFileExplanation);
+
+	// GetTypeAcquisition — project.go:628. Type acquisition settings;
+	// inferred and synthetic projects use defaults.
+	::tsc::TypeAcquisition* GetTypeAcquisition() const;
+
+	// GetUnresolvedImports — project.go:647.
+	collections::Set<std::string>* GetUnresolvedImports();
+
+	// ShouldTriggerATA — project.go:656.
+	bool ShouldTriggerATA(uint64_t snapshotID);
+
+	// ComputeTypingsInfo — project.go:675.
+	ata::TypingsInfo ComputeTypingsInfo();
 };
 
-// APIReconfigureProgramRequest (snapshot.go:335). Go embeds
-// APICreateProgramRequest; C++ inherits.
-struct APIReconfigureProgramRequest : APICreateProgramRequest {
-	SyntheticProjectID ProgramID;
-};
+// NewConfiguredProject — project.go:180.
+Project* NewConfiguredProject(const std::string& configFileName,
+                              const tspath::Path& configFilePath,
+                              ProjectCollectionBuilder* builder,
+                              logging::LogTree* logger);
 
-// APISnapshotRequest (snapshot.go:340).
-struct APISnapshotRequest {
-	collections::Set<std::string>* OpenProjects = nullptr;
-	collections::Set<tspath::Path>* CloseProjects = nullptr;
-	std::map<tspath::Path, std::string> OpenFiles;
-	collections::Set<tspath::Path>* CloseFiles = nullptr;
-	std::vector<APICreateProgramRequest*> CreatePrograms;
-	std::vector<APIReconfigureProgramRequest*> ReconfigurePrograms;
-	collections::Set<SyntheticProjectID>* RemovePrograms = nullptr;
-	collections::Set<ID>* EnsurePrograms = nullptr;
-	bool EnsureAllPrograms{};
-	std::map<tspath::Path, std::string> EnsureFiles;
-	std::shared_ptr<vfs::FS> FileSystem;
-	// ReplaceFileSystem indicates a total filesystem replacement. Layers use
-	// per-path file changes instead of invalidating all inherited state.
-	bool ReplaceFileSystem{};
-};
+// NewInferredProject — project.go:196.
+Project* NewInferredProject(
+    const std::string& currentDirectory, CompilerOptions* compilerOptions,
+    const std::vector<std::string>& rootFileNames,
+    const std::vector<tsc::ProjectReference*>& projectReferences,
+    const std::vector<contentmapper::Mapper*>& contentMappers,
+    ProjectCollectionBuilder* builder, logging::LogTree* logger);
+
+// newSyntheticProject — project.go:234.
+Project* newSyntheticProject(
+    SyntheticProjectID id, const std::string& currentDirectory,
+    CompilerOptions* compilerOptions,
+    const std::vector<std::string>& rootFileNames,
+    const std::vector<tsc::ProjectReference*>& projectReferences,
+    const std::vector<contentmapper::Mapper*>& contentMappers,
+    ProjectCollectionBuilder* builder, logging::LogTree* logger);
+
+// newInferredProjectCommandLine — project.go:258.
+tsoptions::ParsedCommandLine* newInferredProjectCommandLine(
+    CompilerOptions* compilerOptions,
+    const std::vector<std::string>& rootFileNames,
+    const std::vector<tsc::ProjectReference*>& projectReferences,
+    const std::vector<contentmapper::Mapper*>& contentMappers,
+    const tspath::ComparePathsOptions& comparePathsOptions);
+
+// NewProject — project.go:270.
+Project* NewProject(ID id, Kind kind,
+                    const std::string& currentDirectory,
+                    ProjectCollectionBuilder* builder,
+                    logging::LogTree* logger);
 
 } // namespace tsc::project
 
-template <>
-struct std::hash<tsc::project::ID> {
+namespace std {
+// hash specializations — the project ID types are std::string /
+// tspath::Path subclasses; hash like their string values so unordered
+// containers keyed by them work.
+template <> struct hash<tsc::project::ID> {
 	size_t operator()(const tsc::project::ID& id) const noexcept {
-		return std::hash<std::string>()(id.v);
+		return std::hash<std::string>{}(id);
 	}
 };
+template <> struct hash<tsc::project::ConfiguredProjectID> {
+	size_t operator()(const tsc::project::ConfiguredProjectID& id)
+	    const noexcept {
+		return std::hash<std::string>{}(id);
+	}
+};
+template <> struct hash<tsc::project::InferredProjectID> {
+	size_t operator()(const tsc::project::InferredProjectID& id)
+	    const noexcept {
+		return std::hash<std::string>{}(id);
+	}
+};
+template <> struct hash<tsc::project::SyntheticProjectID> {
+	size_t operator()(const tsc::project::SyntheticProjectID& id)
+	    const noexcept {
+		return std::hash<std::string>{}(id);
+	}
+};
+} // namespace std

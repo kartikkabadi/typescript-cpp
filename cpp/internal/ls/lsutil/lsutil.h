@@ -22,6 +22,7 @@
 #include "internal/ast/flags.h"
 #include "internal/collections/collections.h"
 #include "internal/core/text.h"
+#include "internal/gostd/gostd.h" // gostd::Context (lsproto dep decls)
 #include "internal/core/types.h"
 #include "internal/lsp/lsproto/lsproto.h"
 
@@ -221,6 +222,11 @@ struct InlayHintsPreferences {
 	Tristate IncludeInlayPropertyDeclarationTypeHints = Tristate::Unknown;               // raw:"includeInlayPropertyDeclarationTypeHints" config:"inlayHints.propertyDeclarationTypes.enabled"
 	Tristate IncludeInlayFunctionLikeReturnTypeHints = Tristate::Unknown;                // raw:"includeInlayFunctionLikeReturnTypeHints" config:"inlayHints.functionLikeReturnTypes.enabled"
 	Tristate IncludeInlayEnumMemberValueHints = Tristate::Unknown;                       // raw:"includeInlayEnumMemberValueHints" config:"inlayHints.enumMemberValues.enabled"
+
+	// operator== — Go's reflect.DeepEqual comparisons (project/session
+	// slices compare whole preference structs).
+	friend bool operator==(const InlayHintsPreferences&,
+	                       const InlayHintsPreferences&) = default;
 };
 
 // CodeLensUserPreferences — userpreferences.go:220
@@ -230,6 +236,10 @@ struct CodeLensUserPreferences {
 	Tristate ReferencesCodeLensShowOnAllFunctions = Tristate::Unknown;          // raw:"referencesCodeLensShowOnAllFunctions" config:"referencesCodeLens.showOnAllFunctions"
 	Tristate ImplementationsCodeLensShowOnInterfaceMethods = Tristate::Unknown; // raw:"implementationsCodeLensShowOnInterfaceMethods" config:"implementationsCodeLens.showOnInterfaceMethods"
 	Tristate ImplementationsCodeLensShowOnAllClassMethods = Tristate::Unknown;  // raw:"implementationsCodeLensShowOnAllClassMethods" config:"implementationsCodeLens.showOnAllClassMethods"
+
+	// operator== — Go's reflect.DeepEqual comparisons.
+	friend bool operator==(const CodeLensUserPreferences&,
+	                       const CodeLensUserPreferences&) = default;
 };
 
 // UserPreferences — userpreferences.go:47. Field tags preserved as comments;

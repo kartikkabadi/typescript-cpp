@@ -54,3 +54,68 @@ inline ContextPtr withContextValue(const ContextPtr& parent, const void* key, st
 }
 
 } // namespace tsc
+
+// === slice: project ===
+// core/context.go — request ID + checker lifetime context keys over
+// gostd::Context (the port's context.Context with cancel/deadline
+// propagation). Go keys are an unexported `key` enum; opaque inline
+// objects' addresses reproduce that here.
+#include "internal/gostd/gostd.h"
+
+namespace tsc::core {
+
+namespace detail {
+inline const char requestIDKey = 0;
+inline const char checkerLifetimeKey = 0;
+} // namespace detail
+
+// WithRequestID — core/context.go:13.
+inline gostd::Context WithRequestID(const gostd::Context& ctx,
+                                    const std::string& id) {
+    return gostd::contextWithValue(ctx, &detail::requestIDKey, id);
+}
+
+// GetRequestID — core/context.go:17. "" when unset or mistyped.
+inline std::string GetRequestID(const gostd::Context& ctx) {
+    if (const std::any* v = gostd::ctxValue(ctx, &detail::requestIDKey)) {
+        if (const std::string* s = std::any_cast<std::string>(v)) {
+            return *s;
+        }
+    }
+    return "";
+}
+
+// CheckerLifetime — core/context.go:23.
+enum class CheckerLifetime : int {
+    Temporary = 0,
+    Diagnostics,
+    API,
+};
+inline constexpr CheckerLifetime CheckerLifetimeTemporary =
+    CheckerLifetime::Temporary;
+inline constexpr CheckerLifetime CheckerLifetimeDiagnostics =
+    CheckerLifetime::Diagnostics;
+inline constexpr CheckerLifetime CheckerLifetimeAPI =
+    CheckerLifetime::API;
+
+// WithCheckerLifetime — core/context.go:31.
+inline gostd::Context WithCheckerLifetime(const gostd::Context& ctx,
+                                          CheckerLifetime lifetime) {
+    return gostd::contextWithValue(ctx, &detail::checkerLifetimeKey,
+                                   lifetime);
+}
+
+// GetCheckerLifetime — core/context.go:35. Temporary when unset.
+inline CheckerLifetime GetCheckerLifetime(const gostd::Context& ctx) {
+    if (const std::any* v =
+            gostd::ctxValue(ctx, &detail::checkerLifetimeKey)) {
+        if (const CheckerLifetime* l =
+                std::any_cast<CheckerLifetime>(v)) {
+            return *l;
+        }
+    }
+    return CheckerLifetimeTemporary;
+}
+
+} // namespace tsc::core
+// === end slice: project ===

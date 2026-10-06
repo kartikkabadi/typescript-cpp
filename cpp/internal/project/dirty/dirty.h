@@ -10,9 +10,12 @@
 
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
+
+#include "internal/collections/collections.h"
 
 namespace tsc::dirty {
 
@@ -25,6 +28,24 @@ inline V cloneValue(const V& v) {
 		return v.Clone();
 	}
 }
+
+// IValue — interfaces.go Value[T]: the read/mutate handle shared by
+// MapEntry, SyncMapEntry and lockedEntry. Named `Value` via alias below.
+template <typename V>
+struct IValue {
+	virtual ~IValue() = default;
+	virtual V Value() const = 0;
+	virtual V Original() const = 0;
+	virtual bool Dirty() const = 0;
+	virtual void Change(const std::function<void(V&)>& apply) = 0;
+	virtual bool ChangeIf(const std::function<bool(const V&)>& cond,
+	                      const std::function<void(V&)>& apply) = 0;
+	virtual void Delete() = 0;
+	virtual void Locked(const std::function<void(IValue*)>& fn) = 0;
+};
+
+template <typename V>
+using Value = IValue<V>;
 
 template <typename K, typename V>
 inline std::unordered_map<K, V> cloneValue(
@@ -56,13 +77,17 @@ template <typename K, typename V>
 struct Map;
 
 template <typename K, typename V>
-struct MapEntry : mapEntry<K, V>,
+struct MapEntry : mapEntry<K, V>, IValue<V>,
                   std::enable_shared_from_this<MapEntry<K, V>> {
 	Map<K, V>* m = nullptr;
 
+	V Value() const override { return mapEntry<K, V>::Value(); }
+	V Original() const override { return this->original; }
+	bool Dirty() const override { return this->dirty; }
+
 	// Change — clones the value on first change (copy-on-write), then runs
 	// `apply` on the mutable clone.
-	void Change(const std::function<void(V&)>& apply) {
+	void Change(const std::function<void(V&)>& apply) override {
 		if (this->delete_) {
 			throw std::logic_error("tried to change a deleted entry");
 		}
@@ -86,7 +111,7 @@ struct MapEntry : mapEntry<K, V>,
 	}
 
 	bool ChangeIf(const std::function<bool(const V&)>& cond,
-	              const std::function<void(V&)>& apply) {
+	              const std::function<void(V&)>& apply) override {
 		if (cond(this->Value())) {
 			Change(apply);
 			return true;
@@ -94,7 +119,7 @@ struct MapEntry : mapEntry<K, V>,
 		return false;
 	}
 
-	void Delete() {
+	void Delete() override {
 		if (!this->dirty) {
 			m->dirty[this->key] = this->shared_from_this();
 		}
@@ -102,7 +127,9 @@ struct MapEntry : mapEntry<K, V>,
 	}
 
 	// Locked — interfaces.go Value[T].Locked.
-	void Locked(const std::function<void(MapEntry*)>& fn) { fn(this); }
+	void Locked(const std::function<void(IValue<V>*)>& fn) override {
+		fn(this);
+	}
 };
 
 // Map — map.go. A base map with a dirty overlay; Get/Range hand out
@@ -293,7 +320,7 @@ inline MapBuilder<K, VBase, VBuilder>* newMapBuilder(
 
 // Box — box.go.
 template <typename T>
-struct Box {
+struct Box : IValue<T> {
 	T original{};
 	T value{};
 	bool dirty = false;
@@ -302,12 +329,12 @@ struct Box {
 	Box() = default;
 	explicit Box(T original) : original(original), value(original) {}
 
-	T Value() const {
+	T Value() const override {
 		if (delete_) return T{};
 		return value;
 	}
-	const T& Original() const { return original; }
-	bool Dirty() const { return dirty; }
+	T Original() const override { return original; }
+	bool Dirty() const override { return dirty; }
 
 	void Set(T v) {
 		value = std::move(v);
@@ -315,7 +342,7 @@ struct Box {
 		dirty = true;
 	}
 
-	void Change(const std::function<void(T&)>& apply) {
+	void Change(const std::function<void(T&)>& apply) override {
 		if (!dirty) {
 			value = cloneValue(value);
 			dirty = true;
@@ -324,7 +351,7 @@ struct Box {
 	}
 
 	bool ChangeIf(const std::function<bool(const T&)>& cond,
-	              const std::function<void(T&)>& apply) {
+	              const std::function<void(T&)>& apply) override {
 		if (cond(value)) {
 			Change(apply);
 			return true;
@@ -332,7 +359,12 @@ struct Box {
 		return false;
 	}
 
-	void Delete() { delete_ = true; }
+	void Delete() override { delete_ = true; }
+
+	// Locked — box.go (no mutex; just calls fn(b)).
+	void Locked(const std::function<void(IValue<T>*)>& fn) override {
+		fn(this);
+	}
 
 	std::pair<T, bool> Finalize() { return {Value(), dirty || delete_}; }
 };
@@ -366,5 +398,359 @@ inline std::unordered_map<K, V> cloneMapIfNil(T* dirtyObj, T* original,
 	}
 	return *dirtyMap;
 }
+
+// === slice: project ===
+// syncmap.go — mutex-guarded variant of Map. Entries are shared_ptr'd
+// (Go GC): the dirty collections.SyncMap owns dirty entries; clean base
+// entries are handed out as fresh shared_ptrs that register themselves in
+// dirty on first mutation. proxyFor forwarding preserves Go's race
+// resolution when two handles target the same key.
+
+template <typename K, typename V>
+struct SyncMap;
+
+template <typename K, typename V>
+struct SyncMapEntry : mapEntry<K, V>, IValue<V>,
+                      std::enable_shared_from_this<SyncMapEntry<K, V>> {
+	SyncMap<K, V>* m = nullptr;
+	mutable std::mutex mu;
+	// proxyFor is set when this entry loses a race to become the dirty entry
+	// for a value. Since two goroutines hold a reference to two entries that
+	// may try to mutate the same underlying value, all mutations are routed
+	// through the one that actually exists in the dirty map.
+	std::shared_ptr<SyncMapEntry> proxyFor;
+
+	V valueLocked() const {
+		if (this->delete_) {
+			return V{};
+		}
+		return this->value;
+	}
+
+	V Value() const override {
+		std::lock_guard<std::mutex> lk(mu);
+		if (proxyFor != nullptr) {
+			return proxyFor->Value();
+		}
+		return valueLocked();
+	}
+
+	V Original() const override { return this->original; }
+
+	bool Dirty() const override {
+		std::lock_guard<std::mutex> lk(mu);
+		if (proxyFor != nullptr) {
+			return proxyFor->Dirty();
+		}
+		return this->dirty;
+	}
+
+	void Locked(const std::function<void(IValue<V>*)>& fn) override;
+
+	void Change(const std::function<void(V&)>& apply) override {
+		std::lock_guard<std::mutex> lk(mu);
+		if (proxyFor != nullptr) {
+			proxyFor->Change(apply);
+			return;
+		}
+		changeLocked(apply);
+	}
+
+	void changeLocked(const std::function<void(V&)>& apply) {
+		if (this->dirty) {
+			apply(this->value);
+			return;
+		}
+		auto [entry, loaded] =
+			m->dirty.LoadOrStore(this->key, this->shared_from_this());
+		std::unique_lock<std::mutex> entryLock(entry->mu, std::defer_lock);
+		if (loaded) {
+			entryLock.lock();
+		}
+		if (!entry->dirty) {
+			entry->value = cloneValue(entry->value);
+			entry->dirty = true;
+		}
+		if (loaded) {
+			proxyFor = entry;
+			this->value = entry->value;
+			this->dirty = true;
+			this->delete_ = entry->delete_;
+		}
+		apply(entry->value);
+	}
+
+	bool ChangeIf(const std::function<bool(const V&)>& cond,
+	              const std::function<void(V&)>& apply) override {
+		std::lock_guard<std::mutex> lk(mu);
+		if (proxyFor != nullptr) {
+			return proxyFor->ChangeIf(cond, apply);
+		}
+		if (cond(this->value)) {
+			changeLocked(apply);
+			return true;
+		}
+		return false;
+	}
+
+	void Delete() override {
+		std::lock_guard<std::mutex> lk(mu);
+		if (proxyFor != nullptr) {
+			proxyFor->Delete();
+			return;
+		}
+		if (this->dirty) {
+			this->delete_ = true;
+			return;
+		}
+		auto [entry, loaded] =
+			m->dirty.LoadOrStore(this->key, this->shared_from_this());
+		if (loaded) {
+			std::lock_guard<std::mutex> el(entry->mu);
+			this->delete_ = true;
+		} else {
+			entry->delete_ = true;
+		}
+	}
+
+	void deleteLocked() {
+		if (this->dirty) {
+			this->delete_ = true;
+			return;
+		}
+		auto [entry, loaded] =
+			m->dirty.LoadOrStore(this->key, this->shared_from_this());
+		if (loaded) {
+			std::lock_guard<std::mutex> el(entry->mu);
+			proxyFor = entry;
+			this->value = entry->value;
+			this->delete_ = true;
+			this->dirty = entry->dirty;
+		}
+		entry->delete_ = true;
+	}
+
+	void DeleteIf(const std::function<bool(const V&)>& cond) {
+		std::lock_guard<std::mutex> lk(mu);
+		if (proxyFor != nullptr) {
+			proxyFor->DeleteIf(cond);
+			return;
+		}
+		if (cond(this->value)) {
+			deleteLocked();
+		}
+	}
+};
+
+// lockedEntry — the Value[V] handed to Locked callbacks while the entry's
+// mutex is held.
+template <typename K, typename V>
+struct lockedEntry : IValue<V> {
+	SyncMapEntry<K, V>* e;
+
+	explicit lockedEntry(SyncMapEntry<K, V>* e) : e(e) {}
+
+	V Value() const override { return e->valueLocked(); }
+	V Original() const override { return e->original; }
+	bool Dirty() const override { return e->dirty; }
+	void Change(const std::function<void(V&)>& apply) override {
+		e->changeLocked(apply);
+	}
+	bool ChangeIf(const std::function<bool(const V&)>& cond,
+	              const std::function<void(V&)>& apply) override {
+		if (cond(e->valueLocked())) {
+			e->changeLocked(apply);
+			return true;
+		}
+		return false;
+	}
+	void Delete() override { e->deleteLocked(); }
+	void Locked(const std::function<void(IValue<V>*)>& fn) override {
+		fn(this);
+	}
+};
+
+template <typename K, typename V>
+inline void SyncMapEntry<K, V>::Locked(
+	const std::function<void(IValue<V>*)>& fn) {
+	std::lock_guard<std::mutex> lk(mu);
+	if (proxyFor != nullptr) {
+		proxyFor->Locked(fn);
+		return;
+	}
+	lockedEntry<K, V> le{this};
+	fn(&le);
+}
+
+template <typename K, typename V>
+struct FinalizationHooks {
+	std::function<void(const K& key, V value)> OnDelete;
+	std::function<void(const K& key, V oldValue, V newValue)> OnChange;
+	std::function<void(const K& key, V value)> OnAdd;
+};
+
+// SyncMap — syncmap.go.
+template <typename K, typename V>
+struct SyncMap {
+	std::unordered_map<K, V> base;
+	collections::SyncMap<K, std::shared_ptr<SyncMapEntry<K, V>>> dirty;
+
+	std::pair<std::shared_ptr<SyncMapEntry<K, V>>, bool> Load(const K& key) {
+		if (auto [entry, ok] = dirty.Load(key); ok) {
+			std::lock_guard<std::mutex> lk(entry->mu);
+			if (entry->delete_) {
+				return {nullptr, false};
+			}
+			return {entry, true};
+		}
+		auto it = base.find(key);
+		if (it == base.end()) {
+			return {nullptr, false};
+		}
+		auto e = std::make_shared<SyncMapEntry<K, V>>();
+		e->m = this;
+		e->key = key;
+		e->original = it->second;
+		e->value = it->second;
+		return {e, true};
+	}
+
+	std::pair<std::shared_ptr<SyncMapEntry<K, V>>, bool>
+	LoadOrStore(const K& key, V value) {
+		// Check for existence in the base map first so the sync map access is
+		// atomic.
+		if (auto it = base.find(key); it != base.end()) {
+			V baseValue = it->second;
+			if (auto [d, ok] = dirty.Load(key); ok) {
+				std::lock_guard<std::mutex> lk(d->mu);
+				if (d->delete_) {
+					return {nullptr, false};
+				}
+				return {d, true};
+			}
+			auto e = std::make_shared<SyncMapEntry<K, V>>();
+			e->m = this;
+			e->key = key;
+			e->original = baseValue;
+			e->value = baseValue;
+			return {e, true};
+		}
+		auto newEntry = std::make_shared<SyncMapEntry<K, V>>();
+		newEntry->m = this;
+		newEntry->key = key;
+		newEntry->value = std::move(value);
+		newEntry->dirty = true;
+		auto [entry, loaded] = dirty.LoadOrStore(key, newEntry);
+		if (loaded) {
+			std::lock_guard<std::mutex> lk(entry->mu);
+			if (entry->delete_) {
+				return {nullptr, false};
+			}
+		}
+		return {entry, loaded};
+	}
+
+	void Delete(const K& key) {
+		auto newEntry = std::make_shared<SyncMapEntry<K, V>>();
+		newEntry->m = this;
+		newEntry->key = key;
+		auto it = base.find(key);
+		if (it != base.end()) {
+			newEntry->original = it->second;
+		}
+		newEntry->delete_ = true;
+		auto [entry, loaded] = dirty.LoadOrStore(key, newEntry);
+		if (loaded) {
+			entry->Delete();
+		}
+	}
+
+	void Range(
+		const std::function<
+			bool(const std::shared_ptr<SyncMapEntry<K, V>>&)>& fn) {
+		std::unordered_set<K> seenInDirty;
+		dirty.Range([&](const K& key,
+		                const std::shared_ptr<SyncMapEntry<K, V>>& entry) {
+			seenInDirty.insert(key);
+			entry->mu.lock();
+			bool deleted = entry->delete_;
+			entry->mu.unlock();
+			if (!deleted && !fn(entry)) {
+				return false;
+			}
+			return true;
+		});
+		for (auto& [key, value] : base) {
+			if (seenInDirty.count(key)) {
+				continue; // already processed in dirty entries
+			}
+			auto e = std::make_shared<SyncMapEntry<K, V>>();
+			e->m = this;
+			e->key = key;
+			e->original = value;
+			e->value = value;
+			if (!fn(e)) {
+				break;
+			}
+		}
+	}
+
+	std::pair<std::unordered_map<K, V>, bool> finalize(
+		const FinalizationHooks<K, V>& hooks) {
+		bool changed = false;
+		std::unordered_map<K, V> result = base;
+		auto ensureCloned = [&] {
+			if (!changed) {
+				result = base; // maps.Clone equivalent (value copy)
+				changed = true;
+			}
+		};
+
+		dirty.Range([&](const K& key,
+		                const std::shared_ptr<SyncMapEntry<K, V>>& entry) {
+			std::lock_guard<std::mutex> lk(entry->mu);
+			if (entry->delete_) {
+				ensureCloned();
+				if (hooks.OnDelete != nullptr) {
+					hooks.OnDelete(key, entry->value);
+				}
+				result.erase(key);
+			} else if (entry->dirty) {
+				ensureCloned();
+				if (hooks.OnChange != nullptr || hooks.OnAdd != nullptr) {
+					if (base.count(key)) {
+						if (hooks.OnChange != nullptr) {
+							hooks.OnChange(key, entry->original,
+							               entry->value);
+						}
+					} else if (hooks.OnAdd != nullptr) {
+						hooks.OnAdd(key, entry->value);
+					}
+				}
+				result[key] = entry->value;
+			}
+			return true;
+		});
+		return {std::move(result), changed};
+	}
+
+	std::pair<std::unordered_map<K, V>, bool> Finalize() {
+		return finalize(FinalizationHooks<K, V>{});
+	}
+
+	std::pair<std::unordered_map<K, V>, bool> FinalizeWith(
+		const FinalizationHooks<K, V>& hooks) {
+		return finalize(hooks);
+	}
+};
+
+// NewSyncMap — syncmap.go.
+template <typename K, typename V>
+inline SyncMap<K, V>* newSyncMap(std::unordered_map<K, V> base) {
+	auto* m = new SyncMap<K, V>();
+	m->base = std::move(base);
+	return m;
+}
+// === end slice: project ===
 
 } // namespace tsc::dirty

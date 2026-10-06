@@ -2251,6 +2251,15 @@ SimpleProgram* NewProgram(const ProgramOptions& opts) {
 	                            opts.Config, opts.SkipModuleResolution,
 	                            opts.Tracing);
 	p->opts_ = opts;
+	// === slice: project ===
+	// program.go:436 initCheckerPool — the pool is created by
+	// opts.CreateCheckerPool when non-nil; when nil Go builds its own
+	// checkerPool, whose machinery is unported (the lazy single
+	// checker covers that role here).
+	if (opts.CreateCheckerPool != nullptr) {
+		p->checkerPool_ = opts.CreateCheckerPool(p);
+	}
+	// === end slice: project ===
 	if (tracePop) {
 		tracePop();
 	}
@@ -2336,6 +2345,59 @@ std::tuple<SimpleProgram*, SourceFile*, bool> SimpleProgram::ReuseProgram(
         createModuleResolver) {
 	TSC_UNREACHABLE("SimpleProgram::ReuseProgram — owned by compiler");
 }
+
+// === slice: project ===
+
+// program.go:305 UpdateProgram — ReuseProgram fast path, else a fresh
+// program built from opts with the host/factories swapped.
+std::tuple<SimpleProgram*, SourceFile*, bool> SimpleProgram::UpdateProgram(
+    const tspath::Path& changedFilePath, CompilerHost* newHost,
+    const std::function<void*(SimpleProgram*)>& createCheckerPool,
+    const std::function<module::Resolver*(const module::ResolverOptions&)>&
+        createModuleResolver) {
+	auto reuseResult = ReuseProgram(changedFilePath, newHost,
+	                                createCheckerPool,
+	                                createModuleResolver);
+	if (std::get<2>(reuseResult)) {
+		return reuseResult;
+	}
+	SourceFile* newFile = std::get<1>(reuseResult);
+	ProgramOptions newOpts = opts_;
+	newOpts.Host = newHost;
+	if (createCheckerPool != nullptr) {
+		newOpts.CreateCheckerPool = createCheckerPool;
+	}
+	if (createModuleResolver != nullptr) {
+		newOpts.CreateModuleResolver = createModuleResolver;
+	}
+	return {NewProgram(newOpts), newFile, false};
+}
+
+// program.go:2095 HasSameFileNames — maps.EqualFunc over filesByPath
+// (SourceFile FileName equality, casing-insensitive systems read the
+// real name back) plus redirectFilesByPath equality.
+bool SimpleProgram::HasSameFileNames(SimpleProgram* other) {
+	if (filesByPath.size() != other->filesByPath.size() ||
+	    redirectFilesByPath.size() != other->redirectFilesByPath.size()) {
+		return false;
+	}
+	for (const auto& [path, a] : filesByPath) {
+		auto it = other->filesByPath.find(path);
+		if (it == other->filesByPath.end() ||
+		    a->FileName() != it->second->FileName()) {
+			return false;
+		}
+	}
+	for (const auto& [path, a] : redirectFilesByPath) {
+		auto it = other->redirectFilesByPath.find(path);
+		if (it == other->redirectFilesByPath.end() ||
+		    a.fileName != it->second.fileName) {
+			return false;
+		}
+	}
+	return true;
+}
+// === end slice: project ===
 
 // program.go:1690 LineCount.
 int SimpleProgram::LineCount() const {

@@ -51,6 +51,15 @@ public:
 // Default is the default Locale; it is equivalent to an unset locale.
 inline const Locale Default = Locale();
 
+namespace detail {
+// contextKey(0) — package-private context key identity (shared by the
+// ContextPtr and gostd::Context overloads).
+inline const void* localeContextKey() {
+	static const char k = 0;
+	return &k;
+}
+} // namespace detail
+
 // WithLocale returns a Context with `locale` attached.
 ContextPtr withLocale(const ContextPtr& ctx, Locale locale);
 

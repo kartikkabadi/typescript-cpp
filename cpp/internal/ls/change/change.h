@@ -15,6 +15,7 @@
 #include "internal/collections/collections.h"
 #include "internal/core/text.h"
 #include "internal/format/format.h"
+#include "internal/ls/lsconv/lsconv.h"
 #include "internal/ls/lsutil/lsutil.h"
 #include "internal/spanmap/spanmap.h"
 
