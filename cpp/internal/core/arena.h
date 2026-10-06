@@ -11,6 +11,9 @@
 #pragma once
 
 #include <algorithm>
+#include <atomic>
+#include <cstdio>
+#include <cstdlib>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -45,20 +48,35 @@ public:
 	Arena& operator=(const Arena&) = delete;
 	Arena(Arena&& o) noexcept
 	    : blockSize_(o.blockSize_), capacity_(o.capacity_),
-	      offset_(o.offset_), cur_(o.cur_), blocks_(std::move(o.blocks_)) {
+	      offset_(o.offset_), cur_(o.cur_), blocks_(std::move(o.blocks_)),
+	      tracked_(o.tracked_), trackedAllocs_(o.trackedAllocs_),
+	      trackedBytesAllocd_(o.trackedBytesAllocd_),
+	      trackedBytesLive_(o.trackedBytesLive_) {
 		o.capacity_ = o.offset_ = 0;
 		o.cur_ = nullptr;
+		o.trackedAllocs_ = nullptr;
+		o.trackedBytesAllocd_ = o.trackedBytesLive_ = 0;
 	}
 	Arena& operator=(Arena&& o) noexcept {
-		blockSize_ = o.blockSize_;
-		capacity_ = o.capacity_;
-		offset_ = o.offset_;
-		cur_ = o.cur_;
-		blocks_ = std::move(o.blocks_);
-		o.capacity_ = o.offset_ = 0;
-		o.cur_ = nullptr;
+		if (this != &o) {
+			clear();
+			blockSize_ = o.blockSize_;
+			capacity_ = o.capacity_;
+			offset_ = o.offset_;
+			cur_ = o.cur_;
+			blocks_ = std::move(o.blocks_);
+			tracked_ = o.tracked_;
+			trackedAllocs_ = o.trackedAllocs_;
+			trackedBytesAllocd_ = o.trackedBytesAllocd_;
+			trackedBytesLive_ = o.trackedBytesLive_;
+			o.capacity_ = o.offset_ = 0;
+			o.cur_ = nullptr;
+			o.trackedAllocs_ = nullptr;
+			o.trackedBytesAllocd_ = o.trackedBytesLive_ = 0;
+		}
 		return *this;
 	}
+	~Arena() { clear(); }
 
 	// Tracked mode: every allocation is individually registered so marking
 	// can distinguish live objects from dead ones (Go ReleaseArenas analog).
@@ -118,6 +136,14 @@ public:
 				trackedAllocs_ = next;
 			}
 			markIndex_.clear();
+			// The arena dies with its objects: pull its contributions out
+			// of the global GC accounting so the pacing numbers stay honest.
+			trackedBytesAllocdGlobal_.fetch_sub(trackedBytesAllocd_,
+			                                    std::memory_order_relaxed);
+			trackedBytesLiveGlobal_.fetch_sub(trackedBytesLive_,
+			                                  std::memory_order_relaxed);
+			trackedBytesAllocd_ = 0;
+			trackedBytesLive_ = 0;
 		}
 	}
 
@@ -198,11 +224,13 @@ public:
 	// next pass. Returns the number of freed allocations.
 	size_t sweep() {
 		size_t freed = 0;
+		size_t live = 0;
 		TrackedAlloc** pp = &trackedAllocs_;
 		while (*pp != nullptr) {
 			TrackedAlloc* h = *pp;
 			if (h->marked) {
 				h->marked = false;
+				live += sizeof(TrackedAlloc) + h->size;
 				pp = &h->next;
 				continue;
 			}
@@ -211,10 +239,55 @@ public:
 			++freed;
 		}
 		markIndex_.clear();
+		// Fold this arena's accounting into the process-wide GC counters:
+		// the bytes it reported as "allocated since last sweep" are now
+		// resolved (freed or promoted to live), and its live set changes by
+		// the delta of the previous and current surviving totals.
+		trackedBytesAllocdGlobal_.fetch_sub(trackedBytesAllocd_,
+		                                    std::memory_order_relaxed);
+		if (live >= trackedBytesLive_) {
+			trackedBytesLiveGlobal_.fetch_add(
+			    live - trackedBytesLive_, std::memory_order_relaxed);
+		} else {
+			trackedBytesLiveGlobal_.fetch_sub(
+			    trackedBytesLive_ - live, std::memory_order_relaxed);
+		}
+		trackedBytesLive_ = live;
+		trackedBytesAllocd_ = 0;
 		return freed;
 	}
 
+	// Amortization gate for tracked arenas: a mark+sweep costs O(live heap),
+	// so we only run one once the garbage since the last sweep crosses a
+	// threshold — mirroring Go's GC pacing (GOGC≈25: collect once the heap
+	// grows ~25% over the live set), which is what makes Go's ReleaseArenas
+	// O(1). Go's trigger is global — it watches total heap, not per-arena
+	// garbage — so the accounting here is process-wide across all tracked
+	// arenas; each arena is still swept only by its own owner's release call
+	// (the same thread that allocates on it), matching the GC-assist model.
+	// RSS bound: unswept tracked bytes stay < max(floor, live/4, cap).
+	static bool globalShouldSweep(size_t floorBytes, size_t capBytes) {
+		size_t allocd = trackedBytesAllocdGlobal_.load(
+		    std::memory_order_relaxed);
+		size_t live = trackedBytesLiveGlobal_.load(
+		    std::memory_order_relaxed);
+		size_t threshold = live / 4;
+		if (threshold < floorBytes)
+			threshold = floorBytes;
+		if (threshold > capBytes)
+			threshold = capBytes;
+		if (debugGc_) {
+			fprintf(stderr, "[gc] allocd=%zu live=%zu threshold=%zu\n",
+			        allocd, live, threshold);
+		}
+		return allocd >= threshold;
+	}
+
 private:
+	static inline std::atomic<size_t> trackedBytesAllocdGlobal_{0};
+	static inline std::atomic<size_t> trackedBytesLiveGlobal_{0};
+	static inline bool debugGc_ = getenv("TSCPP_GC_DEBUG") != nullptr;
+
 	struct alignas(std::max_align_t) TrackedAlloc {
 		TrackedAlloc* next;
 		TraceFn trace;
@@ -236,6 +309,16 @@ private:
 		}
 	};
 
+	TrackedAlloc* newTrackedAlloc(size_t size) {
+		auto* hdr = static_cast<TrackedAlloc*>(
+		    ::operator new(sizeof(TrackedAlloc) + size));
+		size_t bytes = sizeof(TrackedAlloc) + size;
+		trackedBytesAllocd_ += bytes;
+		trackedBytesAllocdGlobal_.fetch_add(bytes,
+		                                    std::memory_order_relaxed);
+		return hdr;
+	}
+
 	template <class T, class... Args>
 	T* allocImpl(TraceFn tracer, Args&&... args) {
 		static_assert(std::is_trivially_destructible_v<T> || true,
@@ -243,8 +326,7 @@ private:
 		if (tracked_) {
 			static_assert(alignof(T) <= alignof(std::max_align_t),
 			              "tracked arena supports max_align_t alignment only");
-			auto* hdr = static_cast<TrackedAlloc*>(
-			    ::operator new(sizeof(TrackedAlloc) + sizeof(T)));
+			auto* hdr = newTrackedAlloc(sizeof(T));
 			hdr->trace = tracer;
 			hdr->dtor = +[](void* p) { static_cast<T*>(p)->~T(); };
 			hdr->size = sizeof(T);
@@ -260,8 +342,7 @@ private:
 	}
 
 	void* trackedRaw(size_t size, DtorFn dtor) {
-		auto* hdr = static_cast<TrackedAlloc*>(
-		    ::operator new(sizeof(TrackedAlloc) + size));
+		auto* hdr = newTrackedAlloc(size);
 		hdr->trace = nullptr;
 		hdr->dtor = dtor;
 		hdr->size = static_cast<uint32_t>(size);
@@ -292,6 +373,8 @@ private:
 	std::vector<std::unique_ptr<char[]>> blocks_;
 	bool tracked_ = false;
 	TrackedAlloc* trackedAllocs_ = nullptr;
+	size_t trackedBytesAllocd_ = 0;
+	size_t trackedBytesLive_ = 0;
 	std::vector<std::pair<const char*, TrackedAlloc*>> markIndex_;
 	std::vector<TrackedAlloc*> markWorklist_;
 };
