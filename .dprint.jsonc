@@ -59,7 +59,9 @@
         "packages/typescript/tsconfig.tsbuildinfo",
         "packages/vscode-typescript/dist/**",
         "packages/vscode-typescript-nightly/dist/**",
-        "packages/typescript/vendor/**"
+        "packages/typescript/vendor/**",
+        // Generated benchmark output (cpp/tools/perf writes these).
+        "cpp/tools/perf/results/**"
     ],
     // Note: if adding new languages, make sure settings.template.json is updated too.
     "plugins": [
