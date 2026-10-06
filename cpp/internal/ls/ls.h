@@ -308,7 +308,7 @@ struct memberCompletionEntry {
 	std::string insertText;
 	std::string filterText;
 	bool isSnippet = false;
-	std::vector<lsproto::TextEdit*> additionalTextEdits;
+	std::vector<std::shared_ptr<lsproto::TextEdit>> additionalTextEdits;
 };
 
 // completions.go:2585 objectLiteralMethodSymbol.
@@ -618,7 +618,7 @@ public:
 	    int position, bool isMemberCompletion, bool isSnippet, bool hasAction,
 	    bool preselect, const std::string& source,
 	    lsproto::AutoImportFix* autoImportFix,
-	    std::vector<lsproto::TextEdit*>* additionalTextEdits,
+	    std::vector<std::shared_ptr<lsproto::TextEdit>>* additionalTextEdits,
 	    std::string* detail);
 	// completions.go:5119 getLabelCompletionsAtPosition.
 	CompletionList* getLabelCompletionsAtPosition(
@@ -814,9 +814,9 @@ public:
 	CompletionList* getJSDocSnippetCompletion(const ContextPtr& ctx,
 	                                          SourceFile* file, int position);
 	// jsdoc_snippet.go:87 getJSDocSnippetCompletionRange.
-	lsproto::TextEditOrInsertReplaceEdit* getJSDocSnippetCompletionRange(
-	    const ContextPtr& ctx, SourceFile* file, int position,
-	    const std::string& newText);
+	std::shared_ptr<lsproto::TextEditOrInsertReplaceEdit>
+	getJSDocSnippetCompletionRange(const ContextPtr& ctx, SourceFile* file,
+	                               int position, const std::string& newText);
 
 	// --- utilities.go ---
 
@@ -1253,10 +1253,10 @@ inline displayPartsWriter* newDisplayPartsWriter(bool vsCapability) {
 std::vector<CompletionItem*> cloneItems(
     const std::vector<lsproto::CompletionItem*>& items);
 // completions.go:139 supplementalFileIndex.
-int32_t* supplementalFileIndex(SourceFile* file);
+std::optional<int32_t> supplementalFileIndex(SourceFile* file);
 // completions.go:152 sourceFileForSupplementalFileIndex.
-SourceFile* sourceFileForSupplementalFileIndex(SourceFile* file,
-                                             int32_t* index);
+SourceFile* sourceFileForSupplementalFileIndex(
+    SourceFile* file, const std::optional<int32_t>& index);
 // completions.go:384 toLSP — CompletionList method.
 // (declared on CompletionList below via member decl)
 // completions.go:182 getRelevantTokens... (see below)

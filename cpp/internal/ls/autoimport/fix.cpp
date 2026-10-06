@@ -46,7 +46,9 @@ std::string upperFirstChar(const std::string& name) {
 // content-mapped file and any edit could not be placed within a single
 // verbatim span, meaning it cannot be safely applied to the original text and
 // the caller should discard it.
-std::tuple<std::vector<lsp::lsproto::TextEdit*>, std::string, bool> Fix::Edits(
+std::tuple<lsp::lsproto::Slice<std::shared_ptr<lsp::lsproto::TextEdit>>,
+           std::string, bool>
+Fix::Edits(
     gostd::Context ctx, SourceFile* file, const CompilerOptions* compilerOptions,
     const lsutil::FormatCodeSettings& formatOptions,
     lsconv::Converters* converters,
@@ -186,17 +188,19 @@ std::tuple<std::vector<lsp::lsproto::TextEdit*>, std::string, bool> Fix::Edits(
 // content-mapped file that cannot be faithfully mapped back to the original
 // text, so an empty result with safe == false means the fix could not be
 // represented and must be discarded.
-std::pair<std::vector<lsp::lsproto::TextEdit*>, bool> fileEdits(
-    change::Tracker* tracker, SourceFile* file) {
+std::pair<lsp::lsproto::Slice<std::shared_ptr<lsp::lsproto::TextEdit>>, bool>
+fileEdits(change::Tracker* tracker, SourceFile* file) {
 	auto [changes, unmappable] = tracker->GetChanges();
 	auto it = changes.find(file->OriginalFileName());
-	std::vector<lsp::lsproto::TextEdit*> edits;
+	lsp::lsproto::Slice<std::shared_ptr<lsp::lsproto::TextEdit>> edits;
 	if (it != changes.end()) {
 		// Go shares heap []*lsproto.TextEdit (GC lifetime); materialize the
 		// same ownership here — the tracker is discarded after GetChanges.
-		edits.reserve(it->second.size());
+		edits.emplace();
+		edits->reserve(it->second.size());
 		for (auto& e : it->second) {
-			edits.push_back(new lsp::lsproto::TextEdit(std::move(e)));
+			edits->push_back(
+			    std::make_shared<lsp::lsproto::TextEdit>(std::move(e)));
 		}
 	}
 	return {edits, unmappable.empty()};
