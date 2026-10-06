@@ -19,6 +19,7 @@
 #include "internal/ls/autoimport/autoimport.h"
 #include "internal/ls/lsconv/lsconv.h"
 #include "internal/ls/lsutil/lsutil.h"
+#include "internal/ls/ls.h"
 #include "internal/project/ata/ata.h"
 #include "internal/project/client.h"
 #include "internal/project/configfileregistry.h"
@@ -446,6 +447,57 @@ struct Snapshot {
 
 	// dispose — snapshot.go:787.
 	void dispose();
+};
+
+// SnapshotLSHost — Go's project.Snapshot satisfies ls.Host structurally;
+// C++ needs an explicit adapter for the interface boundary. Raw,
+// leak-tolerant like the rest of the snapshot graph.
+struct SnapshotLSHost : ls::Host {
+	Snapshot* snapshot = nullptr;
+	explicit SnapshotLSHost(Snapshot* s) : snapshot(s) {}
+
+	bool UseCaseSensitiveFileNames() override {
+		return snapshot->UseCaseSensitiveFileNames();
+	}
+	std::pair<std::string, bool> ReadFile(
+	    const std::string& fileName) override {
+		return snapshot->ReadFile(fileName);
+	}
+	lsconv::Converters* Converters() override {
+		return snapshot->Converters();
+	}
+	ls::lsutil::UserPreferences GetPreferences(
+	    const std::string& activeFile) override {
+		return snapshot->GetPreferences(activeFile);
+	}
+	sourcemap::ECMALineInfo* GetECMALineInfo(
+	    const std::string& fileName) override {
+		return snapshot->GetECMALineInfo(fileName);
+	}
+	ls::autoimport::Registry* AutoImportRegistry() override {
+		return snapshot->AutoImportRegistry();
+	}
+	std::vector<std::string> ReadDirectory(
+	    const std::string& currentDir, const std::string& path,
+	    const std::vector<std::string>& extensions,
+	    const std::vector<std::string>* excludes,
+	    const std::vector<std::string>& includes, int depth) override {
+		static const std::vector<std::string> empty;
+		return snapshot->ReadDirectory(
+		    currentDir, path, extensions,
+		    excludes != nullptr ? *excludes : empty,
+		    includes, depth);
+	}
+	std::vector<std::string> GetDirectories(
+	    const std::string& path) override {
+		return snapshot->GetDirectories(path);
+	}
+	bool DirectoryExists(const std::string& path) override {
+		return snapshot->DirectoryExists(path);
+	}
+	bool FileExists(const std::string& path) override {
+		return snapshot->FileExists(path);
+	}
 };
 
 // overlayFileHandles — snapshot.go:192.

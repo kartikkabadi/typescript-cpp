@@ -215,7 +215,7 @@ NewLSPClient(gostd::testing::T* t, lsp::ServerOptions serverOpts,
 	serverOpts.In = transport.serverIn;
 	serverOpts.Out = transport.serverOut;
 
-	auto server = lsp::NewServer(&serverOpts);
+	auto server = lsp::NewServer(serverOpts);
 
 	auto ctxPair = gostd::contextWithCancel(t->Context());
 	auto cancel = ctxPair.second;

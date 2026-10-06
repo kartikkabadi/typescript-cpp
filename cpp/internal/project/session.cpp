@@ -25,15 +25,6 @@
 #include <sys/sysinfo.h>
 #endif
 
-// NewLanguageService — dep-stub — owned by ls.
-namespace tsc::ls {
-LanguageService* NewLanguageService(
-    ls::autoimport::ProjectID* projectID, compiler::SimpleProgram* program,
-    project::Snapshot* host, const std::string& activeFile) {
-	TSC_UNREACHABLE("NewLanguageService — owned by ls");
-}
-} // namespace tsc::ls
-
 namespace tsc::project {
 
 namespace {
@@ -1088,7 +1079,8 @@ Session::getSnapshotAndDefaultProject(
 	}
 	return {snapshot, project,
 	        ls::NewLanguageService(internProjectID(project->ID()),
-	                               project->GetProgram(), snapshot,
+	                               project->GetProgram(),
+	                               new SnapshotLSHost(snapshot),
 	                               lsp::lsproto::
 	                                   documentUriFileName(uri)),
 	        gostd::Error{}};
@@ -1166,8 +1158,8 @@ Session::GetLanguageServicesForDocumentsLoadingProjectTree(
 		}
 
 		services.push_back(ls::NewLanguageService(
-		    internProjectID(project->ID()), program, snapshot,
-		    activeFile));
+		    internProjectID(project->ID()), program,
+		    new SnapshotLSHost(snapshot), activeFile));
 	}
 	return services;
 }
@@ -1191,7 +1183,8 @@ ls::LanguageService* Session::GetLanguageServiceForProjectWithFile(
 	}
 	return ls::NewLanguageService(
 	    internProjectID(project->ID()), project->GetProgram(),
-	    snapshot, lsp::lsproto::documentUriFileName(uri));
+	    new SnapshotLSHost(snapshot),
+	    lsp::lsproto::documentUriFileName(uri));
 }
 
 // WithSnapshotLoadingProjectTree — session.go:1172.
@@ -1243,7 +1236,7 @@ Session::GetCurrentLanguageServiceWithAutoImports(
 	}
 	return {ls::NewLanguageService(
 	            internProjectID(project->ID()),
-	            project->GetProgram(), snapshot,
+	            project->GetProgram(), new SnapshotLSHost(snapshot),
 	            lsp::lsproto::documentUriFileName(uri)),
 	        gostd::Error{}};
 }
@@ -1300,7 +1293,7 @@ Session::GetLanguageServiceWithAutoImports(
 
 	return {ls::NewLanguageService(
 	            internProjectID(project->ID()),
-	            project->GetProgram(), newSnapshot,
+	            project->GetProgram(), new SnapshotLSHost(newSnapshot),
 	            lsp::lsproto::documentUriFileName(uri)),
 	        gostd::Error{}};
 }

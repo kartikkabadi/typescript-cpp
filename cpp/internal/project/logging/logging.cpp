@@ -218,7 +218,18 @@ struct logCollectorImpl final : LogCollector {
 		};
 	}
 
-	void Log(std::string_view msg) override { inner.Log(msg); }
+	using Logger::Error;
+	using Logger::Errorf;
+	using Logger::Warn;
+	using Logger::Warnf;
+	using Logger::Info;
+	using Logger::Infof;
+	using Logger::Log;
+	using Logger::Logf;
+
+	void Log(const std::vector<gostd::fmtArg>& msg) override {
+		inner.Log(msg);
+	}
 	void Logf(std::string_view format,
 	          const std::vector<gostd::fmtArg>& args) override {
 		inner.Logf(format, args);

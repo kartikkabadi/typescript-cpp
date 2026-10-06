@@ -35,13 +35,6 @@ LSPLineMap* ComputeLSPLineStarts(const std::string& text);
 // FileNameToDocumentURI (converters.go:332).
 lsproto::DocumentUri FileNameToDocumentURI(const std::string& fileName);
 
-// FileNameToDocumentURI — converters.go:332 (exported spelling used by the
-// project slice). dep-stub — owned by ls/lsconv.
-inline tsc::lsp::lsproto::DocumentUri FileNameToDocumentURI(
-    std::string_view fileName) {
-	TSC_UNREACHABLE("FileNameToDocumentURI — owned by ls/lsconv");
-}
-
 // DiagnosticToLSPPull (converters.go:459) — dep-stub: the full port lands
 // with the lsconv slice (needs the unported localize machinery).
 class Converters;
@@ -51,11 +44,6 @@ lsproto::Diagnostic* DiagnosticToLSPPull(
 
 // LSPLineMap — linemap.go:14. dep-stub — owned by ls/lsconv.
 struct LSPLineMap;
-
-// ComputeLSPLineStarts — linemap.go:19. dep-stub — owned by ls/lsconv.
-inline LSPLineMap* ComputeLSPLineStarts(std::string_view text) {
-	TSC_UNREACHABLE("ComputeLSPLineStarts — owned by ls/lsconv");
-}
 
 // DiagnosticToLSPPush — owned by ls/lsconv. dep-stub.
 class Converters;
