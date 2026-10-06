@@ -4711,6 +4711,11 @@ bool Node::forEachChild(F&& v) const {
 			auto* n = static_cast<const JSDocTypeExpression*>(this);
 			return visitChild(v, n->Type);
 		}
+		case Kind::JSDocTypeLiteral:
+		{
+			auto* n = static_cast<const JSDocTypeLiteral*>(this);
+			return visitChildList(v, n->JSDocPropertyTags);
+		}
 		case Kind::JSDocTypeTag:
 		{
 			auto* n = static_cast<const JSDocTypeTag*>(this);
@@ -5054,6 +5059,11 @@ bool Node::forEachChild(F&& v) const {
 			auto* n = static_cast<const SwitchStatement*>(this);
 			return visitChild(v, n->Expression) ||
 				visitChild(v, n->CaseBlock);
+		}
+		case Kind::SyntaxList:
+		{
+			auto* n = static_cast<const SyntaxList*>(this);
+			return visitChildList(v, n->Children);
 		}
 		case Kind::SyntheticExpression:
 		{

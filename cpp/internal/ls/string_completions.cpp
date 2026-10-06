@@ -1995,7 +1995,7 @@ LanguageService::getModulesForPathsPattern(
 	std::string normalizedSuffix = tspath::normalizePath(suffix);
 
 	std::string declarationExtension;
-	std::vector<std::string_view> inputExtensions;
+	std::vector<std::string> inputExtensions;
 	if (!normalizedSuffix.empty()) {
 		declarationExtension =
 		    tspath::getDeclarationEmitExtensionForPath(

@@ -64,9 +64,18 @@ inline Option ignorePaths(std::initializer_list<std::string> paths) {
 }
 
 // domPathsIgnored reports whether a struct member name is ignored by opts at
-// this level (".Name" top-level; nested paths unsupported by fourslash uses).
+// this level. Ignore paths name Go struct fields (".Kind"); the marshaled DOM
+// keys are the JSON wire names ("kind"), so both cases are tried.
 inline bool pathIgnored(const Option& opts, std::string_view fieldName) {
-	return opts.count("." + std::string(fieldName)) != 0;
+	std::string key = "." + std::string(fieldName);
+	if (opts.count(key) != 0) {
+		return true;
+	}
+	if (key.size() > 1) {
+		key[1] = static_cast<char>(
+		    std::toupper(static_cast<unsigned char>(key[1])));
+	}
+	return opts.count(key) != 0;
 }
 
 // domEqual — deep equality of two JSON DOM trees honoring ignored

@@ -736,8 +736,8 @@ Node* missingMemberFixer::importTypeNode(
 	}
 
 	auto [importedTypeNode, symbols] =
-	    autoimport::TryGetAutoImportableReferenceFromTypeNode(typeNode,
-	                                                        idToSymbol);
+	    autoimport::TryGetAutoImportableReferenceFromTypeNode(
+	        typeNode, idToSymbol, changeTracker->nodeFactory);
 	if (importedTypeNode != nullptr) {
 		for (auto* symbol : symbols) {
 			auto* exportSymbol = getExportedSymbol(symbol);

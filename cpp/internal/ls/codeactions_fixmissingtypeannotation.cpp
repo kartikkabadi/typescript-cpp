@@ -1726,8 +1726,8 @@ Node* isolatedDeclarationsFixer::typeToMinimizedReferenceType(
 	// Convert import type references (e.g. import("./path").Name) to simple
 	// type references and collect symbols that need to be imported
 	auto [referenceTypeNode, importableSymbols] =
-	    autoimport::TryGetAutoImportableReferenceFromTypeNode(typeNode,
-	                                                        &idToSymbol);
+	    autoimport::TryGetAutoImportableReferenceFromTypeNode(
+	        typeNode, &idToSymbol, changeTracker->nodeFactory);
 	if (referenceTypeNode != nullptr) {
 		typeNode = referenceTypeNode;
 		symbolsToImport.insert(symbolsToImport.end(),

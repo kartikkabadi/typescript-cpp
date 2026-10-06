@@ -5036,7 +5036,8 @@ struct NodeBuilderImpl {
 	NodeVisitor* cloneBindingNameVisitor = nullptr;
 
 	// symbols for synthesized identifiers, needed for e.g. inlay hints
-	std::unordered_map<Node*, Symbol*> idToSymbol;
+	// (Go map reference: shared with the caller's map when passed non-null).
+	std::unordered_map<Node*, Symbol*>* idToSymbol = nullptr;
 
 	// Builder-lifetime heap objects (contexts, trackers, boundaries, cache
 	// entries, symbol args) — in Go these die with the builder; here

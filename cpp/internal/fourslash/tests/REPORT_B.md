@@ -405,3 +405,77 @@ the fourslash recover harness reports it as SKIP. Affects every
   `t.Run` subtests.
 - `TestOrganizeImports_removeUnusedUsesLanguageServiceFormatOptions` —
   uses `ParseUserPreferences` on `map[string]any`.
+## Divergences fixed (batch-B follow-up)
+
+25 of the baseline/field-diff failures above are now fixed; suite result
+**597/718 pass** (baseline was 554/718 at branch point — cross-cutting
+fixes also recovered ~18 tests sharing the same helpers). Root causes:
+
+### §5b/§9 tsx ×4 + jsx ×6 — `pathIgnored` field-name casing
+`fourslash_deps.h::pathIgnored` looked up ignored paths as `.fieldName`
+(lowercase) only, while baseline JSON keys for completion-item fields use
+the capitalized `.FieldName` form, so `filterText`/`data.fileName` diffs
+were never filtered. Now tries `.fieldName` then `.FieldName`.
+Fixes: `TestTsxCompletion7/12/13`, `TestTsxCompletionNonTagLessThan`,
+and the 6 jsx `Completion item mismatch` diffs.
+
+### §6b codefix ×5 — two root causes
+- **SpellingJs3/8** (js-diagnostics gate): `checker.cpp::addErrorOrSuggestion`
+  appended the original error diagnostic verbatim instead of cloning it
+  into `suggestionDiagnostics` with `CategorySuggestion` (Go
+  checker.go:14258), and `program.cpp` ran the plainJS error filter
+  *after* the jsdoc-append/diagnostic merge instead of early-returning
+  the filtered list (Go program.go:1518-1523). Stray
+  `Property 'none' may not exist` / `Unused '@ts-expect-error'`
+  diagnostics are gone.
+- **MissingTypeAnnotationOnExports30/31/56** (arena lifetime +
+  idToSymbol): `TypeToTypeNodeEx` shares `idToSymbol` with the caller by
+  reference in Go; C++ copied the map by value so it looked empty, and
+  `TryGetAutoImportableReferenceFromTypeNode` rebuilt the type node with
+  a stack `NodeFactory` whose arena died on return — the escaped
+  `TypeReferenceNode` dangled into garbage (`kind==Unknown`) and the
+  printer panicked in `typeToStringForDiag`. `autoimport.h` signatures
+  now take a `NodeFactory*`; callers pass `&c->factory` /
+  `changeTracker->nodeFactory`. NOTE (shared-helper edit):
+  `codeactions_missingmemberfixer.cpp` needed the same extra argument at
+  its `TryGetAutoImportableReferenceFromTypeNode` call site.
+
+### §4 quickinfodp ×6 — `%x` formatting + idToSymbol
+`SymbolDisplayPart.Id` prints node ids as hex via `%X`; `gostd::fmtArg`
+only knew strings, so int ids byte-hexed as garbage. `fmtArg` now carries
+`num`/`isInt` and `%x`/`%X` format ints in hex (string handling
+unchanged). Together with the `idToSymbol` reference-semantics fix
+(`checker.h` + `checker_nodebuilder.cpp`, 6 sites), all 6 vSQuickInfo
+baselines match including `canIncreaseVerbosity`.
+
+### §4 smartSelection ×2 — `forEachChild` missing `SyntaxList` case
+`gencpp.py` parsed `visit(v, node.X)`/`visitNodeList`/`visitModifiers`
+in Go `ForEachChild` bodies but not `visitNodes` over `[]*Node` fields —
+so `SyntaxList::Children` and `JSDocTypeLiteral::JSDocPropertyTags`
+emitted no switch case and `forEachChild` fell through to `default:` →
+`false`. The synthesized SyntaxList levels selectionranges builds for
+mapped-type children were therefore invisible, dropping the long
+`IsExactlyAny<...>` conditional line. Fixed gencpp (regex +
+`visitNodes`→`visitChildList` + `deepCloneNodeVec` emit), added a
+`visitChildList` overload for `std::vector<Node*>` in `ast.h`, and
+hand-inserted the two generated-format cases into `nodes_generated.h`
+(the checked-in file carries hand customizations — full regen reverts
+them, so the two cases were inserted in generated form only).
+
+### §7 getEdits css ×2 — extension-helper ownership + nil-vs-list
+- **cssImport2** (`/app2.css` never tracked):
+  `tspath::getPossibleOriginalInputExtensionForExtension` returned
+  `std::vector<std::string_view>`, but the `.d.x.ts` branch synthesized
+  `"." + inner` as a `std::string` **temporary** — the returned view
+  dangled, the twin-candidate extension was garbage bytes,
+  `host->FileExists(oldOriginalPath)` was false, and the
+  `RenameFile{app.css→app2.css}` op was never emitted. Return type is
+  now `std::vector<std::string>` (Go's escaping `[]string` equivalent);
+  `string_completions.cpp` local updated to match.
+- **cssImport3** (raw css over declaration):
+  `getNewFileNameForModuleRename` passed `extensionsToRemove` to
+  `changeAnyExtension` where Go passes `nil` — `.css` isn't in
+  `extensionsToRemove`, so `ChangeAnyExtension("/app2.css", ".d.css.ts")`
+  was a no-op and the module rename targeted `/app2.css` instead of
+  `/app2.d.css.ts`. Now passes an empty extensions list (Go `nil`
+  semantics: last-dot extension).
