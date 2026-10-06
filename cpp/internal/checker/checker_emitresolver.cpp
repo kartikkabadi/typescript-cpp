@@ -859,10 +859,12 @@ bool EmitResolver::isValueAliasDeclarationWorker(Node* node) {
 	}
 	case Kind::ExportDeclaration: {
 		Node* exportClause = node->as<ExportDeclaration>()->ExportClause;
-		return exportClause != nullptr &&
-			(isNamespaceExport(exportClause) ||
-			 std::any_of(exportClause->elements().begin(), exportClause->elements().end(),
-						 isValueAliasDeclaration));
+		if (exportClause == nullptr)
+			return false;
+		if (isNamespaceExport(exportClause))
+			return true;
+		auto els = exportClause->elements();
+		return std::any_of(els.begin(), els.end(), isValueAliasDeclaration);
 	}
 	case Kind::ExportAssignment:
 		if (node->expression() != nullptr && node->expression()->kind == Kind::Identifier) {

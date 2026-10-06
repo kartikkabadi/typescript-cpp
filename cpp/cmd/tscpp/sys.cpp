@@ -164,11 +164,23 @@ spawnProcess(const std::vector<std::string>& command, const std::string& dir,
 	int stdinPipe[2] = {-1, -1};
 	int stdoutPipe[2] = {-1, -1};
 	int stderrPipe[2] = {-1, -1};
-	if (::pipe(stdinPipe) != 0 || ::pipe(stdoutPipe) != 0 ||
-	    ::pipe(stderrPipe) != 0) {
+	// O_CLOEXEC (Go os/exec uses CLOEXEC pipes): without it, a second spawned
+	// process inherits the first's parent-side fds and pins its stdin open,
+	// so the first child never sees EOF.
+	if (::pipe2(stdinPipe, O_CLOEXEC) != 0 ||
+	    ::pipe2(stdoutPipe, O_CLOEXEC) != 0 ||
+	    ::pipe2(stderrPipe, O_CLOEXEC) != 0) {
 		return {nullptr,
 		        gostd::newError(std::string("pipe: ") + std::strerror(errno))};
 	}
+	// Build argv before fork: malloc in a forked child of a multi-threaded
+	// parent can deadlock on a lock held by another thread.
+	std::vector<char*> argv;
+	argv.reserve(command.size() + 1);
+	for (const auto& a : command) {
+		argv.push_back(const_cast<char*>(a.c_str()));
+	}
+	argv.push_back(nullptr);
 	pid_t pid = ::fork();
 	if (pid < 0) {
 		return {nullptr,
@@ -185,15 +197,14 @@ spawnProcess(const std::vector<std::string>& command, const std::string& dir,
 		::close(stdoutPipe[1]);
 		::close(stderrPipe[0]);
 		::close(stderrPipe[1]);
-		if (!dir.empty()) {
-			::chdir(dir.c_str());
+		if (!dir.empty() && ::chdir(dir.c_str()) != 0) {
+			// Go's exec.Cmd.Start reports the chdir error; the closest we can
+			// get post-fork is a nonzero exit with the reason on stderr.
+			std::string msg =
+			    std::string("chdir: ") + std::strerror(errno) + "\n";
+			(void)!::write(STDERR_FILENO, msg.data(), msg.size());
+			::_exit(1);
 		}
-		std::vector<char*> argv;
-		argv.reserve(command.size() + 1);
-		for (const auto& a : command) {
-			argv.push_back(const_cast<char*>(a.c_str()));
-		}
-		argv.push_back(nullptr);
 		::execvp(argv[0], argv.data());
 		::_exit(127);
 	}

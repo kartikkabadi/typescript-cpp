@@ -667,6 +667,10 @@ static void installCrashExitHandlers() {
 
 int main(int argc, char** argv) {
 	installCrashExitHandlers();
+	// Go's runtime ignores SIGPIPE except for writes to stdout/stderr —
+	// writes to a dead mapper child's stdin must fail with EPIPE, not kill
+	// the process.
+	std::signal(SIGPIPE, SIG_IGN);
 	if (argc < 2) {
 		std::fprintf(
 			stderr,

@@ -1346,8 +1346,8 @@ const std::vector<const CommandLineOption*>& optionsForCompiler()
 const std::vector<const CommandLineOption*>& OptionsDeclarations() {
 	static const std::vector<const CommandLineOption*> v = [] {
 		std::vector<const CommandLineOption*> v = commonOptionsWithBuild();
-		v.insert(v.end(), optionsForCompiler().begin(),
-		         optionsForCompiler().end());
+		auto opts = optionsForCompiler();
+		v.insert(v.end(), opts.begin(), opts.end());
 		return v;
 	}();
 	return v;

@@ -96,7 +96,7 @@ host::ReadBuildInfo(tsoptions::ParsedCommandLine* config) {
 std::optional<std::string>
 host::SetMTime(const std::string& file, std::filesystem::file_time_type mTime) {
 	if (auto err = host_->fs->Chtimes(
-	        file, vfs::TimePoint{},
+	        file, vfs::TimePoint{std::chrono::seconds{-62135596800}},
 	        std::chrono::file_clock::to_sys(mTime))) {
 		return err.str();
 	}

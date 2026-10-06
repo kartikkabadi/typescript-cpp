@@ -24,7 +24,7 @@ public:
 	    const std::string& fileName,
 	    std::filesystem::file_time_type mTime) override {
 		if (auto err = host_->fs->Chtimes(
-		        fileName, vfs::TimePoint{},
+		        fileName, vfs::TimePoint{std::chrono::seconds{-62135596800}},
 		        std::chrono::file_clock::to_sys(mTime))) {
 			return err.str();
 		}

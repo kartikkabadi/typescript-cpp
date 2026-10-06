@@ -427,9 +427,11 @@ int getActualIndentationForNode(Node* current, Node* parent, int cuurentLine, in
 bool isArgumentAndStartLineOverlapsExpressionBeingCalled(Node* parent, Node* child,
 														 int childStartLine,
 														 SourceFile* sourceFile) {
-	if (!(isCallExpression(parent) &&
-		  std::find(parent->arguments().begin(), parent->arguments().end(), child) !=
-			  parent->arguments().end())) {
+	if (!isCallExpression(parent)) {
+		return false;
+	}
+	auto args = parent->arguments();
+	if (std::find(args.begin(), args.end(), child) == args.end()) {
 		return false;
 	}
 	int expressionOfCallExpressionEnd = parent->expression()->end();

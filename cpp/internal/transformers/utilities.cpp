@@ -107,9 +107,10 @@ bool isIdentifierReference(Node* name, Node* parent) {
 		if (parent->expression() == name) {
 			return true;
 		}
-		return std::find(parent->arguments().begin(),
-		                 parent->arguments().end(),
-		                 name) != parent->arguments().end();
+		{
+			auto args = parent->arguments();
+			return std::find(args.begin(), args.end(), name) != args.end();
+		}
 	case Kind::TaggedTemplateExpression:
 		return parent->as<TaggedTemplateExpression>()->Tag == name;
 	case Kind::ImportAttribute:

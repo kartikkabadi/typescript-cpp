@@ -1,6 +1,8 @@
 // Port of tsc/internal/tsoptions/contentmappers.go.
 #include "internal/tsoptions/tsoptions.h"
 
+#include <memory>
+
 #include "internal/diagnostics/messages_generated.h"
 #include "internal/module/resolver.h"
 #include "internal/packagejson/packagejson.h"
@@ -18,13 +20,13 @@ std::tuple<contentmapper::Manifest, std::string, Diagnostic*>
 resolveContentMapperManifest(ParseConfigHost* host,
                              std::string_view containingFile,
                              std::string_view packageName) {
-	auto compilerOptions = new CompilerOptions{
-	    .ModuleResolution = ModuleResolutionKind::Bundler,
-	};
-	module::DefaultResolver* resolver = module::NewResolver(module::ResolverOptions{
-	    .Host = host,
-	    .CompilerOptions = compilerOptions,
-	});
+	auto compilerOptions = std::make_unique<CompilerOptions>(
+	    CompilerOptions{.ModuleResolution = ModuleResolutionKind::Bundler});
+	std::unique_ptr<module::DefaultResolver> resolver(
+	    module::NewResolver(module::ResolverOptions{
+	        .Host = host,
+	        .CompilerOptions = compilerOptions.get(),
+	    }));
 	auto resolved = resolver->ResolvePackageDirectory(
 	    packageName, containingFile, ResolutionModeNone, nullptr);
 	if (resolved == nullptr || resolved->ResolvedFileName.empty()) {

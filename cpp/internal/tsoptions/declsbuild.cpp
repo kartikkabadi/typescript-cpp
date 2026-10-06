@@ -92,7 +92,8 @@ const std::vector<const CommandLineOption*>& OptionsForBuild() {
 const std::vector<const CommandLineOption*>& BuildOpts() {
 	static const std::vector<const CommandLineOption*> v = [] {
 		std::vector<const CommandLineOption*> v = commonOptionsWithBuild();
-		v.insert(v.end(), OptionsForBuild().begin(), OptionsForBuild().end());
+		auto opts = OptionsForBuild();
+		v.insert(v.end(), opts.begin(), opts.end());
 		return v;
 	}();
 	return v;
