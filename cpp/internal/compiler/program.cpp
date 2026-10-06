@@ -2012,7 +2012,21 @@ void SimpleProgram::verifyProjectReferences() {}
 // so the incremental Program can drive it (execute/incremental slice).
 std::vector<Diagnostic*> getDiagnosticsOfAnyProgram(
     ProgramLike* program, const std::vector<SourceFile*>& files,
-    bool skipNoEmitCheckForDtsDiagnostics) {
+    bool skipNoEmitCheckForDtsDiagnostics,
+    std::function<std::vector<Diagnostic*>(SourceFile*)>
+        getBindDiagnostics,
+    std::function<std::vector<Diagnostic*>(SourceFile*)>
+        getSemanticDiagnostics) {
+	if (getBindDiagnostics == nullptr) {
+		getBindDiagnostics = [program](SourceFile* f) {
+			return program->GetBindDiagnostics(f);
+		};
+	}
+	if (getSemanticDiagnostics == nullptr) {
+		getSemanticDiagnostics = [program](SourceFile* f) {
+			return program->GetSemanticDiagnostics(f);
+		};
+	}
 	std::vector<Diagnostic*> allDiagnostics =
 	    program->GetConfigFileParsingDiagnostics();
 	size_t configFileParsingDiagnosticsLength = allDiagnostics.size();
@@ -2050,9 +2064,7 @@ std::vector<Diagnostic*> getDiagnosticsOfAnyProgram(
 		                      progDiags.end());
 
 		// Do binding early so we can track the time.
-		appendDiagnosticsForAllFiles({}, [&](SourceFile* f) {
-			return program->GetBindDiagnostics(f);
-		});
+		appendDiagnosticsForAllFiles({}, getBindDiagnostics);
 
 		if (program->Options()->ListFilesOnly != Tristate::True) {
 			auto globals = program->GetGlobalDiagnostics();
@@ -2062,9 +2074,7 @@ std::vector<Diagnostic*> getDiagnosticsOfAnyProgram(
 			if (allDiagnostics.size() ==
 			    configFileParsingDiagnosticsLength) {
 				allDiagnostics = appendDiagnosticsForAllFiles(
-				    allDiagnostics, [&](SourceFile* f) {
-					    return program->GetSemanticDiagnostics(f);
-				    });
+				    allDiagnostics, getSemanticDiagnostics);
 				// Late program check to get global diagnostics — Go gates
 				// this on `program.(*Program)`, i.e. only for the
 				// concrete (non-incremental) program.
@@ -2189,5 +2199,158 @@ SimpleProgram::GetSemanticDiagnosticsForIncremental(
 }
 
 // === end slice: incremental ===
+
+// === slice: execute-tsc ===
+
+// program.go:285 NewProgram — PhaseProgram "createProgram" trace span, then
+// the SimpleProgram ctor (which does the processAllProgramFiles-equivalent).
+SimpleProgram* NewProgram(const ProgramOptions& opts) {
+	std::function<void()> tracePop;
+	if (opts.Tracing != nullptr) {
+		// Go: defer Tracing.Push(...)() — the pop runs when NewProgram
+		// returns, so the span covers the createProgram body.
+		tracePop = opts.Tracing->Push(
+		    tracing::PhaseProgram, "createProgram",
+		    tracing::TraceArgs{
+		        {"configFilePath",
+		         opts.Config->ParsedConfig->CompilerOptions->ConfigFilePath}},
+		    true);
+	}
+	// program.go: opts.Config — pass the caller's ParsedCommandLine through
+	// to the program (borrowed); the impl ctor stores it in commandLine_ so
+	// loader-time ContentMapperExtensions() sees the real config.
+	auto* p = new SimpleProgram(opts.Host,
+	                            *opts.Config->ParsedConfig->CompilerOptions,
+	                            opts.Config->ParsedConfig->FileNames,
+	                            opts.Config, opts.SkipModuleResolution);
+	p->opts_ = opts;
+	if (tracePop) {
+		tracePop();
+	}
+	return p;
+}
+
+// program.go:2120 ExplainFiles.
+void SimpleProgram::ExplainFiles(std::ostream& w,
+                                 const locale::Locale& locale) {
+	auto toRelativeFileName = [this](const std::string& fileName) {
+		return tspath::getRelativePathFromDirectory(
+		    GetCurrentDirectory(), fileName, comparePathsOptions());
+	};
+	auto localizeDiag = [&](Diagnostic* d) {
+		// ast.Diagnostic.Localize — diagnostic.go:117.
+		if (d->message == nullptr && !d->messageText.empty()) {
+			return d->messageText;
+		}
+		return ::tsc::localize(locale, d->message,
+		                     std::string(d->messageKey), d->messageArgs);
+	};
+	int filesExplained = 0;
+	std::vector<SourceFile*> files = GetSourceFiles();
+	int sourceFileIndex = 0;
+	// explainFile — ast.HasFileName reduced to (FileName, Path) so
+	// redirectsFile can share it.
+	auto explainFile = [&](const std::string& fileName,
+	                       const tspath::Path& path) {
+		w << toRelativeFileName(fileName) << '\n';
+		auto it = includeProcessor_.fileIncludeReasons.find(path);
+		if (it != includeProcessor_.fileIncludeReasons.end()) {
+			for (auto* reason : it->second) {
+				auto* diag = reason->toDiagnostic(this, true);
+				w << "   " << localizeDiag(diag) << '\n';
+			}
+		}
+		for (auto* diag : includeProcessor_.explainRedirectAndImpliedFormat(
+		         this, path,
+		         [&](std::string_view name) {
+			         return toRelativeFileName(std::string(name));
+		         })) {
+			w << "   " << localizeDiag(diag) << '\n';
+		}
+		filesExplained++;
+	};
+
+	auto explainSourceFiles = [&](int endIndex) {
+		for (; filesExplained < endIndex;) {
+			explainFile(files[sourceFileIndex]->FileName(),
+			            files[sourceFileIndex]->Path());
+			sourceFileIndex++;
+		}
+	};
+
+	std::vector<redirectsFile> redirectFiles;
+	redirectFiles.reserve(redirectFilesByPath.size());
+	for (auto& [path, rf] : redirectFilesByPath) {
+		redirectFiles.push_back(rf);
+	}
+	std::sort(redirectFiles.begin(), redirectFiles.end(),
+	          [](const redirectsFile& a, const redirectsFile& b) {
+		          return a.index < b.index;
+	          });
+
+	for (auto& redirectFile : redirectFiles) {
+		// Explain all sourceFiles till we reach this redirectFile index
+		explainSourceFiles(redirectFile.index);
+		explainFile(redirectFile.fileName, redirectFile.path);
+	}
+
+	// Explain any remaining sourceFiles
+	explainSourceFiles(static_cast<int>(files.size() + redirectFiles.size()));
+}
+
+// program.go:332 ReuseProgram — the UpdateProgram single-file fast path.
+// dep-stub — owned by compiler: the program-state replay machinery
+// (processedFiles, lazyValue caches, updateFileIncludeProcessor,
+// initCheckerPool) is not ported.
+std::tuple<SimpleProgram*, SourceFile*, bool> SimpleProgram::ReuseProgram(
+    const tspath::Path& changedFilePath, CompilerHost* newHost,
+    const std::function<void*(SimpleProgram*)>& createCheckerPool,
+    const std::function<module::Resolver*(const module::ResolverOptions&)>&
+        createModuleResolver) {
+	TSC_UNREACHABLE("SimpleProgram::ReuseProgram — owned by compiler");
+}
+
+// program.go:1690 LineCount.
+int SimpleProgram::LineCount() const {
+	int count = 0;
+	for (auto* file : files) {
+		count += static_cast<int>(file->ecmaLineMap().size());
+	}
+	return count;
+}
+
+// program.go:1698 IdentifierCount.
+int SimpleProgram::IdentifierCount() const {
+	int count = 0;
+	for (auto* file : files) {
+		count += file->IdentifierCount;
+	}
+	return count;
+}
+
+// program.go:1706 SymbolCount — single checker port: files plus the lazy
+// checker's symbol count when it exists.
+int SimpleProgram::SymbolCount() const {
+	int count = 0;
+	for (auto* file : files) {
+		count += file->SymbolCount;
+	}
+	if (checker_ != nullptr) {
+		count += static_cast<int>(checker_->SymbolCount);
+	}
+	return count;
+}
+
+// program.go:1719 TypeCount — single checker.
+uint32_t SimpleProgram::TypeCount() {
+	return checker_ != nullptr ? checker_->TypeCount : 0;
+}
+
+// program.go:1727 InstantiationCount — single checker.
+uint64_t SimpleProgram::InstantiationCount() {
+	return checker_ != nullptr ? checker_->TotalInstantiationCount : 0;
+}
+
+// === end slice: execute-tsc ===
 
 }  // namespace tsc::compiler
