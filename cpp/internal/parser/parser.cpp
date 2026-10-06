@@ -1071,7 +1071,7 @@ void Parser::parseExpectedMatchingBrackets(Kind openKind, Kind closeKind,
 			The_parser_expected_to_find_a_1_to_match_the_0_token_here,
 			{std::string(tokenToString(openKind)),
 	         std::string(tokenToString(closeKind))});
-		lastError->messageChain.push_back(related);
+		lastError->AddRelatedInfo(related);
 	}
 }
 
@@ -3621,7 +3621,7 @@ Node* Parser::parseImportType() {
 						TextRange{openBracePosition, openBracePosition},
 						The_parser_expected_to_find_a_1_to_match_the_0_token_here,
 						{"{", "}"});
-					lastDiagnostic->messageChain.push_back(related);
+					lastDiagnostic->AddRelatedInfo(related);
 				}
 			}
 		}
@@ -3675,7 +3675,7 @@ Node* Parser::parseImportAttributes(Kind token_, bool skipKeyword) {
 						TextRange{openBracePosition, openBracePosition},
 						The_parser_expected_to_find_a_1_to_match_the_0_token_here,
 						{"{", "}"});
-					lastDiagnostic->messageChain.push_back(related);
+					lastDiagnostic->AddRelatedInfo(related);
 				}
 			}
 		}

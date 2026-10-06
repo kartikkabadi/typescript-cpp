@@ -1075,6 +1075,7 @@ NodeList* NodeBuilderImpl::mapToTypeNodes(std::vector<Type*> list,
 				}
 			}
 		}
+		restoreFlags();
 	}
 
 	return f->newNodeList(result);
