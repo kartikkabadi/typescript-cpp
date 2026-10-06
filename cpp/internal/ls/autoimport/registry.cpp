@@ -924,13 +924,13 @@ void registryBuilder::updateIndexes(gostd::Context ctx, RegistryChange& change,
 		    return {0, false};
 	    });
 
+	// The forked LogTree is owned by its parent tree (Fork links it into
+	// logger->logs) — Go relies on GC. Do NOT take unique ownership here:
+	// builderLogs->String() later recurses into this child.
 	logging::LogTree* nodeModulesLogger = nullptr;
-	std::vector<std::unique_ptr<logging::LogTree>> nodeModulesLoggerOwned;
 	if (logger != nullptr && !nodeModulesTasks.empty()) {
-		nodeModulesLoggerOwned.push_back(
-		    std::unique_ptr<logging::LogTree>(logging::fork(
-		        logger, "Building node_modules indexes")));
-		nodeModulesLogger = nodeModulesLoggerOwned.back().get();
+		nodeModulesLogger = logging::fork(
+		    logger, "Building node_modules indexes");
 	}
 
 	// --- Phase 1: Discovery (parallel per bucket) ---

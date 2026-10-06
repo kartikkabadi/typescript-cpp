@@ -1024,7 +1024,11 @@ Server::handleCompletionItemResolve(
 	try {
 		auto r = languageService->ResolveCompletionItem(
 			toContextPtr(ctx), params.get(), data);
-		resp = std::shared_ptr<lsproto::CompletionItem>(r.first);
+		// Go returns the same *CompletionItem as params (GC-shared). Alias
+		// params' ownership so the response doesn't own a second control
+		// block over the request item — a plain shared_ptr(r.first) would
+		// delete it while params still holds it (writer-thread UAF).
+		resp = std::shared_ptr<lsproto::CompletionItem>(params, r.first);
 		lsErr = r.second;
 	} catch (...) {
 		recover_(reqMsg);
