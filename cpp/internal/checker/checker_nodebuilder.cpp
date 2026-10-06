@@ -744,6 +744,8 @@ static NodeBuilderImpl* newNodeBuilderImpl(
 	b->e = e;
 	if (idToSymbol != nullptr) {
 		b->idToSymbol = *idToSymbol;
+		// Go: b.idToSymbol is the caller's map — mirror writes back out.
+		b->idToSymbolOut = idToSymbol;
 	}
 	b->pc = pseudochecker::newPseudoChecker(ch->strictNullChecks,
 	                                      ch->exactOptionalPropertyTypes);
@@ -2375,7 +2377,7 @@ Node* NodeBuilderImpl::setTextRange(Node* range_, Node* location) {
 		range_->loc = TextRange{-1, -1};
 		auto it = idToSymbol.find(original);
 		if (it != idToSymbol.end()) {
-			idToSymbol[range_] = it->second;
+			recordIdSymbol(range_, it->second);
 		}
 	}
 	if (range_ == location || location == nullptr) {
@@ -2792,14 +2794,14 @@ Node* NodeBuilderImpl::parameterToParameterDeclarationName(
 	case Kind::Identifier: {
 		Node* cloned = deepCloneNode(*f, name);
 		e->setEmitFlags(cloned, printer::EFNoAsciiEscaping);
-		idToSymbol[cloned] = parameterSymbol;
+		recordIdSymbol(cloned, parameterSymbol);
 		return cloned;
 	}
 	case Kind::QualifiedName: {
 		Node* cloned =
 		    deepCloneNode(*f, name->as<QualifiedName>()->Right);
 		e->setEmitFlags(cloned, printer::EFNoAsciiEscaping);
-		idToSymbol[cloned] = parameterSymbol;
+		recordIdSymbol(cloned, parameterSymbol);
 		return cloned;
 	}
 	default:
@@ -5413,7 +5415,7 @@ Node* NodeBuilderImpl::newIdentifier(const std::string& text,
                                      Symbol* symbol) {
 	Node* id = f->newIdentifier(text);
 	if (symbol != nullptr) {
-		idToSymbol[id] = symbol;
+		recordIdSymbol(id, symbol);
 	}
 	return id;
 }

@@ -141,7 +141,17 @@ std::string marshalInto(Encoder& enc, const T& v) {
         return enc.writeToken(tokenString(std::string_view(v)));
     } else if constexpr (isOptional<U>::value) {
         if (!v.has_value()) {
-            return enc.writeToken(Null);
+            // encoding/json/v2 marshals a nil Go slice as [] and a nil Go
+            // map as {} (v1's null needs FormatNilSliceAsNull/MapAsNull).
+            if constexpr (IsVector<typename U::value_type>) {
+                if (auto err = enc.writeToken(BeginArray); !err.empty()) return err;
+                return enc.writeToken(EndArray);
+            } else if constexpr (IsMapLike<typename U::value_type>) {
+                if (auto err = enc.writeToken(BeginObject); !err.empty()) return err;
+                return enc.writeToken(EndObject);
+            } else {
+                return enc.writeToken(Null);
+            }
         }
         return marshalInto(enc, *v);
     } else if constexpr (isSharedOrUniquePtr<U>::value || std::is_pointer_v<U>) {

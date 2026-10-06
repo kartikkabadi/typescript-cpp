@@ -5037,6 +5037,18 @@ struct NodeBuilderImpl {
 
 	// symbols for synthesized identifiers, needed for e.g. inlay hints
 	std::unordered_map<Node*, Symbol*> idToSymbol;
+	// Go's idToSymbol is a map (reference type): writes during building are
+	// visible to the caller (inlay hints reads it after TypeToTypeNode).
+	// The member above remains the builder's working copy — markEmitRoots
+	// may iterate it after the caller's map is gone — so writes are also
+	// mirrored into the caller's map here.
+	std::unordered_map<Node*, Symbol*>* idToSymbolOut = nullptr;
+	void recordIdSymbol(Node* id, Symbol* symbol) {
+		idToSymbol[id] = symbol;
+		if (idToSymbolOut != nullptr) {
+			(*idToSymbolOut)[id] = symbol;
+		}
+	}
 
 	// Builder-lifetime heap objects (contexts, trackers, boundaries, cache
 	// entries, symbol args) — in Go these die with the builder; here

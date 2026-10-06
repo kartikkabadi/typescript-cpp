@@ -398,7 +398,12 @@ std::vector<Node*> removeUnusedImports(
 	    compilerOptions->Jsx == JsxEmit::React ||
 	    compilerOptions->Jsx == JsxEmit::ReactNative;
 
-	NodeFactory factory{NodeFactoryHooks{}};
+	// Go allocates a fresh factory with empty hooks; its nodes are GC-kept.
+	// Here the updated decls are returned and later printed by the change
+	// tracker, so they must live in the emit context's arena (the tracker-
+	// owned factory). Using it also gives updated decls the same
+	// Synthesized/original tracking the emit pipeline expects.
+	NodeFactory& factory = *changeTracker->nodeFactory;
 	std::vector<Node*> usedImports;
 	usedImports.reserve(oldImports.size());
 
@@ -665,7 +670,10 @@ std::vector<Node*> coalesceImportsWorker(
 			coalescedImports.push_back(categorized.importWithoutClause);
 		}
 
-		NodeFactory factory{NodeFactoryHooks{}};
+		// See removeUnusedImports: synthesized decls outlive this function
+		// (returned for sorting and emitted by the change tracker), so they
+		// must be allocated on the tracker-owned emit-context factory.
+		NodeFactory& factory = *changeTracker->nodeFactory;
 
 		for (int i = 0; i < 2; i++) {
 			auto& group = i == 0 ? categorized.regularImports
@@ -1142,7 +1150,9 @@ std::vector<Node*> coalesceExportsWorker(
 	                 });
 
 	std::vector<Node*> coalescedExports;
-	NodeFactory factory{NodeFactoryHooks{}};
+	// Same lifetime rule as the import workers above: the tracker-owned
+	// emit-context factory, since these decls are printed after return.
+	NodeFactory& factory = *changeTracker->nodeFactory;
 
 	for (auto& moduleSpecifier : moduleSpecifierOrder) {
 		auto& group = exportsByModuleSpecifier[moduleSpecifier];

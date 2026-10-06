@@ -177,9 +177,10 @@ public:
 
 	// host.go FS() — Go returns the vfs.FS itself.
 	std::shared_ptr<vfs::FS> FS() { return fs; }
-	// host.go Trace.
-	void Trace(const DiagnosticMessage* msg,
-	           const std::vector<std::string>& args);
+	// host.go Trace — part of Go's compiler.CompilerHost interface:
+	// virtual so project/build hosts' overrides are dispatched.
+	virtual void Trace(const DiagnosticMessage* msg,
+	                   const std::vector<std::string>& args);
 	// host.go ContentMapperProject — returns the field installed by
 	// execute/tsc when the command line has content mappers. Virtual:
 	// execute/build's compilerHost overrides it (compilerHost.go).
