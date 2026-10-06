@@ -7665,43 +7665,45 @@ bool Checker::markSymbolOfAliasDeclarationIfTypeOnly(
 
 const DiagnosticMessage* Checker::getCannotFindNameDiagnosticForName(
     Node* node) {
-	std::string text = node->text();
-	if (text == "document" || text == "console") {
+	std::string scratch;
+	std::string_view text = node->textView(scratch);
+	using namespace std::literals;
+	if (text == "document"sv || text == "console"sv) {
 		return Cannot_find_name_0_Do_you_need_to_change_your_target_library_Try_changing_the_lib_compiler_option_to_include_dom;
 	}
-	if (text == "$") {
+	if (text == "$"sv) {
 		return compilerOptions->UsesWildcardTypes()
 		           ? Cannot_find_name_0_Do_you_need_to_install_type_definitions_for_jQuery_Try_npm_i_save_dev_types_Slashjquery
 		           : Cannot_find_name_0_Do_you_need_to_install_type_definitions_for_jQuery_Try_npm_i_save_dev_types_Slashjquery_and_then_add_jquery_to_the_types_field_in_your_tsconfig;
 	}
-	if (text == "beforeEach" || text == "describe" || text == "suite" ||
-	    text == "it" || text == "test") {
+	if (text == "beforeEach"sv || text == "describe"sv || text == "suite"sv ||
+	    text == "it"sv || text == "test"sv) {
 		return compilerOptions->UsesWildcardTypes()
 		           ? Cannot_find_name_0_Do_you_need_to_install_type_definitions_for_a_test_runner_Try_npm_i_save_dev_types_Slashjest_or_npm_i_save_dev_types_Slashmocha
 		           : Cannot_find_name_0_Do_you_need_to_install_type_definitions_for_a_test_runner_Try_npm_i_save_dev_types_Slashjest_or_npm_i_save_dev_types_Slashmocha_and_then_add_jest_or_mocha_to_the_types_field_in_your_tsconfig;
 	}
-	if (text == "process" || text == "require" || text == "Buffer" ||
-	    text == "module" || text == "NodeJS") {
+	if (text == "process"sv || text == "require"sv || text == "Buffer"sv ||
+	    text == "module"sv || text == "NodeJS"sv) {
 		return compilerOptions->UsesWildcardTypes()
 		           ? Cannot_find_name_0_Do_you_need_to_install_type_definitions_for_node_Try_npm_i_save_dev_types_Slashnode
 		           : Cannot_find_name_0_Do_you_need_to_install_type_definitions_for_node_Try_npm_i_save_dev_types_Slashnode_and_then_add_node_to_the_types_field_in_your_tsconfig;
 	}
-	if (text == "Bun") {
+	if (text == "Bun"sv) {
 		return compilerOptions->UsesWildcardTypes()
 		           ? Cannot_find_name_0_Do_you_need_to_install_type_definitions_for_Bun_Try_npm_i_save_dev_types_Slashbun
 		           : Cannot_find_name_0_Do_you_need_to_install_type_definitions_for_Bun_Try_npm_i_save_dev_types_Slashbun_and_then_add_bun_to_the_types_field_in_your_tsconfig;
 	}
-	if (text == "Map" || text == "Set" || text == "Promise" ||
-	    text == "Symbol" || text == "WeakMap" || text == "WeakSet" ||
-	    text == "Iterator" || text == "AsyncIterator" ||
-	    text == "SharedArrayBuffer" || text == "Atomics" ||
-	    text == "AsyncIterable" || text == "AsyncIterableIterator" ||
-	    text == "AsyncGenerator" || text == "AsyncGeneratorFunction" ||
-	    text == "BigInt" || text == "Reflect" || text == "BigInt64Array" ||
-	    text == "BigUint64Array") {
+	if (text == "Map"sv || text == "Set"sv || text == "Promise"sv ||
+	    text == "Symbol"sv || text == "WeakMap"sv || text == "WeakSet"sv ||
+	    text == "Iterator"sv || text == "AsyncIterator"sv ||
+	    text == "SharedArrayBuffer"sv || text == "Atomics"sv ||
+	    text == "AsyncIterable"sv || text == "AsyncIterableIterator"sv ||
+	    text == "AsyncGenerator"sv || text == "AsyncGeneratorFunction"sv ||
+	    text == "BigInt"sv || text == "Reflect"sv || text == "BigInt64Array"sv ||
+	    text == "BigUint64Array"sv) {
 		return Cannot_find_name_0_Do_you_need_to_change_your_target_library_Try_changing_the_lib_compiler_option_to_1_or_later;
 	}
-	if (text == "await" && isCallExpression(node->parent)) {
+	if (text == "await"sv && isCallExpression(node->parent)) {
 		return Cannot_find_name_0_Did_you_mean_to_write_this_in_an_async_function;
 	}
 	if (node->parent->kind == Kind::ShorthandPropertyAssignment) {

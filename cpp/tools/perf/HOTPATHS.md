@@ -10,10 +10,12 @@ plus the pathological single file `tsc/testdata/tests/cases/compiler/deeplyNeste
 | workload                              | before        | latest        |
 |---------------------------------------|---------------|---------------|
 | `tscpp check deeplyNestedMappedTypes` | ~130 s        | **0.40–0.43 s** (byte-identical to checkdump oracle) |
-| `tsc -p` emit (perfproj, med ratio)   | ~1.95× slower | **~1.4–1.6× slower** (noisy) |
-| `tsc -p` --noEmit                     | ~2.33× slower | **~1.37–1.44×** |
-| `tsc -p` --declaration                | ~2.37× slower | **~1.39–1.48×** |
+| `tsc -p` emit (perfproj, med ratio)   | ~1.95× slower | **~1.16–1.42× slower** (very noisy VM) |
+| `tsc -p` --noEmit                     | ~2.33× slower | **~1.18–1.44×** |
+| `tsc -p` --declaration                | ~2.37× slower | **~1.16–1.25×** |
 | `tsc -p` parse phase                  | 0.107 s vs Go 0.035 s | **~0.063–0.066 s** |
+| `mprotect` syscalls per `tsc -p` run  | 21,635        | **22** (mimalloc) |
+| decl-emit peak RSS                    | ~460 MB gate  | **323 MB** |
 | `--diagnostics` Instantiations        | 8,934 (+35% vs Go) | **6,630 = Go exactly** |
 | `parse-all` testdata corpus (4.6MB)   | 1,173 ms, 3.9 MB/s | **~30 ms, ~150 MB/s (39×)** |
 
@@ -120,37 +122,82 @@ After: `tscpp tsc -p … --outDir` and `--declaration` exit 0 across 8/8
 runs with `diff -r` identical to `tsgo` output; tsctestrunner 99/99 ×3
 consecutive.
 
-## Current top hot spots (`tsc -p --noEmit`, flat perf, ~1100 samples)
+## Fixed: mimalloc drop-in allocator (replaces the mprotect storm)
 
-The run is now short enough (~0.4–0.5 s wall) that fixed startup cost and
-machine noise dominate; ordering below is the profile, attribution is manual.
+**Symptom.** `strace -c -f` counted **21,635 `mprotect` calls** in one 0.4 s
+`tsc -p --noEmit` run — glibc per-thread arena heaps growing page-by-page
+(`grow_heap`); ~30% of perf samples were kernel mm-lock/page-fault paths.
 
-1. **~30% kernel mm-lock contention** — `osq_lock` 22.6% +
-   `_raw_spin_lock`/`asm_exc_page_fault`/`rmqueue_bulk`/… under
-   `do_mprotect_pkey` + page-fault paths. `strace -c -f` shows **21,244
-   `mprotect` calls** in one 0.4 s run. These are glibc per-thread arena heaps
-   growing in page-size increments (`grow_heap` → `mprotect(PROT_NONE→RW)`,
-   no tunable controls the step — `glibc.malloc.top_pad` only affects the main
-   arena; measured: barely moved). Every small `new` on a worker thread drizzles
-   a few more pages. **Go attribution**: Go's allocator mmap's large spans once
-   and sub-allocates per-P with no locks — effectively zero mprotect per run.
-   **Fix direction (not done)**: route hot Node/Type/vector allocations through
-   `tsc::Arena` (large-block bump) instead of `new`, or link a span allocator
-   (mimalloc/tcmalloc). That's a structural porting decision, not a one-liner.
-2. **~9% glibc malloc/free userspace** (`malloc`, `_int_free`, `_int_malloc`,
-   `cfree`, memset) — same root cause as #1: per-object `new` for nodes, types,
-   map nodes, strings. Go pays this too but per-P and lock-free.
-3. **~4.4% hashing + key ops** — `std::_Hash_bytes` 1.45% +
-   `memcmp`/`memmove` ~3%: `std::unordered_map` (chained buckets) vs Go 1.24+
-   Swiss-table maps. Sites: `SymbolTable` (`std::string` keys — copies on
-   insert), `CacheKey` maps, LinkStore. **Fix direction**: hash table with
-   open addressing + `string_view` keys, or intern symbols once at bind.
-4. **`getSourceFileOfNode` 0.95%, `Binder::bind` 0.89%, `Scanner::scan`
-   0.71%, `Node::eagerJSDoc` 0.60%, `getIdentifierToken` 0.72%** — ordinary
-   work, roughly matches Go's binder/parser/scanner CPU; no port-level
-   pathology evident at this granularity.
-5. **`_dl_relocate_object` 1.2%** — process startup; fixed ~10 ms cost that
-   reads large only because runs are now sub-second.
+**Fix.** Vendored mimalloc 2.1.7 (`cpp/third_party/mimalloc/`, src+include+
+LICENSE), built as `tsc_mimalloc` static lib from `src/static.c` (the unity TU
+that already contains `alloc-override.c`). `MI_MALLOC_OVERRIDE` interposes the
+C malloc family inside the binary; `cmd/malloc_override.cpp` adds
+`<mimalloc-new-delete.h>` for global `operator new`/`delete`. `project()` now
+declares `C` so `static.c` compiles as C11. `TSCPP_MIMALLOC=ON` (default)
+prepends the lib before `libtsc.a` on `tscpp`/`tsctestrunner` link lines.
+Works unchanged under the fork-per-test runners and clang-15 RelWithDebInfo.
+
+**Verified.** mprotect 21,635 → **22**; emit ~1.16–1.42×, noEmit ~1.18–1.44×,
+decl ~1.16–1.25× (VM noise ±20%); decl-emit RSS **323 MB** (glibc: 321 MB) —
+460 MB gate holds; 300/300 check smoke byte-identical; tsctestrunner 99/99;
+emit+decl output `diff -r` identical to `tsgo`. `mallinfo2()` in
+`execute/tsc/emit.cpp` still feeds `Alloc` (mimalloc populates it); the
+`Mallocs` field was never populated and stays 0.
+
+Consequence: the custom span-allocator work from the previous "fix direction"
+is **not needed** — the drop-in captured the whole mprotect/pooling win.
+
+## Fixed: `Node::text()` copies + literal compares in hot diagnostic paths
+
+Post-mimalloc callgrind (`tsc -p --noEmit`, 2.04G instr): `std::operator==`
+(string vs `char*`) 2.54% + `__strlen` 1.19%, dominated by
+`Checker::getCannotFindNameDiagnosticForName` (1.53M calls — `node->text()`
+by-value copy plus ~30 `== "literal"` compares each) and
+`checkTypeNameIsReserved` (127K calls, same pattern). Go does the same work
+but `node.Text()` is a string view and literal compares are size-gated.
+
+**Fix.** New `Node::textView(std::string& scratch)` (ast.h/ast.cpp): returns a
+`string_view` into the node's stored `Text` member for all name-bearing kinds
+(identifiers, literals, template parts, `MetaProperty` recursion); composed
+names (`JsxNamespacedName`, JSDoc text) fall back to `text()` into scratch —
+identical content, no copy on the hot path. Both functions now compare
+`text` against `"...sv` literals (size-check + memcmp, no per-call `strlen`).
+
+**Scope note.** `Node::text()` has ~400 call sites; only the two hottest
+switched (per "top-3 hottest" guidance). The accessor is available for
+whichever sites profile hot next.
+
+## Skipped: `unordered_map` hashing (~4.4%)
+
+`_Hash_bytes` 3.28% + node alloc/lookup ~2% post-mimalloc — but `SymbolTable`
+iteration order leaks into diagnostic suggestion ordering. Any hash/container
+swap changes bucket order and breaks byte-identity. Left alone deliberately;
+Go attribution noted for the record (Swiss-table + memhash vs chained
+`unordered_map` + Murmur).
+
+## Current top hot spots (`tsc -p --noEmit`, post-mimalloc callgrind, 2.04G instr)
+
+Flat attribution after the allocator swap (pre-mimalloc kernel-side ~30% +
+glibc malloc ~9% are gone; mimalloc's own cost shows up as `operator new[]`
+3.50% + `free` 2.92%):
+
+1. **`operator new[]` 3.50% + `memcpy_avx` 3.29% + `free` 2.92%** — vector and
+   `std::string` growth/copies: `Parser::rewind` state saves, `newIdentifier`,
+   `newSymbol`, `declareSymbolEx` name copies. Go pays equivalent work but
+   slice-header strings and per-P bump allocation make each op cheaper.
+2. **`std::_Hash_bytes` 3.28% + `_Hashtable` node alloc/find/`operator[]`
+   ~3% + `memcmp` 2.15%** — `SymbolTable`/`CacheKey` churn. Skipped: bucket
+   order leaks into diagnostic ordering (see "Skipped" above).
+3. **`Scanner::scan` 2.83% + `scanIdentifier` 2.38% +
+   `ScannerState` copies 1.34%** — faithful port of Go's scanner; the
+   `ScannerState` copy carries `std::string tokenValue` +
+   `vector<CommentDirective>` (SSO keeps most small).
+4. **`std::operator==`(string,char*) 2.54% + `__strlen` 1.19%** — was
+   dominated by `getCannotFindNameDiagnosticForName` (1.53M calls) +
+   `checkTypeNameIsReserved`; both now use `textView` + `"sv` literals.
+5. **`Checker::compareNodes` 2.21% + `getSourceFileOfNode` 1.90%** —
+   `compareSymbolsWorker` sorts compare nodes across files; mirrors Go's
+   parent-walk (`ast/utilities.go:861`) exactly — faithful, no port gap.
 
 ## Known bugs found while profiling (not fixed here)
 
@@ -182,7 +229,8 @@ machine noise dominate; ordering below is the profile, attribution is manual.
   (ast.h ~185, ~455 call sites): a heap copy per access. Go returns the slice
   header (O(1) view). Doesn't dominate this workload (<1%) but is a broad
   death-by-cuts cost; converting to `span`/iterator pairs is mechanical but
-  touches hundreds of sites.
+  touches hundreds of sites. `text()` variant: `Node::textView()` added and
+  applied to the two hottest diagnostic paths.
 - **`tscpp tsc -p … --outDir` exits 2** on some invocations (CLI arg quirk,
   pre-existing, unrelated to emit correctness).
 
