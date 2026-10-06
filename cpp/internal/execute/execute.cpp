@@ -12,27 +12,13 @@
 #include <ostream>
 
 #include "internal/core/textchange.h"
+#include "internal/execute/build/build.h"
 #include "internal/execute/watcher.h"
 #include "internal/format/format.h"
 #include "internal/json/json.h"
 #include "internal/parser/parser.h"
 #include "internal/pprof/pprof.h"
 #include "internal/tspath/tspath.h"
-
-// ---------------------------------------------------------------------------
-// dep-stub: execute/build — owned by execute-build
-// ---------------------------------------------------------------------------
-namespace tsc::execute::build {
-
-Orchestrator NewOrchestrator(Options opts) {
-	return Orchestrator(std::move(opts));
-}
-
-tsc::CommandLineResult Orchestrator::Start(gostd::Context ctx) {
-	TSC_UNREACHABLE("build::Orchestrator::Start — owned by execute-build");
-}
-
-}  // namespace tsc::execute::build
 
 // ---------------------------------------------------------------------------
 // dep-stub: tracing — owned by tracing
@@ -404,10 +390,10 @@ tsc::CommandLineResult tscBuildCompilation(
 		return {.Status = tsc::ExitStatusSuccess};
 	}
 
-	auto orchestrator = build::NewOrchestrator(
+	auto* orchestrator = build::NewOrchestrator(
 	    build::Options{.Sys = sys, .Command = buildCommand,
 	                   .Testing = testing});
-	return orchestrator.Start(ctx);
+	return orchestrator->Start();
 }
 
 // tscCompilation — tsc.go:122.

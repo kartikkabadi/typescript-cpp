@@ -22,28 +22,6 @@
 #include "internal/tsoptions/tsoptions.h"
 
 // ---------------------------------------------------------------------------
-// dep-stub: execute/build — owned by execute-build
-// build.NewOrchestrator + Options + Orchestrator.Start, per
-// tsc/internal/execute/build/orchestrator.go.
-// ---------------------------------------------------------------------------
-namespace tsc::execute::build {
-
-struct Options {
-	tsc::System* Sys = nullptr;
-	tsoptions::ParsedBuildCommandLine* Command = nullptr;
-	tsc::CommandLineTesting* Testing = nullptr;
-};
-
-struct Orchestrator {
-	Options opts;
-	explicit Orchestrator(Options opts) : opts(std::move(opts)) {}
-	tsc::CommandLineResult Start(gostd::Context ctx);
-};
-
-Orchestrator NewOrchestrator(Options opts);
-
-}  // namespace tsc::execute::build
-
 // ---------------------------------------------------------------------------
 // dep-stub: tracing — owned by tracing
 // tracing.StartTracing (tracing.go:152) and Tracing.StopTracing

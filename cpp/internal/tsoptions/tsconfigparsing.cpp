@@ -129,10 +129,16 @@ convertOptionsFromJsonImpl(const CommandLineOptionNameMap& optionsNameMap,
 // `option == extendsOptionDeclaration`).
 
 const CommandLineOption& compilerOptionsDeclaration() {
-	static const CommandLineOption o{
-	    .Name = "compilerOptions",
-	    .Kind = CommandLineOptionTypeObject,
-	};
+	// tsconfigparsing.go:36 — ElementOptions is CommandLineCompilerOptionsMap;
+	// attached post-init since the map is built lazily.
+	static const CommandLineOption o = [] {
+		CommandLineOption o{
+		    .Name = "compilerOptions",
+		    .Kind = CommandLineOptionTypeObject,
+		};
+		o.ElementOptions = CommandLineCompilerOptionsMap();
+		return o;
+	}();
 	return o;
 }
 const CommandLineOption& compileOnSaveCommandLineOption() {
