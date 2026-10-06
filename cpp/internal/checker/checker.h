@@ -923,6 +923,10 @@ struct DeclarationFileLinks {
 // NewNodeBuilder — nodebuilder.go:279 (dep-stub until the nodebuilder slice lands)
 struct NodeBuilder;
 NodeBuilder* NewNodeBuilder(Checker* ch, printer::EmitContext* e);
+// NewNodeBuilderEx — nodebuilder.go:283 (defined in checker_nodebuilder.cpp)
+NodeBuilder* NewNodeBuilderEx(
+    Checker* ch, printer::EmitContext* e,
+    std::unordered_map<Node*, Symbol*>* idToSymbol);
 
 // EmitResolver — emitresolver.go:34. Go's checkerMu is elided: the C++ checker
 // is single-threaded, so every lock in emitresolver.go compiles away.

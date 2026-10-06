@@ -4,6 +4,7 @@
 // interfaces, sync.OnceFunc, and time helpers.
 #pragma once
 
+#include <any>
 #include <atomic>
 #include <cstdio>
 #include <chrono>
@@ -16,6 +17,7 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -277,10 +279,31 @@ struct ContextImpl {
 	bool done = false;
 	Error err;
 	std::vector<std::function<void()>> afterFuncs;
+	// Go context.WithValue storage: each WithValue call produces a child
+	// context whose map is the parent's merged with the new key.
+	std::unordered_map<const void*, std::any> values;
+
+	// Value returns the value stored under `key`, or nullptr if absent.
+	const std::any* value(const void* key) const {
+		auto it = values.find(key);
+		return it == values.end() ? nullptr : &it->second;
+	}
 };
 
 using Context = std::shared_ptr<ContextImpl>;
 using CancelFunc = std::function<void()>;
+
+// context.WithValue — returns a context carrying key=value (a shallow copy
+// of the parent that shadows the key, matching Go's child-wins lookup).
+inline Context contextWithValue(const Context& parent, const void* key,
+                                std::any value) {
+	auto child = std::make_shared<ContextImpl>();
+	if (parent) {
+		child->values = parent->values;
+	}
+	child->values[key] = std::move(value);
+	return child;
+}
 
 inline Context contextBackground() {
 	static const Context bg = std::make_shared<ContextImpl>();

@@ -14,6 +14,7 @@
 #include <utility>
 
 #include "internal/core/context.h"
+#include "internal/gostd/gostd.h"
 #include "internal/locale/localetags.h"
 
 namespace tsc::locale {
@@ -58,6 +59,12 @@ Locale fromContext(const ContextPtr& ctx);
 
 // HasLocale reports whether ctx carries a Locale.
 bool hasLocale(const ContextPtr& ctx);
+
+// gostd::Context overloads — same behavior over the gostd context used by
+// LS/compiler code paths (locale.FromContext(ctx)).
+gostd::Context withLocale(const gostd::Context& ctx, Locale locale);
+Locale fromContext(const gostd::Context& ctx);
+bool hasLocale(const gostd::Context& ctx);
 
 // Parse parses a BCP 47 language tag into a Locale, e.g. "en-US".
 // It returns ok=false if the tag is not well-formed or contains an
