@@ -1074,7 +1074,7 @@ public:
 
 // tsoptions.SourceOutputAndProjectReference
 struct SourceOutputAndProjectReference {
-	SourceFile* source{};
+	std::string source{}; // tsoptions' Source — a file name, not a SourceFile*
 	std::string outputDts{};
 	ProjectReference* resolved{};
 };

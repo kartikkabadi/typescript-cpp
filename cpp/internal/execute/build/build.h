@@ -42,18 +42,10 @@
 
 namespace tsc {
 
-// ast.go — SourceFileParseOptions needs operator==/hash to serve as the
-// parseCache key (Go `comparable`); defined here so build's parseCache can
-// key on it.
-inline bool operator==(const ExternalModuleIndicatorOptions& a,
-                       const ExternalModuleIndicatorOptions& b) {
-	return a.JSX == b.JSX && a.Force == b.Force;
-}
-inline bool operator==(const SourceFileParseOptions& a,
-                       const SourceFileParseOptions& b) {
-	return a.FileName == b.FileName && a.Path == b.Path &&
-	       a.ExternalModuleIndicatorOptions == b.ExternalModuleIndicatorOptions;
-}
+// ast.go — SourceFileParseOptions serves as the parseCache key (Go
+// `comparable`); operator== lives on the structs in ast.h (this TU once
+// owned them — moved when program.cpp started comparing ParseOptions
+// for canReplaceFileInProgram, program.go:466).
 
 } // namespace tsc
 
