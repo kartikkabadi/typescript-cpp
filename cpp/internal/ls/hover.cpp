@@ -133,12 +133,6 @@ bool shouldGetType(::tsc::Node* node) {
 	}
 }
 
-// hover.go:421 — symbolDisplayInfo
-struct symbolDisplayInfo {
-	displayPartsWriter* displayParts = nullptr;
-	::tsc::Node* declaration = nullptr;
-};
-
 // hover.go:943 — typeParameterToString. Renders a type parameter declaration
 // (e.g., "T extends FooType").
 std::string typeParameterToString(checker::Checker* c, checker::Type* t,
@@ -1540,7 +1534,7 @@ documentationLocationMapper LanguageService::documentationLocationMapper(
 // hover.go:175 — getQuickInfoAndDocumentationForSymbol
 // ============================================================================
 std::tuple<std::string, std::string, std::string,
-		   std::vector<lsp::lsproto::VSClassifiedTextRun*>>
+		   lsp::lsproto::Slice<std::shared_ptr<lsp::lsproto::VSClassifiedTextRun>>>
 LanguageService::getQuickInfoAndDocumentationForSymbol(
 	checker::Checker* c, Symbol* symbol, ::tsc::Node* node,
 	lsp::lsproto::MarkupKind contentFormat,
@@ -1551,8 +1545,7 @@ LanguageService::getQuickInfoAndDocumentationForSymbol(
 	if (quickInfo.empty()) {
 		return {"", "", "", {}};
 	}
-	std::vector<lsp::lsproto::VSClassifiedTextRun*> quickInfoRuns =
-		info.displayParts->GetRuns();
+	auto quickInfoRuns = info.displayParts->GetRuns();
 
 	std::string documentation = getDocumentationForSymbol(
 		documentationLocationMapper(spanmap::FeatureHover), c, symbol,
@@ -1583,21 +1576,20 @@ LanguageService::getQuickInfoAndDocumentationForSymbol(
 // ============================================================================
 lsp::lsproto::HoverResponse LanguageService::ProvideHover(
 	gostd::Context ctx, lsp::lsproto::HoverParams* params) {
-	const lsp::lsproto::ResolvedClientCapabilities* caps =
-		lsp::lsproto::GetClientCapabilities(ctx);
+	auto caps = lsp::lsproto::getClientCapabilities(ctx);
 	lsp::lsproto::MarkupKind contentFormat =
 		lsp::lsproto::PreferredMarkupKind(
 			caps->TextDocument.Hover.ContentFormat);
 
 	int verbosityLevel = 0;
-	if (params->VerbosityLevel != nullptr) {
+	if (params->VerbosityLevel.has_value()) {
 		verbosityLevel = int(*params->VerbosityLevel);
 	}
 
 	auto [program, file] = getProgramAndFile(params->TextDocument.Uri);
 	auto positions = converters->FromLSPPositionForSourceFile(
 		file, params->Position, spanmap::FeatureHover);
-	std::vector<lsp::lsproto::Hover*> hovers;
+	std::vector<std::shared_ptr<lsp::lsproto::Hover>> hovers;
 	for (auto& projection : positions) {
 		if (!projection.Fidelity.IsSingleSegment()) {
 			continue;
@@ -1654,13 +1646,14 @@ lsp::lsproto::HoverResponse LanguageService::ProvideHover(
 			content = quickInfo + documentation;
 		}
 
-		auto* hover = new lsp::lsproto::Hover;
-		auto* markupContent = new lsp::lsproto::MarkupContent;
+		auto hover = std::make_shared<lsp::lsproto::Hover>();
+		auto markupContent = std::make_shared<lsp::lsproto::MarkupContent>();
 		markupContent->Kind = contentFormat;
 		markupContent->Value = content;
 		hover->Contents.MarkupContent = markupContent;
 		if (hoverFidelity.IsSingleSegment()) {
-			hover->Range = new lsp::lsproto::Range(hoverRange);
+			hover->Range =
+				std::make_shared<lsp::lsproto::Range>(hoverRange);
 		}
 
 		if (caps->Experimental.HoverVerbosityLevel) {
@@ -1671,7 +1664,7 @@ lsp::lsproto::HoverResponse LanguageService::ProvideHover(
 		// Clients that support Visual Studio extensions (e.g. VS itself, when Corsa/Native TS Preview is
 		// enabled) render `_vs_rawContent` in place of `contents`. Without it, VS shows plain markdown
 		// with no symbol icon and no syntax coloring, unlike the legacy TSServer-backed hover path.
-		if (vsCapability && !quickInfoRuns.empty()) {
+		if (vsCapability && !quickInfoRuns->empty()) {
 			lsutil::ScriptElementKind kind =
 				lsutil::ScriptElementKindKeyword;
 			lsutil::ScriptElementKindModifier modifiers =
@@ -1693,8 +1686,9 @@ lsp::lsproto::HoverResponse LanguageService::ProvideHover(
 			}
 			lsp::lsproto::VSImageId* imageId =
 				getVSHoverImageId(kind, modifiers);
-			std::vector<lsp::lsproto::VSClassifiedTextRun*>
-				documentationRuns;
+			lsp::lsproto::Slice<std::shared_ptr<lsp::lsproto::VSClassifiedTextRun>>
+			    documentationRuns{
+			        std::vector<std::shared_ptr<lsp::lsproto::VSClassifiedTextRun>>{}};
 			// strings.TrimLeft(vsDocumentation, "\n")
 			std::string_view docText{vsDocumentation};
 			size_t docStart = docText.find_first_not_of('\n');
@@ -1702,15 +1696,15 @@ lsp::lsproto::HoverResponse LanguageService::ProvideHover(
 						  ? ""
 						  : docText.substr(docStart);
 			if (!docText.empty()) {
-				auto* run = new lsp::lsproto::VSClassifiedTextRun;
+				auto run = std::make_shared<lsp::lsproto::VSClassifiedTextRun>();
 				run->ClassificationTypeName =
 					lsp::lsproto::ClassificationTypeName(
 						lsp::lsproto::ClassificationTypeNameText);
 				run->Text = std::string(docText);
-				documentationRuns.push_back(run);
+				documentationRuns->push_back(run);
 			}
-			hover->VSRawContent = buildVSHoverRawContent(
-				imageId, quickInfoRuns, documentationRuns);
+			hover->VSRawContent = std::shared_ptr<lsp::lsproto::VSContainerElement>(
+			    buildVSHoverRawContent(imageId, quickInfoRuns, documentationRuns));
 		}
 
 		hovers.push_back(hover);
@@ -1724,15 +1718,15 @@ lsp::lsproto::HoverResponse LanguageService::ProvideHover(
 		return resp;
 	}
 
-	lsp::lsproto::Hover* combined = hovers[0];
+	std::shared_ptr<lsp::lsproto::Hover> combined = hovers[0];
 	std::vector<std::string> contents;
 	collections::Set<std::string> seenContents;
 	std::vector<lsp::lsproto::
 					VSImageElementOrClassifiedTextElementOrContainerElement>
 		rawContents;
-	lsp::lsproto::Range* commonRange = combined->Range;
+	std::shared_ptr<lsp::lsproto::Range> commonRange = combined->Range;
 
-	for (auto* hover : hovers) {
+	for (auto& hover : hovers) {
 		// strings.TrimRight(hover.Contents.MarkupContent.Value, "\n")
 		std::string_view val{hover->Contents.MarkupContent->Value};
 		size_t end = val.find_last_not_of('\n');

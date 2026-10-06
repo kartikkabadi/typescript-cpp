@@ -11,6 +11,14 @@
 
 namespace tsc::lsconv {
 
+// DiagnosticToLSPPull (converters.go:459) — dep-stub: port lands with the
+// lsconv slice.
+lsproto::Diagnostic* DiagnosticToLSPPull(
+    gostd::Context ctx, Converters* converters, Diagnostic* diagnostic,
+    bool reportStyleChecksAsWarnings) {
+	TSC_UNREACHABLE("DiagnosticToLSPPull — lsconv slice");
+}
+
 // ComputeLSPLineStarts (linemap.go:19) — like core.ComputeLineStarts, but only
 // considers "\n", "\r", and "\r\n" as line breaks, and reports when the text
 // is ASCII-only.

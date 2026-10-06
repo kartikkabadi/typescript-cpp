@@ -1,5 +1,6 @@
 // === slice: ls-coreC ===
 // definition.cpp — definition.go: go-to-definition and go-to-type-definition.
+#include "internal/astnav/tokens.h"
 #include "internal/ls/ls.h"
 
 namespace tsc::ls {
@@ -18,22 +19,11 @@ struct Deferred {
 };
 
 // --- file-local replicas of ast/utilities.go helpers ---
-// ast/utilities.go:2326 — IsJumpStatementTarget
-bool isJumpStatementTarget(::tsc::Node* node) {
-	if (!isIdentifier(node)) {
-		return false;
-	}
-	if (!(isBreakStatement(node->parent) || isContinueStatement(node->parent))) {
-		return false;
-	}
-	return node == node->parent->label();
-}
+// (isJumpStatementTarget / isRightSideOfPropertyAccess live in
+// utilities.cpp)
 
-// ast/utilities.go:3646 — IsRightSideOfPropertyAccess
-bool isRightSideOfPropertyAccess(::tsc::Node* node) {
-	return node->parent->kind == Kind::PropertyAccessExpression &&
-		   node->parent->name() == node;
-}
+// findallreferences.cpp — findallreferences.go:297.
+::tsc::Node* getContextNode(::tsc::Node* node);
 
 // ast/utilities.go:3764 — GetInvokedExpression
 ::tsc::Node* getInvokedExpression(::tsc::Node* node) {
@@ -163,11 +153,12 @@ namespace tsc::ls {
 lsp::lsproto::DefinitionResponse combineDefinitionResponses(
 	const std::vector<lsp::lsproto::DefinitionResponse>& results, bool links) {
 	std::vector<lsp::lsproto::Location> locations;
-	std::vector<lsp::lsproto::LocationLink*> definitionLinks;
+	std::vector<std::shared_ptr<lsp::lsproto::LocationLink>>
+	    definitionLinks;
 	collections::Set<lsp::lsproto::Location> seen;
 	for (auto& result : results) {
 		if (result.DefinitionLinks != nullptr) {
-			for (auto* link : *result.DefinitionLinks) {
+			for (auto& link : **result.DefinitionLinks) {
 				lsp::lsproto::Location location;
 				location.Uri = link->TargetUri;
 				location.Range = link->TargetSelectionRange;
@@ -179,17 +170,17 @@ lsp::lsproto::DefinitionResponse combineDefinitionResponses(
 		}
 		if (result.Location != nullptr && seen.AddIfAbsent(*result.Location)) {
 			locations.push_back(*result.Location);
-			auto* link = new lsp::lsproto::LocationLink;
+			auto link = std::make_shared<lsp::lsproto::LocationLink>();
 			link->TargetUri = result.Location->Uri;
 			link->TargetRange = result.Location->Range;
 			link->TargetSelectionRange = result.Location->Range;
 			definitionLinks.push_back(link);
 		}
 		if (result.Locations != nullptr) {
-			for (auto& location : *result.Locations) {
+			for (auto& location : **result.Locations) {
 				if (seen.AddIfAbsent(location)) {
 					locations.push_back(location);
-					auto* link = new lsp::lsproto::LocationLink;
+					auto link = std::make_shared<lsp::lsproto::LocationLink>();
 					link->TargetUri = location.Uri;
 					link->TargetRange = location.Range;
 					link->TargetSelectionRange = location.Range;
@@ -200,11 +191,12 @@ lsp::lsproto::DefinitionResponse combineDefinitionResponses(
 	}
 	lsp::lsproto::LocationOrLocationsOrDefinitionLinksOrNull res;
 	if (links) {
-		res.DefinitionLinks =
-			new std::vector<lsp::lsproto::LocationLink*>(std::move(definitionLinks));
+		res.DefinitionLinks = std::make_shared<lsp::lsproto::Slice<
+		    std::shared_ptr<lsp::lsproto::LocationLink>>>(
+		    std::move(definitionLinks));
 	} else {
-		res.Locations =
-			new std::vector<lsp::lsproto::Location>(std::move(locations));
+		res.Locations = std::make_shared<lsp::lsproto::Slice<
+		    lsp::lsproto::Location>>(std::move(locations));
 	}
 	return res;
 }
@@ -235,16 +227,18 @@ bool lspRangeContains(lsp::lsproto::Range outer, lsp::lsproto::Range inner) {
 
 // definition.go:286 — createLocationsFromLinks
 lsp::lsproto::DefinitionResponse createLocationsFromLinks(
-	std::vector<lsp::lsproto::LocationLink*>& links) {
-	auto locations = mapVec(links, [](lsp::lsproto::LocationLink* link) {
+	std::vector<std::shared_ptr<lsp::lsproto::LocationLink>>& links) {
+	auto locations = mapVec(links,
+	                        [](const std::shared_ptr<lsp::lsproto::LocationLink>&
+	                               link) {
 		lsp::lsproto::Location loc;
 		loc.Uri = link->TargetUri;
 		loc.Range = link->TargetSelectionRange;
 		return loc;
 	});
 	lsp::lsproto::LocationOrLocationsOrDefinitionLinksOrNull res;
-	res.Locations =
-		new std::vector<lsp::lsproto::Location>(std::move(locations));
+	res.Locations = std::make_shared<lsp::lsproto::Slice<
+	    lsp::lsproto::Location>>(std::move(locations));
 	return res;
 }
 
@@ -524,8 +518,7 @@ lsp::lsproto::DefinitionResponse LanguageService::ProvideDefinition(
 lsp::lsproto::DefinitionResponse LanguageService::provideDefinitionWorker(
 	gostd::Context ctx, lsp::lsproto::DocumentUri documentURI,
 	lsp::lsproto::Position position) {
-	const lsp::lsproto::ResolvedClientCapabilities* caps =
-		lsp::lsproto::GetClientCapabilities(ctx);
+	auto caps = lsp::lsproto::getClientCapabilities(ctx);
 	bool clientSupportsLink = caps->TextDocument.Definition.LinkSupport;
 
 	auto [program, file] = getProgramAndFile(documentURI);
@@ -642,8 +635,7 @@ lsp::lsproto::DefinitionResponse LanguageService::provideDefinitionAtPosition(
 lsp::lsproto::TypeDefinitionResponse LanguageService::ProvideTypeDefinition(
 	gostd::Context ctx, lsp::lsproto::DocumentUri documentURI,
 	lsp::lsproto::Position position) {
-	const lsp::lsproto::ResolvedClientCapabilities* caps =
-		lsp::lsproto::GetClientCapabilities(ctx);
+	auto caps = lsp::lsproto::getClientCapabilities(ctx);
 	bool clientSupportsLink = caps->TextDocument.TypeDefinition.LinkSupport;
 
 	auto [program, file] = getProgramAndFile(documentURI);
@@ -712,13 +704,14 @@ lsp::lsproto::DefinitionResponse LanguageService::createDefinitionLocations(
 	lsp::lsproto::Range originSelectionRange, bool clientSupportsLink,
 	std::vector<::tsc::Node*> declarations, refInfo* reference,
 	spanmap::Feature feature) {
-	std::vector<lsp::lsproto::LocationLink*> locations;
+	std::vector<std::shared_ptr<lsp::lsproto::LocationLink>> locations;
 	collections::Set<fileRange> locationRanges;
 
 	if (reference != nullptr) {
 		lsp::lsproto::Range targetRange;
-		auto* link = new lsp::lsproto::LocationLink;
-		link->OriginSelectionRange = new lsp::lsproto::Range(originSelectionRange);
+		auto link = std::make_shared<lsp::lsproto::LocationLink>();
+		link->OriginSelectionRange =
+			std::make_shared<lsp::lsproto::Range>(originSelectionRange);
 		link->TargetUri =
 			lsconv::FileNameToDocumentURI(reference->fileName);
 		link->TargetRange = targetRange;
@@ -757,9 +750,9 @@ lsp::lsproto::DefinitionResponse LanguageService::createDefinitionLocations(
 				!lspRangeContains(targetLoc.Range, targetSelectionLoc.Range)) {
 				targetLoc = targetSelectionLoc;
 			}
-			auto* link = new lsp::lsproto::LocationLink;
-			link->OriginSelectionRange =
-				new lsp::lsproto::Range(originSelectionRange);
+			auto link = std::make_shared<lsp::lsproto::LocationLink>();
+			link->OriginSelectionRange = std::make_shared<lsp::lsproto::Range>(
+			    originSelectionRange);
 			link->TargetSelectionRange = targetSelectionLoc.Range;
 			link->TargetUri = targetLoc.Uri;
 			link->TargetRange = targetLoc.Range;
@@ -769,8 +762,9 @@ lsp::lsproto::DefinitionResponse LanguageService::createDefinitionLocations(
 
 	lsp::lsproto::LocationOrLocationsOrDefinitionLinksOrNull res;
 	if (clientSupportsLink) {
-		res.DefinitionLinks =
-			new std::vector<lsp::lsproto::LocationLink*>(std::move(locations));
+		res.DefinitionLinks = std::make_shared<lsp::lsproto::Slice<
+		    std::shared_ptr<lsp::lsproto::LocationLink>>>(
+		    std::move(locations));
 		return res;
 	}
 	return createLocationsFromLinks(locations);
@@ -785,7 +779,8 @@ lsp::lsproto::DefinitionResponse LanguageService::createLocationFromFileAndRange
 		mappedLocation.Range = lsp::lsproto::Range{};
 	}
 	lsp::lsproto::LocationOrLocationsOrDefinitionLinksOrNull res;
-	res.Location = new lsp::lsproto::Location(mappedLocation);
+	res.Location =
+		std::make_shared<lsp::lsproto::Location>(mappedLocation);
 	return res;
 }
 

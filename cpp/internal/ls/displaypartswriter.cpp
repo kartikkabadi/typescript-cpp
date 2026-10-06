@@ -21,10 +21,10 @@ void displayPartsWriter::addRun(lsproto::ClassificationTypeName classification,
 		return;
 	}
 	if (vsCapability) {
-		runs.push_back(new lsproto::VSClassifiedTextRun{
-		    .ClassificationTypeName = classification,
-		    .Text = text,
-		});
+		auto run = std::make_shared<lsproto::VSClassifiedTextRun>();
+		run->ClassificationTypeName = classification;
+		run->Text = text;
+		runs.push_back(std::move(run));
 	}
 	lastWritten = text;
 	builder += text;
@@ -43,8 +43,10 @@ void displayPartsWriter::WriteClassified(
 void displayPartsWriter::WriteFrom(displayPartsWriter* other) {
 	builder += other->String();
 	if (vsCapability) {
-		for (auto* run : other->GetRuns()) {
-			runs.push_back(run);
+		if (auto otherRuns = other->GetRuns(); otherRuns.has_value()) {
+			for (auto& run : *otherRuns) {
+				runs.push_back(run);
+			}
 		}
 	}
 	if (other->lastWritten != "") {
@@ -53,7 +55,8 @@ void displayPartsWriter::WriteFrom(displayPartsWriter* other) {
 }
 
 // GetRuns — displaypartswriter.go:60.
-std::vector<lsproto::VSClassifiedTextRun*> displayPartsWriter::GetRuns()
+lsproto::Slice<std::shared_ptr<lsproto::VSClassifiedTextRun>>
+displayPartsWriter::GetRuns()
     const {
 	return runs;
 }
@@ -130,69 +133,69 @@ bool displayPartsWriter::IsAtStartOfLine() {
 
 // RawWrite — displaypartswriter.go:103.
 void displayPartsWriter::RawWrite(const std::string& s) {
-	addRun(lsproto::ClassificationTypeText, s);
+	addRun(lsproto::ClassificationTypeNameText, s);
 }
 
 // Write — displaypartswriter.go:107.
 void displayPartsWriter::Write(const std::string& s) {
-	addRun(lsproto::ClassificationTypeText, s);
+	addRun(lsproto::ClassificationTypeNameText, s);
 }
 
 // WriteComment — displaypartswriter.go:111. Strada's writeComment uses
 // unknownWrite → SymbolDisplayPartKind.text → "text".
 void displayPartsWriter::WriteComment(const std::string& text) {
-	addRun(lsproto::ClassificationTypeText, text);
+	addRun(lsproto::ClassificationTypeNameText, text);
 }
 
 // WriteKeyword — displaypartswriter.go:116.
 void displayPartsWriter::WriteKeyword(const std::string& text) {
-	addRun(lsproto::ClassificationTypeKeyword, text);
+	addRun(lsproto::ClassificationTypeNameKeyword, text);
 }
 
 // WriteLine — displaypartswriter.go:120.
 void displayPartsWriter::WriteLine() {
-	addRun(lsproto::ClassificationTypeWhiteSpace, " ");
+	addRun(lsproto::ClassificationTypeNameWhiteSpace, " ");
 }
 
 // WriteLineForce — displaypartswriter.go:124.
 void displayPartsWriter::WriteLineForce(bool force) {
-	addRun(lsproto::ClassificationTypeWhiteSpace, " ");
+	addRun(lsproto::ClassificationTypeNameWhiteSpace, " ");
 }
 
 // WriteLiteral — displaypartswriter.go:128. Strada's writeLiteral →
 // SymbolDisplayPartKind.stringLiteral → "string".
 void displayPartsWriter::WriteLiteral(const std::string& s) {
-	addRun(lsproto::ClassificationTypeStringLiteral, s);
+	addRun(lsproto::ClassificationTypeNameString, s);
 }
 
 // WriteOperator — displaypartswriter.go:133.
 void displayPartsWriter::WriteOperator(const std::string& text) {
-	addRun(lsproto::ClassificationTypeOperator, text);
+	addRun(lsproto::ClassificationTypeNameOperator, text);
 }
 
 // WriteParameter — displaypartswriter.go:137.
 void displayPartsWriter::WriteParameter(const std::string& text) {
-	addRun(lsproto::ClassificationTypeParameterName, text);
+	addRun(lsproto::ClassificationTypeNameParameterName, text);
 }
 
 // WriteProperty — displaypartswriter.go:141.
 void displayPartsWriter::WriteProperty(const std::string& text) {
-	addRun(lsproto::ClassificationTypePropertyName, text);
+	addRun(lsproto::ClassificationTypeNamePropertyName, text);
 }
 
 // WritePunctuation — displaypartswriter.go:145.
 void displayPartsWriter::WritePunctuation(const std::string& text) {
-	addRun(lsproto::ClassificationTypePunctuation, text);
+	addRun(lsproto::ClassificationTypeNamePunctuation, text);
 }
 
 // WriteSpace — displaypartswriter.go:149.
 void displayPartsWriter::WriteSpace(const std::string& text) {
-	addRun(lsproto::ClassificationTypeWhiteSpace, text);
+	addRun(lsproto::ClassificationTypeNameWhiteSpace, text);
 }
 
 // WriteStringLiteral — displaypartswriter.go:153.
 void displayPartsWriter::WriteStringLiteral(const std::string& text) {
-	addRun(lsproto::ClassificationTypeStringLiteral, text);
+	addRun(lsproto::ClassificationTypeNameString, text);
 }
 
 // WriteSymbol — displaypartswriter.go:157.
@@ -204,7 +207,7 @@ void displayPartsWriter::WriteSymbol(const std::string& text,
 
 // WriteTrailingSemicolon — displaypartswriter.go:162.
 void displayPartsWriter::WriteTrailingSemicolon(const std::string& text) {
-	addRun(lsproto::ClassificationTypePunctuation, text);
+	addRun(lsproto::ClassificationTypeNamePunctuation, text);
 }
 
 // classificationForSymbol — displaypartswriter.go:168. Determines the Roslyn
@@ -212,55 +215,55 @@ void displayPartsWriter::WriteTrailingSemicolon(const std::string& text) {
 // translation chain: displayPartKind() → GetClassificationName().
 lsproto::ClassificationTypeName classificationForSymbol(Symbol* symbol) {
 	if (symbol == nullptr) {
-		return lsproto::ClassificationTypeText;
+		return lsproto::ClassificationTypeNameText;
 	}
 	auto flags = symbol->flags;
 	if (flags & SymbolFlagsVariable) {
 		if (isFirstDeclarationOfSymbolParameter(symbol)) {
-			return lsproto::ClassificationTypeParameterName;
+			return lsproto::ClassificationTypeNameParameterName;
 		}
-		return lsproto::ClassificationTypeLocalName;
+		return lsproto::ClassificationTypeNameLocalName;
 	}
 	if (flags & SymbolFlagsProperty) {
-		return lsproto::ClassificationTypePropertyName;
+		return lsproto::ClassificationTypeNamePropertyName;
 	}
 	if (flags & SymbolFlagsGetAccessor) {
-		return lsproto::ClassificationTypePropertyName;
+		return lsproto::ClassificationTypeNamePropertyName;
 	}
 	if (flags & SymbolFlagsSetAccessor) {
-		return lsproto::ClassificationTypePropertyName;
+		return lsproto::ClassificationTypeNamePropertyName;
 	}
 	if (flags & SymbolFlagsEnumMember) {
-		return lsproto::ClassificationTypeFieldName;
+		return lsproto::ClassificationTypeNameFieldName;
 	}
 	if (flags & SymbolFlagsFunction) {
-		return lsproto::ClassificationTypeMethodName;
+		return lsproto::ClassificationTypeNameMethodName;
 	}
 	if (flags & SymbolFlagsClass) {
-		return lsproto::ClassificationTypeClassName;
+		return lsproto::ClassificationTypeNameClassName;
 	}
 	if (flags & SymbolFlagsInterface) {
-		return lsproto::ClassificationTypeInterfaceName;
+		return lsproto::ClassificationTypeNameInterfaceName;
 	}
 	if (flags & SymbolFlagsEnum) {
-		return lsproto::ClassificationTypeEnumName;
+		return lsproto::ClassificationTypeNameEnumName;
 	}
 	if (flags & SymbolFlagsModule) {
-		return lsproto::ClassificationTypeModuleName;
+		return lsproto::ClassificationTypeNameModuleName;
 	}
 	if (flags & SymbolFlagsMethod) {
-		return lsproto::ClassificationTypeMethodName;
+		return lsproto::ClassificationTypeNameMethodName;
 	}
 	if (flags & SymbolFlagsTypeParameter) {
-		return lsproto::ClassificationTypeTypeParameterName;
+		return lsproto::ClassificationTypeNameTypeParameterName;
 	}
 	if (flags & SymbolFlagsTypeAlias) {
-		return lsproto::ClassificationTypeIdentifier;
+		return lsproto::ClassificationTypeNameIdentifier;
 	}
 	if (flags & SymbolFlagsAlias) {
-		return lsproto::ClassificationTypeIdentifier;
+		return lsproto::ClassificationTypeNameIdentifier;
 	}
-	return lsproto::ClassificationTypeText;
+	return lsproto::ClassificationTypeNameText;
 }
 
 // isFirstDeclarationOfSymbolParameter — displaypartswriter.go:211. Checks if

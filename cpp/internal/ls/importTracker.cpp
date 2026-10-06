@@ -37,45 +37,6 @@ bool contains(const std::vector<T>& v, const T& x) {
 	return std::find(v.begin(), v.end(), x) != v.end();
 }
 
-// nodeSeenTracker — utilities.go:1292, inlined (sibling slice owns it).
-struct nodeSeenTracker {
-	collections::Set<Node*> seen;
-	bool operator()(Node* node) {
-		if (seen.Has(node)) {
-			return false;
-		}
-		seen.Add(node);
-		return true;
-	}
-};
-
-// ast.TryGetImportFromModuleSpecifier — utilities.go:4203.
-Node* tryGetImportFromModuleSpecifier(Node* node) {
-	switch (node->parent->kind) {
-	case Kind::ImportDeclaration:
-	case Kind::JSImportDeclaration:
-	case Kind::ExportDeclaration:
-		return node->parent;
-	case Kind::ExternalModuleReference:
-		return node->parent->parent;
-	case Kind::CallExpression:
-		if (isImportCall(node->parent) ||
-		    isRequireCall(node->parent, false /*requireStringLiteralLikeArgument*/)) {
-			return node->parent;
-		}
-		return nullptr;
-	case Kind::LiteralType:
-		if (!isStringLiteral(node)) {
-			return nullptr;
-		}
-		if (isImportTypeNode(node->parent->parent)) {
-			return node->parent->parent;
-		}
-		return nullptr;
-	}
-	return nullptr;
-}
-
 // ast.ImportFromModuleSpecifier — utilities.go:4195.
 Node* importFromModuleSpecifier(Node* node) {
 	if (auto* result = tryGetImportFromModuleSpecifier(node); result != nullptr) {
@@ -281,7 +242,7 @@ Node* getSourceFileLikeForImportDeclaration(Node* node) {
 	if (isSourceFile(parent)) {
 		return parent;
 	}
-	assert(isModuleBlock(parent) &&
+	debug::assert(isModuleBlock(parent) &&
 	              isAmbientModuleDeclaration(parent->parent));
 	return parent->parent;
 }
@@ -310,8 +271,8 @@ std::pair<std::vector<Node*>, std::vector<SourceFile*>> getImportersForExport(
     ExportInfo* exportInfo, checker::Checker* ch) {
 	std::vector<Node*> directImports;
 	std::vector<Node*> indirectUserDeclarations;
-	nodeSeenTracker markSeenDirectImport;
-	nodeSeenTracker markSeenIndirectUser;
+	auto markSeenDirectImport = nodeSeenTracker();
+	auto markSeenIndirectUser = nodeSeenTracker();
 	bool isAvailableThroughGlobal = isSourceFileWithGlobalExports(
 	    exportInfo->exportingModuleSymbol->valueDeclaration);
 
@@ -343,7 +304,7 @@ std::pair<std::vector<Node*>, std::vector<SourceFile*>> getImportersForExport(
 		    if (moduleSymbol == nullptr) {
 			    return;
 		    }
-		    assert(moduleSymbol->flags & SymbolFlagsModule);
+		    debug::assert(moduleSymbol->flags & SymbolFlagsModule);
 		    for (auto* directImport : getDirectImports(moduleSymbol)) {
 			    if (!isImportTypeNode(directImport)) {
 				    addIndirectUser(
@@ -388,7 +349,7 @@ std::pair<std::vector<Node*>, std::vector<SourceFile*>> getImportersForExport(
 		} else if (!isAvailableThroughGlobal) {
 			auto* sourceFileLike =
 			    getSourceFileLikeForImportDeclaration(importDeclaration);
-			assert(isSourceFile(sourceFileLike) ||
+			debug::assert(isSourceFile(sourceFileLike) ||
 			              isModuleDeclaration(sourceFileLike));
 			addIndirectUser(
 			    sourceFileLike,
@@ -970,7 +931,7 @@ bool isNodeImport(Node* node) {
 		return parent->propertyName() == nullptr;
 	case Kind::ImportClause:
 	case Kind::NamespaceImport:
-		assert(parent->name() == node);
+		debug::assert(parent->name() == node);
 		return true;
 	case Kind::BindingElement:
 		return isInJSFile(node) &&
@@ -1028,7 +989,7 @@ Symbol* getExportEqualsLocalSymbol(Symbol* importedSymbol,
 		return ch->GetImmediateAliasedSymbol(importedSymbol);
 	}
 	auto* decl = importedSymbol->valueDeclaration;
-	assert(decl != nullptr);
+	debug::assert(decl != nullptr);
 	if (isExportAssignment(decl)) {
 		return decl->expression()->symbol();
 	}

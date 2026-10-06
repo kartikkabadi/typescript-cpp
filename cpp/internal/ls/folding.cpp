@@ -1,5 +1,6 @@
 // === slice: ls-coreC ===
 // folding.cpp — folding.go: folding ranges (node outlining + region comments).
+#include "internal/astnav/tokens.h"
 #include "internal/ls/ls.h"
 
 namespace tsc::ls {
@@ -149,7 +150,7 @@ lsp::lsproto::FoldingRange* createFoldingRange(gostd::Context ctx,
 
 // folding.go:600 — supportsCollapsedText
 bool supportsCollapsedText(gostd::Context ctx) {
-	return lsp::lsproto::GetClientCapabilities(ctx)
+	return lsp::lsproto::getClientCapabilities(ctx)
 		->TextDocument.FoldingRange.FoldingRange.CollapsedText;
 }
 
@@ -777,7 +778,7 @@ lsp::lsproto::FoldingRangeResponse LanguageService::ProvideFoldingRange(
 		auto ranges = addNodeOutliningSpans(ctx, projection);
 		auto regionRanges = addRegionOutliningSpans(ctx, projection);
 		ranges.insert(ranges.end(), regionRanges.begin(), regionRanges.end());
-		if (lsp::lsproto::GetClientCapabilities(ctx)
+		if (lsp::lsproto::getClientCapabilities(ctx)
 				->TextDocument.FoldingRange.LineFoldingOnly) {
 			ranges = adjustFoldingEnd(ranges, projection);
 		}

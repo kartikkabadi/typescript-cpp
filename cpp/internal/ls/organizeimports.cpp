@@ -35,16 +35,16 @@ struct doneGuard {
 
 // organizeImportsComparerSettings — organizeimports.go:120.
 struct organizeImportsComparerSettings {
-	std::function<int(std::string, std::string)> moduleSpecifierComparer;
-	std::function<int(std::string, std::string)> namedImportComparer;
+	lsutil::StringComparer moduleSpecifierComparer;
+	lsutil::StringComparer namedImportComparer;
 	lsutil::OrganizeImportsTypeOrder typeOrder;
 };
 
 // importGroup — organizeimports.go:628.
 struct importGroup {
-	std::vector<Statement*> defaultImports;
-	std::vector<Statement*> namespaceImports;
-	std::vector<Statement*> namedImports;
+	std::vector<Node*> defaultImports;
+	std::vector<Node*> namespaceImports;
+	std::vector<Node*> namedImports;
 
 	bool isEmpty() const {
 		return defaultImports.empty() && namespaceImports.empty() &&
@@ -54,76 +54,77 @@ struct importGroup {
 
 // categorizedImports — organizeimports.go:623.
 struct categorizedImports {
-	Statement* importWithoutClause = nullptr;
+	Node* importWithoutClause = nullptr;
 	importGroup typeOnlyImports;
 	importGroup regularImports;
 };
 
 // categorizedExports — organizeimports.go:924.
 struct categorizedExports {
-	Statement* exportWithoutClause = nullptr;
-	std::vector<Statement*> namedExports;
-	std::vector<Statement*> typeOnlyExports;
+	Node* exportWithoutClause = nullptr;
+	std::vector<Node*> namedExports;
+	std::vector<Node*> typeOnlyExports;
 };
 
 void organizeImportsWorker(
-    std::vector<Statement*> oldImportDecls,
+    std::vector<Node*> oldImportDecls,
     const organizeImportsComparerSettings& comparer, bool shouldSort,
     bool shouldCombine, bool shouldRemove, SourceFile* sourceFile,
     compiler::SimpleProgram* program, change::Tracker* changeTracker,
     const gostd::Context& ctx);
-std::vector<std::vector<Statement*>> groupByModuleSpecifier(
-    const std::vector<Statement*>& imports);
-std::vector<Statement*> removeUnusedImports(
-    std::vector<Statement*> oldImports, SourceFile* sourceFile,
+std::vector<std::vector<Node*>> groupByModuleSpecifier(
+    const std::vector<Node*>& imports);
+std::vector<Node*> removeUnusedImports(
+    std::vector<Node*> oldImports, SourceFile* sourceFile,
     checker::Checker* typeChecker, compiler::SimpleProgram* program,
     change::Tracker* changeTracker);
-std::vector<Statement*> filterUsedImportSpecifiers(
-    const std::vector<Statement*>& elements, checker::Checker* typeChecker,
+std::vector<Node*> filterUsedImportSpecifiers(
+    const std::vector<Node*>& elements, checker::Checker* typeChecker,
     SourceFile* sourceFile, bool jsxElementsPresent,
     bool jsxModeNeedsExplicitImport);
 bool hasModuleDeclarationMatchingSpecifier(SourceFile* sourceFile,
                                            Node* moduleSpecifier);
 std::string getImportAttributesKey(Node* attributes);
-std::vector<std::vector<Statement*>> groupByNewlineContiguous(
-    SourceFile* sourceFile, const std::vector<Statement*>& decls);
-bool isNewGroup(SourceFile* sourceFile, Statement* decl, Scanner* s);
-std::vector<Statement*> coalesceImportsWorker(
-    std::vector<Statement*> importDecls,
-    const std::function<int(std::string, std::string)>& comparer,
+std::vector<std::vector<Node*>> groupByNewlineContiguous(
+    SourceFile* sourceFile, const std::vector<Node*>& decls);
+bool isNewGroup(SourceFile* sourceFile, Node* decl, Scanner* s);
+std::vector<Node*> coalesceImportsWorker(
+    std::vector<Node*> importDecls,
+    const lsutil::StringComparer& comparer,
     const std::function<int(Node*, Node*)>& specifierComparer,
     SourceFile* sourceFile, change::Tracker* changeTracker);
 categorizedImports getCategorizedImports(
-    const std::vector<Statement*>& importDecls);
+    const std::vector<Node*>& importDecls);
 std::vector<Node*> getNewImportSpecifiers(
-    const std::vector<Statement*>& namedImports, NodeFactory* factory);
-std::vector<Node*> tryGetNamedBindingElements(Statement* namedImport);
-std::vector<std::vector<Statement*>> getTopLevelExportGroups(
+    const std::vector<Node*>& namedImports, NodeFactory* factory);
+std::vector<Node*> tryGetNamedBindingElements(Node* namedImport);
+std::vector<std::vector<Node*>> getTopLevelExportGroups(
     SourceFile* sourceFile);
 void organizeExportsWorker(
-    const std::vector<Statement*>& oldExportDecls,
+    const std::vector<Node*>& oldExportDecls,
     const organizeImportsComparerSettings& comparer,
     SourceFile* sourceFile, change::Tracker* changeTracker);
-std::vector<Statement*> coalesceExportsWorker(
-    const std::vector<Statement*>& exportGroup,
+std::vector<Node*> coalesceExportsWorker(
+    const std::vector<Node*>& exportGroup,
     const std::function<int(Node*, Node*)>& specifierComparer,
-    const std::function<int(std::string, std::string)>&
+    const lsutil::StringComparer&
         moduleSpecifierComparer,
     SourceFile* sourceFile, change::Tracker* changeTracker);
 categorizedExports getCategorizedExports(
-    const std::vector<Statement*>& exportGroup);
+    const std::vector<Node*>& exportGroup);
 
 } // namespace
 
 // OrganizeImports — organizeimports.go:21.
-std::unordered_map<std::string, std::vector<lsproto::TextEdit*>>
+lsproto::Map<std::string,
+             lsproto::Slice<std::shared_ptr<lsproto::TextEdit>>>
 LanguageService::OrganizeImports(const gostd::Context& ctx,
                                  SourceFile* sourceFile,
                                  compiler::SimpleProgram* program,
                                  lsproto::CodeActionKind kind) {
 	auto* changeTracker =
-	    change::NewTracker(ctx, program->Options(), FormatOptions(),
-	                       converters);
+	    new change::Tracker(format::FormatRequestContext{},
+	                        program->Options(), FormatOptions(), converters);
 	bool shouldSort =
 	    kind == lsproto::CodeActionKindSourceSortImportsTs ||
 	    kind == lsproto::CodeActionKindSourceOrganizeImportsTs;
@@ -142,8 +143,8 @@ LanguageService::OrganizeImports(const gostd::Context& ctx,
 	auto& defaultComparer = comparersToTest[0];
 	auto sort = lsutil::ResolveOrganizeImportsSort(preferences);
 
-	std::function<int(std::string, std::string)> moduleSpecifierComparer;
-	std::function<int(std::string, std::string)> namedImportComparer;
+	lsutil::StringComparer moduleSpecifierComparer;
+	lsutil::StringComparer namedImportComparer;
 	if (sort != lsutil::OrganizeImportsSortAuto) {
 		moduleSpecifierComparer = defaultComparer;
 		namedImportComparer = defaultComparer;
@@ -216,7 +217,7 @@ LanguageService::OrganizeImports(const gostd::Context& ctx,
 		}
 
 		if (kind != lsproto::CodeActionKindSourceRemoveUnusedImportsTs) {
-			std::vector<Statement*> ambientModuleExportDecls;
+			std::vector<Node*> ambientModuleExportDecls;
 			for (auto* s : moduleBody->Statements->nodes) {
 				if (s->kind == Kind::ExportDeclaration) {
 					ambientModuleExportDecls.push_back(s);
@@ -231,14 +232,26 @@ LanguageService::OrganizeImports(const gostd::Context& ctx,
 	// whose imports cannot be faithfully rewritten yields no edits rather
 	// than a corrupting one.
 	auto changes = changeTracker->GetChanges().first;
-	return changes;
+	lsproto::Map<std::string,
+	             lsproto::Slice<std::shared_ptr<lsproto::TextEdit>>>
+	    out;
+	for (auto& [fileName, edits] : changes) {
+		std::vector<std::shared_ptr<lsproto::TextEdit>> fileEdits;
+		fileEdits.reserve(edits.size());
+		for (auto& e : edits) {
+			fileEdits.push_back(std::make_shared<lsproto::TextEdit>(e));
+		}
+		out[fileName] = lsproto::Slice<
+		    std::shared_ptr<lsproto::TextEdit>>(std::move(fileEdits));
+	}
+	return out;
 }
 
 namespace {
 
 // organizeImportsWorker — organizeimports.go:127.
 void organizeImportsWorker(
-    std::vector<Statement*> oldImportDecls,
+    std::vector<Node*> oldImportDecls,
     const organizeImportsComparerSettings& comparer, bool shouldSort,
     bool shouldCombine, bool shouldRemove, SourceFile* sourceFile,
     compiler::SimpleProgram* program, change::Tracker* changeTracker,
@@ -260,13 +273,13 @@ void organizeImportsWorker(
 		                        program, changeTracker);
 	}
 
-	std::vector<Statement*> newImportDecls;
+	std::vector<Node*> newImportDecls;
 	if (shouldCombine) {
 		auto grouped = groupByModuleSpecifier(processedImports);
 		if (shouldSort) {
 			std::sort(grouped.begin(), grouped.end(),
-			          [&comparer](const std::vector<Statement*>& a,
-			                      const std::vector<Statement*>& b) {
+			          [&comparer](const std::vector<Node*>& a,
+			                      const std::vector<Node*>& b) {
 				          if (a.empty() || b.empty()) {
 					          return false;
 				          }
@@ -288,7 +301,7 @@ void organizeImportsWorker(
 			    specifierComparer, sourceFile, changeTracker);
 			if (shouldSort) {
 				std::sort(coalesced.begin(), coalesced.end(),
-				          [&comparer](Statement* a, Statement* b) {
+				          [&comparer](Node* a, Node* b) {
 					          return lsutil::
 					                     CompareImportsOrRequireStatements(
 					                         a, b,
@@ -306,7 +319,7 @@ void organizeImportsWorker(
 
 	if (shouldSort && !shouldCombine) {
 		std::sort(newImportDecls.begin(), newImportDecls.end(),
-		          [&comparer](Statement* a, Statement* b) {
+		          [&comparer](Node* a, Node* b) {
 			          return lsutil::CompareImportsOrRequireStatements(
 			                     a, b, comparer.moduleSpecifierComparer) <
 			                 0;
@@ -321,14 +334,14 @@ void organizeImportsWorker(
 		    change::TrailingTriviaOptionInclude);
 	} else {
 		for (auto* imp : newImportDecls) {
-			changeTracker->EmitContext->setEmitFlags(
+			changeTracker->emitContext->setEmitFlags(
 			    imp, printer::EFNoLeadingComments);
 		}
 
 		change::NodeOptions options{
-		    .leadingTriviaOption =
+		    .leadingTrivia =
 		        change::LeadingTriviaOptionExclude, // Preserve header comment
-		    .trailingTriviaOption =
+		    .trailingTrivia =
 		        change::TrailingTriviaOptionInclude,
 		    .Suffix = "\n",
 		};
@@ -350,10 +363,10 @@ void organizeImportsWorker(
 }
 
 // groupByModuleSpecifier — organizeimports.go:212.
-std::vector<std::vector<Statement*>> groupByModuleSpecifier(
-    const std::vector<Statement*>& imports) {
-	std::map<std::string, std::vector<Statement*>> groups_;
-	std::unordered_map<std::string, std::vector<Statement*>> groups;
+std::vector<std::vector<Node*>> groupByModuleSpecifier(
+    const std::vector<Node*>& imports) {
+	std::map<std::string, std::vector<Node*>> groups_;
+	std::unordered_map<std::string, std::vector<Node*>> groups;
 	std::vector<std::string> order;
 
 	for (auto* imp : imports) {
@@ -365,7 +378,7 @@ std::vector<std::vector<Statement*>> groupByModuleSpecifier(
 		groups[specifier].push_back(imp);
 	}
 
-	std::vector<std::vector<Statement*>> result;
+	std::vector<std::vector<Node*>> result;
 	result.reserve(order.size());
 	for (auto& key : order) {
 		result.push_back(groups[key]);
@@ -374,8 +387,8 @@ std::vector<std::vector<Statement*>> groupByModuleSpecifier(
 }
 
 // removeUnusedImports — organizeimports.go:231.
-std::vector<Statement*> removeUnusedImports(
-    std::vector<Statement*> oldImports, SourceFile* sourceFile,
+std::vector<Node*> removeUnusedImports(
+    std::vector<Node*> oldImports, SourceFile* sourceFile,
     checker::Checker* typeChecker, compiler::SimpleProgram* program,
     change::Tracker* changeTracker) {
 	auto compilerOptions = program->Options();
@@ -386,7 +399,7 @@ std::vector<Statement*> removeUnusedImports(
 	    compilerOptions->Jsx == JsxEmit::ReactNative;
 
 	NodeFactory factory{NodeFactoryHooks{}};
-	std::vector<Statement*> usedImports;
+	std::vector<Node*> usedImports;
 	usedImports.reserve(oldImports.size());
 
 	for (auto* importDecl : oldImports) {
@@ -442,7 +455,7 @@ std::vector<Statement*> removeUnusedImports(
 				    !nodeIsSynthesized(originalBindings) &&
 				    !printer::RangeIsOnSingleLine(
 				        originalBindings->loc, sourceFile)) {
-					changeTracker->EmitContext->setEmitFlags(
+					changeTracker->emitContext->setEmitFlags(
 					    namedBindings, printer::EFMultiLine);
 				}
 				break;
@@ -487,11 +500,11 @@ std::vector<Statement*> removeUnusedImports(
 }
 
 // filterUsedImportSpecifiers — organizeimports.go:322.
-std::vector<Statement*> filterUsedImportSpecifiers(
-    const std::vector<Statement*>& elements, checker::Checker* typeChecker,
+std::vector<Node*> filterUsedImportSpecifiers(
+    const std::vector<Node*>& elements, checker::Checker* typeChecker,
     SourceFile* sourceFile, bool jsxElementsPresent,
     bool jsxModeNeedsExplicitImport) {
-	std::vector<Statement*> result;
+	std::vector<Node*> result;
 	for (auto* elem : elements) {
 		auto* spec = elem->as<ImportSpecifier>();
 		if (typeChecker->IsDeclarationUsed(
@@ -560,12 +573,12 @@ std::string getImportAttributesKey(Node* attributes) {
 }
 
 // groupByNewlineContiguous — organizeimports.go:384.
-std::vector<std::vector<Statement*>> groupByNewlineContiguous(
-    SourceFile* sourceFile, const std::vector<Statement*>& decls) {
+std::vector<std::vector<Node*>> groupByNewlineContiguous(
+    SourceFile* sourceFile, const std::vector<Node*>& decls) {
 	Scanner s;
 	s.setSkipTrivia(false); // Must not skip trivia to detect newlines
-	std::vector<std::vector<Statement*>> groups;
-	std::vector<Statement*> currentGroup;
+	std::vector<std::vector<Node*>> groups;
+	std::vector<Node*> currentGroup;
 
 	for (auto* decl : decls) {
 		if (!currentGroup.empty() && isNewGroup(sourceFile, decl, &s)) {
@@ -583,7 +596,7 @@ std::vector<std::vector<Statement*>> groupByNewlineContiguous(
 }
 
 // isNewGroup — organizeimports.go:405.
-bool isNewGroup(SourceFile* sourceFile, Statement* decl, Scanner* s) {
+bool isNewGroup(SourceFile* sourceFile, Node* decl, Scanner* s) {
 	auto fullStart = decl->pos();
 	if (fullStart < 0) {
 		return false;
@@ -619,16 +632,16 @@ bool isNewGroup(SourceFile* sourceFile, Statement* decl, Scanner* s) {
 }
 
 // coalesceImportsWorker — organizeimports.go:432.
-std::vector<Statement*> coalesceImportsWorker(
-    std::vector<Statement*> importDecls,
-    const std::function<int(std::string, std::string)>& comparer,
+std::vector<Node*> coalesceImportsWorker(
+    std::vector<Node*> importDecls,
+    const lsutil::StringComparer& comparer,
     const std::function<int(Node*, Node*)>& specifierComparer,
     SourceFile* sourceFile, change::Tracker* changeTracker) {
 	if (importDecls.empty()) {
 		return importDecls;
 	}
 
-	std::unordered_map<std::string, std::vector<Statement*>>
+	std::unordered_map<std::string, std::vector<Node*>>
 	    importGroupsByAttributes;
 	std::vector<std::string> attributeKeys;
 
@@ -642,7 +655,7 @@ std::vector<Statement*> coalesceImportsWorker(
 		importGroupsByAttributes[key].push_back(importDecl);
 	}
 
-	std::vector<Statement*> coalescedImports;
+	std::vector<Node*> coalescedImports;
 
 	for (auto& attributeKey : attributeKeys) {
 		auto& importGroupSameAttrs = importGroupsByAttributes[attributeKey];
@@ -693,7 +706,7 @@ std::vector<Statement*> coalesceImportsWorker(
 
 			std::sort(group.namespaceImports.begin(),
 			          group.namespaceImports.end(),
-			          [&comparer](Statement* a, Statement* b) {
+			          [&comparer](Node* a, Node* b) {
 				          auto* n1 = a->as<ImportDeclaration>()
 				                         ->ImportClause->as<ImportClause>()
 				                         ->NamedBindings
@@ -722,8 +735,8 @@ std::vector<Statement*> coalesceImportsWorker(
 				coalescedImports.push_back(newImportDecl);
 			}
 
-			Statement* firstDefaultImport = nullptr;
-			Statement* firstNamedImport = nullptr;
+			Node* firstDefaultImport = nullptr;
+			Node* firstNamedImport = nullptr;
 
 			if (!group.defaultImports.empty()) {
 				firstDefaultImport = group.defaultImports[0];
@@ -813,7 +826,7 @@ std::vector<Statement*> coalesceImportsWorker(
 				if (!nodeIsSynthesized(firstNamedBindings) &&
 				    !printer::RangeIsOnSingleLine(
 				        firstNamedBindings->loc, sourceFile)) {
-					changeTracker->EmitContext->setEmitFlags(
+					changeTracker->emitContext->setEmitFlags(
 					    newNamedImports, printer::EFMultiLine);
 				}
 			}
@@ -878,8 +891,8 @@ std::vector<Statement*> coalesceImportsWorker(
 
 // getCategorizedImports — organizeimports.go:647.
 categorizedImports getCategorizedImports(
-    const std::vector<Statement*>& importDecls) {
-	Statement* importWithoutClause = nullptr;
+    const std::vector<Node*>& importDecls) {
+	Node* importWithoutClause = nullptr;
 	importGroup typeOnlyImports;
 	importGroup regularImports;
 
@@ -928,7 +941,7 @@ categorizedImports getCategorizedImports(
 
 // getNewImportSpecifiers — organizeimports.go:690.
 std::vector<Node*> getNewImportSpecifiers(
-    const std::vector<Statement*>& namedImports, NodeFactory* factory) {
+    const std::vector<Node*>& namedImports, NodeFactory* factory) {
 	std::vector<Node*> result;
 
 	for (auto* namedImport : namedImports) {
@@ -962,7 +975,7 @@ std::vector<Node*> getNewImportSpecifiers(
 }
 
 // tryGetNamedBindingElements — organizeimports.go:723.
-std::vector<Node*> tryGetNamedBindingElements(Statement* namedImport) {
+std::vector<Node*> tryGetNamedBindingElements(Node* namedImport) {
 	if (namedImport->kind != Kind::ImportDeclaration) {
 		return {};
 	}
@@ -985,9 +998,9 @@ std::vector<Node*> tryGetNamedBindingElements(Statement* namedImport) {
 }
 
 // getTopLevelExportGroups — organizeimports.go:743.
-std::vector<std::vector<Statement*>> getTopLevelExportGroups(
+std::vector<std::vector<Node*>> getTopLevelExportGroups(
     SourceFile* sourceFile) {
-	std::vector<std::vector<Statement*>> topLevelExportGroups;
+	std::vector<std::vector<Node*>> topLevelExportGroups;
 	auto& statements = sourceFile->Statements->nodes;
 	auto statementsLen = statements.size();
 
@@ -1020,7 +1033,7 @@ std::vector<std::vector<Statement*>> getTopLevelExportGroups(
 		}
 	}
 
-	std::vector<std::vector<Statement*>> result;
+	std::vector<std::vector<Node*>> result;
 	for (auto& exportGroup : topLevelExportGroups) {
 		auto subGroups =
 		    groupByNewlineContiguous(sourceFile, exportGroup);
@@ -1032,7 +1045,7 @@ std::vector<std::vector<Statement*>> getTopLevelExportGroups(
 
 // organizeExportsWorker — organizeimports.go:789.
 void organizeExportsWorker(
-    const std::vector<Statement*>& oldExportDecls,
+    const std::vector<Node*>& oldExportDecls,
     const organizeImportsComparerSettings& comparer,
     SourceFile* sourceFile, change::Tracker* changeTracker) {
 	if (oldExportDecls.empty()) {
@@ -1057,14 +1070,14 @@ void organizeExportsWorker(
 			    change::TrailingTriviaOptionInclude);
 		} else {
 			for (auto* exp : newExportDecls) {
-				changeTracker->EmitContext->addEmitFlags(
+				changeTracker->emitContext->addEmitFlags(
 				    exp, printer::EFNoLeadingComments);
 			}
 
 			change::NodeOptions options{
-			    .leadingTriviaOption =
+			    .leadingTrivia =
 			        change::LeadingTriviaOptionExclude,
-			    .trailingTriviaOption =
+			    .trailingTrivia =
 			        change::TrailingTriviaOptionInclude,
 			    .Suffix = "\n",
 			};
@@ -1088,17 +1101,17 @@ void organizeExportsWorker(
 }
 
 // coalesceExportsWorker — organizeimports.go:833.
-std::vector<Statement*> coalesceExportsWorker(
-    const std::vector<Statement*>& exportGroup,
+std::vector<Node*> coalesceExportsWorker(
+    const std::vector<Node*>& exportGroup,
     const std::function<int(Node*, Node*)>& specifierComparer,
-    const std::function<int(std::string, std::string)>&
+    const lsutil::StringComparer&
         moduleSpecifierComparer,
     SourceFile* sourceFile, change::Tracker* changeTracker) {
 	if (exportGroup.empty()) {
 		return exportGroup;
 	}
 
-	std::unordered_map<std::string, std::vector<Statement*>>
+	std::unordered_map<std::string, std::vector<Node*>>
 	    exportsByModuleSpecifier;
 	std::vector<std::string> moduleSpecifierOrder;
 
@@ -1128,7 +1141,7 @@ std::vector<Statement*> coalesceExportsWorker(
 		                 return moduleSpecifierComparer(a, b) < 0;
 	                 });
 
-	std::vector<Statement*> coalescedExports;
+	std::vector<Node*> coalescedExports;
 	NodeFactory factory{NodeFactoryHooks{}};
 
 	for (auto& moduleSpecifier : moduleSpecifierOrder) {
@@ -1140,7 +1153,7 @@ std::vector<Statement*> coalesceExportsWorker(
 			coalescedExports.push_back(categorized.exportWithoutClause);
 		}
 
-		for (auto* subGroupPtr : std::vector<std::vector<Statement*>*>{
+		for (auto* subGroupPtr : std::vector<std::vector<Node*>*>{
 		         &categorized.namedExports,
 		         &categorized.typeOnlyExports}) {
 			auto& subGroup = *subGroupPtr;
@@ -1187,7 +1200,7 @@ std::vector<Statement*> coalesceExportsWorker(
 					    !nodeIsSynthesized(namedExports) &&
 					    !printer::RangeIsOnSingleLine(
 					        namedExports->loc, sourceFile)) {
-						changeTracker->EmitContext->setEmitFlags(
+						changeTracker->emitContext->setEmitFlags(
 						    updatedExportClause,
 						    printer::EFMultiLine);
 					}
@@ -1209,10 +1222,10 @@ std::vector<Statement*> coalesceExportsWorker(
 
 // getCategorizedExports — organizeimports.go:932.
 categorizedExports getCategorizedExports(
-    const std::vector<Statement*>& exportGroup) {
-	Statement* exportWithoutClause = nullptr;
-	std::vector<Statement*> namedExports;
-	std::vector<Statement*> typeOnlyExports;
+    const std::vector<Node*>& exportGroup) {
+	Node* exportWithoutClause = nullptr;
+	std::vector<Node*> namedExports;
+	std::vector<Node*> typeOnlyExports;
 
 	for (auto* exportDecl : exportGroup) {
 		auto* export_ = exportDecl->as<ExportDeclaration>();

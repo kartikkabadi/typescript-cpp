@@ -134,7 +134,7 @@ lsp::lsproto::CodeLensResponse LanguageService::ProvideCodeLenses(
 		return lsp::lsproto::CodeLensResponse{};
 	}
 
-	std::vector<lsp::lsproto::CodeLens*> result;
+	std::vector<std::shared_ptr<lsp::lsproto::CodeLens>> result;
 	std::unordered_set<codeLensKey, codeLensKeyHash> seen;
 	std::vector<SourceFile*> projections;
 	projections.push_back(file);
@@ -161,7 +161,8 @@ lsp::lsproto::CodeLensResponse LanguageService::ProvideCodeLenses(
 											   lsp::lsproto::CodeLensKindReferences);
 						codeLens != nullptr &&
 						seen.insert(keyForCodeLens(codeLens)).second) {
-						result.push_back(codeLens);
+						result.push_back(
+										std::shared_ptr<lsp::lsproto::CodeLens>(codeLens));
 					}
 				}
 
@@ -172,7 +173,8 @@ lsp::lsproto::CodeLensResponse LanguageService::ProvideCodeLenses(
 											   lsp::lsproto::CodeLensKindImplementations);
 						codeLens != nullptr &&
 						seen.insert(keyForCodeLens(codeLens)).second) {
-						result.push_back(codeLens);
+						result.push_back(
+										std::shared_ptr<lsp::lsproto::CodeLens>(codeLens));
 					}
 				}
 			}
@@ -187,7 +189,9 @@ lsp::lsproto::CodeLensResponse LanguageService::ProvideCodeLenses(
 	}
 
 	lsp::lsproto::CodeLensResponse res;
-	res.CodeLenses = new std::vector<lsp::lsproto::CodeLens*>(std::move(result));
+	res.CodeLenses = std::make_shared<
+		lsp::lsproto::Slice<std::shared_ptr<lsp::lsproto::CodeLens>>>(
+		std::move(result));
 	return res;
 }
 
@@ -220,13 +224,17 @@ std::pair<lsp::lsproto::CodeLens*, gostd::Error> LanguageService::ResolveCodeLen
 		lsp::lsproto::ReferenceParams params;
 		params.TextDocument = textDoc;
 		params.Position = codeLens->Range.Start;
-		params.Context = new lsp::lsproto::ReferenceContext;
+		params.Context = std::make_shared<lsp::lsproto::ReferenceContext>();
 		// Don't include the declaration in the references count.
 		params.Context->IncludeDeclaration = false;
-		lsp::lsproto::ReferencesResponse referencesResp =
+		auto [referencesResp, err] =
 			provideReferencesFromData(ctx, &params, orchestrator, data);
+		if (err != nullptr) {
+			return {nullptr, err};
+		}
 		if (referencesResp.Locations != nullptr) {
-			locs = *referencesResp.Locations;
+			locs = referencesResp.Locations->value_or(
+				std::vector<lsp::lsproto::Location>{});
 		}
 
 		if (locs.size() == 1) {
@@ -250,10 +258,14 @@ std::pair<lsp::lsproto::CodeLens*, gostd::Error> LanguageService::ResolveCodeLen
 		symbolEntryTransformOptions options;
 		options.requireLocationsResult = true;
 		options.dropOriginNodes = true;
-		lsp::lsproto::ImplementationResponse implementations =
-			provideImplementationsFromData(ctx, &params, options, orchestrator, data);
+		auto [implementations, err2] = provideImplementationsFromData(
+			ctx, &params, options, orchestrator, data);
+		if (err2 != nullptr) {
+			return {nullptr, err2};
+		}
 		if (implementations.Locations != nullptr) {
-			locs = *implementations.Locations;
+			locs = implementations.Locations->value_or(
+				std::vector<lsp::lsproto::Location>{});
 		}
 
 		if (locs.size() == 1) {
@@ -266,11 +278,37 @@ std::pair<lsp::lsproto::CodeLens*, gostd::Error> LanguageService::ResolveCodeLen
 		}
 	}
 
-	auto* cmd = new lsp::lsproto::Command;
+	auto cmd = std::make_shared<lsp::lsproto::Command>();
 	cmd->Title = lensTitle;
 	if (!locs.empty() && showLocationsCommandName != nullptr) {
 		cmd->Command = *showLocationsCommandName;
-		cmd->Arguments = new std::vector<std::any>{uri, codeLens->Range.Start, locs};
+		// Go marshals each argument via encoding/json; LSPAny stores the
+		// decoded form, so pack the same JSON shapes.
+		auto positionToLSPAny = [](const lsp::lsproto::Position& p) {
+			return lsp::lsproto::LSPAny(
+				std::map<std::string, lsp::lsproto::LSPAny>{
+					{"line", lsp::lsproto::LSPAny(int64_t(p.Line))},
+					{"character", lsp::lsproto::LSPAny(int64_t(p.Character))},
+				});
+		};
+		std::vector<lsp::lsproto::LSPAny> locArr;
+		locArr.reserve(locs.size());
+		for (auto& l : locs) {
+			locArr.push_back(lsp::lsproto::LSPAny(
+				std::map<std::string, lsp::lsproto::LSPAny>{
+					{"uri", lsp::lsproto::LSPAny(l.Uri)},
+					{"range", lsp::lsproto::LSPAny(
+								  std::map<std::string, lsp::lsproto::LSPAny>{
+									  {"start", positionToLSPAny(l.Range.Start)},
+									  {"end", positionToLSPAny(l.Range.End)},
+								  })},
+				}));
+		}
+		cmd->Arguments = std::make_shared<
+			lsp::lsproto::Slice<lsp::lsproto::LSPAny>>(
+			std::vector<lsp::lsproto::LSPAny>{lsp::lsproto::LSPAny(uri),
+											positionToLSPAny(codeLens->Range.Start),
+											lsp::lsproto::LSPAny(std::move(locArr))});
 	}
 
 	codeLens->Command = cmd;
@@ -298,7 +336,7 @@ lsp::lsproto::CodeLens* LanguageService::newCodeLensForNode(
 
 	auto* codeLens = new lsp::lsproto::CodeLens;
 	codeLens->Range = lspRange;
-	codeLens->Data = new lsp::lsproto::CodeLensData;
+	codeLens->Data = std::make_shared<lsp::lsproto::CodeLensData>();
 	codeLens->Data->Kind = kind;
 	codeLens->Data->Uri = fileUri;
 	codeLens->Data->Position = int32_t(pos);

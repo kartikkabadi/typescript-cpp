@@ -352,7 +352,7 @@ std::vector<uint32_t> encodeSemanticTokens(gostd::Context ctx,
 		modifierMapping;
 
 	const lsp::lsproto::ResolvedSemanticTokensClientCapabilities* clientCapabilities =
-		&lsp::lsproto::GetClientCapabilities(ctx)->TextDocument.SemanticTokens;
+		&lsp::lsproto::getClientCapabilities(ctx)->TextDocument.SemanticTokens;
 
 	// Map server token types to client-supported indices
 	uint32_t clientIdx = 0;

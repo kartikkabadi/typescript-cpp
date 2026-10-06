@@ -50,7 +50,7 @@ LanguageService::getMappedLocation(const std::string& fileName,
 		    createLspRangeFromRange(fileRange, getScript(fileName));
 		return {lsproto::Location{
 		            .Uri = lsconv::FileNameToDocumentURI(fileName),
-		            .Range_ = lspRange,
+		            .Range = lspRange,
 		        },
 		        fidelity};
 	}
@@ -71,7 +71,7 @@ LanguageService::getMappedLocation(const std::string& fileName,
 	    createLspRangeFromRange(newRange, getScript(startPos->FileName));
 	return {lsproto::Location{
 	            .Uri = lsconv::FileNameToDocumentURI(startPos->FileName),
-	            .Range_ = lspRange,
+	            .Range = lspRange,
 	        },
 	        fidelity};
 }

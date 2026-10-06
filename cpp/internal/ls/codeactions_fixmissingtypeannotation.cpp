@@ -211,9 +211,10 @@ getAllIsolatedDeclarationsCodeActions(const gostd::Context& ctx,
 	doneGuard doneGuard_{done};
 
 	auto* changeTracker =
-	    change::NewTracker(ctx, fixContext->Program->Options(),
+	    new change::Tracker(format::FormatRequestContext{},
+	                    fixContext->Program->Options(),
 	                       fixContext->LS->FormatOptions(),
-	                       fixContext->LS->converters);
+	                       fixContext->LS->Converters());
 
 	isolatedDeclarationsFixer fixer{
 	    .sourceFile = fixContext->SourceFile,
@@ -240,7 +241,10 @@ getAllIsolatedDeclarationsCodeActions(const gostd::Context& ctx,
 	}
 
 	auto [changes, _] = changeTracker->GetChanges();
-	auto fileChanges = changes[fixContext->SourceFile->OriginalFileName()];
+	std::vector<std::shared_ptr<lsproto::TextEdit>> fileChanges;
+	for (auto& e : changes[fixContext->SourceFile->OriginalFileName()]) {
+		fileChanges.push_back(std::make_shared<lsproto::TextEdit>(e));
+	}
 	if (fileChanges.empty()) {
 		return {nullptr, nullptr};
 	}
@@ -259,9 +263,10 @@ CodeAction* tryCodeAction(const gostd::Context& ctx,
                           const std::function<std::string(
                               isolatedDeclarationsFixer*)>& fn) {
 	auto* changeTracker =
-	    change::NewTracker(ctx, fixContext->Program->Options(),
+	    new change::Tracker(format::FormatRequestContext{},
+	                    fixContext->Program->Options(),
 	                       fixContext->LS->FormatOptions(),
-	                       fixContext->LS->converters);
+	                       fixContext->LS->Converters());
 
 	autoimport::ImportAdder* importAdder = nullptr;
 	// importAdder may be nil if the auto-import registry is not available;
@@ -290,13 +295,18 @@ CodeAction* tryCodeAction(const gostd::Context& ctx,
 	}
 
 	auto [changes, _] = changeTracker->GetChanges();
-	auto fileChanges = changes[fixContext->SourceFile->OriginalFileName()];
+	std::vector<std::shared_ptr<lsproto::TextEdit>> fileChanges;
+	for (auto& e : changes[fixContext->SourceFile->OriginalFileName()]) {
+		fileChanges.push_back(std::make_shared<lsproto::TextEdit>(e));
+	}
 
 	// Add import edits if import adder has fixes
 	if (importAdder != nullptr && importAdder->HasFixes()) {
 		auto importEdits = importAdder->Edits();
-		fileChanges.insert(fileChanges.end(), importEdits.begin(),
-		                   importEdits.end());
+		if (importEdits.has_value()) {
+			fileChanges.insert(fileChanges.end(), importEdits->begin(),
+			                   importEdits->end());
+		}
 	}
 
 	if (fileChanges.empty()) {
@@ -499,16 +509,16 @@ int endOfRequiredTypeParameters(checker::Checker* ch, checker::Type* t) {
 // descriptions — codeactions_fixmissingtypeannotation.go:1282.
 std::string typeToStringForDiag(Node* typeNode, SourceFile* sourceFile,
                                 change::Tracker* ct) {
-	auto savedFlags = ct->EmitContext->emitFlags(typeNode);
-	ct->EmitContext->setEmitFlags(typeNode,
+	auto savedFlags = ct->emitContext->emitFlags(typeNode);
+	ct->emitContext->setEmitFlags(typeNode,
 	                              savedFlags | printer::EFSingleLine);
 	auto* p = printer::NewPrinter(
 	    printer::PrinterOptions{.NewLine = NewLineKind::LineFeed},
-	    printer::PrintHandlers{}, ct->EmitContext);
+	    printer::PrintHandlers{}, ct->emitContext);
 	auto [writer, release] = printer::GetSingleLineStringWriter();
 	doneGuard releaseGuard{release};
 	p->Write(typeNode, sourceFile, writer, nullptr);
-	ct->EmitContext->setEmitFlags(typeNode, savedFlags);
+	ct->emitContext->setEmitFlags(typeNode, savedFlags);
 	std::string result = writer->String();
 	if (result.size() > 160) {
 		return result.substr(0, 157) + "...";
@@ -663,7 +673,7 @@ isolatedDeclarationsFixer::createNamespaceForExpandoProperties(
 		return "";
 	}
 
-	auto* factory = changeTracker->NodeFactory;
+	auto* factory = changeTracker->nodeFactory;
 
 	std::vector<Node*> newProperties;
 	for (auto* symbol : elements) {
@@ -788,7 +798,7 @@ std::string isolatedDeclarationsFixer::addInlineAssertion(TextRange span) {
 		return "";
 	}
 
-	auto* factory = changeTracker->NodeFactory;
+	auto* factory = changeTracker->nodeFactory;
 
 	if (isShorthandPropertyAssignmentTarget) {
 		// Insert `: expr as Type` after the shorthand property name
@@ -836,7 +846,7 @@ std::string isolatedDeclarationsFixer::extractAsVariable(TextRange span) {
 		return "";
 	}
 
-	auto* factory = changeTracker->NodeFactory;
+	auto* factory = changeTracker->nodeFactory;
 
 	// Array literals should be marked as const
 	if (isArrayLiteralExpression(targetNode)) {
@@ -858,7 +868,7 @@ std::string isolatedDeclarationsFixer::extractAsVariable(TextRange span) {
 			return "";
 		}
 
-		auto* tempName = changeTracker->EmitContext->factory.newUniqueName(
+		auto* tempName = changeTracker->emitContext->factory.newUniqueName(
 		    getIdentifierNameForNode(targetNode),
 		    printer::AutoGenerateOptions{
 		        .Flags =
@@ -985,10 +995,10 @@ isolatedDeclarationsFixer::transformExportAssignment(Node* defaultExport) {
 		return "";
 	}
 
-	auto* factory = changeTracker->NodeFactory;
+	auto* factory = changeTracker->nodeFactory;
 
 	auto* defaultIdentifier =
-	    changeTracker->EmitContext->factory.newUniqueName("_default");
+	    changeTracker->emitContext->factory.newUniqueName("_default");
 
 	// Deep clone the expression so synthesized nodes don't reference
 	// original source positions
@@ -1042,14 +1052,14 @@ std::string isolatedDeclarationsFixer::transformExtendsClauseWithExpression(
 		return "";
 	}
 
-	auto* factory = changeTracker->NodeFactory;
+	auto* factory = changeTracker->nodeFactory;
 
 	std::string baseName = "Anonymous";
 	if (cd->Node::name() != nullptr) {
 		baseName = cd->Node::name()->text() + "Base";
 	}
 	auto* baseClassName =
-	    changeTracker->EmitContext->factory.newUniqueName(
+	    changeTracker->emitContext->factory.newUniqueName(
 	        baseName, printer::AutoGenerateOptions{
 	                      .Flags =
 	                          printer::GeneratedIdentifierFlagsOptimistic});
@@ -1094,14 +1104,14 @@ std::string isolatedDeclarationsFixer::transformDestructuringPatterns(
 		return "";
 	}
 
-	auto* factory = changeTracker->NodeFactory;
+	auto* factory = changeTracker->nodeFactory;
 	std::vector<Node*> newNodes;
 
 	Node* baseExprNode = nullptr;
 	if (!isIdentifier(initializer)) {
 		// Create a temporary variable for complex expressions
 		auto* tempName =
-		    changeTracker->EmitContext->factory.newUniqueName(
+		    changeTracker->emitContext->factory.newUniqueName(
 		        "dest",
 		        printer::AutoGenerateOptions{
 		            .Flags = printer::
@@ -1163,7 +1173,7 @@ std::string isolatedDeclarationsFixer::transformDestructuringPatterns(
 void isolatedDeclarationsFixer::extractBindingElements(
     Node* bindingPattern, Node* baseExpr, std::vector<Node*>* newNodes,
     Node* enclosingVarStmt) {
-	auto* factory = changeTracker->NodeFactory;
+	auto* factory = changeTracker->nodeFactory;
 
 	if (isObjectBindingPattern(bindingPattern)) {
 		for (auto* element :
@@ -1187,7 +1197,7 @@ void isolatedDeclarationsFixer::extractBindingElements(
 				    be->PropertyName->as<ComputedPropertyName>()
 				        ->Expression;
 				auto* identifierForComputedProperty =
-				    changeTracker->EmitContext->factory
+				    changeTracker->emitContext->factory
 				        .newGeneratedNameForNode(computedExpression);
 				auto* compVarDecl = factory->newVariableDeclaration(
 				    identifierForComputedProperty, nullptr, nullptr,
@@ -1279,7 +1289,7 @@ void isolatedDeclarationsFixer::emitBindingElementVariable(
 		if (propName != nullptr && isIdentifier(propName)) {
 			tempBaseName = propName->text();
 		}
-		auto* tempName = changeTracker->EmitContext->factory.newUniqueName(
+		auto* tempName = changeTracker->emitContext->factory.newUniqueName(
 		    tempBaseName,
 		    printer::AutoGenerateOptions{
 		        .Flags =
@@ -1318,8 +1328,8 @@ ModifierList* isolatedDeclarationsFixer::getExportModifier(
     Node* enclosingVarStmt) {
 	if (hasSyntacticModifier(enclosingVarStmt, ModifierFlagsExport)) {
 		auto* exportToken =
-		    changeTracker->NodeFactory->newToken(Kind::ExportKeyword);
-		return changeTracker->NodeFactory->newModifierList({exportToken});
+		    changeTracker->nodeFactory->newToken(Kind::ExportKeyword);
+		return changeTracker->nodeFactory->newModifierList({exportToken});
 	}
 	return nullptr;
 }
@@ -1422,8 +1432,8 @@ isolatedDeclarationsFixer::getExtraFlags(Node* node,
 // codeactions_fixmissingtypeannotation.go:935.
 Node* isolatedDeclarationsFixer::createTypeOfFromEntityNameExpression(
     Node* node) {
-	return changeTracker->NodeFactory->newTypeQueryNode(
-	    deepCloneNode(*changeTracker->NodeFactory, node), nullptr);
+	return changeTracker->nodeFactory->newTypeQueryNode(
+	    deepCloneNode(*changeTracker->nodeFactory, node), nullptr);
 }
 
 // typeFromArraySpreadElements decomposes an array literal with spread
@@ -1440,7 +1450,7 @@ Node* isolatedDeclarationsFixer::typeFromArraySpreadElements(
 	if (name == "") {
 		name = "temp";
 	}
-	auto* factory = changeTracker->NodeFactory;
+	auto* factory = changeTracker->nodeFactory;
 	return typeFromSpreads(
 	    node->asNode(), name, isInConstContext,
 	    [](Node* n) -> std::vector<Node*> {
@@ -1475,7 +1485,7 @@ Node* isolatedDeclarationsFixer::typeFromObjectSpreadAssignment(
 	if (name == "") {
 		name = "temp";
 	}
-	auto* factory = changeTracker->NodeFactory;
+	auto* factory = changeTracker->nodeFactory;
 	return typeFromSpreads(
 	    node->asNode(), name, isInConstContext,
 	    [](Node* n) -> std::vector<Node*> {
@@ -1507,7 +1517,7 @@ Node* isolatedDeclarationsFixer::typeFromSpreads(
     const std::function<Node*(Node*)>& createSpread,
     const std::function<Node*(std::vector<Node*>)>& makeNodeOfKind,
     const std::function<Node*(std::vector<Node*>)>& finalType) {
-	auto* factory = changeTracker->NodeFactory;
+	auto* factory = changeTracker->nodeFactory;
 	std::vector<Node*> intersectionTypes;
 	std::vector<Node*> newSpreads;
 	std::vector<Node*> currentVariableProperties;
@@ -1562,7 +1572,7 @@ void isolatedDeclarationsFixer::makeSpreadVariable(
     Node* expression, std::vector<Node*>* intersectionTypes,
     std::vector<Node*>* newSpreads) {
 	auto* tempName =
-	    changeTracker->EmitContext->factory
+	    changeTracker->emitContext->factory
 	        .newUniqueName(name + "_Part" +
 	                           std::to_string(newSpreads->size() + 1),
 	                       printer::AutoGenerateOptions{
@@ -1667,7 +1677,7 @@ Node* isolatedDeclarationsFixer::relativeType(Node* node) {
 			return nullptr;
 		}
 		mutatedTarget = trueMutated || mutatedTarget;
-		auto* factory = changeTracker->NodeFactory;
+		auto* factory = changeTracker->nodeFactory;
 		return factory->newUnionTypeNode(
 		    factory->newNodeList({trueType, falseType}));
 	}
@@ -1700,11 +1710,11 @@ Node* isolatedDeclarationsFixer::typeToMinimizedReferenceType(
 			if (cutoff < (int)nodeTypeArgs.size()) {
 				// Trim trailing default type arguments
 				auto* trimmedArgs =
-				    changeTracker->NodeFactory->newNodeList(
+				    changeTracker->nodeFactory->newNodeList(
 				        std::vector<Node*>(
 				            nodeTypeArgs.begin(),
 				            nodeTypeArgs.begin() + cutoff));
-				typeNode = changeTracker->NodeFactory
+				typeNode = changeTracker->nodeFactory
 				               ->updateTypeReferenceNode(
 				                   typeNode->as<TypeReferenceNode>(),
 				                   typeNode->as<TypeReferenceNode>()
@@ -1717,7 +1727,7 @@ Node* isolatedDeclarationsFixer::typeToMinimizedReferenceType(
 	// type references and collect symbols that need to be imported
 	auto [referenceTypeNode, importableSymbols] =
 	    autoimport::TryGetAutoImportableReferenceFromTypeNode(typeNode,
-	                                                        idToSymbol);
+	                                                        &idToSymbol);
 	if (referenceTypeNode != nullptr) {
 		typeNode = referenceTypeNode;
 		symbolsToImport.insert(symbolsToImport.end(),
@@ -1793,7 +1803,7 @@ void isolatedDeclarationsFixer::addSymbolToExistingImport(Symbol* sym) {
 			auto existingElements =
 			    importClause->NamedBindings->as<NamedImports>()
 			        ->Elements->nodes;
-			auto* factory = changeTracker->NodeFactory;
+			auto* factory = changeTracker->nodeFactory;
 			auto* newSpecifier = factory->newImportSpecifier(
 			    false, nullptr, factory->newIdentifier(symbolName));
 			existingElements.push_back(newSpecifier);

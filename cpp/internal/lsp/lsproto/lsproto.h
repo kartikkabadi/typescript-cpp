@@ -108,6 +108,14 @@ bool codeActionKindContains(const CodeActionKind& kind, const CodeActionKind& ot
 // ---------------------------------------------------------------------------
 std::string documentUriFileName(DocumentUri uri);
 tspath::Path documentUriPath(DocumentUri uri, bool useCaseSensitiveFileNames);
+
+// Location is the only value type here without the generated defaulted
+// operator== (Position/Range/TextEdit have one) — needed by
+// collections::Set<Location>.
+inline bool operator==(const Location& a, const Location& b) {
+	return a.Uri == b.Uri && a.Range == b.Range;
+}
+inline bool operator!=(const Location& a, const Location& b) { return !(a == b); }
 } // namespace tsc::lsp::lsproto
 
 // std::hash specializations — collections::Set<T> and unordered_map<K,...>

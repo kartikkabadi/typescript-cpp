@@ -410,7 +410,7 @@ lsproto::SignatureHelp* createTypeHelpItems(
 	    sourceFile, c);
 
 	// Check client capabilities for activeParameter handling
-	auto* caps = lsproto::GetClientCapabilities(ctx);
+	auto* caps = lsproto::getClientCapabilities(ctx);
 	auto& sigInfoCaps = caps->TextDocument.SignatureHelp.SignatureInformation;
 	bool supportsPerSignatureActiveParam = sigInfoCaps.ActiveParameterSupport;
 
@@ -560,7 +560,7 @@ lsproto::SignatureHelp* LanguageService::createSignatureHelpItems(
     const std::vector<checker::Signature*>& candidates,
     checker::Signature* resolvedSignature, argumentListInfo* argumentInfo,
     SourceFile* sourceFile, checker::Checker* c, bool useFullPrefix) {
-	auto* caps = lsproto::GetClientCapabilities(ctx);
+	auto* caps = lsproto::getClientCapabilities(ctx);
 	lsproto::MarkupKind docFormat = lsproto::PreferredMarkupKind(
 	    &caps->TextDocument.SignatureHelp.SignatureInformation
 	         .DocumentationFormat);
@@ -870,7 +870,7 @@ LanguageService::itemInfoForTypeParameters(
 		std::string label =
 		    *signatureHelpTypeParameters[i].parameterInfo->Label.String;
 		dpw->WriteClassified(
-		    label, lsproto::ClassificationTypeTypeParameterName);
+		    label, lsproto::ClassificationTypeNameTypeParameterName);
 	}
 	std::string_view greaterThanToken =
 	    tokenToString(Kind::GreaterThanToken);
@@ -963,7 +963,7 @@ std::vector<signatureHelpItemInfo*> LanguageService::itemInfoForParameters(
 			std::string label =
 			    *signatureHelpTypeParameters[i].parameterInfo->Label.String;
 			dpw->WriteClassified(
-			    label, lsproto::ClassificationTypeTypeParameterName);
+			    label, lsproto::ClassificationTypeNameTypeParameterName);
 		}
 		std::string_view greaterThanToken =
 		    tokenToString(Kind::GreaterThanToken);

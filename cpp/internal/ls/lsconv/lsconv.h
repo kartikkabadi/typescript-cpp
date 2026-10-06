@@ -8,7 +8,12 @@
 #include <string>
 #include <vector>
 
+#include "internal/gostd/gostd.h"
 #include "internal/lsp/lsproto/lsproto.h"
+
+namespace tsc {
+struct Diagnostic;
+}
 
 namespace tsc::lsconv {
 
@@ -29,5 +34,12 @@ LSPLineMap* ComputeLSPLineStarts(const std::string& text);
 
 // FileNameToDocumentURI (converters.go:332).
 lsproto::DocumentUri FileNameToDocumentURI(const std::string& fileName);
+
+// DiagnosticToLSPPull (converters.go:459) — dep-stub: the full port lands
+// with the lsconv slice (needs the unported localize machinery).
+class Converters;
+lsproto::Diagnostic* DiagnosticToLSPPull(
+    gostd::Context ctx, Converters* converters, Diagnostic* diagnostic,
+    bool reportStyleChecksAsWarnings);
 
 } // namespace tsc::lsconv

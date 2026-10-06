@@ -152,7 +152,7 @@ struct inlayHintState {
 	SourceFile* file = nullptr;
 	checker::Checker* checker = nullptr;
 	lsconv::Converters* converters = nullptr;
-	std::vector<lsp::lsproto::InlayHint*> result;
+	std::vector<std::shared_ptr<lsp::lsproto::InlayHint>> result;
 
 	// inlay_hints.go:74 — visit
 	bool visit(::tsc::Node* node) {
@@ -388,7 +388,7 @@ struct inlayHintState {
 		if (hintParts.String != nullptr) {
 			hintText = *hintParts.String;
 		} else if (hintParts.InlayHintLabelParts != nullptr) {
-			for (auto* part : *hintParts.InlayHintLabelParts) {
+			for (auto& part : **hintParts.InlayHintLabelParts) {
 				hintText += part->Value;
 			}
 		}
@@ -481,7 +481,8 @@ struct inlayHintState {
 		debug::assert(typeNode != nullptr, "should always get typenode");
 		lsp::lsproto::StringOrInlayHintLabelParts out;
 		out.InlayHintLabelParts =
-			new std::vector<lsp::lsproto::InlayHintLabelPart*>(
+			std::make_shared<lsp::lsproto::Slice<
+				std::shared_ptr<lsp::lsproto::InlayHintLabelPart>>>(
 				getInlayHintLabelParts(typeNode, idToSymbol));
 		return out;
 	}
@@ -503,7 +504,8 @@ struct inlayHintState {
 					  "should always get typePredicateNode");
 		lsp::lsproto::StringOrInlayHintLabelParts out;
 		out.InlayHintLabelParts =
-			new std::vector<lsp::lsproto::InlayHintLabelPart*>(
+			std::make_shared<lsp::lsproto::Slice<
+				std::shared_ptr<lsp::lsproto::InlayHintLabelPart>>>(
 				getInlayHintLabelParts(typeNode, idToSymbol));
 		return out;
 	}
@@ -519,26 +521,29 @@ struct inlayHintState {
 			return;
 		}
 		if (hint.String != nullptr) {
-			hint.String = new std::string(": " + *hint.String);
+			hint.String =
+				std::make_shared<std::string>(": " + *hint.String);
 		} else {
-			auto* parts =
-				new std::vector<lsp::lsproto::InlayHintLabelPart*>;
-			auto* prefix = new lsp::lsproto::InlayHintLabelPart;
-			prefix->Value = ": ";
-			parts->push_back(prefix);
+			std::vector<std::shared_ptr<lsp::lsproto::InlayHintLabelPart>>
+			    parts;
+			parts.push_back(std::make_shared<
+			                lsp::lsproto::InlayHintLabelPart>(
+			    lsp::lsproto::InlayHintLabelPart{.Value = ": "}));
 			if (hint.InlayHintLabelParts != nullptr) {
-				parts->insert(parts->end(),
-							  hint.InlayHintLabelParts->begin(),
-							  hint.InlayHintLabelParts->end());
+				parts.insert(parts.end(),
+				             (*hint.InlayHintLabelParts)->begin(),
+				             (*hint.InlayHintLabelParts)->end());
 			}
-			hint.InlayHintLabelParts = parts;
+			hint.InlayHintLabelParts =
+				std::make_shared<lsp::lsproto::Slice<std::shared_ptr<
+				    lsp::lsproto::InlayHintLabelPart>>>(std::move(parts));
 		}
-		auto* resultHint = new lsp::lsproto::InlayHint;
+		auto resultHint = std::make_shared<lsp::lsproto::InlayHint>();
 		resultHint->Label = std::move(hint);
 		resultHint->Position = lspPosition;
-		resultHint->Kind = new lsp::lsproto::InlayHintKind(
+		resultHint->Kind = std::make_shared<lsp::lsproto::InlayHintKind>(
 			lsp::lsproto::InlayHintKindType);
-		resultHint->PaddingLeft = new bool(true);
+		resultHint->PaddingLeft = true;
 		result.push_back(resultHint);
 	}
 
@@ -551,11 +556,11 @@ struct inlayHintState {
 		if (fidelity.IsNone()) {
 			return;
 		}
-		auto* resultHint = new lsp::lsproto::InlayHint;
-		resultHint->Label.String =
-			new std::string("= " + std::string(text));
+		auto resultHint = std::make_shared<lsp::lsproto::InlayHint>();
+		resultHint->Label.String = std::make_shared<std::string>(
+		    "= " + std::string(text));
 		resultHint->Position = lspPosition;
-		resultHint->PaddingLeft = new bool(true);
+		resultHint->PaddingLeft = true;
 		result.push_back(resultHint);
 	}
 
@@ -571,34 +576,41 @@ struct inlayHintState {
 		}
 		std::string hintText =
 			(isFirstVariadicArgument ? "..." : "") + std::string(text);
-		auto* displayParts =
-			new std::vector<lsp::lsproto::InlayHintLabelPart*>;
+		std::vector<std::shared_ptr<lsp::lsproto::InlayHintLabelPart>>
+		    displayPartsVec;
+		auto* displayParts = &displayPartsVec;
 		displayParts->push_back(
 			getNodeDisplayPart(hintText, parameter));
-		auto* colon = new lsp::lsproto::InlayHintLabelPart;
-		colon->Value = ":";
-		displayParts->push_back(colon);
+		displayParts->push_back(
+		    std::make_shared<lsp::lsproto::InlayHintLabelPart>(
+		        lsp::lsproto::InlayHintLabelPart{.Value = ":"}));
 		lsp::lsproto::StringOrInlayHintLabelParts labelParts;
-		labelParts.InlayHintLabelParts = displayParts;
+		labelParts.InlayHintLabelParts =
+			std::make_shared<lsp::lsproto::Slice<
+			    std::shared_ptr<lsp::lsproto::InlayHintLabelPart>>>(
+			    std::move(*displayParts));
 
-		auto* resultHint = new lsp::lsproto::InlayHint;
+		auto resultHint = std::make_shared<lsp::lsproto::InlayHint>();
 		resultHint->Label = labelParts;
 		resultHint->Position = lspPosition;
-		resultHint->Kind = new lsp::lsproto::InlayHintKind(
+		resultHint->Kind = std::make_shared<lsp::lsproto::InlayHintKind>(
 			lsp::lsproto::InlayHintKindParameter);
-		resultHint->PaddingRight = new bool(true);
+		resultHint->PaddingRight = true;
 		result.push_back(resultHint);
 	}
 
 	// inlay_hints.go:442 — getInlayHintLabelParts
-	std::vector<lsp::lsproto::InlayHintLabelPart*> getInlayHintLabelParts(
+	std::vector<std::shared_ptr<lsp::lsproto::InlayHintLabelPart>>
+	getInlayHintLabelParts(
 		::tsc::Node* node,
 		const std::unordered_map<::tsc::Node*, ::tsc::Symbol*>&
 			idToSymbol) {
-		std::vector<lsp::lsproto::InlayHintLabelPart*> parts;
+		std::vector<std::shared_ptr<lsp::lsproto::InlayHintLabelPart>>
+		    parts;
 
 		auto pushPart = [&](std::string_view v) {
-			auto* p = new lsp::lsproto::InlayHintLabelPart;
+			auto p =
+			    std::make_shared<lsp::lsproto::InlayHintLabelPart>();
 			p->Value = std::string(v);
 			parts.push_back(p);
 		};
@@ -1023,13 +1035,13 @@ struct inlayHintState {
 	}
 
 	// inlay_hints.go:784 — getNodeDisplayPart
-	lsp::lsproto::InlayHintLabelPart* getNodeDisplayPart(
+	std::shared_ptr<lsp::lsproto::InlayHintLabelPart> getNodeDisplayPart(
 		std::string_view text, ::tsc::Node* node) {
 		SourceFile* file = getSourceFileOfNode(node);
 		int pos = astnav::getStartOfNode(node, file,
 										 false /*includeJSDoc*/);
 		int end = int(node->end());
-		auto* part = new lsp::lsproto::InlayHintLabelPart;
+		auto part = std::make_shared<lsp::lsproto::InlayHintLabelPart>();
 		part->Value = std::string(text);
 		// The location is an optional go-to target for the name. Only attach it when the name maps back to a
 		// single concrete span in the original text; an approximate or synthesized mapping would point the
@@ -1041,7 +1053,7 @@ struct inlayHintState {
 							  static_cast<TextPos>(end)},
 					spanmap::FeatureInlayHints);
 			fidelity.IsSingleSegment()) {
-			auto* loc = new lsp::lsproto::Location;
+			auto loc = std::make_shared<lsp::lsproto::Location>();
 			loc->Uri = lsconv::FileNameToDocumentURI(
 				file->OriginalFileName());
 			loc->Range = lspRange;
@@ -1170,8 +1182,7 @@ struct inlayHintState {
 
 		const std::string& fileText = file->Text();
 		bool found = false;
-		getLeadingCommentRangesOfNode(
-			node, file, [&](const CommentRange& r) -> bool {
+		for (auto& r : getLeadingCommentRangesOfNode(node, file)) {
 				// strings.TrimFunc(text, unicode.IsSpace || '/' || '*')
 				std::string_view commentText{
 					fileText.data() + r.pos(),
@@ -1221,10 +1232,9 @@ struct inlayHintState {
 				}
 				if (commentText.substr(b, e - b) == name) {
 					found = true;
-					return false; // stop iteration
+					break;
 				}
-				return true;
-			});
+		}
 		return found;
 	}
 
@@ -1276,7 +1286,7 @@ lsp::lsproto::InlayHintResponse LanguageService::ProvideInlayHint(
 
 	auto mappedRanges = converters->FromLSPRangeIntersectingForSourceFile(
 		file, params->Range, spanmap::FeatureInlayHints);
-	std::vector<lsp::lsproto::InlayHint*> result;
+	std::vector<std::shared_ptr<lsp::lsproto::InlayHint>> result;
 	result.reserve(mappedRanges.size());
 	for (auto& mapped : mappedRanges) {
 		SourceFile* projection = mapped.Script;
@@ -1298,8 +1308,8 @@ lsp::lsproto::InlayHintResponse LanguageService::ProvideInlayHint(
 					  inlayHintState.result.end());
 	}
 	lsp::lsproto::InlayHintsOrNull out;
-	out.InlayHints =
-		new std::vector<lsp::lsproto::InlayHint*>(std::move(result));
+	out.InlayHints = std::make_shared<lsp::lsproto::Slice<
+	    std::shared_ptr<lsp::lsproto::InlayHint>>>(std::move(result));
 	return out;
 }
 

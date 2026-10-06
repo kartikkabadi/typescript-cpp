@@ -6768,7 +6768,7 @@ Session::handleGetSignatureUsages(
 		return {std::vector<SignatureUsageResponse>{}, err4};
 	}
 
-	auto usages = langSvc->GetSignatureUsages(toLSContext(ctx), signatureDecl);
+	auto usages = langSvc->GetSignatureUsages(ctx, signatureDecl);
 	if (usages.empty()) {
 		return {std::vector<SignatureUsageResponse>{}, nullptr};
 	}
@@ -6930,7 +6930,7 @@ Session::handleGetReferencedSymbolsForNode(
 	}
 
 	auto sourceFiles = program->GetSourceFiles();
-	auto entries = langSvc->GetReferencedSymbolsForNode(toLSContext(ctx), params->Position,
+	auto entries = langSvc->GetReferencedSymbolsForNode(ctx, params->Position,
 	                                                  node, sourceFiles);
 	if (entries.empty()) {
 		return {std::vector<ReferencedSymbolEntry>{}, nullptr};
@@ -6945,7 +6945,7 @@ Session::handleGetReferencedSymbolsForNode(
 		std::vector<NodeHandle> refs;
 		for (auto* ref : entry->References()) {
 			if (ref->IsNodeEntry()) {
-				refs.push_back(sd->nodeHandleFrom(ref->Node()));
+				refs.push_back(sd->nodeHandleFrom(ref->Node_()));
 			}
 		}
 		ReferencedSymbolEntry re;
