@@ -162,8 +162,10 @@ pathUpdater LanguageService::createPathUpdater(
     const std::string& oldPath, const std::string& newPath) {
 	tspath::ComparePathsOptions compareOptions{
 	    .useCaseSensitiveFileNames = UseCaseSensitiveFileNames()};
-	auto trimmedOldPath =
-	    tspath::removeTrailingDirectorySeparator(oldPath);
+	// removeTrailingDirectorySeparator returns a string_view: copy it
+	// here so the lambda below can outlive the caller's oldPath.
+	std::string trimmedOldPath{
+	    tspath::removeTrailingDirectorySeparator(oldPath)};
 	return [oldPath, newPath, compareOptions, trimmedOldPath,
 	    ucsf = UseCaseSensitiveFileNames()](
 	       const std::string& path) -> std::pair<std::string, bool> {

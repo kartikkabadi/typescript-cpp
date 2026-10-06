@@ -2943,7 +2943,7 @@ DefaultResolver::GetEntrypointsFromPackageJsonInfo(
 	auto mainResolution = state.loadNodeModuleFromDirectoryWorker(
 	    exts, packageJson->PackageDirectory, packageJson);
 
-	if (mainResolution->isResolved()) {
+	if (mainResolution != nullptr && mainResolution->isResolved()) {
 		result.push_back(createResolvedEntrypointHandlingSymlink(
 		    mainResolution->path, packageName, nullptr, nullptr,
 		    Ending::Fixed));
@@ -2959,7 +2959,7 @@ DefaultResolver::GetEntrypointsFromPackageJsonInfo(
 		comparePathsOptions.useCaseSensitiveFileNames =
 		    host->UseCaseSensitiveFileNames();
 		for (auto& file : otherFiles) {
-			if (mainResolution->isResolved() &&
+			if (mainResolution != nullptr && mainResolution->isResolved() &&
 			    tspath::comparePaths(file, mainResolution->path,
 			                         comparePathsOptions) == 0) {
 				continue;
@@ -3063,7 +3063,7 @@ resolutionState::loadEntrypointsFromExportMap(
 				    {exports_.AsString()});
 				if (auto result = loadFileNameFromPackageJSONField(
 				        ext, resolvedTarget, exports_.AsString());
-				    result->isResolved()) {
+				    result != nullptr && result->isResolved()) {
 					entrypoints.push_back(
 					    resolver
 					        ->createResolvedEntrypointHandlingSymlink(

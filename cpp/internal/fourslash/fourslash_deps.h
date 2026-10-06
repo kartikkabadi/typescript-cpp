@@ -58,9 +58,23 @@ namespace tsc::cmp {
 using Option = std::unordered_set<std::string>;
 
 // ignorePaths — builds a cmp.Option-like value matching fourslash.go's
-// ignorePaths(".Kind", ".SortText", ...).
+// ignorePaths(".Kind", ".SortText", ...). Go compares Go field names
+// (pascal case); this implementation diffs the JSON marshalled form, so
+// each path segment is normalized to its JSON member name (lower-first).
 inline Option ignorePaths(std::initializer_list<std::string> paths) {
-	return Option(paths.begin(), paths.end());
+	Option out;
+	out.reserve(paths.size());
+	for (const auto& p : paths) {
+		std::string norm = p;
+		for (size_t i = 0; i < norm.size(); i++) {
+			if (norm[i] == '.' && i + 1 < norm.size()) {
+				norm[i + 1] = static_cast<char>(
+				    std::tolower(static_cast<unsigned char>(norm[i + 1])));
+			}
+		}
+		out.insert(std::move(norm));
+	}
+	return out;
 }
 
 // domPathsIgnored reports whether a struct member name is ignored by opts at
