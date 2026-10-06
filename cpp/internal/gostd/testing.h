@@ -18,7 +18,9 @@
 // ignores it, matching Go where recover() cannot stop Goexit.
 #pragma once
 
+#include <chrono>
 #include <exception>
+#include <filesystem>
 #include <functional>
 #include <iostream>
 #include <memory>
@@ -48,7 +50,13 @@ inline std::string joinArgs(std::initializer_list<fmtArg> args) {
 
 class T {
 public:
-	virtual ~T() = default;
+	virtual ~T() {
+		// Go runs Cleanup functions when the test function returns,
+		// LIFO. A test T lives exactly as long as its test function
+		// (subtests run on stack children inside Run), so the
+		// destructor is the same point.
+		runCleanups();
+	}
 
 	// Run runs fn as a subtest named `name`, synchronously (the port has no
 	// parallel test scheduler). Child failure propagates to the parent like
@@ -78,6 +86,37 @@ public:
 
 	// Context returns the test's context (background in this port).
 	Context Context() const { return contextBackground(); }
+
+	// === slice: testutil-leaves ===
+	// Cleanup — testing.T.Cleanup: registers fn to run when the test
+	// ends; functions run LIFO like Go.
+	virtual void Cleanup(std::function<void()> fn) {
+		cleanups_.push_back(std::move(fn));
+	}
+
+	// TempDir — testing.T.TempDir: creates a unique temporary
+	// directory under the OS temp dir and registers its removal with
+	// Cleanup. Go names it with the test name sanitized; uniqueness
+	// is what callers rely on, so the timestamped name suffices.
+	virtual std::string TempDir() {
+		auto base = std::filesystem::temp_directory_path();
+		auto stamp = std::to_string(
+			std::chrono::steady_clock::now().time_since_epoch().count());
+		for (int i = 0;; i++) {
+			auto dir = base / ("go-test-" + stamp + "-" +
+			                   std::to_string(i));
+			std::error_code ec;
+			if (std::filesystem::create_directory(dir, ec)) {
+				std::string path = dir.string();
+				Cleanup([path] {
+					std::error_code ec;
+					std::filesystem::remove_all(path, ec);
+				});
+				return path;
+			}
+		}
+	}
+	// === end slice: testutil-leaves ===
 
 	bool Failed() const { return failed_; }
 	bool Skipped() const { return skipped_; }
@@ -128,10 +167,18 @@ public:
 	}
 
 private:
+	void runCleanups() {
+		for (auto it = cleanups_.rbegin(); it != cleanups_.rend(); ++it) {
+			(*it)();
+		}
+		cleanups_.clear();
+	}
+
 	bool failed_ = false;
 	bool skipped_ = false;
 	T* parent_ = nullptr;
 	std::string name_;
+	std::vector<std::function<void()>> cleanups_;
 };
 
 }  // namespace tsc::gostd::testing

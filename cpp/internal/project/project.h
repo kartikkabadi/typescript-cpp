@@ -7,6 +7,7 @@
 // TSC_UNREACHABLE. The project slice should replace this file when it lands.
 #pragma once
 
+#include <any>
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -16,6 +17,7 @@
 
 #include "internal/collections/collections.h"
 #include "internal/gostd/gostd.h"
+#include "internal/locale/locale.h"
 #include "internal/lsp/lsproto/lsproto.h"
 #include "internal/tspath/tspath.h"
 #include "internal/vfs/vfs.h"
@@ -36,7 +38,8 @@ namespace json { struct Dom; class Decoder; class Encoder; }
 // === slice: api === — Logger is a std::function alias in contentmapper.h;
 // an alias re-declaration is legal where a struct fwd-decl was not.
 namespace contentmapper { struct Spawner; using Logger = std::function<void(std::string_view)>; struct Host; }
-namespace logging { struct Logger; }
+namespace logging { struct Logger; struct LogCollector; }
+namespace ata { struct NpmExecutor; }
 } // namespace tsc
 
 namespace tsc::project {
@@ -52,6 +55,11 @@ struct ModuleResolverFactory;
 struct APICreateProgramRequest;
 struct APIReconfigureProgramRequest;
 struct APISnapshotRequest;
+
+// === slice: testutil-leaves ===
+struct Client;
+struct ParseCache;
+// === end slice: testutil-leaves ===
 
 // project.go:32-96 — project ID types.
 using ConfiguredProjectID = tspath::Path;
@@ -259,8 +267,12 @@ struct SessionInit {
 	gostd::Context BackgroundCtx;
 	std::shared_ptr<SessionOptions> Options;
 	std::shared_ptr<vfs::FS> FS;
-	// Client, Logger, NpmExecutor, Spawner, ContentMapperLogger, ParseCache,
-	// ContentMappedParseCache — owned by project.
+	// === slice: testutil-leaves === — fields consumed by projecttestutil.
+	std::shared_ptr<Client> Client;
+	std::shared_ptr<logging::LogCollector> Logger;
+	std::shared_ptr<ata::NpmExecutor> NpmExecutor;
+	// === end slice: testutil-leaves ===
+	// ParseCache, ContentMappedParseCache — owned by project.
 	std::shared_ptr<contentmapper::Spawner> Spawner;
 	std::shared_ptr<contentmapper::Logger> ContentMapperLogger;
 };
@@ -296,8 +308,46 @@ struct Session {
 	// session.go:264 — read-only after init.
 	virtual ls::lsutil::UserPreferences Config() = 0;
 
+	// === slice: testutil-leaves ===
+	// Close (session.go:1683) — owned by project; dep-stub.
+	virtual void Close() = 0;
+	// === end slice: testutil-leaves ===
+
 	project::SnapshotHost* SnapshotHost_ = nullptr; // embedded field
 };
+
+// === slice: testutil-leaves ===
+// WatcherID — watch.go:155.
+using WatcherID = std::string;
+
+// Client — client.go:11. The session's client-facing interface; consumed by
+// the projecttestutil ClientMock. Interface decl is faithful; project owns
+// implementations.
+struct Client {
+	virtual ~Client() = default;
+	virtual gostd::Error WatchFiles(
+	    gostd::Context ctx, WatcherID id,
+	    const std::vector<std::shared_ptr<lsproto::FileSystemWatcher>>& watchers) = 0;
+	virtual gostd::Error UnwatchFiles(gostd::Context ctx, WatcherID id) = 0;
+	virtual gostd::Error RegisterContentMapperExtensions(
+	    gostd::Context ctx, const std::vector<std::string>& extensions) = 0;
+	virtual gostd::Error RefreshDiagnostics(gostd::Context ctx) = 0;
+	virtual gostd::Error PublishDiagnostics(
+	    gostd::Context ctx,
+	    const std::shared_ptr<lsproto::PublishDiagnosticsParams>& params) = 0;
+	virtual gostd::Error RefreshInlayHints(gostd::Context ctx) = 0;
+	virtual gostd::Error RefreshCodeLens(gostd::Context ctx) = 0;
+	virtual void ProgressStart(const DiagnosticMessage* message,
+	                           const std::vector<std::any>& args) = 0;
+	virtual void ProgressFinish(const DiagnosticMessage* message,
+	                            const std::vector<std::any>& args) = 0;
+	virtual gostd::Error SendTelemetry(
+	    gostd::Context ctx, const lsproto::TelemetryEvent& telemetry) = 0;
+	virtual bool IsActive() = 0;
+	virtual void SetLocale(const std::string& locale) = 0;
+	virtual locale::Locale GetLocale() = 0;
+};
+// === end slice: testutil-leaves ===
 
 // --- snapshot.go ----------------------------------------------------------
 

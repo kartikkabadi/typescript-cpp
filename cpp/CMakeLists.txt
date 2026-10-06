@@ -280,6 +280,21 @@ add_library(tsc STATIC
 	internal/testutil/tsbaseline/type_symbol_baseline.cpp
 	internal/testutil/tsbaseline/contentmapper_baseline.cpp
 	internal/testutil/contentmappertest/contentmappertest.cpp
+	# === slice: testutil-leaves ===
+	internal/lsp/lsp.cpp
+	internal/testutil/autoimporttestutil/autoimporttestutil.cpp
+	internal/testutil/emittestutil/emittestutil.cpp
+	internal/testutil/filefixture/filefixture.cpp
+	internal/testutil/fixtures/fixtures.cpp
+	internal/testutil/fsbaselineutil/fsbaselineutil.cpp
+	internal/testutil/jstest/node.cpp
+	internal/testutil/lsptestutil/lspclient.cpp
+	internal/testutil/parsetestutil/parsetestutil.cpp
+	internal/testutil/projecttestutil/clientmock_generated.cpp
+	internal/testutil/projecttestutil/npmexecutormock_generated.cpp
+	internal/testutil/projecttestutil/projecttestutil.cpp
+	internal/testutil/stringtestutil/stringtestutil.cpp
+	internal/testutil/testutil.cpp
 	# === slice: bundled ===
 	internal/bundled/bundled.cpp
 	internal/bundled/bundled_generated.cpp

@@ -4,6 +4,8 @@
 #include <cstdlib>
 #include <mutex>
 
+#include "internal/testutil/race/race.h"
+
 namespace tsc::testutil {
 
 namespace {
@@ -21,16 +23,16 @@ std::pair<bool, bool> parseBool(const std::string& v) {
 	return {false, false};
 }
 
-// testProgramIsSingleThreaded — testutil.go:37 (sync.OnceValue). There is
-// no C++ race detector, so `!race.Enabled` is true.
+// testProgramIsSingleThreaded — testutil.go:37 (sync.OnceValue).
 bool computeTestProgramIsSingleThreaded() {
+	// Leave Program in SingleThreaded mode unless explicitly configured or in race mode.
 	if (const char* v = std::getenv("TS_TEST_PROGRAM_SINGLE_THREADED");
 	    v != nullptr && *v != '\0') {
 		if (auto [b, ok] = parseBool(v); ok) {
 			return b;
 		}
 	}
-	return true;
+	return !race::Enabled;
 }
 
 }  // namespace

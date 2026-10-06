@@ -4,9 +4,11 @@
 // when the owning slice lands real headers.
 #pragma once
 
+#include <any>
 #include <exception>
 #include <string>
 #include <string_view>
+#include <typeinfo>
 
 #include "internal/gostd/gostd.h"
 #include "internal/gostd/testing.h"
@@ -48,6 +50,120 @@ void withRecoverAndFail(gostd::testing::T* t, const std::string& msg,
 
 // TestProgramIsSingleThreaded — testutil.go:44.
 bool TestProgramIsSingleThreaded();
+
+}  // namespace tsc::testutil
+
+namespace tsc::gotest::assert {
+
+// Assert — fwd decl for AssertPanics below (defined at file end; the
+// default argument lives there).
+inline void Assert(gostd::testing::T* t, bool condition,
+                   std::string_view msg);
+
+namespace detail {
+
+// anyEqual — reflect.DeepEqual(got, expected) for the common `any`
+// shapes tests compare: string, int/int64, bool, and Error.
+inline bool anyEqual(const std::any& a, const std::any& b) {
+	if (a.type() != b.type()) {
+		return false;
+	}
+	if (!a.has_value()) {
+		return true;
+	}
+	if (a.type() == typeid(std::string)) {
+		return std::any_cast<std::string>(a) == std::any_cast<std::string>(b);
+	}
+	if (a.type() == typeid(const char*)) {
+		return std::string(std::any_cast<const char*>(a)) ==
+		       std::any_cast<const char*>(b);
+	}
+	if (a.type() == typeid(std::string_view)) {
+		return std::any_cast<std::string_view>(a) ==
+		       std::any_cast<std::string_view>(b);
+	}
+	if (a.type() == typeid(int)) {
+		return std::any_cast<int>(a) == std::any_cast<int>(b);
+	}
+	if (a.type() == typeid(int64_t)) {
+		return std::any_cast<int64_t>(a) == std::any_cast<int64_t>(b);
+	}
+	if (a.type() == typeid(bool)) {
+		return std::any_cast<bool>(a) == std::any_cast<bool>(b);
+	}
+	if (a.type() == typeid(double)) {
+		return std::any_cast<double>(a) == std::any_cast<double>(b);
+	}
+	if (a.type() == typeid(gostd::Error)) {
+		return std::any_cast<gostd::Error>(a) == std::any_cast<gostd::Error>(b);
+	}
+	return false;
+}
+
+}  // namespace detail
+
+// Equal — gotest.tools/v3/assert.Equal: fails the test when got !=
+// expected (reflect.DeepEqual on the Go side). For `std::any` operands the
+// common shapes above are compared; unequal types fail.
+template <class A, class B>
+void Equal(gostd::testing::T* t, const A& got, const B& expected,
+           std::string_view msg = "") {
+	bool ok;
+	if constexpr (std::is_same_v<A, std::any> &&
+	              std::is_same_v<B, std::any>) {
+		ok = detail::anyEqual(got, expected);
+	} else {
+		ok = (got == expected);
+	}
+	if (!ok) {
+		t->Fatalf("assert.Equal failed%s%s", {msg.empty() ? "" : ": ",
+	                                        std::string(msg)});
+	}
+}
+
+// NilError — gotest.tools/v3/assert.NilError: fails the test when err is
+// non-nil.
+inline void NilError(gostd::testing::T* t, const gostd::Error& err,
+                     std::string_view msg = "") {
+	if (err != nullptr) {
+		if (msg.empty()) {
+			t->Fatalf("assert.NilError failed: %v", {err});
+		} else {
+			t->Fatalf("assert.NilError failed (%s): %v",
+			          {std::string(msg), err});
+		}
+	}
+}
+
+}  // namespace tsc::gotest::assert
+
+namespace tsc::testutil {
+
+// AssertPanics — testutil.go:14. Go recovers the panic value from fn and
+// asserts it equals `expected`. C++ panics are exceptions: `got` captures
+// the thrown value — std::string for exception what()s and thrown
+// strings — which anyEqual compares.
+template <typename F>
+void AssertPanics(gostd::testing::T* tb, F&& fn, const std::any& expected,
+                  std::string_view msg = "") {
+	tb->Helper();
+	std::any got;
+	try {
+		fn();
+	} catch (const gostd::testing::testGoexit&) {
+		throw;
+	} catch (const std::exception& e) {
+		got = std::string(e.what());
+	} catch (const std::string& s) {
+		got = s;
+	} catch (const char* s) {
+		got = std::string(s);
+	} catch (...) {
+		got = std::string("<panic>");
+	}
+	gotest::assert::Assert(tb, got.has_value(), std::string(msg));
+	gotest::assert::Equal(tb, got, expected, std::string(msg));
+}
 
 }  // namespace tsc::testutil
 
