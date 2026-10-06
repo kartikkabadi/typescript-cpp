@@ -3,13 +3,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/microsoft/TypeScript/tsc/internal/json"
 	"os"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/internal/ast"
 	"github.com/microsoft/TypeScript/tsc/internal/core"
 	"github.com/microsoft/TypeScript/tsc/internal/diagnostics"
+	"github.com/microsoft/TypeScript/tsc/internal/json"
 	"github.com/microsoft/TypeScript/tsc/internal/scanner"
 )
 
