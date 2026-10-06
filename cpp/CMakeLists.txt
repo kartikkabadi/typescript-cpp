@@ -361,6 +361,13 @@ add_library(tsc STATIC
 	internal/ls/organizeimports.cpp
 	internal/ls/signaturehelp.cpp
 	internal/ls/findallreferences.cpp
+
+	# === slice: lsp-server ===
+	internal/lsp/lsp_logger.cpp
+	internal/lsp/lsp_progress.cpp
+	internal/lsp/lsp_stack_sanitizer.cpp
+	internal/lsp/lsp_server.cpp
+	internal/lsp/lsp_handlers.cpp
 )
 
 target_link_libraries(tsc PUBLIC z) # zlib — pprof profile writer

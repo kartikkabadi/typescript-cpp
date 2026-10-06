@@ -293,13 +293,27 @@ struct ContextImpl {
 using Context = std::shared_ptr<ContextImpl>;
 using CancelFunc = std::function<void()>;
 
+// Forward decls — contextWithValue's cancellation propagation needs these.
+inline void ctxCancel(const Context& c, const Error& err);
+inline Error ctxErr(const Context& c);
+inline std::function<bool()> contextAfterFunc(const Context& c,
+                                              std::function<void()> f);
+
 // context.WithValue — returns a context carrying key=value (a shallow copy
 // of the parent that shadows the key, matching Go's child-wins lookup).
+// Go's valueCtx delegates Done/Err to its parent, so the child inherits the
+// parent's cancellation (with the parent's cause).
 inline Context contextWithValue(const Context& parent, const void* key,
                                 std::any value) {
 	auto child = std::make_shared<ContextImpl>();
 	if (parent) {
 		child->values = parent->values;
+		std::weak_ptr<ContextImpl> w = child;
+		contextAfterFunc(parent, [w, parent] {
+			if (auto s = w.lock()) {
+				ctxCancel(s, ctxErr(parent));
+			}
+		});
 	}
 	child->values[key] = std::move(value);
 	return child;
@@ -357,16 +371,44 @@ inline std::function<bool()> contextAfterFunc(const Context& c,
 	return [flag] { return !flag->exchange(true); };
 }
 
-// context.WithCancel — child cancels with errCanceled when the parent finishes.
+// context.WithCancel — child cancels when the parent finishes, inheriting
+// the parent's Err (Go's propagateCancel passes parent.Err() through).
 inline std::pair<Context, CancelFunc> contextWithCancel(const Context& parent) {
 	auto c = std::make_shared<ContextImpl>();
 	std::weak_ptr<ContextImpl> w = c;
-	contextAfterFunc(parent, [w] {
+	contextAfterFunc(parent, [w, parent] {
 		if (auto s = w.lock()) {
-			ctxCancel(s, errCanceled);
+			ctxCancel(s, ctxErr(parent) ? ctxErr(parent) : errCanceled);
 		}
 	});
 	return {c, [c] { ctxCancel(c, errCanceled); }};
+}
+
+// context.WithCancelCause — the returned cancel takes the cancellation
+// cause; context.Cause(ctx) reads it back (ctx.Err() in this port — Go
+// tracks cause separately but never differs from Err here since every
+// cancellation carries its cause).
+inline std::pair<Context, std::function<void(const Error&)>>
+contextWithCancelCause(const Context& parent) {
+	auto c = std::make_shared<ContextImpl>();
+	std::weak_ptr<ContextImpl> w = c;
+	contextAfterFunc(parent, [w, parent] {
+		if (auto s = w.lock()) {
+			ctxCancel(s, ctxErr(parent) ? ctxErr(parent) : errCanceled);
+		}
+	});
+	return {c, [c](const Error& cause) {
+		ctxCancel(c, cause ? cause : errCanceled);
+	}};
+}
+
+// context.Cause — the error the context was cancelled with (nil while open).
+inline Error contextCause(const Context& c) { return ctxErr(c); }
+
+// WaitDone blocks until ctx is done — Go `<-ctx.Done()`.
+inline void ctxWaitDone(const Context& c) {
+	std::unique_lock<std::mutex> lk(c->mu);
+	c->cv.wait(lk, [&] { return c->done; });
 }
 
 // context.WithTimeout(parent, d) — as WithCancel plus a deadline that cancels

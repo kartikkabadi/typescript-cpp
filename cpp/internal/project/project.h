@@ -16,6 +16,8 @@
 
 #include "internal/collections/collections.h"
 #include "internal/gostd/gostd.h"
+#include "internal/locale/locale.h"
+#include "internal/ls/ls.h"
 #include "internal/lsp/lsproto/lsproto.h"
 #include "internal/tspath/tspath.h"
 #include "internal/vfs/vfs.h"
@@ -28,6 +30,8 @@ namespace tsoptions { struct ParsedCommandLine; }
 namespace module { struct ResolverOptions; struct Resolver; }
 namespace lsconv { struct Converters; struct LSPLineMap; }
 namespace ls {
+class LanguageService;
+struct Project;
 namespace lsutil { struct UserPreferences; }
 namespace autoimport { struct Registry; }
 }
@@ -35,7 +39,7 @@ namespace sourcemap { struct ECMALineInfo; }
 namespace json { struct Dom; class Decoder; class Encoder; }
 // === slice: api === — Logger is a std::function alias in contentmapper.h;
 // an alias re-declaration is legal where a struct fwd-decl was not.
-namespace contentmapper { struct Spawner; using Logger = std::function<void(std::string_view)>; struct Host; }
+namespace contentmapper { struct Spawner; using Logger = std::function<void(std::string_view)>; struct Host; struct Mapper; }
 namespace logging { struct Logger; }
 } // namespace tsc
 
@@ -52,6 +56,58 @@ struct ModuleResolverFactory;
 struct APICreateProgramRequest;
 struct APIReconfigureProgramRequest;
 struct APISnapshotRequest;
+
+// === slice: lsp-server — dep decls (project owns the impls) ===
+struct Client;
+struct NpmExecutor;
+struct ParseCache;
+
+// WatcherID — watcher.go (project): identifies one file-watcher subscription.
+using WatcherID = std::string;
+
+// ContentMapperContributions — session.go:57.
+struct ContentMapperContributions {
+	std::vector<std::shared_ptr<contentmapper::Mapper>> Mappers;
+	std::vector<std::string> Extensions;
+};
+
+// ErrNoProjectForUnknownScriptKind — session.go:65.
+inline const gostd::Error ErrNoProjectForUnknownScriptKind =
+	gostd::newError("no project for unknown script kind");
+
+// Client — client.go:10: the LSP-side callbacks the session invokes.
+struct Client {
+	virtual ~Client() = default;
+	virtual gostd::Error WatchFiles(
+		gostd::Context ctx, WatcherID id,
+		const std::vector<std::shared_ptr<lsproto::FileSystemWatcher>>& watchers) = 0;
+	virtual gostd::Error UnwatchFiles(gostd::Context ctx, WatcherID id) = 0;
+	virtual gostd::Error RegisterContentMapperExtensions(
+		gostd::Context ctx, const std::vector<std::string>& extensions) = 0;
+	virtual gostd::Error RefreshDiagnostics(gostd::Context ctx) = 0;
+	virtual gostd::Error PublishDiagnostics(
+		gostd::Context ctx, lsproto::PublishDiagnosticsParams* params) = 0;
+	virtual gostd::Error RefreshInlayHints(gostd::Context ctx) = 0;
+	virtual gostd::Error RefreshCodeLens(gostd::Context ctx) = 0;
+	virtual void ProgressStart(const DiagnosticMessage* message,
+	                           const std::vector<gostd::fmtArg>& args) = 0;
+	virtual void ProgressFinish(const DiagnosticMessage* message,
+	                            const std::vector<gostd::fmtArg>& args) = 0;
+	virtual gostd::Error SendTelemetry(
+		gostd::Context ctx,
+		const lsproto::RequestFailureTelemetryEventOrPerformanceStatsTelemetryEventOrProjectInfoTelemetryEventOrNull& telemetry) = 0;
+	virtual bool IsActive() = 0;
+	virtual void SetLocale(std::string_view localeString) = 0;
+	virtual tsc::locale::Locale GetLocale() = 0;
+};
+
+// NpmExecutor — ata/types.go (npm install callback).
+struct NpmExecutor {
+	virtual ~NpmExecutor() = default;
+	virtual std::pair<std::vector<uint8_t>, gostd::Error> NpmInstall(
+		const std::string& cwd, const std::vector<std::string>& args) = 0;
+};
+// === end slice: lsp-server ===
 
 // project.go:32-96 — project ID types.
 using ConfiguredProjectID = tspath::Path;
@@ -259,7 +315,13 @@ struct SessionInit {
 	gostd::Context BackgroundCtx;
 	std::shared_ptr<SessionOptions> Options;
 	std::shared_ptr<vfs::FS> FS;
-	// Client, Logger, NpmExecutor, Spawner, ContentMapperLogger, ParseCache,
+	// === slice: lsp-server === (real field decls; values still owned by
+	// project).
+	std::shared_ptr<Client> Client;
+	std::shared_ptr<tsc::logging::Logger> Logger;
+	std::shared_ptr<NpmExecutor> NpmExecutor;
+	std::shared_ptr<ParseCache> ParseCache;
+	// === end slice: lsp-server ===
 	// ContentMappedParseCache — owned by project.
 	std::shared_ptr<contentmapper::Spawner> Spawner;
 	std::shared_ptr<contentmapper::Logger> ContentMapperLogger;
@@ -283,7 +345,8 @@ struct Session {
 		const std::vector<lsproto::TextDocumentContentChangePartialOrWholeDocument>& changes) = 0;
 	virtual gostd::Error DidSaveFile(gostd::Context ctx, lsproto::DocumentUri uri) = 0;
 	virtual gostd::Error DidChangeWatchedFiles(
-		gostd::Context ctx, const std::vector<lsproto::FileEvent>& changes) = 0;
+		gostd::Context ctx,
+		const std::vector<std::shared_ptr<lsproto::FileEvent>>& changes) = 0;
 
 	// APIUpdate (api.go:18).
 	virtual std::pair<Snapshot*, gostd::Error> APIUpdate(
@@ -295,6 +358,83 @@ struct Session {
 
 	// session.go:264 — read-only after init.
 	virtual ls::lsutil::UserPreferences Config() = 0;
+
+	// === slice: lsp-server — dep decls (project owns the impls) ===
+
+	// GetLanguageService — session.go:1118.
+	virtual std::pair<ls::LanguageService*, gostd::Error> GetLanguageService(
+		gostd::Context ctx, lsproto::DocumentUri uri) = 0;
+
+	// GetLanguageServiceAndProjectsForFile — session.go:1126. Go returns
+	// (defaultProject, defaultLs, allProjects, error).
+	struct LanguageServiceAndProjects {
+		project::Project* DefaultProject = nullptr;
+		ls::LanguageService* DefaultLanguageService = nullptr;
+		std::vector<ls::Project*> AllProjects;
+		gostd::Error Err;
+	};
+	virtual LanguageServiceAndProjects GetLanguageServiceAndProjectsForFile(
+		gostd::Context ctx, lsproto::DocumentUri uri) = 0;
+
+	// GetProjectsForFile — session.go:1136.
+	virtual std::pair<std::vector<ls::Project*>, gostd::Error>
+	GetProjectsForFile(gostd::Context ctx, lsproto::DocumentUri uri) = 0;
+
+	// GetLanguageServicesForDocumentsLoadingProjectTree — session.go:1153.
+	virtual std::vector<ls::LanguageService*>
+	GetLanguageServicesForDocumentsLoadingProjectTree(
+		gostd::Context ctx,
+		const std::vector<lsproto::DocumentUri>& uris) = 0;
+
+	// GetLanguageServiceForProjectWithFile — session.go:1181.
+	virtual ls::LanguageService* GetLanguageServiceForProjectWithFile(
+		gostd::Context ctx, project::Project* project,
+		lsproto::DocumentUri uri) = 0;
+
+	// WithSnapshotLoadingProjectTree — session.go:1202.
+	virtual void WithSnapshotLoadingProjectTree(
+		gostd::Context ctx,
+		collections::Set<tspath::Path>* requestedProjectTrees,
+		std::function<void(Snapshot*)> fn) = 0;
+
+	// WithSnapshotForDocument — session.go:1216.
+	virtual void WithSnapshotForDocument(
+		gostd::Context ctx, lsproto::DocumentUri uri,
+		std::function<void(Snapshot*)> fn) = 0;
+
+	// WithLanguageServiceAndSnapshot — session.go:1257. Go returns
+	// (asyncWork func() error, error); fn returns the same pair.
+	virtual std::pair<std::function<gostd::Error()>, gostd::Error>
+	WithLanguageServiceAndSnapshot(
+		gostd::Context ctx, lsproto::DocumentUri uri,
+		std::function<std::pair<std::function<gostd::Error()>, gostd::Error>(
+			ls::LanguageService*, Snapshot*)> fn) = 0;
+
+	// GetLanguageServiceWithAutoImports — session.go:1281.
+	virtual std::pair<ls::LanguageService*, gostd::Error>
+	GetLanguageServiceWithAutoImports(gostd::Context ctx,
+	                                  Snapshot* baseSnapshot,
+	                                  lsproto::DocumentUri uri) = 0;
+
+	// Configure — session.go:287.
+	virtual void Configure(ls::lsutil::UserPreferences config) = 0;
+	// InitializeWithUserConfig — session.go:314.
+	virtual void InitializeWithUserConfig(
+		ls::lsutil::UserPreferences config) = 0;
+	// SetContentMapperContributions — session.go:344.
+	virtual void SetContentMapperContributions(
+		gostd::Context ctx, const ContentMapperContributions& contributions,
+		const std::vector<lsproto::DocumentUri>& documentURIs) = 0;
+	// DidChangeCompilerOptionsForInferredProjects — session.go:499.
+	virtual void DidChangeCompilerOptionsForInferredProjects(
+		gostd::Context ctx, CompilerOptions* options) = 0;
+	// StartPerformanceTelemetry — session.go:707.
+	virtual void StartPerformanceTelemetry() = 0;
+	// EnqueuePublishGlobalDiagnostics — session.go:1965.
+	virtual void EnqueuePublishGlobalDiagnostics() = 0;
+	// Close — session.go:1683.
+	virtual void Close() = 0;
+	// === end slice: lsp-server ===
 
 	project::SnapshotHost* SnapshotHost_ = nullptr; // embedded field
 };
@@ -336,13 +476,20 @@ struct Snapshot {
 	virtual bool isOpenFile(const std::string& fileName) = 0;
 	virtual tspath::Path toPath(const std::string& fileName) = 0;
 
+	// === slice: lsp-server ===
+	// GetLanguageServiceProjectsContainingFile — snapshot.go:207.
+	virtual std::vector<ls::Project*> GetLanguageServiceProjectsContainingFile(
+		lsproto::DocumentUri uri) = 0;
+	// === end slice: lsp-server ===
+
 	project::ProjectCollection* ProjectCollection = nullptr;
 };
 
 // --- project.go (Project) -------------------------------------------------
 
-// Project (project.go) — a single TypeScript project.
-struct Project {
+// Project (project.go) — a single TypeScript project. Implements
+// ls::Project implicitly in Go; realized as inheritance here.
+struct Project : public ls::Project {
 	virtual ~Project() = default;
 
 	int Kind{};                    // project Kind enum

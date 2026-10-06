@@ -38,6 +38,7 @@
 #include "internal/ls/change/change.h"
 #include "internal/ls/lsutil/lsutil.h"
 
+namespace tsc::lsp { class Server; }
 namespace tsc::ls::autoimport {
 struct ProjectID;
 struct Registry;
@@ -1743,8 +1744,7 @@ private:
 															 SourceFile* sourceFile,
 															 std::vector<SourceFile*> sourceFiles);
 
-	// crossproject.go (dep stub — ls-coreB)
-	template <class Req, class Resp>
+	// format_document.go ProvideFormatDocument (dep stub — ls formatting slice)
 	lsp::lsproto::DocumentFormattingResponse ProvideFormatDocument(
 		gostd::Context ctx, lsp::lsproto::DocumentUri documentURI,
 		lsp::lsproto::FormattingOptions* options);
@@ -1938,6 +1938,22 @@ private:
 
 	// === slice: ls-coreC — hover.go ===
 	lsp::lsproto::HoverResponse ProvideHover(gostd::Context ctx, lsp::lsproto::HoverParams* params);
+
+	// === slice: lsp-server — dep decls owned by ls slices ===
+	// server.go calls the exported Provide*/Get*/Resolve methods directly, so
+	// the LSP server is a friend while the owning slices keep their private
+	// sections.
+	friend class ::tsc::lsp::Server;
+	// autoinsert.go:13 ProvideOnAutoInsert (autoinsert.go is not yet ported).
+	std::pair<lsp::lsproto::VSOnAutoInsertResponse, gostd::Error>
+	ProvideOnAutoInsert(gostd::Context ctx,
+	                    lsp::lsproto::VSOnAutoInsertParams* params);
+	// linkedediting.go:18 ProvideLinkedEditingRange (linkedediting.go is not
+	// yet ported).
+	std::pair<lsp::lsproto::LinkedEditingRangeResponse, gostd::Error>
+	ProvideLinkedEditingRange(gostd::Context ctx,
+	                          lsp::lsproto::LinkedEditingRangeParams* params);
+	// === end slice: lsp-server ===
 }
 ;
 

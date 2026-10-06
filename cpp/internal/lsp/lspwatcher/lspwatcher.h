@@ -18,23 +18,8 @@
 #include "internal/fswatch/fswatch.h"
 #include "internal/gostd/gostd.h"
 #include "internal/lsp/lsproto/lsproto.h"
+#include "internal/project/logging/logging.h"
 #include "internal/vfs/vfs.h"
-
-namespace tsc::project::logging {
-
-// === dep decls — owned by project slice (tsc/internal/project/logging) ===
-// logger.go:10 — Logger interface (minimal surface used by lspwatcher). The
-// project slice owns the real package and will replace this decl when it
-// lands.
-struct Logger {
-	virtual ~Logger() = default;
-	virtual void Logf(std::string_view format,
-	                  std::initializer_list<gostd::fmtArg> args) = 0;
-};
-
-// === end dep decls ===
-
-} // namespace tsc::project::logging
 
 namespace tsc::lsconv {
 
@@ -116,7 +101,7 @@ struct Watcher : std::enable_shared_from_this<Watcher> {
 	std::shared_ptr<vfs::FS> fs;
 	std::shared_ptr<watcherBackend> backend;
 	std::function<void(std::vector<std::shared_ptr<lsproto::FileEvent>>)> onChanges;
-	std::shared_ptr<project::logging::Logger> logger;
+	std::shared_ptr<tsc::logging::Logger> logger;
 
 	std::mutex mu;
 	// watches holds the watches associated with each LSP WatcherID. A single
@@ -175,21 +160,21 @@ struct watch : std::enable_shared_from_this<watch> {
 std::shared_ptr<Watcher>
 New(const std::shared_ptr<vfs::FS>& fs,
     std::function<void(std::vector<std::shared_ptr<lsproto::FileEvent>>)> onChanges,
-    const std::shared_ptr<project::logging::Logger>& logger);
+    const std::shared_ptr<tsc::logging::Logger>& logger);
 
 // newWithBackend — lspwatcher.go:99: shared construction path.
 std::shared_ptr<Watcher>
 newWithBackend(const std::shared_ptr<vfs::FS>& fs,
                const std::shared_ptr<watcherBackend>& backend,
                std::function<void(std::vector<std::shared_ptr<lsproto::FileEvent>>)> onChanges,
-               const std::shared_ptr<project::logging::Logger>& logger);
+               const std::shared_ptr<tsc::logging::Logger>& logger);
 
 // NewWithFSWatcher constructs a Watcher backed by the provided
 // fswatch.Watcher.
 std::shared_ptr<Watcher>
 NewWithFSWatcher(const std::shared_ptr<vfs::FS>& fs, fswatch::Watcher* watcher,
                  std::function<void(std::vector<std::shared_ptr<lsproto::FileEvent>>)> onChanges,
-                 const std::shared_ptr<project::logging::Logger>& logger);
+                 const std::shared_ptr<tsc::logging::Logger>& logger);
 
 // watchRoot extracts the directory the fswatch subscription should be rooted
 // at from a FileSystemWatcher (lspwatcher.go:532).
