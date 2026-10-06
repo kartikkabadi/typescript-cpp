@@ -59,6 +59,7 @@ add_library(tsc STATIC
 	internal/checker/checker_relater.cpp
 	internal/checker/checker_emitresolver.cpp
 	internal/checker/mapper.cpp
+	internal/compiler/checkerpool.cpp
 	internal/compiler/emitter.cpp
 	internal/compiler/fileloader.cpp
 	internal/compiler/host.cpp
