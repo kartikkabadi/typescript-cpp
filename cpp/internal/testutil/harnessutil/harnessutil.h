@@ -2,6 +2,7 @@
 // utility package.
 #pragma once
 
+#include <ostream>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -12,6 +13,7 @@
 #include "internal/gostd/gostd.h"
 #include "internal/gostd/regexp.h"
 #include "internal/gostd/testing.h"
+#include "internal/tspath/tspath.h"
 #include "internal/vfs/vfs.h"
 
 namespace tsc::compiler {
@@ -23,6 +25,7 @@ class ProgramLike;
 namespace tsc {
 struct CompilerOptions;
 struct Diagnostic;
+struct DiagnosticMessage;
 }  // namespace tsc
 
 namespace tsc::tsoptions {
@@ -161,6 +164,35 @@ std::vector<NamedTestConfiguration*> GetFileBasedTestConfigurations(
     gostd::testing::T* t,
     const std::unordered_map<std::string, std::string>& settings,
     const std::unordered_set<std::string>& varyByOptions);
+
+// === slice: tsctests ===
+// TracerForBaselining — harnessutil.go:489. Sanitizing trace sink used by
+// test systems so module-resolution/package.json lookups produce stable
+// baseline output (lifts the previously TU-local type for tsctests).
+struct TracerForBaselining {
+	tspath::ComparePathsOptions opts;
+	std::unordered_map<tspath::Path, bool> packageJsonCache;
+	// strings.Builder — the output buffer, owned by the caller.
+	std::string* builder = nullptr;
+
+	// Trace — harnessutil.go:502.
+	void Trace(const DiagnosticMessage* msg,
+	           const std::vector<std::string>& args);
+	// TraceWithWriter — harnessutil.go:507 (io.Writer → std::ostream*).
+	void TraceWithWriter(std::ostream* w, const std::string& msg,
+	                     bool usePackageJsonCache);
+	// sanitizeTrace — harnessutil.go:519.
+	std::string sanitizeTrace(const std::string& msg,
+	                          bool usePackageJsonCache);
+	// String/Reset — harnessutil.go:607/611.
+	const std::string& String() const;
+	void Reset();
+};
+
+// NewTracerForBaselining — harnessutil.go:495.
+TracerForBaselining* NewTracerForBaselining(
+    tspath::ComparePathsOptions opts, std::string* builder);
+// === end slice: tsctests ===
 
 // GetConfigNameFromFileName — harnessutil.go:1228.
 std::string GetConfigNameFromFileName(std::string_view filename);
