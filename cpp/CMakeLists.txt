@@ -251,6 +251,20 @@ add_library(tsc STATIC
 	internal/testrunner/testrunner_deps.cpp
 	internal/testrunner/transpile_runner.cpp
 	internal/testrunner/compiler_runner.cpp
+	# === slice: testutil ===
+	internal/testutil/harnessutil/harnessutil.cpp
+	internal/testutil/harnessutil/recorderfs.cpp
+	internal/testutil/harnessutil/sourcemap_recorder.cpp
+	internal/testutil/baseline/baseline.cpp
+	internal/testutil/tsbaseline/util.cpp
+	internal/testutil/tsbaseline/error_baseline.cpp
+	internal/testutil/tsbaseline/js_emit_baseline.cpp
+	internal/testutil/tsbaseline/sourcemap_baseline.cpp
+	internal/testutil/tsbaseline/sourcemap_record_baseline.cpp
+	internal/testutil/tsbaseline/module_resolution_baseline.cpp
+	internal/testutil/tsbaseline/type_symbol_baseline.cpp
+	internal/testutil/tsbaseline/contentmapper_baseline.cpp
+	internal/testutil/contentmappertest/contentmappertest.cpp
 	# === slice: bundled ===
 	internal/bundled/bundled.cpp
 	internal/bundled/bundled_generated.cpp

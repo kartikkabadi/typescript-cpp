@@ -26,4 +26,11 @@ inline constexpr std::string_view NoContent = "<no content>";
 void Run(gostd::testing::T* t, const std::string& fileName,
          const std::string& actual, const Options& opts);
 
+// DiffText — baseline.go:31.
+std::string DiffText(const std::string& oldName, const std::string& newName,
+                     const std::string& expected, const std::string& actual);
+
+// Track — testmain.go:36.
+std::function<void()> Track();
+
 }  // namespace tsc::testutil::baseline

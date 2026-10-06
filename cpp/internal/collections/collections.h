@@ -83,6 +83,16 @@ struct OrderedMap {
 	// during iteration; index-based loops reproduce that.
 	const std::vector<K>& Keys() const { return keys; }
 
+	// === slice: testutil ===
+	// Values — collections.go orderedmap values in insertion order (Go
+	// returns an iterator; materializing is equivalent for read-only use).
+	std::vector<V> Values() const {
+		std::vector<V> out;
+		out.reserve(keys.size());
+		for (const K& k : keys) out.push_back(mp.at(k));
+		return out;
+	}
+
 	OrderedMap Clone() const { return *this; }
 };
 

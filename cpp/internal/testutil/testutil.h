@@ -46,6 +46,9 @@ void withRecoverAndFail(gostd::testing::T* t, const std::string& msg,
 	}
 }
 
+// TestProgramIsSingleThreaded — testutil.go:44.
+bool TestProgramIsSingleThreaded();
+
 }  // namespace tsc::testutil
 
 namespace tsc::gotest::assert {

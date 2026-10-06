@@ -64,6 +64,17 @@ const DiagnosticMessage* keyToMessage(std::string_view key);
 // Replaces {N} placeholders; panics on an out-of-range index like Go.
 std::string formatText(std::string_view text, const std::vector<std::string>& args);
 
+// === slice: testutil ===
+// NewAdHocMessage — diagnostics.go:164. A codeless (-1) error message whose
+// text is the whole diagnostic text (harness "pre/post emit mismatch" notes).
+// The returned pointer and its stored text are leaked like GC'd Go storage —
+// test-only usage.
+inline const DiagnosticMessage* NewAdHocMessage(std::string text) {
+	auto* stored = new std::string(std::move(text));
+	return new DiagnosticMessage{-1, DiagnosticCategory::Error, "-1",
+	                             stored->c_str()};
+}
+
 // getLocalizedMessages — diagnostics.go:101. Localized message tables are
 // generated data from diagnostics/loc_generated.go; none are ported yet, so
 // every lookup currently finds nothing (English).
