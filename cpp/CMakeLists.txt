@@ -169,6 +169,21 @@ add_library(tsc STATIC
 	internal/ls/change/delete.cpp
 	internal/ls/change/tracker.cpp
 	internal/ls/change/trackerimpl.cpp
+	# === slice: ls-coreC ===
+	internal/ls/ls.cpp
+	internal/ls/codelens.cpp
+	internal/ls/definition.cpp
+	internal/ls/documenthighlights.cpp
+	internal/ls/folding.cpp
+	internal/ls/format.cpp
+	internal/ls/inlay_hints.cpp
+	internal/ls/rename.cpp
+	internal/ls/selectionranges.cpp
+	internal/ls/semantictokens.cpp
+	internal/ls/sourcedefinition.cpp
+	internal/ls/symbols.cpp
+	internal/ls/callhierarchy.cpp
+	internal/ls/hover.cpp
 	# === slice: infra ===
 	internal/locale/locale.cpp
 	# === slice: contentmapper ===

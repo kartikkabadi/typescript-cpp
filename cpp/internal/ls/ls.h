@@ -412,7 +412,7 @@ struct stringLiteralCompletions {
 
 // ==================== ls-coreB merged decls ====================
 
-// fwd decls — types declared later in this header (merged ls-coreB sections
+// fwd decls — types declared later in this header (merged ls-coreB/C sections
 // and sibling-owned dep-stubs kept in their original positions).
 class LanguageService;
 struct SignatureUsage;
@@ -421,6 +421,12 @@ struct typeArgsInvocation;
 struct contextualInvocation;
 struct invocation;
 struct argumentListInfo;
+struct refInfo;
+struct RenameInfo;
+struct sourceDefResolver;
+struct incomingEntry;
+struct callSite;
+struct semanticToken;
 
 // === findallreferences.go — shared result types ===
 
@@ -1729,7 +1735,211 @@ private:
 	                compiler::SimpleProgram* program,
 	                lsproto::CodeActionKind kind);
 
-};
+	// === ls-coreC merged decls (format/codelens/selectionranges/definition/rename/folding/sourcedefinition/semantictokens/symbols/documenthighlights/inlay_hints/callhierarchy/hover) ===
+
+
+	std::vector<ReferenceEntry*> getReferencedSymbolsForSymbol(gostd::Context ctx, Symbol* symbol,
+															 std::vector<::tsc::Node*> excludeDeclaration,
+															 SourceFile* sourceFile,
+															 std::vector<SourceFile*> sourceFiles);
+
+	// crossproject.go (dep stub — ls-coreB)
+	template <class Req, class Resp>
+	lsp::lsproto::DocumentFormattingResponse ProvideFormatDocument(
+		gostd::Context ctx, lsp::lsproto::DocumentUri documentURI,
+		lsp::lsproto::FormattingOptions* options);
+	std::vector<lsp::lsproto::TextEdit*> getFormattingEditsForMappedRange(
+		gostd::Context ctx, SourceFile* file, lsutil::FormatCodeSettings options,
+		TextRange originalRange);
+	lsp::lsproto::DocumentRangeFormattingResponse ProvideFormatDocumentRange(
+		gostd::Context ctx, lsp::lsproto::DocumentUri documentURI,
+		lsp::lsproto::FormattingOptions* options, lsp::lsproto::Range r);
+	lsp::lsproto::DocumentOnTypeFormattingResponse ProvideFormatDocumentOnType(
+		gostd::Context ctx, lsp::lsproto::DocumentUri documentURI,
+		lsp::lsproto::FormattingOptions* options, lsp::lsproto::Position position,
+		std::string character);
+	std::vector<TextChange> getFormattingEditsForRange(gostd::Context ctx, SourceFile* file,
+													 lsutil::FormatCodeSettings options,
+													 TextRange r);
+	std::vector<TextChange> getFormattingEditsForDocument(gostd::Context ctx, SourceFile* file,
+														lsutil::FormatCodeSettings options);
+	std::vector<TextChange> getFormattingEditsAfterKeystroke(gostd::Context ctx, SourceFile* file,
+														   lsutil::FormatCodeSettings options,
+														   int position, std::string key);
+
+	// === slice: ls-coreC — codelens.go ===
+	lsp::lsproto::CodeLensResponse ProvideCodeLenses(gostd::Context ctx,
+													 lsp::lsproto::DocumentUri documentURI);
+	std::pair<lsp::lsproto::CodeLens*, gostd::Error> ResolveCodeLens(
+		gostd::Context ctx, lsp::lsproto::CodeLens* codeLens,
+		std::string* showLocationsCommandName, CrossProjectOrchestrator* orchestrator);
+	lsp::lsproto::CodeLens* newCodeLensForNode(lsp::lsproto::DocumentUri fileUri, SourceFile* file,
+											   ::tsc::Node* node, lsp::lsproto::CodeLensKind kind);
+
+	// === slice: ls-coreC — selectionranges.go ===
+	lsp::lsproto::SelectionRangeResponse ProvideSelectionRanges(
+		gostd::Context ctx, lsp::lsproto::SelectionRangeParams* params);
+
+	// === slice: ls-coreC — definition.go ===
+	lsp::lsproto::DefinitionResponse ProvideDefinition(gostd::Context ctx,
+													   lsp::lsproto::DocumentUri documentURI,
+													   lsp::lsproto::Position position);
+	lsp::lsproto::DefinitionResponse provideDefinitionWorker(
+		gostd::Context ctx, lsp::lsproto::DocumentUri documentURI,
+		lsp::lsproto::Position position);
+	lsp::lsproto::DefinitionResponse provideDefinitionAtPosition(
+		gostd::Context ctx, compiler::SimpleProgram* program, SourceFile* file, TextPos textPos,
+		bool clientSupportsLink);
+	lsp::lsproto::TypeDefinitionResponse ProvideTypeDefinition(gostd::Context ctx,
+															 lsp::lsproto::DocumentUri documentURI,
+															 lsp::lsproto::Position position);
+	lsp::lsproto::TypeDefinitionResponse provideTypeDefinitionAtPosition(
+		gostd::Context ctx, compiler::SimpleProgram* program, SourceFile* file, TextPos textPos,
+		bool clientSupportsLink);
+	lsp::lsproto::DefinitionResponse createDefinitionLocations(
+		lsp::lsproto::Range originSelectionRange, bool clientSupportsLink,
+		std::vector<::tsc::Node*> declarations, refInfo* reference, spanmap::Feature feature);
+	lsp::lsproto::DefinitionResponse createLocationFromFileAndRange(SourceFile* file,
+																  TextRange textRange,
+																  spanmap::Feature feature);
+
+	// === slice: ls-coreC — rename.go ===
+	std::pair<lsp::lsproto::WorkspaceEditOrNull, gostd::Error> ProvideRename(
+		gostd::Context ctx, lsp::lsproto::RenameParams* params,
+		CrossProjectOrchestrator* orchestrator);
+	RenameInfo GetRenameInfo(gostd::Context ctx, std::string newName,
+							 lsp::lsproto::DocumentUri documentURI, lsp::lsproto::Position position);
+	std::pair<lsp::lsproto::WorkspaceEditOrNull, gostd::Error> symbolAndEntriesToRename(
+		gostd::Context ctx, lsp::lsproto::RenameParams* params, SymbolAndEntriesData data,
+		symbolEntryTransformOptions options);
+	std::pair<lsp::lsproto::Range, bool> renameEditRange(ReferenceEntry* entry);
+	std::pair<RenameInfo, bool> getRenameInfoForNode(gostd::Context ctx, std::string newName,
+													 ::tsc::Node* node, SourceFile* sourceFile,
+													 compiler::SimpleProgram* program);
+	const DiagnosticMessage* renameBlockedReason(SourceFile* sourceFile,
+												 ::tsc::Node* node, Symbol* symbol,
+												 checker::Checker* ch,
+												 compiler::SimpleProgram* program);
+	std::pair<RenameInfo, bool> getRenameInfoForModule(gostd::Context ctx, std::string newName,
+													   ::tsc::Node* specifier, SourceFile* sourceFile,
+													   Symbol* moduleSymbol);
+	std::string getNewFileNameForModuleRename(std::string oldPath, std::string specifierText,
+											  std::string newName);
+	std::string getTextForRename(::tsc::Node* originalNode, ReferenceEntry* entry,
+								 std::string newText, checker::Checker* ch,
+								 lsutil::QuotePreference quotePreference, bool useAliasesForRename);
+
+	// === slice: ls-coreC — folding.go ===
+	lsp::lsproto::FoldingRangeResponse ProvideFoldingRange(gostd::Context ctx,
+														 lsp::lsproto::DocumentUri documentURI);
+	std::vector<lsp::lsproto::FoldingRange*> adjustFoldingEnd(
+		std::vector<lsp::lsproto::FoldingRange*> ranges, SourceFile* sourceFile);
+	std::vector<lsp::lsproto::FoldingRange*> addNodeOutliningSpans(gostd::Context ctx,
+																 SourceFile* sourceFile);
+	std::vector<lsp::lsproto::FoldingRange*> addRegionOutliningSpans(gostd::Context ctx,
+																   SourceFile* sourceFile);
+	std::pair<lsp::lsproto::Range, spanmap::Fidelity> createFoldingRangeFromBounds(int start, int end,
+																				 SourceFile* sourceFile);
+
+	// === slice: ls-coreC — sourcedefinition.go ===
+	lsp::lsproto::DefinitionResponse ProvideSourceDefinition(gostd::Context ctx,
+															 lsp::lsproto::DocumentUri documentURI,
+															 lsp::lsproto::Position position);
+	std::pair<lsp::lsproto::DefinitionResponse, gostd::Error> provideSourceDefinitionAtPosition(
+		gostd::Context ctx, compiler::SimpleProgram* program, SourceFile* file, TextPos textPos);
+	sourceDefResolver* newSourceDefResolver(compiler::SimpleProgram* program, std::string resolveFrom);
+
+	// === slice: ls-coreC — semantictokens.go ===
+	lsp::lsproto::SemanticTokensResponse ProvideSemanticTokens(gostd::Context ctx,
+															   lsp::lsproto::DocumentUri documentURI);
+	lsp::lsproto::SemanticTokensRangeResponse ProvideSemanticTokensRange(
+		gostd::Context ctx, lsp::lsproto::DocumentUri documentURI, lsp::lsproto::Range rng);
+	std::vector<semanticToken> collectSemanticTokens(gostd::Context ctx, checker::Checker* c,
+													 SourceFile* file,
+													 compiler::SimpleProgram* program);
+	std::vector<semanticToken> collectSemanticTokensInRange(gostd::Context ctx, checker::Checker* c,
+															SourceFile* file,
+															int spanStart, int spanEnd);
+
+	// === slice: ls-coreC — symbols.go ===
+	lsp::lsproto::DocumentSymbolResponse ProvideDocumentSymbols(gostd::Context ctx,
+																lsp::lsproto::DocumentUri documentURI);
+	std::vector<lsp::lsproto::SymbolInformation> getDocumentSymbolInformations(
+		gostd::Context ctx, SourceFile* file, lsp::lsproto::DocumentUri documentURI);
+	std::vector<lsp::lsproto::DocumentSymbol*> getDocumentSymbolsForChildren(gostd::Context ctx,
+																		   ::tsc::Node* node,
+																		   SourceFile* file);
+	lsp::lsproto::DocumentSymbol* newDocumentSymbol(
+		::tsc::Node* node, ::tsc::Node* name, std::vector<lsp::lsproto::DocumentSymbol*> children);
+
+	// === slice: ls-coreC — documenthighlights.go ===
+	lsp::lsproto::DocumentHighlightResponse ProvideDocumentHighlights(
+		gostd::Context ctx, lsp::lsproto::DocumentUri documentUri,
+		lsp::lsproto::Position documentPosition);
+	lsp::lsproto::CustomMultiDocumentHighlightResponse ProvideMultiDocumentHighlights(
+		gostd::Context ctx, lsp::lsproto::DocumentUri documentUri,
+		lsp::lsproto::Position documentPosition,
+		std::vector<lsp::lsproto::DocumentUri> filesToSearch);
+	std::pair<lsp::lsproto::MultiDocumentHighlightsOrNull, gostd::Error>
+	provideDocumentHighlightsWorker(gostd::Context ctx, lsp::lsproto::DocumentUri documentUri,
+									lsp::lsproto::Position documentPosition,
+									std::vector<lsp::lsproto::DocumentUri> filesToSearch);
+	lsp::lsproto::MultiDocumentHighlightsOrNull provideDocumentHighlightsAtPosition(
+		gostd::Context ctx, lsp::lsproto::DocumentUri documentUri, int position,
+		std::vector<lsp::lsproto::DocumentUri> filesToSearch);
+	std::vector<lsp::lsproto::MultiDocumentHighlight*> getSemanticDocumentHighlights(
+		gostd::Context ctx, int position, ::tsc::Node* node, compiler::SimpleProgram* program,
+		std::vector<SourceFile*> sourceFiles);
+	std::pair<std::string, lsp::lsproto::DocumentHighlight*> toDocumentHighlight(ReferenceEntry* entry);
+	std::vector<lsp::lsproto::DocumentHighlight*> getSyntacticDocumentHighlights(::tsc::Node* node,
+																			   SourceFile* sourceFile);
+	std::vector<lsp::lsproto::DocumentHighlight*> useParent(
+		::tsc::Node* node, std::function<bool(::tsc::Node*)> nodeTest,
+		std::function<std::vector<::tsc::Node*>(::tsc::Node*, SourceFile*)> getNodes,
+		SourceFile* sourceFile);
+	std::vector<lsp::lsproto::DocumentHighlight*> highlightSpans(std::vector<::tsc::Node*> nodes,
+															   SourceFile* sourceFile);
+	std::vector<lsp::lsproto::DocumentHighlight*> getFromAllDeclarations(
+		std::function<bool(::tsc::Node*)> nodeTest, std::vector<Kind> keywords, ::tsc::Node* node,
+		SourceFile* sourceFile);
+	std::vector<lsp::lsproto::DocumentHighlight*> getIfElseOccurrences(IfStatement* ifStatement,
+																	 SourceFile* sourceFile);
+
+	// === slice: ls-coreC — inlay_hints.go ===
+	lsp::lsproto::InlayHintResponse ProvideInlayHint(gostd::Context ctx,
+												   lsp::lsproto::InlayHintParams* params);
+
+	// === slice: ls-coreC — callhierarchy.go ===
+	lsp::lsproto::CallHierarchyItem* createCallHierarchyItem(compiler::SimpleProgram* program,
+														   ::tsc::Node* node);
+	lsp::lsproto::CallHierarchyIncomingCall* convertCallSiteGroupToIncomingCall(
+		compiler::SimpleProgram* program, std::vector<callSite*> entries);
+	lsp::lsproto::CallHierarchyOutgoingCall* convertCallSiteGroupToOutgoingCall(
+		compiler::SimpleProgram* program, std::vector<callSite*> entries);
+	std::pair<lsp::lsproto::CallHierarchyIncomingCallsResponse, gostd::Error> getIncomingCalls(
+		gostd::Context ctx, compiler::SimpleProgram* program, ::tsc::Node* declaration,
+		CrossProjectOrchestrator* orchestrator);
+	std::pair<lsp::lsproto::CallHierarchyIncomingCallsResponse, gostd::Error>
+	symbolAndEntriesToIncomingCalls(gostd::Context ctx, incomingEntry* params,
+									SymbolAndEntriesData data, symbolEntryTransformOptions options);
+	std::vector<lsp::lsproto::CallHierarchyOutgoingCall*> getOutgoingCalls(
+		compiler::SimpleProgram* program, ::tsc::Node* declaration);
+	lsp::lsproto::CallHierarchyPrepareResponse ProvidePrepareCallHierarchy(
+		gostd::Context ctx, lsp::lsproto::DocumentUri documentURI,
+		lsp::lsproto::Position position);
+	lsp::lsproto::CallHierarchyIncomingCallsResponse ProvideCallHierarchyIncomingCalls(
+		gostd::Context ctx, lsp::lsproto::CallHierarchyItem* item,
+		CrossProjectOrchestrator* orchestrator);
+	lsp::lsproto::CallHierarchyOutgoingCallsResponse ProvideCallHierarchyOutgoingCalls(
+		gostd::Context ctx, lsp::lsproto::CallHierarchyItem* item);
+	std::vector<::tsc::Node*> callHierarchyDeclarations(SourceFile* file,
+														lsp::lsproto::Position position,
+														bool allowSourceFile);
+
+	// === slice: ls-coreC — hover.go ===
+	lsp::lsproto::HoverResponse ProvideHover(gostd::Context ctx, lsp::lsproto::HoverParams* params);
+}
+;
 
 // jsdoc_snippet.go:74 isPotentiallyValidJSDocSnippetCompletionPosition —
 // body lives in jsdoc_snippet.cpp.
@@ -3108,6 +3318,78 @@ bool containsErrorCode(const std::vector<int32_t>& codes, int32_t code);
 lsproto::CommandOrCodeAction convertToLSPCodeAction(
     CodeAction* action, lsproto::Diagnostic* diag, lsproto::DocumentUri uri);
 
+
+
+
+
+// ==================== ls-coreC merged decls ====================
+
+// ls-coreC fwd decls (file-local types defined in their .cpp).
+struct sourceDefResolver;
+struct incomingEntry;
+struct callSite;
+struct semanticToken;
+
+// rename.go:25 — RenameInfo.
+struct RenameInfo {
+	bool CanRename = false;
+	std::string LocalizedErrorMessage;
+	std::string DisplayName;
+	lsp::lsproto::Range TriggerSpan;
+	std::string FileToRename;
+	std::string NewFileName;
+};
+
+
+// === slice: ls-coreC — helpers missing from already-ported slices ===
+// ast.go:3087 — GetDeclarationName (not yet in cpp/internal/ast)
+std::string getDeclarationName(::tsc::Node* declaration);
+// ast.go:2968 — SourceFile.GetDeclarationMap (not yet in cpp/internal/ast)
+const std::unordered_map<std::string, std::vector<::tsc::Node*>>&
+getDeclarationMap(SourceFile* file);
+// stringutil/util.go:256 — TruncateByRunes (not yet in cpp/internal/stringutil)
+std::string truncateByRunes(std::string_view str, int maxLength);
+// symbols.go:669 — shared by symbols.cpp + callhierarchy.cpp
+lsp::lsproto::SymbolKind getSymbolKindFromNode(::tsc::Node* node);
+// definition.go:281 — shared by definition.cpp + callhierarchy.cpp
+bool lspRangeContains(lsp::lsproto::Range outer, lsp::lsproto::Range inner);
+// hovericon.go:56 (dep stub — ls-coreA)
+lsp::lsproto::VSImageId* getVSHoverImageId(lsutil::ScriptElementKind kind,
+										 lsutil::ScriptElementKindModifier modifiers);
+// hovericon.go:132 (dep stub — ls-coreA)
+lsp::lsproto::VSContainerElement* buildVSHoverRawContent(
+	lsp::lsproto::VSImageId* imageId, std::vector<lsp::lsproto::VSClassifiedTextRun*> quickInfoRuns,
+	std::vector<lsp::lsproto::VSClassifiedTextRun*> documentationRuns);
+
+// ============================================================================
+
+// === slice: ls-coreC === — exported package-level fns
+// ============================================================================
+// semantictokens.go:109
+lsp::lsproto::SemanticTokensLegend* SemanticTokensLegend(
+	lsp::lsproto::ResolvedSemanticTokensClientCapabilities clientCapabilities);
+// symbols.go:546
+std::pair<lsp::lsproto::WorkspaceSymbolResponse, gostd::Error> ProvideWorkspaceSymbols(
+	gostd::Context ctx, std::vector<compiler::SimpleProgram*> programs,
+	lsconv::Converters* converters, lsutil::UserPreferences preferences, std::string query);
+// rename.go:294
+bool ClientSupportsDocumentChanges(gostd::Context ctx);
+// rename.go:298
+bool ClientSupportsRenameResourceOperations(gostd::Context ctx);
+// symbols.go:619 — isInsideNodeModules (owned by this slice, defined in symbols.cpp)
+bool isInsideNodeModules(std::string_view fileName);
+
+// ============================================================================
+// format.go — slice types
+// ============================================================================
+// format.go:107 — mappedFormattingRange
+struct mappedFormattingRange {
+	SourceFile* projection = nullptr;
+	spanmap::Segment segment;
+	TextRange originalRange;
+};
+// format.go:130 — nonOverlappingFormattingRanges
+std::vector<mappedFormattingRange> nonOverlappingFormattingRanges(std::vector<mappedFormattingRange> candidates);
 
 
 
