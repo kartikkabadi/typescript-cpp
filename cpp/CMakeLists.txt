@@ -402,6 +402,16 @@ add_library(tsc STATIC
 	internal/lsp/lsp_stack_sanitizer.cpp
 	internal/lsp/lsp_server.cpp
 	internal/lsp/lsp_handlers.cpp
+
+	# === slice: fourslash ===
+	internal/fourslash/fourslash.cpp
+	internal/fourslash/fourslash_deps.cpp
+	internal/fourslash/test_parser.cpp
+	internal/fourslash/baselineutil.cpp
+	internal/fourslash/statebaseline.cpp
+	internal/fourslash/semantictokens.cpp
+	internal/fourslash/tests/util/util.cpp
+	internal/testutil/fsbaselineutil/differ.cpp
 )
 
 target_link_libraries(tsc PUBLIC z) # zlib — pprof profile writer

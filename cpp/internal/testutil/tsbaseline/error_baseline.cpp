@@ -77,20 +77,20 @@ std::string minimalDiagnosticsToString(
 }
 
 // iterateErrorBaseline — error_baseline.go:80. Go is generic over
-// diagnosticwriter.Diagnostic; the C++ port instantiates ASTDiagnostic
-// (the only type callers pass).
+// diagnosticwriter.Diagnostic; this core handles the Diagnostic*
+// instantiation (used by fourslash).
 std::vector<std::string> iterateErrorBaseline(
     gostd::testing::T* t,
     const std::vector<harnessutil::TestFile*>& inputFiles,
-    const std::vector<
-        std::unique_ptr<diagnosticwriter::ASTDiagnostic>>& inputDiagnostics,
-    int (*compareDiagnostics)(diagnosticwriter::ASTDiagnostic*,
-                              diagnosticwriter::ASTDiagnostic*),
+    const std::vector<diagnosticwriter::Diagnostic*>& inputDiagnostics,
+    const std::function<int(diagnosticwriter::Diagnostic*,
+                            diagnosticwriter::Diagnostic*)>&
+        compareDiagnostics,
     bool pretty) {
 	t->Helper();
-	std::vector<diagnosticwriter::ASTDiagnostic*> diagnostics;
+	std::vector<diagnosticwriter::Diagnostic*> diagnostics;
 	diagnostics.reserve(inputDiagnostics.size());
-	for (auto& d : inputDiagnostics) diagnostics.push_back(d.get());
+	for (auto* d : inputDiagnostics) diagnostics.push_back(d);
 	std::stable_sort(diagnostics.begin(), diagnostics.end(),
 	                 compareDiagnostics);
 
@@ -180,13 +180,8 @@ std::vector<std::string> iterateErrorBaseline(
 		}
 	};
 
-	auto asDiags = [&] {
-		return diagnosticwriter::toDiagnostics<
-		    diagnosticwriter::ASTDiagnostic>(
-		    std::span<diagnosticwriter::ASTDiagnostic* const>(
-		        diagnostics.data(), diagnostics.size()));
-	};
-	auto topDiagnostics = minimalDiagnosticsToString(asDiags(), pretty);
+	auto topDiagnostics =
+	    minimalDiagnosticsToString(diagnostics, pretty);
 	topDiagnostics = removeTestPathPrefixes(topDiagnostics, false);
 	topDiagnostics = diagnosticsLocationPrefix().ReplaceAllString(
 	    topDiagnostics, "$1(--,--)");
@@ -211,7 +206,7 @@ std::vector<std::string> iterateErrorBaseline(
 	for (auto* inputFile : inputFiles) {
 		// Filter down to the errors in the file
 		auto inputPath = removeTestPathPrefixes(inputFile->UnitName, false);
-		std::vector<diagnosticwriter::ASTDiagnostic*> fileErrors;
+		std::vector<diagnosticwriter::Diagnostic*> fileErrors;
 		for (auto* e : diagnostics) {
 			if (e->file() != nullptr &&
 			    tspath::comparePaths(
@@ -328,27 +323,32 @@ std::vector<std::string> iterateErrorBaseline(
 
 	auto numLibraryDiagnostics = std::count_if(
 	    diagnostics.begin(), diagnostics.end(),
-	    [](diagnosticwriter::ASTDiagnostic* d) {
+	    [](diagnosticwriter::Diagnostic* d) {
 		    return d->file() != nullptr &&
 		           (isDefaultLibraryFile(d->file()->fileName()) ||
 		            isBuiltFile(d->file()->fileName()));
 	    });
 	auto numTsconfigDiagnostics = std::count_if(
 	    diagnostics.begin(), diagnostics.end(),
-	    [](diagnosticwriter::ASTDiagnostic* d) {
+	    [](diagnosticwriter::Diagnostic* d) {
 		    return d->file() != nullptr &&
 		           isTsConfigFile(d->file()->fileName());
 	    });
 	auto numContentMapperSupplementalDiagnostics = std::count_if(
 	    diagnostics.begin(), diagnostics.end(),
-	    [](diagnosticwriter::ASTDiagnostic* d) {
-		    // any(d).(*diagnosticwriter.ASTDiagnostic) — for our
-		    // instantiation T is always ASTDiagnostic.
-		    auto* file = d->diagnostic()->File();
+	    [](diagnosticwriter::Diagnostic* d) {
+		    // any(d).(*diagnosticwriter.ASTDiagnostic)
+		    if (auto* ad =
+		            dynamic_cast<diagnosticwriter::ASTDiagnostic*>(d);
+		        ad != nullptr) {
+			    auto* file = ad->diagnostic()->File();
+			    return file != nullptr &&
+			           file->IsContentMapperSupplemental();
+		    }
 		    // The Go second branch (asserting d.File() to
-		    // *ast.SourceFile) is unreachable for this instantiation:
-		    // the C++ FileLike is an adapter, not a SourceFile.
-		    return file != nullptr && file->IsContentMapperSupplemental();
+		    // *ast.SourceFile) is unreachable: the C++ FileLike is
+		    // an adapter, not a SourceFile.
+		    return false;
 	    });
 	// Verify we didn't miss any errors in total
 	int total = totalErrorsReportedInNonLibraryNonTsconfigFiles +
@@ -362,6 +362,30 @@ std::vector<std::string> iterateErrorBaseline(
 	}
 
 	return result;
+}
+
+// ASTDiagnostic instantiation (error_baseline.go:80, T=*ASTDiagnostic) —
+// used by testrunner.
+std::vector<std::string> iterateErrorBaseline(
+    gostd::testing::T* t,
+    const std::vector<harnessutil::TestFile*>& inputFiles,
+    const std::vector<
+        std::unique_ptr<diagnosticwriter::ASTDiagnostic>>& inputDiagnostics,
+    int (*compareDiagnostics)(diagnosticwriter::ASTDiagnostic*,
+                              diagnosticwriter::ASTDiagnostic*),
+    bool pretty) {
+	std::vector<diagnosticwriter::Diagnostic*> ptrs;
+	ptrs.reserve(inputDiagnostics.size());
+	for (auto& d : inputDiagnostics) ptrs.push_back(d.get());
+	return iterateErrorBaseline(
+	    t, inputFiles, ptrs,
+	    [compareDiagnostics](diagnosticwriter::Diagnostic* a,
+	                         diagnosticwriter::Diagnostic* b) {
+		    return compareDiagnostics(
+		        static_cast<diagnosticwriter::ASTDiagnostic*>(a),
+		        static_cast<diagnosticwriter::ASTDiagnostic*>(b));
+	    },
+	    pretty);
 }
 
 }  // namespace
@@ -391,14 +415,15 @@ void DoErrorBaseline(gostd::testing::T* t, const std::string& baselinePath,
 	}
 }
 
-// GetErrorBaseline — error_baseline.go:66.
-std::string GetErrorBaseline(
+// getErrorBaselineImpl — shared core for the two GetErrorBaseline
+// instantiations (error_baseline.go:66).
+static std::string getErrorBaselineImpl(
     gostd::testing::T* t,
     const std::vector<harnessutil::TestFile*>& inputFiles,
-    const std::vector<std::unique_ptr<diagnosticwriter::ASTDiagnostic>>&
-        diagnostics,
-    int (*compareDiagnostics)(diagnosticwriter::ASTDiagnostic*,
-                              diagnosticwriter::ASTDiagnostic*),
+    const std::vector<diagnosticwriter::Diagnostic*>& diagnostics,
+    const std::function<int(diagnosticwriter::Diagnostic*,
+                            diagnosticwriter::Diagnostic*)>&
+        compareDiagnostics,
     bool pretty) {
 	t->Helper();
 	auto outputLines =
@@ -407,20 +432,51 @@ std::string GetErrorBaseline(
 
 	if (pretty) {
 		std::ostringstream summaryBuilder;
-		std::vector<diagnosticwriter::ASTDiagnostic*> ptrs;
-		for (auto& d : diagnostics) ptrs.push_back(d.get());
-		auto all = diagnosticwriter::toDiagnostics<
-		    diagnosticwriter::ASTDiagnostic>(
-		    std::span<diagnosticwriter::ASTDiagnostic* const>(
-		        ptrs.data(), ptrs.size()));
-		diagnosticwriter::writeErrorSummaryText(summaryBuilder, all,
-		                                      formatOpts());
+		diagnosticwriter::writeErrorSummaryText(
+		    summaryBuilder, diagnostics, formatOpts());
 		auto summary = removeTestPathPrefixes(summaryBuilder.str(), false);
 		outputLines.push_back(summary);
 	}
 	std::string out;
 	for (auto& l : outputLines) out += l;
 	return out;
+}
+
+// GetErrorBaseline — error_baseline.go:66. ASTDiagnostic instantiation.
+std::string GetErrorBaseline(
+    gostd::testing::T* t,
+    const std::vector<harnessutil::TestFile*>& inputFiles,
+    const std::vector<std::unique_ptr<diagnosticwriter::ASTDiagnostic>>&
+        diagnostics,
+    int (*compareDiagnostics)(diagnosticwriter::ASTDiagnostic*,
+                              diagnosticwriter::ASTDiagnostic*),
+    bool pretty) {
+	std::vector<diagnosticwriter::Diagnostic*> ptrs;
+	ptrs.reserve(diagnostics.size());
+	for (auto& d : diagnostics) ptrs.push_back(d.get());
+	return getErrorBaselineImpl(
+	    t, inputFiles, ptrs,
+	    [compareDiagnostics](diagnosticwriter::Diagnostic* a,
+	                         diagnosticwriter::Diagnostic* b) {
+		    return compareDiagnostics(
+		        static_cast<diagnosticwriter::ASTDiagnostic*>(a),
+		        static_cast<diagnosticwriter::ASTDiagnostic*>(b));
+	    },
+	    pretty);
+}
+
+// GetErrorBaseline — error_baseline.go:66. Diagnostic* instantiation
+// (used by fourslash).
+std::string GetErrorBaseline(
+    gostd::testing::T* t,
+    const std::vector<harnessutil::TestFile*>& inputFiles,
+    const std::vector<diagnosticwriter::Diagnostic*>& diagnostics,
+    const std::function<int(diagnosticwriter::Diagnostic*,
+                            diagnosticwriter::Diagnostic*)>&
+        compareDiagnostics,
+    bool pretty) {
+	return getErrorBaselineImpl(t, inputFiles, diagnostics,
+	                            compareDiagnostics, pretty);
 }
 
 }  // namespace tsc::testutil::tsbaseline
