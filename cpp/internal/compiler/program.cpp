@@ -2377,6 +2377,33 @@ SimpleProgram::GetTypeChecker(gostd::Context ctx) {
 	return {getChecker(), []() {}};
 }
 
+// === slice: testrunner ===
+
+// program.go:517 GetContentMapper — returns the content mapper that
+// produced the given source file, or nullptr if the file was not produced
+// by a content mapper.
+contentmapper::Mapper* SimpleProgram::GetContentMapper(SourceFile* file) {
+	if (file->ContentMapper().empty()) {
+		return nullptr;
+	}
+	auto* mapper =
+	    commandLine_->GetContentMapperForFileName(file->FileName());
+	if (mapper != nullptr && mapper->Identity() == file->ContentMapper()) {
+		return mapper;
+	}
+	return nullptr;
+}
+
+// program.go:597 ForEachCheckerParallel — Go iterates the
+// compilerCheckerPool when non-nil. The port's equivalent is the single
+// lazy checker covering all files, so the callback runs once.
+void SimpleProgram::ForEachCheckerParallel(
+    const std::function<void(int, checker::Checker*)>& cb) {
+	cb(0, getChecker());
+}
+
+// === end slice: testrunner ===
+
 // program.go:2226 collectPackageNames — lazy like Go's lazyValue.
 SimpleProgram::packageNamesInfo* SimpleProgram::collectPackageNames() {
 	if (packageNames_.has_value()) {
