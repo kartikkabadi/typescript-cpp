@@ -26,7 +26,7 @@ oracle.
 | Transformers | `transformers/` | `cpp/internal/transformers` | complete — root package (transformer/chain/modifiervisitor/utilities/destructuring) + all sub-packages: estransforms (17 files incl. classfields 4k, esdecorator, namedevaluation, classthis, async family), jsxtransforms, moduletransforms, inliners, tstransforms (6 files), declarations (transform/diagnostics/tracker/supplementalreferences/util) |
 | Emitter | `printer/`, `compiler/emitter.go`, `compiler/emitHost.go` | `cpp/internal/printer`, `cpp/internal/compiler/emitter.cpp` | emitter + emitHost + `Program::Emit` ported; `tscpp emit`/`tscpp emitdump` byte-identical to the Go `emitdump` oracle on the full corpus (12,734/12,734); sourcemap/spanmap/contentmapper/incremental landed |
 | Stage-5 | `tsoptions`, `format`, `contentmapper`+`spanmap`, `execute/incremental`, `vfs`, `locale`, `json`, `jsonrpc`, `xxh3`, `gostd`, `transpile` | `cpp/internal/{tsoptions,format,contentmapper,spanmap,execute/incremental,vfs,locale,json,jsonrpc,xxh3,gostd,transpile}` | complete — incl. `tsoptions::ParseCommandLine` CLI wiring (real flag parsing in tscpp), contentmapper→fileloader seam (`parseContentMappedFile` + host mapping + program diagnostics), transpile API (byte-identical to `transpiledump` oracle) |
-| Stage-5 (merged) | `fswatch`, `ipc`, `execute/tsc`+`build`, `watchmanager`, `ls`, `api`, `project`, `lsp`, `fourslash`, `tsctests`, `lsconv`, `lspwatcher`, `collections`, `testutil/*` | `cpp/internal/...` | ports merged (function-by-function); `lsp` server + `proto.go` tail in flight |
+| Stage-5 (merged) | `fswatch`, `ipc`, `execute/tsc`+`build`, `watchmanager`, `ls`, `api`, `project`, `lsp`, `fourslash`, `tsctests`, `lsconv`, `lspwatcher`, `collections`, `testutil/*` | `cpp/internal/...` | complete — `lsp` server + `proto.go` tail landed; `--lsp`/`--api` event streams byte-identical; `tsctestrunner` 99/99 tsc scenarios; fourslash test batch in flight |
 
 ## Conformance
 
@@ -87,6 +87,14 @@ reparse) sustains ~90–95 MB/s on mixed files and ~330 MB/s for scanning
 alone; see `tscpp bench` / `tscpp bench-parse`. Node allocation is arena
 based — an entire SourceFile's nodes are freed in one shot, and parsing
 performs no per-node refcount/GC work.
+
+Project-level (`tsc -p`, 100-file synthetic project, Linux/x86): after the
+FENNEL checker pool (~250% CPU) and emit-arena release fixes, tscpp is
+currently ~2× slower than Go `tsc` (emit 1.95×, --noEmit 2.33×,
+--declaration 2.37×; decl-emit RSS 462 MB vs Go 274 MB). The ROADMAP ≥3×
+gate is not yet met — remaining gap is per-CPU hot-path work; see
+`cpp/tools/perf/PERF_REPORT.md` and `run_all.sh` for the reproducible
+harness.
 
 ## Layout
 
