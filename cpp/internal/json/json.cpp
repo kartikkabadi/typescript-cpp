@@ -225,7 +225,9 @@ std::string goFloat(double f) {
             out += digits;
         }
     } else {
-        // 'e' notation: d.ddde±XX (2-digit minimum exponent)
+        // 'e' notation: d.ddde±X — jsonwire.AppendFloat cleans up e-09 → e-9,
+        // i.e. no leading zeros in the exponent (positive exps are >=21 so
+        // they are already 2+ digits).
         out += digits[0];
         if (digits.size() > 1) {
             out += '.';
@@ -233,9 +235,7 @@ std::string goFloat(double f) {
         }
         out += 'e';
         out += decExp < 0 ? '-' : '+';
-        char ebuf[8];
-        std::snprintf(ebuf, sizeof(ebuf), "%02d", std::abs(decExp));
-        out += ebuf;
+        out += std::to_string(std::abs(decExp));
     }
     return out;
 }

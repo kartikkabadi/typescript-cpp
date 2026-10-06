@@ -1,8 +1,12 @@
 #include "internal/jsnum/jsnum.h"
 
+#include "internal/json/json.h"
+
+#include <bit>
 #include <charconv>
 #include <cstdlib>
 #include <cstring>
+#include <limits>
 #include <string_view>
 #include <vector>
 
@@ -93,8 +97,15 @@ double prefixedToDouble(std::string_view digits, int bitsPerDigit) {
 }
 
 double stringToFloat64(const std::string& s) {
-	// strtod is correctly rounded on conforming libc implementations.
-	return std::strtod(s.c_str(), nullptr);
+	// strconv.ParseFloat: the entire string must parse (a trailing segment is
+	// a syntax error → NaN); ErrRange still returns the rounded value.
+	if (s.empty())
+		return std::numeric_limits<double>::quiet_NaN();
+	char* end = nullptr;
+	double f = std::strtod(s.c_str(), &end);
+	if (end != s.c_str() + s.size())
+		return std::numeric_limits<double>::quiet_NaN();
+	return f;
 }
 
 double parseFloatString(std::string_view s) {
@@ -286,30 +297,49 @@ bool isNumberRune(uint32_t r) {
 	return false;
 }
 
+// utf8.DecodeRuneInString: invalid encodings (bad lead, bad continuation,
+// overlong, surrogate, >U+10FFFF, truncated) yield (RuneError, 1).
 size_t decodeUtf8(std::string_view s, uint32_t* out) {
 	if (s.empty()) {
 		*out = 0;
 		return 0;
 	}
+	auto fail = [&]() -> size_t {
+		*out = 0xFFFD;
+		return 1;
+	};
 	auto b0 = static_cast<unsigned char>(s[0]);
 	if (b0 < 0x80) {
 		*out = b0;
 		return 1;
 	}
-	int len = b0 < 0xE0 ? 2 : b0 < 0xF0 ? 3 : 4;
-	if (s.size() < static_cast<size_t>(len)) {
-		*out = 0xFFFD;
-		return 1;
+	int len;
+	uint32_t min;
+	if (b0 < 0xC2) {
+		return fail();  // 0x80..0xC1: stray continuation or overlong lead
+	} else if (b0 < 0xE0) {
+		len = 2;
+		min = 0x80;
+	} else if (b0 < 0xF0) {
+		len = 3;
+		min = 0x800;
+	} else if (b0 < 0xF5) {
+		len = 4;
+		min = 0x10000;
+	} else {
+		return fail();  // 0xF5..0xFF: above U+10FFFF
 	}
+	if (s.size() < static_cast<size_t>(len))
+		return fail();
 	uint32_t r = b0 & (0x7F >> len);
 	for (int i = 1; i < len; i++) {
 		auto bi = static_cast<unsigned char>(s[i]);
-		if ((bi & 0xC0) != 0x80) {
-			*out = 0xFFFD;
-			return 1;
-		}
+		if ((bi & 0xC0) != 0x80)
+			return fail();
 		r = (r << 6) | (bi & 0x3F);
 	}
+	if (r < min || (r >= 0xD800 && r <= 0xDFFF))
+		return fail();  // overlong / surrogate
 	*out = r;
 	return static_cast<size_t>(len);
 }
@@ -395,14 +425,141 @@ std::string Number::string() const {
 		}
 	}
 
-	// Shortest round-trip representation, JS-style.
-	char buf[40];
-	auto r = std::to_chars(buf, buf + sizeof(buf), v, std::chars_format::general);
-	std::string out(buf, r.ptr);
-	// to_chars emits e.g. "1e+21", "1.5e-7", "0.0001" — all JS-valid forms.
-	// JS exponent uses no leading zeros ("1e-07" would need fixing) and always
-	// a sign; std::to_chars already satisfies both.
-	return out;
+	// jsnum string.go:36 — Go delegates to json.Marshal(float64), i.e.
+	// strconv 'f' notation when 1e-6 <= |x| < 1e21 else 'e' notation with
+	// shortest round-trip digits.
+	return json::detail::goFloat(v);
+}
+
+// jsnum.go:147 — big.Int equivalent: arbitrary-precision unsigned integer,
+// little-endian 64-bit limbs.
+struct PowUint {
+	std::vector<uint64_t> limbs;  // no trailing zero limbs; empty == 0
+
+	bool isZero() const { return limbs.empty(); }
+	uint64_t bit(int i) const {
+		return (limbs[i / 64] >> (i % 64)) & 1;
+	}
+	int bitLen() const {
+		if (limbs.empty())
+			return 0;
+		return static_cast<int>(limbs.size() * 64 -
+		                        std::countl_zero(limbs.back()));
+	}
+	void trim() {
+		while (!limbs.empty() && limbs.back() == 0)
+			limbs.pop_back();
+	}
+
+	static PowUint fromU64(uint64_t x) {
+		PowUint r;
+		if (x)
+			r.limbs.push_back(x);
+		return r;
+	}
+
+	static PowUint mul(const PowUint& a, const PowUint& b) {
+		PowUint r;
+		if (a.isZero() || b.isZero())
+			return r;
+		r.limbs.assign(a.limbs.size() + b.limbs.size(), 0);
+		for (size_t i = 0; i < a.limbs.size(); ++i) {
+			uint64_t carry = 0;
+			for (size_t j = 0; j < b.limbs.size(); ++j) {
+				__uint128_t cur = static_cast<__uint128_t>(a.limbs[i]) *
+				                      b.limbs[j] +
+				                  r.limbs[i + j] + carry;
+				r.limbs[i + j] = static_cast<uint64_t>(cur);
+				carry = static_cast<uint64_t>(cur >> 64);
+			}
+			for (size_t k = i + b.limbs.size(); carry; ++k) {
+				__uint128_t cur = static_cast<__uint128_t>(r.limbs[k]) + carry;
+				r.limbs[k] = static_cast<uint64_t>(cur);
+				carry = static_cast<uint64_t>(cur >> 64);
+			}
+		}
+		r.trim();
+		return r;
+	}
+
+	static PowUint pow(uint64_t base, uint64_t e) {
+		PowUint result = fromU64(1), b = fromU64(base);
+		while (e) {
+			if (e & 1)
+				result = mul(result, b);
+			e >>= 1;
+			if (e)
+				b = mul(b, b);
+		}
+		return result;
+	}
+};
+
+// Round-to-nearest-even the top `keep` significant bits of `x` (like
+// big.Float.SetInt at precision `keep`). Fills out[0..3] with the kept
+// mantissa (normalized: bit keep-1 set unless zero) and returns `shift`
+// such that the rounded value == out * 2^shift.
+static int roundTopBits(const PowUint& x, int keep, uint64_t out[4]) {
+	int L = x.bitLen();
+	uint64_t mant[5] = {};
+	if (L <= keep) {
+		// no rounding — normalize so the top bit sits at position keep-1
+		int back = keep - L;
+		for (int i = 0; i < L; ++i)
+			if (x.bit(i))
+				mant[(i + back) / 64] |= uint64_t(1) << ((i + back) % 64);
+		for (int i = 0; i < 4; ++i)
+			out[i] = mant[i];
+		return L - keep;
+	}
+	int shift = L - keep;
+	for (int i = 0; i < keep; ++i)
+		if (x.bit(shift + i))
+			mant[i / 64] |= uint64_t(1) << (i % 64);
+	uint64_t roundBit = x.bit(shift - 1);
+	bool sticky = false;
+	for (int i = 0; i < shift - 1; ++i)
+		if (x.bit(i)) {
+			sticky = true;
+			break;
+		}
+	if (roundBit && (sticky || (mant[0] & 1))) {
+		for (int i = 0, nl = keep / 64 + 1; i < nl; ++i)
+			if (++mant[i])
+				break;
+		if (mant[keep / 64] & (uint64_t(1) << (keep % 64))) {
+			// carry out past bit keep-1 → rounded value = 2^keep
+			mant[0] = mant[1] = mant[2] = mant[3] = mant[4] = 0;
+			mant[(keep - 1) / 64] = uint64_t(1) << ((keep - 1) % 64);
+			++shift;
+		}
+	}
+	for (int i = 0; i < 4; ++i)
+		out[i] = mant[i];
+	return shift;
+}
+
+// big.Float SetPrec(256).SetInt(ri).Float64(): RNE to 256 significant bits,
+// then RNE to a double's 53-bit mantissa; sign applied by caller.
+static double bigIntToDoubleRounded(const PowUint& x) {
+	uint64_t m256[4];
+	int s1 = roundTopBits(x, 256, m256);
+	PowUint m;
+	m.limbs.assign(m256, m256 + 4);
+	m.trim();
+	uint64_t m53[4];
+	int s2 = roundTopBits(m, 53, m53);
+	int exp = s1 + s2;  // value == m53 * 2^exp, m53 normalized to 53 bits
+	// m53's bit 52 is the implicit leading 1.
+	uint64_t mant53 = m53[0];  // 53 bits fit in limb 0
+	int e2 = exp + 52;         // unbiased binary exponent
+	if (e2 >= 1024)
+		return std::numeric_limits<double>::infinity();
+	uint64_t fieldExp = static_cast<uint64_t>(e2 + 1023);
+	uint64_t bits = (fieldExp << 52) | (mant53 & ((uint64_t(1) << 52) - 1));
+	double d;
+	std::memcpy(&d, &bits, 8);
+	return d;
 }
 
 Number Number::exponentiate(Number exponent) const {
@@ -419,29 +576,16 @@ Number Number::exponentiate(Number exponent) const {
 		double magnitude = e * std::log2(std::fabs(b));
 		if (magnitude > 53 &&
 		    magnitude <= std::log2(std::numeric_limits<double>::max())) {
-			// Exact big-int exponentiation, round to nearest double.
-			uint64_t babs = static_cast<uint64_t>(std::llabs(static_cast<long long>(b)));
+			// Go uses big.Int.Exp (exact, signed) then big.Float(256) →
+			// Float64: round-to-nearest-even at 256 bits, then at 53.
+			int64_t bi = static_cast<int64_t>(b);
 			uint64_t ei = static_cast<uint64_t>(e);
-			// Binary exponentiation with 128-bit overflow tracking and sticky
-			// bits for correct rounding.
-			if (babs == 0)
-				return Number(0);
-			// Result magnitude is e*log2|b| bits; if it stays within 64 bits,
-			// use exact integer math.
-			if (magnitude <= 64) {
-				__uint128_t result = 1, base = babs;
-				while (ei) {
-					if (ei & 1)
-						result *= base;
-					base *= base;
-					ei >>= 1;
-				}
-				return Number(static_cast<double>(result));
-			}
-			// Accumulate top bits: result fits into a double after rounding.
-			// Use repeated squaring in double after computing with exact
-			// integer when possible; fall back to pow (within 1 ulp).
-			return Number(std::pow(b, e));
+			uint64_t babs = bi < 0 ? uint64_t(0) - static_cast<uint64_t>(bi)
+			                       : static_cast<uint64_t>(bi);
+			bool neg = bi < 0 && (ei & 1);
+			PowUint ri = PowUint::pow(babs, ei);
+			double result = bigIntToDoubleRounded(ri);
+			return Number(neg ? -result : result);
 		}
 	}
 	return Number(std::pow(b, e));

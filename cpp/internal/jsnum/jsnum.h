@@ -26,11 +26,16 @@ struct Number {
 	// ECMA-262 ToInt32
 	int32_t toInt32() const {
 		double x = v;
-		int32_t smi = static_cast<int32_t>(x);
-		if (static_cast<double>(smi) == x)
-			return smi;
+		// jsnum.go:49 — Go's int32(x) is implementation-defined out of range
+		// (amd64 cvttsd2si → INT32_MIN/INT64_MIN); C++ fp→int conversion out of
+		// range is UB, so non-finite and |x| ≥ 2^63 are guarded before casting.
 		if (std::isnan(x) || std::isinf(x))
 			return 0;
+		if (x > -9223372036854775808.0 && x < 9223372036854775808.0) {
+			int32_t smi = static_cast<int32_t>(static_cast<int64_t>(x));
+			if (static_cast<double>(smi) == x)
+				return smi;
+		}
 		x = std::trunc(x);
 		x = std::fmod(x, 4294967296.0);
 		return static_cast<int32_t>(static_cast<int64_t>(x));
