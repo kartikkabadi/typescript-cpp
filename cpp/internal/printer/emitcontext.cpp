@@ -15,6 +15,10 @@ namespace tsc::printer {
 
 void EmitContext::reset() {
 	// *c = EmitContext{Factory: c.Factory} — Factory is kept as-is.
+	// Go: objects only reachable from this context (emit-resolver
+	// NodeBuilders, etc.) become unreachable here and are GC'd. Delete them
+	// while the context is still fully formed.
+	runCleanups();
 	autoGenerate.clear();
 	textSource.clear();
 	original_.clear();
@@ -25,6 +29,86 @@ void EmitContext::reset() {
 	letScopeStack.clear();
 	emitHelpers.clear();
 	visitors.clear();
+	pinnedNodes.clear();
+	rootTracers.clear();
+	// Go's pooled EmitContext keeps only the Factory struct across Reset —
+	// the nodes it allocated become unreachable and are collected by the GC.
+	// The emit output is fully printed before a context returns to the pool
+	// (emitJsFile/emitDeclarationFile call putEmitContext after printing, and
+	// emit diagnostics carry no node references), so every factory-arena and
+	// emitNodesArena object is dead here: free both arenas rather than
+	// letting each file's ~40MB of transform nodes accumulate in the pooled
+	// context.
+	factory.arena().clear();
+	emitNodesArena.clear();
+}
+
+// releaseArenas (nodebuilder.go ReleaseArenas) — free every factory-arena
+// object unreachable from the state that survives this call, and keep
+// everything Go's GC would keep. Roots: the node-keyed side tables (their
+// keys pin nodes; emitNode values can hold typeNode /
+// externalHelpersModuleName references), the scope stacks' node vectors,
+// helper sets, owned visitors, caller-pinned nodes, and any registered root
+// tracers (NodeBuilder caches — serializedTypes, idToSymbol, in-flight
+// contexts). The maps themselves are NOT cleared — Go keeps them too.
+void EmitContext::releaseArenas() {
+	Arena& a = factory.arena();
+	if (!a.isTracked()) {
+		return; // bump arena: per-context lifetime, freed on reset()
+	}
+	a.beginMark();
+	for (auto& [key, value] : emitNodes.entries) {
+		a.markPointer(key);
+		a.scanObject(value, sizeof(emitNode));
+	}
+	for (auto& [key, value] : original_) {
+		a.markPointer(key);
+		a.markPointer(value);
+	}
+	for (auto& [key, value] : autoGenerate) {
+		a.markPointer(key);
+		a.markPointer(value.Node);
+	}
+	for (auto& [key, value] : textSource) {
+		a.markPointer(key);
+		a.markPointer(value);
+	}
+	for (auto& [key, value] : assignedName) {
+		a.markPointer(key);
+		a.markPointer(value);
+	}
+	for (auto& [key, value] : classThis) {
+		a.markPointer(key);
+		a.markPointer(value);
+	}
+	auto markScopes = [&a](Stack<varScope>& stack) {
+		for (varScope& scope : stack.items) {
+			for (Node* n : scope.variables) {
+				a.markPointer(n);
+			}
+			for (Node* n : scope.functions) {
+				a.markPointer(n);
+			}
+			for (Node* n : scope.initializationStatements) {
+				a.markPointer(n);
+			}
+		}
+	};
+	markScopes(varScopeStack);
+	markScopes(letScopeStack);
+	for (EmitHelper* helper : emitHelpers.elements) {
+		a.scanObject(helper, sizeof(EmitHelper));
+	}
+	for (auto& visitor : visitors) {
+		a.scanObject(visitor.get(), sizeof(NodeVisitor));
+	}
+	for (Node* node : pinnedNodes) {
+		a.markPointer(node);
+	}
+	for (auto& tracer : rootTracers) {
+		tracer(a);
+	}
+	a.sweep();
 }
 
 // GetEmitContext (emitcontext.go:57) — pooled.

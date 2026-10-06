@@ -4865,6 +4865,10 @@ struct NodeBuilderContext {
 		symbolDepth;
 	std::vector<TrackedSymbolArgs*> trackedSymbols;
 	TypeMapper* mapper = nullptr;
+	// Back-pointer to the owning builder, used to register builder-lifetime
+	// heap allocations (TrackedSymbolArgs, trackers, recovery boundaries)
+	// that helpers deep in the tracker graph create (GC-owned in Go).
+	NodeBuilderImpl* impl = nullptr;
 	std::vector<Symbol*> reverseMappedStack;
 	std::unordered_map<SymbolId, Type*> enclosingSymbolTypes;
 	bool suppressReportInferenceFallback = false;
@@ -4900,7 +4904,13 @@ struct NodeBuilder {
 	NodeBuilderImpl* impl = nullptr;
 	VerbosityContext* verbosity = nullptr; // nullptr for non-hover callers
 
+	~NodeBuilder();
+
 	printer::EmitContext* EmitContext();
+	// Registered on the emit context when its factory arena is tracked:
+	// marks every node the builder's caches and in-flight contexts keep
+	// alive across ReleaseArenas (serializedTypes, idToSymbol, ctx stack).
+	void markEmitRoots(Arena& a);
 	void enterContext(Node* enclosingDeclaration, nodebuilder::Flags flags,
 	                  nodebuilder::InternalFlags internalFlags,
 	                  nodebuilder::SymbolTracker* tracker);
@@ -5022,6 +5032,18 @@ struct NodeBuilderImpl {
 
 	// symbols for synthesized identifiers, needed for e.g. inlay hints
 	std::unordered_map<Node*, Symbol*> idToSymbol;
+
+	// Builder-lifetime heap objects (contexts, trackers, boundaries, cache
+	// entries, symbol args) — in Go these die with the builder; here
+	// ~NodeBuilderImpl runs the registered deletes, which happens when the
+	// owning EmitContext is reset (pooled) or destroyed.
+	std::vector<std::function<void()>> ownedDeletes;
+	template <class T>
+	T* own(T* p) {
+		ownedDeletes.push_back([p] { delete p; });
+		return p;
+	}
+	~NodeBuilderImpl();
 
 	// --- nodecopy.go ---
 	Node* reuseNode(Node* node);

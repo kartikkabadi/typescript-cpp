@@ -539,11 +539,50 @@ struct EmitContext {
 	// NodeVisitors created through newNodeVisitor are owned here (Go GC analog).
 	std::vector<std::unique_ptr<NodeVisitor>> visitors;
 
-	EmitContext() : factory(this) {}
+	// Nodes pinned by callers that keep results across releaseArenas() calls
+	// (Go keeps them alive because the caller still references them).
+	std::unordered_set<Node*> pinnedNodes;
+	// Extra liveness roots consulted by releaseArenas() (e.g. NodeBuilder
+	// caches — serializedTypes, idToSymbol, in-flight contexts).
+	std::vector<std::function<void(Arena&)>> rootTracers;
+	// Deletes for objects that are only alive for the context's lifetime —
+	// e.g. NodeBuilders built on this context by the emit resolver. In Go
+	// these become unreachable when the transform completes and are GC'd;
+	// here they are deleted at reset()/destruction.
+	std::vector<std::function<void()>> cleanups;
+
+	explicit EmitContext(bool trackFactoryArena = false) : factory(this) {
+		factory.arena().setTracked(trackFactoryArena);
+	}
+	~EmitContext() { runCleanups(); }
 	EmitContext(const EmitContext&) = delete;
 	EmitContext& operator=(const EmitContext&) = delete;
 
 	void reset();
+
+	// Run `fn` when this context is reset or destroyed — registers
+	// builder-lifetime objects for deletion (see NodeBuilderImpl).
+	void addCleanup(std::function<void()> fn) {
+		cleanups.push_back(std::move(fn));
+	}
+	void runCleanups() {
+		auto pending = std::move(cleanups);
+		cleanups.clear();
+		for (auto& fn : pending) {
+			fn();
+		}
+	}
+
+	// Keep `node` (and everything it transitively references) alive across
+	// releaseArenas() — Go's "caller still holds the pointer" liveness.
+	void pin(Node* node) {
+		if (node != nullptr) {
+			pinnedNodes.insert(node);
+		}
+	}
+	void addRootTracer(std::function<void(Arena&)> tracer) {
+		rootTracers.push_back(std::move(tracer));
+	}
 
 	void onCreate(Node* node) { node->flags |= NodeFlagsSynthesized; }
 	void onUpdate(Node* updated, Node* original) {
@@ -802,17 +841,19 @@ struct EmitContext {
 	Node* newNotEmittedStatement(Node* node);
 
 	// nodebuilder.go — e.Factory.ReleaseArenas()
-	// Go's Factory.ReleaseArenas frees only arena memory the GC can prove
-	// unreachable — nodes still referenced from caches (e.g. NodeBuilderLinks
-	// serializedTypes) stay alive. Our bump arena cannot distinguish, so the
-	// faithful equivalent frees nothing: arena blocks stay live for the
-	// context's lifetime, which also keeps node addresses unique so no
-	// node-keyed map (original_, emitNodes, autoGenerate) can see a stale-key
-	// collision. It must NOT reset() the context maps: Go's emitNodes map
-	// persists across calls, and cached serializedTypes TypeNodes rely on
-	// their emit flags (e.g. EFSingleLine) surviving between typeToString
-	// calls.
-	void releaseArenas() {}
+	// Go's Factory.ReleaseArenas drops the factory's arena headers; the GC
+	// then frees every node that is no longer reachable — nodes still
+	// referenced from caches (e.g. NodeBuilderLinks serializedTypes) or the
+	// context's maps stay alive. The tracked arena gives us the same
+	// semantics: releaseArenas marks every node reachable from the context's
+	// surviving state (emitNodes, original_, autoGenerate, textSource,
+	// assignedName, classThis, scope stacks, pinned nodes, registered root
+	// tracers) and frees the rest. Nodes held as map keys are always marked,
+	// so freed addresses can never collide with stale map keys; and cached
+	// serializedTypes TypeNodes keep their emit flags (EFSingleLine) because
+	// their emitNodes entries persist across calls, exactly as in Go.
+	// It must NOT reset() the context maps — Go's maps persist too.
+	void releaseArenas();
 };
 
 // NewEmitContext (emitcontext.go:45).

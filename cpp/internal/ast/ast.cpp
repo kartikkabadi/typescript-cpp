@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <functional>
 #include <numeric>
+#include <unordered_set>
 
 namespace tsc {
 
@@ -18,7 +19,83 @@ Node* firstOrNull(const NodeList* list) {
 	return list && !list->nodes.empty() ? list->nodes.front() : nullptr;
 }
 
+void traceDiagnosticVector(const std::vector<Diagnostic*>& diags, Arena& a,
+                           std::unordered_set<Diagnostic*>& seen) {
+	for (Diagnostic* d : diags) {
+		if (d == nullptr || !seen.insert(d).second) {
+			continue;
+		}
+		a.scanObject(d, sizeof(Diagnostic));
+		traceDiagnosticVector(d->messageChain, a, seen);
+		traceDiagnosticVector(d->relatedInformation, a, seen);
+	}
+}
+
 }  // namespace
+
+// traceArenaNode (ast.h) — liveness tracer for node payloads in tracked
+// arenas. The byte-scan covers every inline pointer field (AST children,
+// parent, NextContainer, token fields, symbol refs); the kind-dispatched
+// walks below cover members that hold node pointers inside containers,
+// which byte-scan cannot reach.
+void traceArenaNode(const void* obj, size_t size, Arena& a) {
+	a.scanObject(obj, size);
+	const Node* n = static_cast<const Node*>(obj);
+	switch (n->kind) {
+	case Kind::SourceFile: {
+		const auto* sf = static_cast<const SourceFile*>(n);
+		for (Node* c : sf->imports) {
+			a.markPointer(c);
+		}
+		for (Node* c : sf->ModuleAugmentations) {
+			a.markPointer(c);
+		}
+		for (Node* c : sf->ReparsedClones) {
+			a.markPointer(c);
+		}
+		for (auto& [key, values] : sf->jsdocCache) {
+			a.markPointer(key);
+			for (Node* c : values) {
+				a.markPointer(c);
+			}
+		}
+		for (auto& [key, value] : sf->tokenCache) {
+			a.markPointer(value);
+		}
+		for (auto& [key, values] : sf->declarationMap) {
+			for (Node* c : values) {
+				a.markPointer(c);
+			}
+		}
+		std::unordered_set<Diagnostic*> seen;
+		traceDiagnosticVector(sf->diagnostics, a, seen);
+		traceDiagnosticVector(sf->jsDiagnostics, a, seen);
+		traceDiagnosticVector(sf->jsdocDiagnostics, a, seen);
+		traceDiagnosticVector(sf->bindDiagnostics, a, seen);
+		break;
+	}
+	case Kind::JSDocTypeLiteral:
+		for (Node* c :
+		     static_cast<const JSDocTypeLiteral*>(n)->JSDocPropertyTags) {
+			a.markPointer(c);
+		}
+		break;
+	case Kind::SyntaxList:
+		for (Node* c : static_cast<const SyntaxList*>(n)->Children) {
+			a.markPointer(c);
+		}
+		break;
+	default:
+		break;
+	}
+}
+
+void traceArenaNodeList(const void* obj, size_t size, Arena& a) {
+	a.scanObject(obj, size);
+	for (Node* c : static_cast<const NodeList*>(obj)->nodes) {
+		a.markPointer(c);
+	}
+}
 
 ModifierFlags Node::modifierFlags() const {
 	if (ModifierList* m = modifiers())
