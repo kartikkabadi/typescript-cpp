@@ -1881,7 +1881,7 @@ Type* Checker::getTypeOfMappedSymbol(Symbol* symbol) {
 		staleForCheckFile(links->resolvedTypeCheckFile)) {
 		// Go: fresh per-checker cache — recompute under this file.
 		links->resolvedType = nullptr;
-		links->resolvedTypeCheckFile = activeCheckFile;
+		links->resolvedTypeCheckFile = checkFileTag();
 		Type* mappedType = links->containingType;
 		if (!pushTypeResolution(symbol, TypeSystemPropertyName::Type)) {
 			mappedType->AsMappedType()->containsError = true;

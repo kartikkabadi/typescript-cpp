@@ -168,15 +168,14 @@ struct ValueSymbolLinks {
 	TypeMapper* mapper{};
 	Type* nameType{};
 	Type* containingType{}; // Mapped type for mapped type property, containing union or intersection type for synthetic property
-	// Go gives each checker in the pool its own valueSymbolLinks store, so a
-	// value cached while some other file was being checked does not
-	// short-circuit the owning checker's fresh resolution (and its
-	// diagnostics). These record the activeCheckFile each value was produced
-	// under; nullptr means produced outside any file check (or assigned at
-	// symbol creation) and is valid in every context.
+	bool functionOrConstructorChecked{};
+	// Go checker-pool emulation (see aliasTargetCheckFile below): context the
+	// entry was produced under. nullptr = seeded write, valid everywhere;
+	// a foreign tag is treated as absent so the owning file's check re-runs
+	// the resolution and re-fires its diagnostics.
 	SourceFile* resolvedTypeCheckFile{};
 	SourceFile* writeTypeCheckFile{};
-	SourceFile* functionOrConstructorCheckedFile{};
+	SourceFile* functionOrConstructorCheckedFor{};
 };
 
 // Additional links for mapped symbols
@@ -217,9 +216,8 @@ struct AliasSymbolLinks {
 struct ModuleSymbolLinks {
 	SymbolTable resolvedExports;                            // Resolved exports of module or combined early- and late-bound static members of a class.
 	std::unordered_map<std::string, Node*> typeOnlyExportStarMap; // Set on a module symbol when some of its exports were resolved through a 'export type * from "mod"' declaration
-	// Go checker-pool emulation: the file the exports check ran under;
-	// nullptr means never checked (a different file's check re-runs it).
-	SourceFile* exportsCheckedFile{};
+	bool exportsChecked{};
+	SourceFile* exportsCheckedFor{}; // see ValueSymbolLinks::resolvedTypeCheckFile
 };
 
 struct ReverseMappedSymbolLinks {
@@ -278,15 +276,17 @@ struct TypeAliasLinks {
 
 struct DeclaredTypeLinks {
 	Type* declaredType{};
-	// Go gives each checker in the pool its own declaredTypeLinks store, so a
-	// check-once flag set while some other file was being checked does not
-	// suppress the check (and its diagnostics) on the file's own checker.
-	// Each records the activeCheckFile the check ran under; nullptr means the
-	// check has never run and any context runs it.
-	SourceFile* interfaceCheckedFile{};
-	SourceFile* indexSignaturesCheckedFile{};
-	SourceFile* typeParametersCheckedFile{};
-	SourceFile* enumCheckedFile{};
+	bool interfaceChecked{};
+	bool indexSignaturesChecked{};
+	bool typeParametersChecked{};
+	bool enumChecked{};
+	// See ValueSymbolLinks::resolvedTypeCheckFile — once-flags re-run under
+	// each distinct check file because the checks they gate report errors on
+	// declarations that may live in other files (merged symbols).
+	SourceFile* interfaceCheckedFor{};
+	SourceFile* indexSignaturesCheckedFor{};
+	SourceFile* typeParametersCheckedFor{};
+	SourceFile* enumCheckedFor{};
 };
 
 // Links for switch clauses
@@ -411,17 +411,13 @@ struct NodeLinks {
 
 struct SymbolNodeLinks {
 	Symbol* resolvedSymbol{}; // Resolved symbol associated with node
-	// Go checker-pool emulation: file the symbol was resolved under;
-	// nullptr means outside any file check and valid in every context.
-	SourceFile* resolvedSymbolCheckFile{};
+	SourceFile* resolvedSymbolCheckFile{}; // see ValueSymbolLinks::resolvedTypeCheckFile
 };
 
 struct TypeNodeLinks {
 	Type* resolvedType{};             // Resolved type associated with node
+	SourceFile* resolvedTypeCheckFile{};   // see ValueSymbolLinks::resolvedTypeCheckFile
 	std::vector<Type*> outerTypeParameters; // Outer type parameters of anonymous object type
-	// Go checker-pool emulation: file the type was resolved under;
-	// nullptr means outside any file check and valid in every context.
-	SourceFile* resolvedTypeCheckFile{};
 };
 
 struct ComputedNameNodeLinks {

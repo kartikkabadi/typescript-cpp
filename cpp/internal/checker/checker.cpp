@@ -2542,7 +2542,7 @@ Symbol* Checker::lateBindMember(Symbol* parent, SymbolTable& earlySymbols, Symbo
 		// In the event we attempt to resolve the late-bound name of this member recursively,
 		// fall back to the early-bound name of this member.
 		links->resolvedSymbol = decl->symbol();
-		links->resolvedSymbolCheckFile = activeCheckFile;
+		links->resolvedSymbolCheckFile = checkFileTag();
 		Node* declName;
 		if (isBinaryExpression(decl)) {
 			declName = decl->as<BinaryExpression>()->Left;
@@ -2604,7 +2604,7 @@ Symbol* Checker::lateBindMember(Symbol* parent, SymbolTable& earlySymbols, Symbo
 				lateSymbol->parent = parent;
 			}
 			links->resolvedSymbol = lateSymbol;
-			links->resolvedSymbolCheckFile = activeCheckFile;
+			links->resolvedSymbolCheckFile = checkFileTag();
 		}
 	}
 	return links->resolvedSymbol;
@@ -2856,7 +2856,7 @@ Symbol* Checker::resolveAlias(Symbol* symbol) {
 			target = resolveIndirectionAlias(symbol, target);
 		}
 		links->aliasTarget = target != nullptr ? target : unknownSymbol;
-		links->aliasTargetCheckFile = activeCheckFile;
+		links->aliasTargetCheckFile = checkFileTag();
 		if (!popTypeResolution()) {
 			error(node, Circular_definition_of_import_alias_0, {symbolToString(symbol)});
 			links->aliasTarget = unknownSymbol;
@@ -3008,7 +3008,7 @@ Type* Checker::getTypeOfSymbolWithDeferredType(Symbol* symbol) {
 		staleForCheckFile(links->resolvedTypeCheckFile)) {
 		// Go: fresh per-checker cache — recompute under this file.
 		links->resolvedType = nullptr;
-		links->resolvedTypeCheckFile = activeCheckFile;
+		links->resolvedTypeCheckFile = checkFileTag();
 		auto* deferred = deferredSymbolLinks.Get(symbol);
 		if (deferred->parent->flags & TypeFlagsUnion) {
 			links->resolvedType = getUnionType(deferred->constituents);
@@ -3025,7 +3025,7 @@ Type* Checker::getWriteTypeOfSymbolWithDeferredType(Symbol* symbol) {
 		staleForCheckFile(links->writeTypeCheckFile)) {
 		// Go: fresh per-checker cache — recompute under this file.
 		links->writeType = nullptr;
-		links->writeTypeCheckFile = activeCheckFile;
+		links->writeTypeCheckFile = checkFileTag();
 		auto* deferred = deferredSymbolLinks.Get(symbol);
 		if (!deferred->writeConstituents.empty()) {
 			if (deferred->parent->flags & TypeFlagsUnion) {
@@ -5903,7 +5903,7 @@ Symbol* Checker::getImmediateAliasedSymbol(Symbol* symbol) {
 			TSC_UNREACHABLE("Unexpected nil in getImmediateAliasedSymbol");
 		}
 		links->immediateTarget = getTargetOfAliasDeclaration(node);
-		links->immediateTargetCheckFile = activeCheckFile;
+		links->immediateTargetCheckFile = checkFileTag();
 	}
 	return links->immediateTarget;
 }

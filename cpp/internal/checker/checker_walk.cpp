@@ -779,7 +779,7 @@ Type* Checker::checkExpressionCachedEx(Node* node, CheckMode checkMode) {
 		staleForCheckFile(links->resolvedTypeCheckFile)) {
 		// Go: fresh per-checker cache — recompute under this file.
 		links->resolvedType = nullptr;
-		links->resolvedTypeCheckFile = activeCheckFile;
+		links->resolvedTypeCheckFile = checkFileTag();
 		// When computing a type that we're going to cache, we need to ignore any ongoing control flow
 		// analysis because variables may have transient types in indeterminable states. Moving flowLoopStart
 		// to the top of the stack ensures all transient types are computed from a known point.

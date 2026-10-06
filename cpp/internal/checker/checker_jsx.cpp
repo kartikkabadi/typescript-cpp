@@ -1547,7 +1547,7 @@ Symbol* Checker::getIntrinsicTagSymbol(Node* node) {
 		return links->resolvedSymbol;
 	}
 	links->resolvedSymbol = nullptr;
-	links->resolvedSymbolCheckFile = activeCheckFile;
+	links->resolvedSymbolCheckFile = checkFileTag();
 	Type* intrinsicElementsType = getJsxType(JsxNames.IntrinsicElements, node);
 	if (!isErrorType(intrinsicElementsType)) {
 		// Property case

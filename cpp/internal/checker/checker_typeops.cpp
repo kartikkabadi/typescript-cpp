@@ -635,7 +635,7 @@ Type* Checker::checkComputedPropertyName(Node* node) {
 		staleForCheckFile(links->resolvedTypeCheckFile)) {
 		// Go: fresh per-checker cache — recompute under this file.
 		links->resolvedType = nullptr;
-		links->resolvedTypeCheckFile = activeCheckFile;
+		links->resolvedTypeCheckFile = checkFileTag();
 		links->resolvedType = circularConstraintType;
 		if (isInvalidComputedPropertyName(node)) {
 			links->resolvedType = errorType;
@@ -931,7 +931,7 @@ Type* Checker::getPropertyTypeForIndexType(Type* originalObjectType,
 				if (accessFlags & AccessFlagsCacheSymbol) {
 					auto* accessLinks = symbolNodeLinks.Get(accessNode);
 					accessLinks->resolvedSymbol = prop;
-					accessLinks->resolvedSymbolCheckFile = activeCheckFile;
+					accessLinks->resolvedSymbolCheckFile = checkFileTag();
 				}
 				if (isThisPropertyAccessInConstructor(accessExpression, prop)) {
 					return autoType;

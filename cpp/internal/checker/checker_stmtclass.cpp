@@ -953,9 +953,12 @@ void Checker::checkTypeParameterListsIdentical(Symbol* symbol) {
 		return;
 	}
 	auto* links = declaredTypeLinks.Get(symbol);
-	if (links->typeParametersCheckedFile == nullptr ||
-		staleForCheckFile(links->typeParametersCheckedFile)) {
-		links->typeParametersCheckedFile = activeCheckFile;
+	// Per-checker once-flag: re-run under each distinct check file so the
+	// errors below re-fire on declarations owned by that file
+	// (checkFileTagStale).
+	if (!links->typeParametersChecked || staleForCheckFile(links->typeParametersCheckedFor)) {
+		links->typeParametersChecked = true;
+		links->typeParametersCheckedFor = checkFileTag();
 		std::vector<Node*> declarations = getClassOrInterfaceDeclarationsOfSymbol(symbol);
 		if (declarations.size() <= 1) {
 			return;
@@ -1704,11 +1707,12 @@ void Checker::checkIndexConstraintForIndexSignature(Type* t, IndexInfo* checkInf
 
 // checker.go:4987
 void Checker::checkClassOrInterfaceForDuplicateIndexSignatures(Node* node) {
-	// Only check the type once
+	// Only check the type once (per check file — see checkFileTagStale: the
+	// merged index symbol's declarations may live in other files)
 	auto* links = declaredTypeLinks.Get(getSymbolOfDeclaration(node));
-	if (links->indexSignaturesCheckedFile == nullptr ||
-		staleForCheckFile(links->indexSignaturesCheckedFile)) {
-		links->indexSignaturesCheckedFile = activeCheckFile;
+	if (!links->indexSignaturesChecked || staleForCheckFile(links->indexSignaturesCheckedFor)) {
+		links->indexSignaturesChecked = true;
+		links->indexSignaturesCheckedFor = checkFileTag();
 		checkTypeForDuplicateIndexSignatures(node);
 	}
 }

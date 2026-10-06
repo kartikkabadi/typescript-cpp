@@ -2269,7 +2269,7 @@ Symbol* Checker::getResolvedSymbol(Node* node) {
 		staleForCheckFile(links->resolvedSymbolCheckFile)) {
 		// Go: fresh per-checker cache — re-resolve under this file.
 		links->resolvedSymbol = nullptr;
-		links->resolvedSymbolCheckFile = activeCheckFile;
+		links->resolvedSymbolCheckFile = checkFileTag();
 		Symbol* symbol = nullptr;
 		if (!nodeIsMissing(node)) {
 			symbol = resolveName(node, node->text(), SymbolFlagsValue | SymbolFlagsExportValue,

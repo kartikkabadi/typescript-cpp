@@ -1433,11 +1433,32 @@ public:
 	// hide diagnostics that a pooled Go checker would have orphaned on a
 	// different checker instance.
 	SourceFile* activeCheckFile = nullptr;
+	// Go checker-pool emulation for shared link caches and once-flags.
+	// Go runs one checker per file, each with a private LinkStore, so a
+	// resolution or a once-only declaration check first performed while
+	// checking a different file re-runs under the file being checked and
+	// re-fires the diagnostics it raises on declarations owned by this
+	// file. Entries therefore record the context that produced them:
+	// nullptr = seeded before any check or written by code that never
+	// re-resolves (valid everywhere); a real SourceFile = produced during
+	// that file's check; the sentinel = resolved while no file check was
+	// active — file checks treat it as a foreign context since a Go
+	// checker's own store would be cold there.
+	static SourceFile* outsideCheckFileSentinel() {
+		static char sentinel;
+		return reinterpret_cast<SourceFile*>(&sentinel);
+	}
+	// The tag to stamp on a link value produced now: the active check
+	// file, or the sentinel when resolving outside any file check.
+	SourceFile* checkFileTag() const {
+		return activeCheckFile != nullptr ? activeCheckFile : outsideCheckFileSentinel();
+	}
 	// True when `stamp` records a link value produced under a different
-	// file's check. Go's per-checker link caches would be empty on this
-	// file's checker, so the value must be recomputed (re-emitting its
-	// diagnostics). A nullptr stamp is populated outside any file check and
-	// is valid in every context; a nullptr activeCheckFile accepts any stamp.
+	// file's check (or, for sentinel-stamped entries, outside one). Go's
+	// per-checker link caches would be empty on this file's checker, so
+	// the value must be recomputed (re-emitting its diagnostics). A
+	// nullptr stamp is valid in every context; a nullptr activeCheckFile
+	// accepts any stamp.
 	bool staleForCheckFile(const SourceFile* stamp) const {
 		return stamp != nullptr && activeCheckFile != nullptr && stamp != activeCheckFile;
 	}

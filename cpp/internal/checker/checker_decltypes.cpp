@@ -757,7 +757,7 @@ Type* Checker::getTypeOfInstantiatedSymbol(Symbol* symbol) {
 		staleForCheckFile(links->resolvedTypeCheckFile)) {
 		// Go: fresh per-checker cache — recompute under this file.
 		links->resolvedType = nullptr;
-		links->resolvedTypeCheckFile = activeCheckFile;
+		links->resolvedTypeCheckFile = checkFileTag();
 		links->resolvedType = instantiateType(getTypeOfSymbol(links->target), links->mapper);
 	}
 	return links->resolvedType;
@@ -770,7 +770,7 @@ Type* Checker::getWriteTypeOfInstantiatedSymbol(Symbol* symbol) {
 		staleForCheckFile(links->writeTypeCheckFile)) {
 		// Go: fresh per-checker cache — recompute under this file.
 		links->writeType = nullptr;
-		links->writeTypeCheckFile = activeCheckFile;
+		links->writeTypeCheckFile = checkFileTag();
 		links->writeType = instantiateType(getWriteTypeOfSymbol(links->target), links->mapper);
 	}
 	return links->writeType;
@@ -779,11 +779,17 @@ Type* Checker::getWriteTypeOfInstantiatedSymbol(Symbol* symbol) {
 // getTypeOfVariableOrParameterOrProperty — checker.go:16863
 Type* Checker::getTypeOfVariableOrParameterOrProperty(Symbol* symbol) {
 	auto* links = valueSymbolLinks.Get(symbol);
-	if (links->resolvedType == nullptr ||
-		staleForCheckFile(links->resolvedTypeCheckFile)) {
-		// Go: fresh per-checker cache — recompute under this file.
+	// Go's per-checker link store means a type resolved while a different
+	// file was being checked (or outside any check) must not short-circuit
+	// this file's own resolution: drop the foreign-context entry so the
+	// worker re-runs and its diagnostics (e.g. reportImplicitAny) re-fire,
+	// attributed here via Diagnostic::producedDuringCheckOf. The entry must
+	// be cleared during re-resolution — typeResolutionHasProperty reads
+	// resolvedType != nullptr to detect cycles.
+	if (links->resolvedType != nullptr && staleForCheckFile(links->resolvedTypeCheckFile)) {
 		links->resolvedType = nullptr;
-		links->resolvedTypeCheckFile = activeCheckFile;
+	}
+	if (links->resolvedType == nullptr) {
 		Type* t = getTypeOfVariableOrParameterOrPropertyWorker(symbol);
 		if (t == nullptr) {
 			TSC_UNREACHABLE("Unexpected nil type");
@@ -796,6 +802,7 @@ Type* Checker::getTypeOfVariableOrParameterOrProperty(Symbol* symbol) {
 		if (links->resolvedType == nullptr && !isParameterOfContextSensitiveSignature(symbol)) {
 			links->resolvedType = t;
 		}
+		links->resolvedTypeCheckFile = checkFileTag();
 		return t;
 	}
 	return links->resolvedType;
@@ -1215,7 +1222,7 @@ Type* Checker::getTypeOfFuncClassEnumModule(Symbol* symbol) {
 		staleForCheckFile(links->resolvedTypeCheckFile)) {
 		// Go: fresh per-checker cache — recompute under this file.
 		links->resolvedType = nullptr;
-		links->resolvedTypeCheckFile = activeCheckFile;
+		links->resolvedTypeCheckFile = checkFileTag();
 		links->resolvedType = getTypeOfFuncClassEnumModuleWorker(symbol);
 	}
 	return links->resolvedType;
@@ -2741,7 +2748,7 @@ Type* Checker::getTypeOfEnumMember(Symbol* symbol) {
 		staleForCheckFile(links->resolvedTypeCheckFile)) {
 		// Go: fresh per-checker cache — recompute under this file.
 		links->resolvedType = nullptr;
-		links->resolvedTypeCheckFile = activeCheckFile;
+		links->resolvedTypeCheckFile = checkFileTag();
 		links->resolvedType = getDeclaredTypeOfEnumMember(symbol);
 	}
 	return links->resolvedType;
@@ -2754,7 +2761,7 @@ Type* Checker::getTypeOfAccessors(Symbol* symbol) {
 		staleForCheckFile(links->resolvedTypeCheckFile)) {
 		// Go: fresh per-checker cache — recompute under this file.
 		links->resolvedType = nullptr;
-		links->resolvedTypeCheckFile = activeCheckFile;
+		links->resolvedTypeCheckFile = checkFileTag();
 		if (!pushTypeResolution(symbol, TypeSystemPropertyName::Type)) {
 			return errorType;
 		}
@@ -2818,7 +2825,7 @@ Type* Checker::getTypeOfAccessors(Symbol* symbol) {
 		staleForCheckFile(links->resolvedTypeCheckFile)) {
 		// Go: fresh per-checker cache — recompute under this file.
 		links->resolvedType = nullptr;
-		links->resolvedTypeCheckFile = activeCheckFile;
+		links->resolvedTypeCheckFile = checkFileTag();
 			links->resolvedType = t;
 		}
 	}
@@ -2832,7 +2839,7 @@ Type* Checker::getWriteTypeOfAccessors(Symbol* symbol) {
 		staleForCheckFile(links->writeTypeCheckFile)) {
 		// Go: fresh per-checker cache — recompute under this file.
 		links->writeType = nullptr;
-		links->writeTypeCheckFile = activeCheckFile;
+		links->writeTypeCheckFile = checkFileTag();
 		if (!pushTypeResolution(symbol, TypeSystemPropertyName::WriteType)) {
 			return errorType;
 		}
@@ -2858,7 +2865,7 @@ Type* Checker::getWriteTypeOfAccessors(Symbol* symbol) {
 		staleForCheckFile(links->writeTypeCheckFile)) {
 		// Go: fresh per-checker cache — recompute under this file.
 		links->writeType = nullptr;
-		links->writeTypeCheckFile = activeCheckFile;
+		links->writeTypeCheckFile = checkFileTag();
 			if (writeType != nullptr) {
 				links->writeType = writeType;
 			} else {
@@ -2876,7 +2883,7 @@ Type* Checker::getTypeOfAlias(Symbol* symbol) {
 		staleForCheckFile(links->resolvedTypeCheckFile)) {
 		// Go: fresh per-checker cache — recompute under this file.
 		links->resolvedType = nullptr;
-		links->resolvedTypeCheckFile = activeCheckFile;
+		links->resolvedTypeCheckFile = checkFileTag();
 		if (!pushTypeResolution(symbol, TypeSystemPropertyName::Type)) {
 			return errorType;
 		}
@@ -2891,7 +2898,7 @@ Type* Checker::getTypeOfAlias(Symbol* symbol) {
 		staleForCheckFile(links->resolvedTypeCheckFile)) {
 		// Go: fresh per-checker cache — recompute under this file.
 		links->resolvedType = nullptr;
-		links->resolvedTypeCheckFile = activeCheckFile;
+		links->resolvedTypeCheckFile = checkFileTag();
 			if ((getSymbolFlags(targetSymbol) & SymbolFlagsValue) != 0) {
 				links->resolvedType = getTypeOfSymbol(targetSymbol);
 			} else {
@@ -2904,7 +2911,7 @@ Type* Checker::getTypeOfAlias(Symbol* symbol) {
 		staleForCheckFile(links->resolvedTypeCheckFile)) {
 		// Go: fresh per-checker cache — recompute under this file.
 		links->resolvedType = nullptr;
-		links->resolvedTypeCheckFile = activeCheckFile;
+		links->resolvedTypeCheckFile = checkFileTag();
 				links->resolvedType = errorType;
 			}
 			return links->resolvedType;

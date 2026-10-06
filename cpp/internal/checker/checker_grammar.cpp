@@ -272,7 +272,7 @@ Symbol* Checker::getSymbolForPrivateIdentifierExpression(Node* node) {
 	if (links->resolvedSymbol == nullptr ||
 		staleForCheckFile(links->resolvedSymbolCheckFile)) {
 		// Go: fresh per-checker cache — re-resolve under this file.
-		links->resolvedSymbolCheckFile = activeCheckFile;
+		links->resolvedSymbolCheckFile = checkFileTag();
 		links->resolvedSymbol = lookupSymbolForPrivateIdentifierDeclaration(node->text(), node);
 	}
 	return links->resolvedSymbol;

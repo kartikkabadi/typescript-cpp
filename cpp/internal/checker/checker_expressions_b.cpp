@@ -582,7 +582,7 @@ void Checker::assignParameterType(Symbol* parameter, Type* contextualType) {
 		return;
 	}
 	links->resolvedType = nullptr;
-	links->resolvedTypeCheckFile = activeCheckFile;
+	links->resolvedTypeCheckFile = checkFileTag();
 	Node* declaration = parameter->valueDeclaration;
 	Type* t = contextualType;
 	if (t == nullptr) {
@@ -618,7 +618,7 @@ void Checker::assignBindingElementTypes(Node* pattern, Type* parentType) {
 			if (isIdentifier(name)) {
 				auto* elLinks = valueSymbolLinks.Get(getSymbolOfDeclaration(element));
 				elLinks->resolvedType = t;
-				elLinks->resolvedTypeCheckFile = activeCheckFile;
+				elLinks->resolvedTypeCheckFile = checkFileTag();
 			} else {
 				assignBindingElementTypes(name, t);
 			}
@@ -1852,7 +1852,7 @@ Type* Checker::checkPropertyAccessExpressionOrQualifiedName(
 		                         isSelfTypeAccess(left, parentSymbol));
 		auto* propLinks = symbolNodeLinks.Get(node);
 		propLinks->resolvedSymbol = prop;
-		propLinks->resolvedSymbolCheckFile = activeCheckFile;
+		propLinks->resolvedSymbolCheckFile = checkFileTag();
 		checkPropertyAccessibility(node, left->kind == Kind::SuperKeyword,
 		                           isWriteAccess(node), apparentType, prop);
 		if (isAssignmentToReadonlyEntity(node, prop, assignmentKind)) {

@@ -393,7 +393,7 @@ Symbol* Checker::getSymbolOfNameOrPropertyAccessExpression(Node* name) {
 				return links->resolvedSymbol;
 			}
 			links->resolvedSymbol = nullptr;
-			links->resolvedSymbolCheckFile = activeCheckFile;
+			links->resolvedSymbolCheckFile = checkFileTag();
 			if (isPropertyAccessExpression(name)) {
 				checkPropertyAccessExpression(name, CheckModeNormal,
 				                              false /*writeOnly*/);

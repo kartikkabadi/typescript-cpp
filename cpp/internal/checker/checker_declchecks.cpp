@@ -1058,9 +1058,11 @@ void Checker::checkInferType(Node* node) {
 	Symbol* symbol = getSymbolOfDeclaration(typeParameterDeclarationNode);
 	if (symbol->declarations.size() > 1) {
 		DeclaredTypeLinks* links = declaredTypeLinks.Get(symbol);
-		if (links->typeParametersCheckedFile == nullptr ||
-			staleForCheckFile(links->typeParametersCheckedFile)) {
-			links->typeParametersCheckedFile = activeCheckFile;
+		// Per-checker once-flag: re-run under each distinct check file so the
+		// errors below re-fire on declarations owned by that file.
+		if (!links->typeParametersChecked || staleForCheckFile(links->typeParametersCheckedFor)) {
+			links->typeParametersChecked = true;
+			links->typeParametersCheckedFor = checkFileTag();
 			Type* typeParameter = getDeclaredTypeOfTypeParameter(symbol);
 			std::vector<Node*> declarations =
 			    getDeclarationsOfKind(symbol, Kind::TypeParameter);
@@ -1231,11 +1233,11 @@ void Checker::checkFunctionOrMethodDeclaration(Node* node) {
 
 // checker.go:3489
 void Checker::checkFunctionOrConstructorSymbol(Symbol* symbol) {
-	// Only check the symbol once
+	// Only check the symbol once (per check file — see checkFileTagStale)
 	ValueSymbolLinks* links = valueSymbolLinks.Get(symbol);
-	if (links->functionOrConstructorCheckedFile == nullptr ||
-		staleForCheckFile(links->functionOrConstructorCheckedFile)) {
-		links->functionOrConstructorCheckedFile = activeCheckFile;
+	if (!links->functionOrConstructorChecked || staleForCheckFile(links->functionOrConstructorCheckedFor)) {
+		links->functionOrConstructorChecked = true;
+		links->functionOrConstructorCheckedFor = checkFileTag();
 		checkFunctionOrConstructorSymbolWorker(symbol);
 	}
 }

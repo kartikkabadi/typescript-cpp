@@ -1812,7 +1812,7 @@ Type* Checker::getTypeOfReverseMappedSymbol(Symbol* symbol) {
 		staleForCheckFile(links->resolvedTypeCheckFile)) {
 		// Go: fresh per-checker cache — recompute under this file.
 		links->resolvedType = nullptr;
-		links->resolvedTypeCheckFile = activeCheckFile;
+		links->resolvedTypeCheckFile = checkFileTag();
 		ReverseMappedSymbolLinks* reverseLinks = reverseMappedSymbolLinks.Get(symbol);
 		links->resolvedType = orElse(
 			inferReverseMappedType(reverseLinks->propertyType, reverseLinks->mappedType,
