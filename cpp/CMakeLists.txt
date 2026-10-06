@@ -205,6 +205,12 @@ add_library(tsc STATIC
 	internal/execute/incremental/referencemap.cpp
 	internal/execute/incremental/snapshot.cpp
 	internal/execute/incremental/snapshottobuildinfo.cpp
+	# === slice: execute-build ===
+	internal/execute/build/buildtask.cpp
+	internal/execute/build/compilerhost.cpp
+	internal/execute/build/host.cpp
+	internal/execute/build/orchestrator.cpp
+	internal/execute/build/uptodatestatus.cpp
 	# === slice: bundled ===
 	internal/bundled/bundled.cpp
 	internal/bundled/bundled_generated.cpp

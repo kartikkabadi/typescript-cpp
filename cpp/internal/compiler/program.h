@@ -100,8 +100,8 @@ public:
 	std::string Realpath(std::string_view path) override;
 	AccessibleEntries GetAccessibleEntries(std::string_view path) override;
 
-	SourceFile* GetSourceFile(const SourceFileParseOptions& opts,
-	                          SourceFileMetaData metaData);
+	virtual SourceFile* GetSourceFile(const SourceFileParseOptions& opts,
+	                                  SourceFileMetaData metaData);
 
 	// === slice: incremental ===
 	// host.go:37-39 — extendedConfigCache / contentMapperProject host state.
@@ -110,15 +110,15 @@ public:
 
 	// host.go:115 ContentMapperProject — the project-scoped content mapper
 	// used by this host, or nullptr when no project is in scope (CLI).
-	contentmapper::Project* ContentMapperProject() const {
+	virtual contentmapper::Project* ContentMapperProject() const {
 		return contentMapperProject.get();
 	}
 	// host.go:100 GetContentMappedSourceFiles.
-	std::pair<contentmapper::SourceFiles, gostd::Error>
+	virtual std::pair<contentmapper::SourceFiles, gostd::Error>
 	GetContentMappedSourceFiles(const SourceFileParseOptions& parseOptions,
 	                            contentmapper::Mapper* mapper);
 	// host.go:119 GetResolvedProjectReference.
-	tsoptions::ParsedCommandLine* GetResolvedProjectReference(
+	virtual tsoptions::ParsedCommandLine* GetResolvedProjectReference(
 	    const std::string& fileName, const tspath::Path& path);
 	// === end slice: incremental ===
 };

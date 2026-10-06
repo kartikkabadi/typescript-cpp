@@ -144,6 +144,11 @@ DefaultResolver::DefaultResolver(ResolverOptions opts)
 	}
 }
 
+// resolver.go:167 NewResolver — the ctor above performs the field init.
+DefaultResolver* NewResolver(ResolverOptions opts) {
+	return new DefaultResolver(std::move(opts));
+}
+
 tracer* DefaultResolver::newTraceBuilder() {
 	if (compilerOptions->TraceResolution == Tristate::True) {
 		traceBuilderStorage = tracer{};
