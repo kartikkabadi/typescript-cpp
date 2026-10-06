@@ -4,6 +4,7 @@
 // interfaces, sync.OnceFunc, and time helpers.
 #pragma once
 
+#include <any>
 #include <atomic>
 #include <cstdio>
 #include <chrono>
@@ -278,13 +279,31 @@ struct ContextImpl {
 	bool done = false;
 	Error err;
 	std::vector<std::function<void()>> afterFuncs;
-	// context.WithValue support: opaque keyed values inherited from parents.
-	std::shared_ptr<ContextImpl> parent;
-	std::unordered_map<std::string, std::shared_ptr<void>> values;
+	// Go context.WithValue storage: each WithValue call produces a child
+	// context whose map is the parent's merged with the new key.
+	std::unordered_map<const void*, std::any> values;
+
+	// Value returns the value stored under `key`, or nullptr if absent.
+	const std::any* value(const void* key) const {
+		auto it = values.find(key);
+		return it == values.end() ? nullptr : &it->second;
+	}
 };
 
 using Context = std::shared_ptr<ContextImpl>;
 using CancelFunc = std::function<void()>;
+
+// context.WithValue — returns a context carrying key=value (a shallow copy
+// of the parent that shadows the key, matching Go's child-wins lookup).
+inline Context contextWithValue(const Context& parent, const void* key,
+                                std::any value) {
+	auto child = std::make_shared<ContextImpl>();
+	if (parent) {
+		child->values = parent->values;
+	}
+	child->values[key] = std::move(value);
+	return child;
+}
 
 inline Context contextBackground() {
 	static const Context bg = std::make_shared<ContextImpl>();
@@ -341,7 +360,6 @@ inline std::function<bool()> contextAfterFunc(const Context& c,
 // context.WithCancel — child cancels with errCanceled when the parent finishes.
 inline std::pair<Context, CancelFunc> contextWithCancel(const Context& parent) {
 	auto c = std::make_shared<ContextImpl>();
-	c->parent = parent;
 	std::weak_ptr<ContextImpl> w = c;
 	contextAfterFunc(parent, [w] {
 		if (auto s = w.lock()) {
@@ -368,27 +386,6 @@ contextWithTimeout(const Context& parent,
 		}
 	}).detach();
 	return {c, cancel};
-}
-
-// context.WithValue — child context carrying one opaque value under a key;
-// lookups walk the parent chain like Go's context.Value.
-inline Context contextWithValue(const Context& parent, std::string key,
-                                std::shared_ptr<void> value) {
-	auto c = std::make_shared<ContextImpl>();
-	c->parent = parent;
-	c->values.emplace(std::move(key), std::move(value));
-	return c;
-}
-
-// ctx.Value(key) — walks the parent chain; returns nullptr when absent.
-inline std::shared_ptr<void> ctxValue(const Context& c, const std::string& key) {
-	for (auto* p = c.get(); p != nullptr; p = p->parent.get()) {
-		auto it = p->values.find(key);
-		if (it != p->values.end()) {
-			return it->second;
-		}
-	}
-	return nullptr;
 }
 
 // ---------------------------------------------------------------------------

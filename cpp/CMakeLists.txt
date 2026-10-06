@@ -316,6 +316,22 @@ add_library(tsc STATIC
 	internal/lsp/lsproto/lsproto.cpp
 	internal/lsp/lsproto/lsproto_generated.cpp
 	internal/lsp/lspwatcher/lspwatcher.cpp
+
+	# === slice: ls-coreB ===
+	internal/ls/languageservice.cpp
+	internal/ls/diagnostics.cpp
+	internal/ls/source_map.cpp
+	internal/ls/importTracker.cpp
+	internal/ls/crossproject.cpp
+	internal/ls/file_rename.cpp
+	internal/ls/codeactions.cpp
+	internal/ls/codeactions_importfixes.cpp
+	internal/ls/codeactions_fixclassincorrectlyimplementsinterface.cpp
+	internal/ls/codeactions_missingmemberfixer.cpp
+	internal/ls/codeactions_fixmissingtypeannotation.cpp
+	internal/ls/organizeimports.cpp
+	internal/ls/signaturehelp.cpp
+	internal/ls/findallreferences.cpp
 )
 
 target_link_libraries(tsc PUBLIC z) # zlib — pprof profile writer

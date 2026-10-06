@@ -153,6 +153,11 @@ template <class M, class... Msgs>
 }
 
 // Assert — debug.go:45
+// The name `assert` collides with the <cassert> macro (pulled in via
+// ast.h): call sites use plain `assert()`/`TSC_ASSERT` instead of
+// `debug::assert(...)`. push/undef/pop keeps this definition intact.
+#pragma push_macro("assert")
+#undef assert
 template <class... Msgs>
 inline void assert(bool value, Msgs&&... message) {
     if (value) {
@@ -167,5 +172,6 @@ inline void assert(bool value, Msgs&&... message) {
     }
     fail(msg);
 }
+#pragma pop_macro("assert")
 
 } // namespace tsc::debug
