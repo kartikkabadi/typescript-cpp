@@ -25,6 +25,7 @@
 #include "internal/packagejson/packagejson.h"
 #include "internal/tsoptions/tsoptions.h"
 #include "internal/printer/printer.h"
+#include "internal/project/project.h"
 #include "internal/sourcemap/sourcemap.h"
 #include <map>
 #include <mutex>
@@ -753,7 +754,7 @@ struct isolatedDeclarationsFixer {
 
 struct CodeAction {
 	std::string Description;
-	std::vector<lsproto::TextEdit*> Changes;
+	lsproto::Slice<std::shared_ptr<lsproto::TextEdit>> Changes;
 	std::string FixID;
 	std::string FixAllDescription;
 
@@ -762,7 +763,7 @@ struct CodeAction {
 
 struct CombinedCodeActions {
 	std::string Description;
-	std::vector<lsproto::TextEdit*> Changes;
+	lsproto::Slice<std::shared_ptr<lsproto::TextEdit>> Changes;
 };
 
 struct CodeFixContext;
@@ -803,7 +804,7 @@ extern CodeFixProvider* FixClassIncorrectlyImplementsInterfaceProvider;
 // are skipped.
 struct displayPartsWriter : printer::EmitTextWriter {
 	std::string builder;
-	std::vector<lsproto::VSClassifiedTextRun*> runs;
+	std::vector<std::shared_ptr<lsproto::VSClassifiedTextRun>> runs;
 	bool vsCapability = false;
 	std::string lastWritten;
 
@@ -812,7 +813,7 @@ struct displayPartsWriter : printer::EmitTextWriter {
 	void WriteClassified(const std::string& text,
 	                     lsproto::ClassificationTypeName classification);
 	void WriteFrom(displayPartsWriter* other);
-	std::vector<lsproto::VSClassifiedTextRun*> GetRuns() const;
+	lsproto::Slice<std::shared_ptr<lsproto::VSClassifiedTextRun>> GetRuns() const;
 
 	// --- EmitTextWriter ---
 	std::string String() override;
@@ -902,11 +903,17 @@ struct CrossProjectOrchestrator {
 // combineLocationArray — crossproject.go:298.
 template <typename T>
 std::vector<T> combineLocationArray(
-    std::vector<T> combined, std::vector<T>* locations,
+    std::vector<T> combined,
+    const std::shared_ptr<lsproto::Slice<T>>& locations,
     collections::Set<lsproto::Location>* seen) {
-	for (auto& loc : *locations) {
+	if (locations == nullptr || !locations->has_value()) {
+		return combined;
+	}
+	for (auto& loc : **locations) {
 		lsproto::Location key;
 		if constexpr (std::is_pointer_v<T>) {
+			key = loc->GetLocation();
+		} else if constexpr (requires(const T& t) { t->GetLocation(); }) {
 			key = loc->GetLocation();
 		} else {
 			key = loc.GetLocation();
@@ -920,14 +927,15 @@ std::vector<T> combineLocationArray(
 }
 
 template <lsproto::HasLocations T>
-std::vector<lsproto::Location>* combineResponseLocations(
+std::shared_ptr<lsproto::Slice<lsproto::Location>> combineResponseLocations(
     const std::function<void(const std::function<bool(T&)>&)>& resultsSeq) {
-	auto* combined = new std::vector<lsproto::Location>();
+	auto combined = std::make_shared<lsproto::Slice<lsproto::Location>>(
+	    std::vector<lsproto::Location>{});
 	collections::Set<lsproto::Location> seenLocations;
 	resultsSeq([&](T& resp) -> bool {
-		if (auto* locations = resp.GetLocations(); locations != nullptr) {
-			*combined = combineLocationArray(*combined, locations,
-			                                 &seenLocations);
+		if (auto locations = resp.GetLocations(); locations != nullptr) {
+			**combined = combineLocationArray(std::move(**combined),
+			                                  locations, &seenLocations);
 		}
 		return true;
 	});
@@ -976,7 +984,7 @@ struct signatureInformation {
 	std::string* Documentation = nullptr;
 	std::vector<struct signatureHelpParameter> Parameters;
 	bool IsVariadic = false;
-	std::vector<lsproto::VSClassifiedTextRun*> ColorizedRuns;
+	lsproto::Slice<std::shared_ptr<lsproto::VSClassifiedTextRun>> ColorizedRuns;
 };
 
 struct signatureHelpParameter {
@@ -1035,6 +1043,7 @@ bool nodeIsEligibleForRename(Node* node);
 // is read by findallreferences.cpp.
 struct symbolDisplayInfo {
 	displayPartsWriter* displayParts = nullptr;
+	::tsc::Node* declaration = nullptr;
 };
 symbolDisplayInfo getQuickInfoAndDeclarationAtLocation(
     checker::Checker* c, Symbol* symbol, Node* node,
@@ -1146,9 +1155,9 @@ public:
 	// === dep decls — owned by the ls-coreB slice (findallreferences.go) ===
 	// Called by the api slice; stubbed in ls.cpp until ls-coreB lands.
 	std::vector<SignatureUsage> GetSignatureUsages(
-	    const ContextPtr& ctx, Node* signatureDecl);
+	    const gostd::Context& ctx, Node* signatureDecl);
 	std::vector<SymbolAndEntries*> GetReferencedSymbolsForNode(
-	    const ContextPtr& ctx, int position, Node* node,
+	    const gostd::Context& ctx, int position, Node* node,
 	    const std::vector<SourceFile*>& sourceFiles);
 	// completions.go:402 getCompletionsAtPosition.
 	std::pair<CompletionList*, gostd::Error> getCompletionsAtPosition(
@@ -1307,7 +1316,7 @@ public:
 	// (body in lsdeps.cpp; owned by the hover sibling slice).
 	// Returns (quickInfo, documentation, tags, classifiedRuns).
 	std::tuple<std::string, std::string, std::string,
-	           std::vector<lsproto::VSClassifiedTextRun*>>
+	           lsproto::Slice<std::shared_ptr<lsproto::VSClassifiedTextRun>>>
 	getQuickInfoAndDocumentationForSymbol(
 	    checker::Checker* c, Symbol* symbol, Node* node,
 	    lsproto::MarkupKind contentFormat, checker::VerbosityContext* vc,
@@ -1476,8 +1485,13 @@ public:
 	// `ls-internals` section — appended during the port of each Go file.
 
 	autoimport::ProjectID* projectID() { return projectID_; }
+	lsconv::Converters* Converters() { return converters; }
+
+	std::pair<lsp::lsproto::Range, spanmap::Fidelity> createFoldingRangeFromBounds(
+		int start, int end, SourceFile* sourceFile);
 
 private:
+	friend struct sourceDefResolver;
 	autoimport::ProjectID* projectID_;
 	ls::Host* host;
 	lsutil::UserPreferences activeConfig;
@@ -1490,7 +1504,8 @@ private:
 	// --- diagnostics.go ---
 	std::pair<lsproto::DocumentDiagnosticResponse, gostd::Error>
 	ProvideDiagnostics(const gostd::Context& ctx, lsproto::DocumentUri uri);
-	std::vector<lsproto::Diagnostic*> toLSPDiagnostics(
+	lsp::lsproto::Slice<std::shared_ptr<lsproto::Diagnostic>>
+	toLSPDiagnostics(
 	    const gostd::Context& ctx,
 	    std::vector<std::vector<Diagnostic*>> diagnostics);
 
@@ -1533,24 +1548,24 @@ private:
 	std::pair<lsproto::SignatureHelpOrNull, gostd::Error> ProvideSignatureHelp(
 	    const gostd::Context& ctx, lsproto::DocumentUri documentURI,
 	    lsproto::Position position, lsproto::SignatureHelpContext* context);
-	lsproto::SignatureHelp* GetSignatureHelpItems(
+	std::shared_ptr<lsproto::SignatureHelp> GetSignatureHelpItems(
 	    const gostd::Context& ctx, int position,
 	    compiler::SimpleProgram* program, SourceFile* sourceFile,
 	    lsproto::SignatureHelpContext* context);
-	lsproto::SignatureHelp* createJSSignatureHelpItems(
+	std::shared_ptr<lsproto::SignatureHelp> createJSSignatureHelpItems(
 	    const gostd::Context& ctx, argumentListInfo* argumentInfo,
 	    compiler::SimpleProgram* program, checker::Checker* c);
-	lsproto::SignatureHelp* findSignatureHelpFromNamedDeclarations(
+	std::shared_ptr<lsproto::SignatureHelp> findSignatureHelpFromNamedDeclarations(
 	    const gostd::Context& ctx, SourceFile* sourceFile,
 	    const std::string& name, argumentListInfo* argumentInfo,
 	    checker::Checker* c);
-	lsproto::SignatureHelp* createSignatureHelpItems(
+	std::shared_ptr<lsproto::SignatureHelp> createSignatureHelpItems(
 	    const gostd::Context& ctx,
 	    const std::vector<checker::Signature*>& candidates,
 	    checker::Signature* resolvedSignature,
 	    argumentListInfo* argumentInfo, SourceFile* sourceFile,
 	    checker::Checker* c, bool useFullPrefix);
-	lsproto::UintegerOrNull* computeActiveParameter(
+	std::shared_ptr<lsproto::UintegerOrNull> computeActiveParameter(
 	    signatureInformation sig, int argumentIndex, bool supportsNull);
 	std::vector<signatureInformation> getSignatureHelpItem(
 	    checker::Signature* candidate, bool isTypeParameterList,
@@ -1655,7 +1670,8 @@ private:
 	std::vector<lsproto::Location> convertEntriesToLocations(
 	    const std::vector<ReferenceEntry*>& entries,
 	    spanmap::Feature feature);
-	std::vector<lsproto::LocationLink*> convertEntriesToLocationLinks(
+	std::vector<std::shared_ptr<lsproto::LocationLink>>
+	convertEntriesToLocationLinks(
 	    const std::vector<ReferenceEntry*>& entries,
 	    spanmap::Feature feature);
 	std::vector<SymbolAndEntries*> mergeReferences(
@@ -1728,7 +1744,8 @@ private:
 	    const modulespecifiers::UserPreferences& userPreferences);
 
 	// --- organizeimports.go ---
-	std::unordered_map<std::string, std::vector<lsproto::TextEdit*>>
+	lsproto::Map<std::string,
+	             lsproto::Slice<std::shared_ptr<lsproto::TextEdit>>>
 	OrganizeImports(const gostd::Context& ctx, SourceFile* sourceFile,
 	                compiler::SimpleProgram* program,
 	                lsproto::CodeActionKind kind);
@@ -1736,18 +1753,17 @@ private:
 	// === ls-coreC merged decls (format/codelens/selectionranges/definition/rename/folding/sourcedefinition/semantictokens/symbols/documenthighlights/inlay_hints/callhierarchy/hover) ===
 
 
-	std::vector<ReferenceEntry*> getReferencedSymbolsForSymbol(gostd::Context ctx, Symbol* symbol,
-															 std::vector<::tsc::Node*> excludeDeclaration,
-															 SourceFile* sourceFile,
-															 std::vector<SourceFile*> sourceFiles);
-
-	// format_document.go ProvideFormatDocument (dep stub — ls formatting slice)
+	// === slice: ls-coreB — format.go ===
 	lsp::lsproto::DocumentFormattingResponse ProvideFormatDocument(
 		gostd::Context ctx, lsp::lsproto::DocumentUri documentURI,
 		lsp::lsproto::FormattingOptions* options);
-	std::vector<lsp::lsproto::TextEdit*> getFormattingEditsForMappedRange(
+	lsp::lsproto::Slice<std::shared_ptr<lsp::lsproto::TextEdit>>
+	getFormattingEditsForMappedRange(
 		gostd::Context ctx, SourceFile* file, lsutil::FormatCodeSettings options,
 		TextRange originalRange);
+	// format.go:19 toLSProtoTextEdits — nil on non-exact fidelity.
+	lsp::lsproto::Slice<std::shared_ptr<lsp::lsproto::TextEdit>>
+	toLSProtoTextEdits(SourceFile* file, std::vector<TextChange> changes);
 	lsp::lsproto::DocumentRangeFormattingResponse ProvideFormatDocumentRange(
 		gostd::Context ctx, lsp::lsproto::DocumentUri documentURI,
 		lsp::lsproto::FormattingOptions* options, lsp::lsproto::Range r);
@@ -1829,14 +1845,12 @@ private:
 	// === slice: ls-coreC — folding.go ===
 	lsp::lsproto::FoldingRangeResponse ProvideFoldingRange(gostd::Context ctx,
 														 lsp::lsproto::DocumentUri documentURI);
-	std::vector<lsp::lsproto::FoldingRange*> adjustFoldingEnd(
-		std::vector<lsp::lsproto::FoldingRange*> ranges, SourceFile* sourceFile);
-	std::vector<lsp::lsproto::FoldingRange*> addNodeOutliningSpans(gostd::Context ctx,
+	std::vector<std::shared_ptr<lsp::lsproto::FoldingRange>> adjustFoldingEnd(
+		std::vector<std::shared_ptr<lsp::lsproto::FoldingRange>> ranges, SourceFile* sourceFile);
+	std::vector<std::shared_ptr<lsp::lsproto::FoldingRange>> addNodeOutliningSpans(gostd::Context ctx,
 																 SourceFile* sourceFile);
-	std::vector<lsp::lsproto::FoldingRange*> addRegionOutliningSpans(gostd::Context ctx,
+	std::vector<std::shared_ptr<lsp::lsproto::FoldingRange>> addRegionOutliningSpans(gostd::Context ctx,
 																   SourceFile* sourceFile);
-	std::pair<lsp::lsproto::Range, spanmap::Fidelity> createFoldingRangeFromBounds(int start, int end,
-																				 SourceFile* sourceFile);
 
 	// === slice: ls-coreC — sourcedefinition.go ===
 	lsp::lsproto::DefinitionResponse ProvideSourceDefinition(gostd::Context ctx,
@@ -1856,6 +1870,7 @@ private:
 													 compiler::SimpleProgram* program);
 	std::vector<semanticToken> collectSemanticTokensInRange(gostd::Context ctx, checker::Checker* c,
 															SourceFile* file,
+															compiler::SimpleProgram* program,
 															int spanStart, int spanEnd);
 
 	// === slice: ls-coreC — symbols.go ===
@@ -1863,11 +1878,13 @@ private:
 																lsp::lsproto::DocumentUri documentURI);
 	std::vector<lsp::lsproto::SymbolInformation> getDocumentSymbolInformations(
 		gostd::Context ctx, SourceFile* file, lsp::lsproto::DocumentUri documentURI);
-	std::vector<lsp::lsproto::DocumentSymbol*> getDocumentSymbolsForChildren(gostd::Context ctx,
-																		   ::tsc::Node* node,
-																		   SourceFile* file);
-	lsp::lsproto::DocumentSymbol* newDocumentSymbol(
-		::tsc::Node* node, ::tsc::Node* name, std::vector<lsp::lsproto::DocumentSymbol*> children);
+	std::vector<std::shared_ptr<lsp::lsproto::DocumentSymbol>>
+	getDocumentSymbolsForChildren(gostd::Context ctx, ::tsc::Node* node,
+								  SourceFile* file);
+	std::shared_ptr<lsp::lsproto::DocumentSymbol> newDocumentSymbol(
+		::tsc::Node* node, ::tsc::Node* name,
+		std::vector<std::shared_ptr<lsp::lsproto::DocumentSymbol>>
+		    children);
 
 	// === slice: ls-coreC — documenthighlights.go ===
 	lsp::lsproto::DocumentHighlightResponse ProvideDocumentHighlights(
@@ -1883,23 +1900,27 @@ private:
 									std::vector<lsp::lsproto::DocumentUri> filesToSearch);
 	lsp::lsproto::MultiDocumentHighlightsOrNull provideDocumentHighlightsAtPosition(
 		gostd::Context ctx, lsp::lsproto::DocumentUri documentUri, int position,
+		compiler::SimpleProgram* program, SourceFile* sourceFile,
 		std::vector<lsp::lsproto::DocumentUri> filesToSearch);
-	std::vector<lsp::lsproto::MultiDocumentHighlight*> getSemanticDocumentHighlights(
+	std::vector<std::shared_ptr<lsp::lsproto::MultiDocumentHighlight>>
+	getSemanticDocumentHighlights(
 		gostd::Context ctx, int position, ::tsc::Node* node, compiler::SimpleProgram* program,
 		std::vector<SourceFile*> sourceFiles);
-	std::pair<std::string, lsp::lsproto::DocumentHighlight*> toDocumentHighlight(ReferenceEntry* entry);
-	std::vector<lsp::lsproto::DocumentHighlight*> getSyntacticDocumentHighlights(::tsc::Node* node,
-																			   SourceFile* sourceFile);
-	std::vector<lsp::lsproto::DocumentHighlight*> useParent(
+	std::pair<std::string, std::shared_ptr<lsp::lsproto::DocumentHighlight>>
+	toDocumentHighlight(ReferenceEntry* entry);
+	std::vector<std::shared_ptr<lsp::lsproto::DocumentHighlight>>
+	getSyntacticDocumentHighlights(::tsc::Node* node,
+								   SourceFile* sourceFile);
+	std::vector<std::shared_ptr<lsp::lsproto::DocumentHighlight>> useParent(
 		::tsc::Node* node, std::function<bool(::tsc::Node*)> nodeTest,
 		std::function<std::vector<::tsc::Node*>(::tsc::Node*, SourceFile*)> getNodes,
 		SourceFile* sourceFile);
-	std::vector<lsp::lsproto::DocumentHighlight*> highlightSpans(std::vector<::tsc::Node*> nodes,
+	std::vector<std::shared_ptr<lsp::lsproto::DocumentHighlight>> highlightSpans(std::vector<::tsc::Node*> nodes,
 															   SourceFile* sourceFile);
-	std::vector<lsp::lsproto::DocumentHighlight*> getFromAllDeclarations(
+	std::vector<std::shared_ptr<lsp::lsproto::DocumentHighlight>> getFromAllDeclarations(
 		std::function<bool(::tsc::Node*)> nodeTest, std::vector<Kind> keywords, ::tsc::Node* node,
 		SourceFile* sourceFile);
-	std::vector<lsp::lsproto::DocumentHighlight*> getIfElseOccurrences(IfStatement* ifStatement,
+	std::vector<std::shared_ptr<lsp::lsproto::DocumentHighlight>> getIfElseOccurrences(IfStatement* ifStatement,
 																	 SourceFile* sourceFile);
 
 	// === slice: ls-coreC — inlay_hints.go ===
@@ -1907,11 +1928,13 @@ private:
 												   lsp::lsproto::InlayHintParams* params);
 
 	// === slice: ls-coreC — callhierarchy.go ===
-	lsp::lsproto::CallHierarchyItem* createCallHierarchyItem(compiler::SimpleProgram* program,
-														   ::tsc::Node* node);
-	lsp::lsproto::CallHierarchyIncomingCall* convertCallSiteGroupToIncomingCall(
+	std::shared_ptr<lsp::lsproto::CallHierarchyItem> createCallHierarchyItem(
+		compiler::SimpleProgram* program, ::tsc::Node* node);
+	std::shared_ptr<lsp::lsproto::CallHierarchyIncomingCall>
+	convertCallSiteGroupToIncomingCall(
 		compiler::SimpleProgram* program, std::vector<callSite*> entries);
-	lsp::lsproto::CallHierarchyOutgoingCall* convertCallSiteGroupToOutgoingCall(
+	std::shared_ptr<lsp::lsproto::CallHierarchyOutgoingCall>
+	convertCallSiteGroupToOutgoingCall(
 		compiler::SimpleProgram* program, std::vector<callSite*> entries);
 	std::pair<lsp::lsproto::CallHierarchyIncomingCallsResponse, gostd::Error> getIncomingCalls(
 		gostd::Context ctx, compiler::SimpleProgram* program, ::tsc::Node* declaration,
@@ -1919,7 +1942,8 @@ private:
 	std::pair<lsp::lsproto::CallHierarchyIncomingCallsResponse, gostd::Error>
 	symbolAndEntriesToIncomingCalls(gostd::Context ctx, incomingEntry* params,
 									SymbolAndEntriesData data, symbolEntryTransformOptions options);
-	std::vector<lsp::lsproto::CallHierarchyOutgoingCall*> getOutgoingCalls(
+	std::vector<std::shared_ptr<lsp::lsproto::CallHierarchyOutgoingCall>>
+	getOutgoingCalls(
 		compiler::SimpleProgram* program, ::tsc::Node* declaration);
 	lsp::lsproto::CallHierarchyPrepareResponse ProvidePrepareCallHierarchy(
 		gostd::Context ctx, lsp::lsproto::DocumentUri documentURI,
@@ -1931,6 +1955,7 @@ private:
 		gostd::Context ctx, lsp::lsproto::CallHierarchyItem* item);
 	std::vector<::tsc::Node*> callHierarchyDeclarations(SourceFile* file,
 														lsp::lsproto::Position position,
+														compiler::SimpleProgram* program,
 														bool allowSourceFile);
 
 	// === slice: ls-coreC — hover.go ===
@@ -3328,14 +3353,16 @@ bool codeFixProviderMatchesLSPDiagnostic(CodeFixProvider* provider,
 bool isFixableDiagnostic(Diagnostic* diagnostic,
                          const std::vector<int32_t>& errorCodes);
 bool isFixAllKind(lsproto::CodeActionKind kind);
-bool wantsQuickFixes(std::vector<lsproto::CodeActionKind>* only);
+bool wantsQuickFixes(
+    const std::shared_ptr<lsproto::Slice<lsproto::CodeActionKind>>& only);
 std::string getOrganizeImportsActionTitle(const gostd::Context& ctx,
                                           lsproto::CodeActionKind kind);
 std::vector<lsproto::CodeActionKind> getOrganizeImportsActionsForKind(
     lsproto::CodeActionKind requestedKind);
 bool containsErrorCode(const std::vector<int32_t>& codes, int32_t code);
 lsproto::CommandOrCodeAction convertToLSPCodeAction(
-    CodeAction* action, lsproto::Diagnostic* diag, lsproto::DocumentUri uri);
+    CodeAction* action, const std::shared_ptr<lsproto::Diagnostic>& diag,
+    lsproto::DocumentUri uri);
 
 
 
@@ -3370,15 +3397,28 @@ getDeclarationMap(SourceFile* file);
 std::string truncateByRunes(std::string_view str, int maxLength);
 // symbols.go:669 — shared by symbols.cpp + callhierarchy.cpp
 lsp::lsproto::SymbolKind getSymbolKindFromNode(::tsc::Node* node);
+// definition.go:162 — shared by definition.cpp + sourcedefinition.cpp
+lsp::lsproto::DefinitionResponse combineDefinitionResponses(
+	const std::vector<lsp::lsproto::DefinitionResponse>& results, bool links);
 // definition.go:281 — shared by definition.cpp + callhierarchy.cpp
 bool lspRangeContains(lsp::lsproto::Range outer, lsp::lsproto::Range inner);
+// definition.go:306 — shared by definition.cpp + sourcedefinition.cpp
+std::vector<::tsc::Node*> getDeclarationsFromLocation(checker::Checker* c,
+													::tsc::Node* node);
+// definition.go:421 — shared by definition.cpp + sourcedefinition.cpp
+::tsc::Node* tryGetSignatureDeclaration(checker::Checker* typeChecker,
+										::tsc::Node* node);
+// findallreferences.go:496 — shared by findallreferences.cpp + sourcedefinition.cpp
+std::pair<SourceFile*, TextPos> getFileAndStartPosFromDeclaration(
+	Node* declaration);
 // hovericon.go:56 (dep stub — ls-coreA)
 lsp::lsproto::VSImageId* getVSHoverImageId(lsutil::ScriptElementKind kind,
 										 lsutil::ScriptElementKindModifier modifiers);
 // hovericon.go:132 (dep stub — ls-coreA)
 lsp::lsproto::VSContainerElement* buildVSHoverRawContent(
-	lsp::lsproto::VSImageId* imageId, std::vector<lsp::lsproto::VSClassifiedTextRun*> quickInfoRuns,
-	std::vector<lsp::lsproto::VSClassifiedTextRun*> documentationRuns);
+	lsp::lsproto::VSImageId* imageId,
+	lsp::lsproto::Slice<std::shared_ptr<lsp::lsproto::VSClassifiedTextRun>> quickInfoRuns,
+	lsp::lsproto::Slice<std::shared_ptr<lsp::lsproto::VSClassifiedTextRun>> documentationRuns);
 
 // ============================================================================
 

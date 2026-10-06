@@ -36,9 +36,7 @@ std::pair<std::shared_ptr<vfs::FS>, gostd::Error> NewForUpdate(
 	requestFileSystem* baseRequestFileSystem =
 	    getRequestFileSystem(baseFileSystem);
 	if (baseRequestFileSystem != nullptr) {
-		auto compacted = fileSystem->applyTo(*baseRequestFileSystem);
-		fileSystem = std::make_shared<requestFileSystem>(
-		    std::move(compacted));
+		fileSystem = fileSystem->applyTo(*baseRequestFileSystem);
 	}
 	if (params->kind == KindLayer) {
 		addFileChanges(fileChanges, params, baseFileSystem,
@@ -180,16 +178,17 @@ newRequestFileSystemWorker(RequestFileSystem* params,
 	return {result, nullptr};
 }
 
-std::shared_ptr<project::LayeredFileSystem>
-requestFileSystem::WithBaseFileSystem(std::shared_ptr<vfs::FS> base) {
-	auto clone = std::make_shared<requestFileSystem>(*this);
-	clone->base = std::move(base);
+project::LayeredFileSystem*
+requestFileSystem::WithBaseFileSystem(vfs::FS* base) {
+	auto* clone = new requestFileSystem(*this);
+	// non-owning alias — Go reference semantics (base outlives via caller)
+	clone->base = std::shared_ptr<vfs::FS>(base, [](vfs::FS*) {});
 	return clone;
 }
 
-std::map<tspath::Path, std::shared_ptr<project::Overlay>>
+std::unordered_map<tspath::Path, project::Overlay*>
 requestFileSystem::Overlays() {
-	std::map<tspath::Path, std::shared_ptr<project::Overlay>> result;
+	std::unordered_map<tspath::Path, project::Overlay*> result;
 	auto* layered = dynamic_cast<project::LayeredFileSystem*>(base.get());
 	if (layered == nullptr) {
 		return result;
@@ -206,13 +205,14 @@ requestFileSystem::Overlays() {
 }
 
 // applyTo (requestfilesystem.go:240).
-requestFileSystem requestFileSystem::applyTo(requestFileSystem base) {
-	requestFileSystem s = *this;
-	s.paths = composeRequestPaths(base.paths, s.paths,
-	                              requestFallback::Allowed,
-	                              s.useCaseSensitiveNames);
-	s.kind = base.kind;
-	s.base = base.base;
+std::shared_ptr<requestFileSystem>
+requestFileSystem::applyTo(const requestFileSystem& base) {
+	auto s = std::make_shared<requestFileSystem>(*this);
+	s->paths = composeRequestPaths(base.paths, s->paths,
+	                               requestFallback::Allowed,
+	                               s->useCaseSensitiveNames);
+	s->kind = base.kind;
+	s->base = base.base;
 	return s;
 }
 
@@ -428,14 +428,14 @@ bool requestFileSystem::UseCaseSensitiveFileNames() {
 	return useCaseSensitiveNames;
 }
 
-std::shared_ptr<project::FileHandle>
+project::FileHandle*
 requestFileSystem::GetFile(const std::string& fileName) {
 	return GetFileByPath(fileName, toPath(fileName));
 }
 
-std::shared_ptr<project::FileHandle>
+project::FileHandle*
 requestFileSystem::GetFileByPath(const std::string& fileName,
-                                 tspath::Path /*path*/) {
+                                 const tspath::Path& /*path*/) {
 	requestPathLookup lookup = lookupPath(fileName);
 	if (!lookup.ok || (lookup.info != nullptr && lookup.info->IsDir())) {
 		return nullptr;
@@ -448,12 +448,12 @@ requestFileSystem::GetFileByPath(const std::string& fileName,
 		}
 		if (auto [content, ok] = lookup.fileSystem->ReadFile(lookup.path);
 		    ok) {
-			return project::NewCachedFileHandle(fileName, content);
+			return project::newCachedFileHandle(fileName, content);
 		}
 		return nullptr;
 	}
 	if (auto* file = dynamic_cast<requestFile*>(lookup.info)) {
-		return project::NewCachedFileHandle(fileName, file->content);
+		return project::newCachedFileHandle(fileName, file->content);
 	}
 	return nullptr;
 }

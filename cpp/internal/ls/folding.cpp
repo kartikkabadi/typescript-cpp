@@ -1,5 +1,6 @@
 // === slice: ls-coreC ===
 // folding.cpp — folding.go: folding ranges (node outlining + region comments).
+#include "internal/astnav/tokens.h"
 #include "internal/ls/ls.h"
 
 namespace tsc::ls {
@@ -36,15 +37,15 @@ struct foldingRangeKeyHash {
 };
 
 // folding.go:61 — keyForFoldingRange
-foldingRangeKey keyForFoldingRange(lsp::lsproto::FoldingRange* foldingRange) {
+foldingRangeKey keyForFoldingRange(std::shared_ptr<lsp::lsproto::FoldingRange> foldingRange) {
 	foldingRangeKey key;
 	key.startLine = foldingRange->StartLine;
 	key.endLine = foldingRange->EndLine;
-	if (foldingRange->StartCharacter != nullptr) {
+	if (foldingRange->StartCharacter.has_value()) {
 		key.startCharacter = *foldingRange->StartCharacter;
 		key.hasStartCharacter = true;
 	}
-	if (foldingRange->EndCharacter != nullptr) {
+	if (foldingRange->EndCharacter.has_value()) {
 		key.endCharacter = *foldingRange->EndCharacter;
 		key.hasEndCharacter = true;
 	}
@@ -52,7 +53,7 @@ foldingRangeKey keyForFoldingRange(lsp::lsproto::FoldingRange* foldingRange) {
 		key.kind = *foldingRange->Kind;
 		key.hasKind = true;
 	}
-	if (foldingRange->CollapsedText != nullptr) {
+	if (foldingRange->CollapsedText.has_value()) {
 		key.collapsedText = *foldingRange->CollapsedText;
 		key.hasCollapsedText = true;
 	}
@@ -127,34 +128,34 @@ regionDelimiterResult* parseRegionDelimiter(std::string lineText) {
 // folding.go:600 — fwd decl
 bool supportsCollapsedText(gostd::Context ctx);
 
-lsp::lsproto::FoldingRange* createFoldingRange(gostd::Context ctx,
+std::shared_ptr<lsp::lsproto::FoldingRange> createFoldingRange(gostd::Context ctx,
 											 lsp::lsproto::Range textRange,
 											 lsp::lsproto::FoldingRangeKind foldingRangeKind,
 											 std::string collapsedText) {
-	lsp::lsproto::FoldingRangeKind* kind = nullptr;
+	std::shared_ptr<lsp::lsproto::FoldingRangeKind> kind;
 	if (!foldingRangeKind.empty()) {
-		kind = new lsp::lsproto::FoldingRangeKind(foldingRangeKind);
+		kind = std::make_shared<lsp::lsproto::FoldingRangeKind>(foldingRangeKind);
 	}
-	auto* result = new lsp::lsproto::FoldingRange;
+	auto result = std::make_shared<lsp::lsproto::FoldingRange>();
 	result->StartLine = textRange.Start.Line;
-	result->StartCharacter = new uint32_t(textRange.Start.Character);
+	result->StartCharacter = textRange.Start.Character;
 	result->EndLine = textRange.End.Line;
-	result->EndCharacter = new uint32_t(textRange.End.Character);
+	result->EndCharacter = textRange.End.Character;
 	result->Kind = kind;
 	if (!collapsedText.empty() && supportsCollapsedText(ctx)) {
-		result->CollapsedText = new std::string(std::move(collapsedText));
+		result->CollapsedText = std::move(collapsedText);
 	}
 	return result;
 }
 
 // folding.go:600 — supportsCollapsedText
 bool supportsCollapsedText(gostd::Context ctx) {
-	return lsp::lsproto::GetClientCapabilities(ctx)
+	return lsp::lsproto::getClientCapabilities(ctx)
 		->TextDocument.FoldingRange.FoldingRange.CollapsedText;
 }
 
 // folding.go:622 — createFoldingRangeFromBounds (free fn)
-lsp::lsproto::FoldingRange* createFoldingRangeFromBounds(
+std::shared_ptr<lsp::lsproto::FoldingRange> createFoldingRangeFromBounds(
 	gostd::Context ctx, int pos, int end,
 	lsp::lsproto::FoldingRangeKind foldingRangeKind, SourceFile* sourceFile,
 	LanguageService* l) {
@@ -166,7 +167,7 @@ lsp::lsproto::FoldingRange* createFoldingRangeFromBounds(
 }
 
 // folding.go:586 — rangeBetweenTokens
-lsp::lsproto::FoldingRange* rangeBetweenTokens(gostd::Context ctx,
+std::shared_ptr<lsp::lsproto::FoldingRange> rangeBetweenTokens(gostd::Context ctx,
 											 ::tsc::Node* openToken,
 											 ::tsc::Node* closeToken,
 											 SourceFile* sourceFile,
@@ -216,7 +217,7 @@ bool isNodeArrayMultiLine(std::vector<::tsc::Node*> list, SourceFile* sourceFile
 }
 
 // folding.go:634 — functionSpan
-lsp::lsproto::FoldingRange* functionSpan(gostd::Context ctx, ::tsc::Node* node,
+std::shared_ptr<lsp::lsproto::FoldingRange> functionSpan(gostd::Context ctx, ::tsc::Node* node,
 										 ::tsc::Node* body, SourceFile* sourceFile,
 										 LanguageService* l) {
 	::tsc::Node* openToken = tryGetFunctionOpenToken(node, body, sourceFile);
@@ -230,7 +231,7 @@ lsp::lsproto::FoldingRange* functionSpan(gostd::Context ctx, ::tsc::Node* node,
 }
 
 // folding.go:573 — spanForNode
-lsp::lsproto::FoldingRange* spanForNode(gostd::Context ctx, ::tsc::Node* node,
+std::shared_ptr<lsp::lsproto::FoldingRange> spanForNode(gostd::Context ctx, ::tsc::Node* node,
 										Kind open, bool useFullStart,
 										SourceFile* sourceFile, LanguageService* l) {
 	Kind closeBrace = Kind::CloseBraceToken;
@@ -247,7 +248,7 @@ lsp::lsproto::FoldingRange* spanForNode(gostd::Context ctx, ::tsc::Node* node,
 }
 
 // folding.go:562 — spanForNodeArray
-lsp::lsproto::FoldingRange* spanForNodeArray(gostd::Context ctx,
+std::shared_ptr<lsp::lsproto::FoldingRange> spanForNodeArray(gostd::Context ctx,
 											 NodeList* statements,
 											 SourceFile* sourceFile,
 											 LanguageService* l) {
@@ -263,7 +264,7 @@ lsp::lsproto::FoldingRange* spanForNodeArray(gostd::Context ctx,
 }
 
 // folding.go:549 — spanForJSXAttributes
-lsp::lsproto::FoldingRange* spanForJSXAttributes(gostd::Context ctx,
+std::shared_ptr<lsp::lsproto::FoldingRange> spanForJSXAttributes(gostd::Context ctx,
 												 ::tsc::Node* node,
 												 SourceFile* sourceFile,
 												 LanguageService* l) {
@@ -282,7 +283,7 @@ lsp::lsproto::FoldingRange* spanForJSXAttributes(gostd::Context ctx,
 }
 
 // folding.go:529 — spanForJSXElement
-lsp::lsproto::FoldingRange* spanForJSXElement(gostd::Context ctx,
+std::shared_ptr<lsp::lsproto::FoldingRange> spanForJSXElement(gostd::Context ctx,
 											  ::tsc::Node* node,
 											  SourceFile* sourceFile,
 											  LanguageService* l) {
@@ -313,7 +314,7 @@ lsp::lsproto::FoldingRange* spanForJSXElement(gostd::Context ctx,
 }
 
 // folding.go:522 — spanForTemplateLiteral
-lsp::lsproto::FoldingRange* spanForTemplateLiteral(gostd::Context ctx,
+std::shared_ptr<lsp::lsproto::FoldingRange> spanForTemplateLiteral(gostd::Context ctx,
 												 ::tsc::Node* node,
 												 SourceFile* sourceFile,
 												 LanguageService* l) {
@@ -327,7 +328,7 @@ lsp::lsproto::FoldingRange* spanForTemplateLiteral(gostd::Context ctx,
 }
 
 // folding.go:510 — spanForArrowFunction
-lsp::lsproto::FoldingRange* spanForArrowFunction(gostd::Context ctx,
+std::shared_ptr<lsp::lsproto::FoldingRange> spanForArrowFunction(gostd::Context ctx,
 												 ::tsc::Node* node,
 												 SourceFile* sourceFile,
 												 LanguageService* l) {
@@ -348,7 +349,7 @@ lsp::lsproto::FoldingRange* spanForArrowFunction(gostd::Context ctx,
 }
 
 // folding.go:497 — spanForCallExpression
-lsp::lsproto::FoldingRange* spanForCallExpression(gostd::Context ctx,
+std::shared_ptr<lsp::lsproto::FoldingRange> spanForCallExpression(gostd::Context ctx,
 												  ::tsc::Node* node,
 												  SourceFile* sourceFile,
 												  LanguageService* l) {
@@ -371,7 +372,7 @@ lsp::lsproto::FoldingRange* spanForCallExpression(gostd::Context ctx,
 }
 
 // folding.go:485 — spanForParenthesizedExpression
-lsp::lsproto::FoldingRange* spanForParenthesizedExpression(gostd::Context ctx,
+std::shared_ptr<lsp::lsproto::FoldingRange> spanForParenthesizedExpression(gostd::Context ctx,
 														   ::tsc::Node* node,
 														   SourceFile* sourceFile,
 														   LanguageService* l) {
@@ -388,7 +389,7 @@ lsp::lsproto::FoldingRange* spanForParenthesizedExpression(gostd::Context ctx,
 }
 
 // folding.go:464 — spanForImportExportElements
-lsp::lsproto::FoldingRange* spanForImportExportElements(gostd::Context ctx,
+std::shared_ptr<lsp::lsproto::FoldingRange> spanForImportExportElements(gostd::Context ctx,
 													  ::tsc::Node* node,
 													  SourceFile* sourceFile,
 													  LanguageService* l) {
@@ -423,7 +424,7 @@ lsp::lsproto::FoldingRange* spanForImportExportElements(gostd::Context ctx,
 }
 
 // folding.go:400 — getOutliningSpanForNode
-lsp::lsproto::FoldingRange* getOutliningSpanForNode(gostd::Context ctx,
+std::shared_ptr<lsp::lsproto::FoldingRange> getOutliningSpanForNode(gostd::Context ctx,
 												  ::tsc::Node* n,
 												  SourceFile* sourceFile,
 												  LanguageService* l) {
@@ -453,7 +454,7 @@ lsp::lsproto::FoldingRange* getOutliningSpanForNode(gostd::Context ctx,
 				return spanForNode(ctx, n, Kind::OpenBraceToken,
 								   true /*useFullStart*/, sourceFile, l);
 			} else if (tryStatement->FinallyBlock == n) {
-				if (lsp::lsproto::FoldingRange* span = spanForNode(
+				if (auto span = spanForNode(
 						ctx, n, Kind::OpenBraceToken, true /*useFullStart*/,
 						sourceFile, l);
 					span != nullptr) {
@@ -535,9 +536,9 @@ lsp::lsproto::FoldingRange* getOutliningSpanForNode(gostd::Context ctx,
 }
 
 // folding.go:302 — addOutliningForLeadingCommentsForPos
-std::vector<lsp::lsproto::FoldingRange*> addOutliningForLeadingCommentsForPos(
+std::vector<std::shared_ptr<lsp::lsproto::FoldingRange>> addOutliningForLeadingCommentsForPos(
 	gostd::Context ctx, int pos, SourceFile* sourceFile, LanguageService* l) {
-	std::vector<lsp::lsproto::FoldingRange*> foldingRange;
+	std::vector<std::shared_ptr<lsp::lsproto::FoldingRange>> foldingRange;
 	foldingRange.reserve(40);
 	int firstSingleLineCommentStart = -1;
 	int lastSingleLineCommentEnd = -1;
@@ -546,7 +547,7 @@ std::vector<lsp::lsproto::FoldingRange*> addOutliningForLeadingCommentsForPos(
 		lsp::lsproto::FoldingRangeKindComment;
 
 	auto combineAndAddMultipleSingleLineComments =
-		[&]() -> lsp::lsproto::FoldingRange* {
+		[&]() -> std::shared_ptr<lsp::lsproto::FoldingRange> {
 		// Only outline spans of two or more consecutive single line comments
 		if (singleLineCommentCount > 1) {
 			return createFoldingRangeFromBounds(ctx, firstSingleLineCommentStart,
@@ -572,7 +573,7 @@ std::vector<lsp::lsproto::FoldingRange*> addOutliningForLeadingCommentsForPos(
 				std::string commentText =
 					sourceText.substr(commentPos, commentEnd - commentPos);
 				if (parseRegionDelimiter(commentText) != nullptr) {
-					if (lsp::lsproto::FoldingRange* comments =
+					if (auto comments =
 							combineAndAddMultipleSingleLineComments();
 						comments != nullptr) {
 						foldingRange.push_back(comments);
@@ -591,12 +592,12 @@ std::vector<lsp::lsproto::FoldingRange*> addOutliningForLeadingCommentsForPos(
 				break;
 			}
 			case Kind::MultiLineCommentTrivia: {
-				if (lsp::lsproto::FoldingRange* comments =
+				if (auto comments =
 						combineAndAddMultipleSingleLineComments();
 					comments != nullptr) {
 					foldingRange.push_back(comments);
 				}
-				lsp::lsproto::FoldingRange* commentRange =
+				auto commentRange =
 					createFoldingRangeFromBounds(ctx, commentPos, commentEnd,
 												 foldingRangeKindComment,
 												 sourceFile, l);
@@ -611,7 +612,7 @@ std::vector<lsp::lsproto::FoldingRange*> addOutliningForLeadingCommentsForPos(
 			}
 			return true;
 		});
-	if (lsp::lsproto::FoldingRange* addedComments =
+	if (auto addedComments =
 			combineAndAddMultipleSingleLineComments();
 		addedComments != nullptr) {
 		foldingRange.push_back(addedComments);
@@ -620,7 +621,7 @@ std::vector<lsp::lsproto::FoldingRange*> addOutliningForLeadingCommentsForPos(
 }
 
 // folding.go:295 — addOutliningForLeadingCommentsForNode
-std::vector<lsp::lsproto::FoldingRange*> addOutliningForLeadingCommentsForNode(
+std::vector<std::shared_ptr<lsp::lsproto::FoldingRange>> addOutliningForLeadingCommentsForNode(
 	gostd::Context ctx, ::tsc::Node* n, SourceFile* sourceFile,
 	LanguageService* l) {
 	if (isJsxText(n)) {
@@ -630,7 +631,7 @@ std::vector<lsp::lsproto::FoldingRange*> addOutliningForLeadingCommentsForNode(
 }
 
 // folding.go:203 — visitNode
-std::vector<lsp::lsproto::FoldingRange*> visitNode(gostd::Context ctx,
+std::vector<std::shared_ptr<lsp::lsproto::FoldingRange>> visitNode(gostd::Context ctx,
 												 ::tsc::Node* n,
 												 int depthRemaining,
 												 SourceFile* sourceFile,
@@ -639,7 +640,7 @@ std::vector<lsp::lsproto::FoldingRange*> visitNode(gostd::Context ctx,
 		gostd::ctxErr(ctx) != nullptr) {
 		return {};
 	}
-	std::vector<lsp::lsproto::FoldingRange*> foldingRange;
+	std::vector<std::shared_ptr<lsp::lsproto::FoldingRange>> foldingRange;
 	foldingRange.reserve(40);
 	if ((!isBinaryExpression(n) && isDeclaration(n)) ||
 		isVariableStatement(n) || isReturnStatement(n) ||
@@ -689,7 +690,7 @@ std::vector<lsp::lsproto::FoldingRange*> visitNode(gostd::Context ctx,
 		}
 	}
 
-	lsp::lsproto::FoldingRange* span = getOutliningSpanForNode(ctx, n, sourceFile, l);
+	std::shared_ptr<lsp::lsproto::FoldingRange> span = getOutliningSpanForNode(ctx, n, sourceFile, l);
 	if (span != nullptr) {
 		foldingRange.push_back(span);
 	}
@@ -772,19 +773,19 @@ lsp::lsproto::FoldingRangeResponse LanguageService::ProvideFoldingRange(
 		projections.insert(projections.end(), supplemental->begin(),
 						   supplemental->end());
 	}
-	std::vector<lsp::lsproto::FoldingRange*> res;
+	std::vector<std::shared_ptr<lsp::lsproto::FoldingRange>> res;
 	for (auto* projection : projections) {
 		auto ranges = addNodeOutliningSpans(ctx, projection);
 		auto regionRanges = addRegionOutliningSpans(ctx, projection);
 		ranges.insert(ranges.end(), regionRanges.begin(), regionRanges.end());
-		if (lsp::lsproto::GetClientCapabilities(ctx)
+		if (lsp::lsproto::getClientCapabilities(ctx)
 				->TextDocument.FoldingRange.LineFoldingOnly) {
 			ranges = adjustFoldingEnd(ranges, projection);
 		}
 		res.insert(res.end(), ranges.begin(), ranges.end());
 	}
 	std::stable_sort(res.begin(), res.end(),
-					 [](lsp::lsproto::FoldingRange* a, lsp::lsproto::FoldingRange* b) {
+					 [](std::shared_ptr<lsp::lsproto::FoldingRange> a, std::shared_ptr<lsp::lsproto::FoldingRange> b) {
 						 if (a->StartLine != b->StartLine) {
 							 return a->StartLine < b->StartLine;
 						 }
@@ -798,7 +799,7 @@ lsp::lsproto::FoldingRangeResponse LanguageService::ProvideFoldingRange(
 					 });
 	std::unordered_set<foldingRangeKey, foldingRangeKeyHash> seen;
 	res.erase(std::remove_if(res.begin(), res.end(),
-							 [&](lsp::lsproto::FoldingRange* foldingRange) {
+							 [&](std::shared_ptr<lsp::lsproto::FoldingRange> foldingRange) {
 								 return !seen.insert(keyForFoldingRange(
 											 foldingRange))
 											 .second;
@@ -806,7 +807,7 @@ lsp::lsproto::FoldingRangeResponse LanguageService::ProvideFoldingRange(
 			  res.end());
 	lsp::lsproto::FoldingRangesOrNull out;
 	out.FoldingRanges =
-		new std::vector<lsp::lsproto::FoldingRange*>(std::move(res));
+		std::make_shared<lsp::lsproto::Slice<std::shared_ptr<lsp::lsproto::FoldingRange>>>(std::move(res));
 	return out;
 }
 
@@ -815,19 +816,19 @@ lsp::lsproto::FoldingRangeResponse LanguageService::ProvideFoldingRange(
 // When lineFoldingOnly is true, we hide lines from startLine+1 to endLine. And to keep closing
 // brackets/braces visible, we subtract 1 from endLine when the range ends with a closing pair character.
 // folding.go:86
-std::vector<lsp::lsproto::FoldingRange*> LanguageService::adjustFoldingEnd(
-	std::vector<lsp::lsproto::FoldingRange*> ranges, SourceFile* sourceFile) {
+std::vector<std::shared_ptr<lsp::lsproto::FoldingRange>> LanguageService::adjustFoldingEnd(
+	std::vector<std::shared_ptr<lsp::lsproto::FoldingRange>> ranges, SourceFile* sourceFile) {
 	const std::string& sourceText = sourceFile->Text();
-	std::vector<lsp::lsproto::FoldingRange*> result;
+	std::vector<std::shared_ptr<lsp::lsproto::FoldingRange>> result;
 	result.reserve(ranges.size());
-	for (auto* r : ranges) {
-		if (r->EndCharacter != nullptr && *r->EndCharacter > 0) {
+	for (auto& r : ranges) {
+		if (r->EndCharacter.has_value() && *r->EndCharacter > 0) {
 			lsp::lsproto::Position p;
 			p.Line = r->EndLine;
 			p.Character = *r->EndCharacter;
 			auto positions = converters->FromLSPPositionForSourceFile(
 				sourceFile, p, spanmap::FeatureFoldingRanges);
-			const lsconv::MappedPosition<SourceFile>* position = nullptr;
+			const lsconv::MappedPosition<SourceFile*>* position = nullptr;
 			for (auto& mp : positions) {
 				if (mp.Script == sourceFile && !mp.Fidelity.IsNone()) {
 					position = &mp;
@@ -852,14 +853,14 @@ std::vector<lsp::lsproto::FoldingRange*> LanguageService::adjustFoldingEnd(
 }
 
 // folding.go:117 — addNodeOutliningSpans
-std::vector<lsp::lsproto::FoldingRange*> LanguageService::addNodeOutliningSpans(
+std::vector<std::shared_ptr<lsp::lsproto::FoldingRange>> LanguageService::addNodeOutliningSpans(
 	gostd::Context ctx, SourceFile* sourceFile) {
 	int depthRemaining = 40;
 	size_t current = 0;
 
 	NodeList* statements = sourceFile->Statements;
 	size_t n = statements->nodes.size();
-	std::vector<lsp::lsproto::FoldingRange*> foldingRange;
+	std::vector<std::shared_ptr<lsp::lsproto::FoldingRange>> foldingRange;
 	foldingRange.reserve(40);
 	while (current < n) {
 		while (current < n &&
@@ -884,7 +885,7 @@ std::vector<lsp::lsproto::FoldingRange*> LanguageService::addNodeOutliningSpans(
 		if (lastImport != firstImport) {
 			lsp::lsproto::FoldingRangeKind foldingRangeKind =
 				lsp::lsproto::FoldingRangeKindImports;
-			lsp::lsproto::FoldingRange* imports =
+			std::shared_ptr<lsp::lsproto::FoldingRange> imports =
 				::tsc::ls::createFoldingRangeFromBounds(
 				ctx,
 				astnav::getStartOfNode(
@@ -909,7 +910,7 @@ std::vector<lsp::lsproto::FoldingRange*> LanguageService::addNodeOutliningSpans(
 }
 
 // folding.go:160 — addRegionOutliningSpans
-std::vector<lsp::lsproto::FoldingRange*> LanguageService::addRegionOutliningSpans(
+std::vector<std::shared_ptr<lsp::lsproto::FoldingRange>> LanguageService::addRegionOutliningSpans(
 	gostd::Context ctx, SourceFile* sourceFile) {
 	struct regionStart {
 		int position = 0;
@@ -917,7 +918,7 @@ std::vector<lsp::lsproto::FoldingRange*> LanguageService::addRegionOutliningSpan
 	};
 	std::vector<regionStart> regions;
 	regions.reserve(40);
-	std::vector<lsp::lsproto::FoldingRange*> out;
+	std::vector<std::shared_ptr<lsp::lsproto::FoldingRange>> out;
 	out.reserve(40);
 	auto& lineStarts = tsc::getECMALineStarts(sourceFile);
 	for (auto currentLineStart : lineStarts) {
@@ -955,9 +956,9 @@ std::vector<lsp::lsproto::FoldingRange*> LanguageService::addRegionOutliningSpan
 				if (fidelity.IsNone()) {
 					continue;
 				}
-				lsp::lsproto::FoldingRange* foldingRange = createFoldingRange(
+				std::shared_ptr<lsp::lsproto::FoldingRange> foldingRange = createFoldingRange(
 					ctx, textRange, lsp::lsproto::FoldingRangeKindRegion, "");
-				foldingRange->CollapsedText = region.collapsedText;
+				if (region.collapsedText != nullptr) { foldingRange->CollapsedText = *region.collapsedText; }
 				out.push_back(foldingRange);
 			}
 		}

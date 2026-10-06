@@ -45,15 +45,17 @@ LanguageService::ProvideDiagnostics(const gostd::Context& ctx,
 	auto [program, file] = getProgramAndFile(uri);
 
 	if (tristateIsFalse(UserPreferences().EnableValidation)) {
-		auto diagnostics = std::vector<lsproto::Diagnostic*>{};
+		auto diagnostics =
+		    std::vector<std::shared_ptr<lsproto::Diagnostic>>{};
 		return {
 		    lsproto::DocumentDiagnosticResponse{
 		        lsproto::
 		            RelatedFullDocumentDiagnosticReportOrUnchangedDocumentDiagnosticReport{
-		                .FullDocumentDiagnosticReport =
+		                .FullDocumentDiagnosticReport = std::shared_ptr<
+		                    lsproto::RelatedFullDocumentDiagnosticReport>(
 		                    new lsproto::RelatedFullDocumentDiagnosticReport{
 		                        .Items = diagnostics,
-		                    },
+		                    }),
 		            }},
 		    nullptr};
 	}
@@ -64,16 +66,18 @@ LanguageService::ProvideDiagnostics(const gostd::Context& ctx,
 	    lsproto::DocumentDiagnosticResponse{
 	        lsproto::
 	            RelatedFullDocumentDiagnosticReportOrUnchangedDocumentDiagnosticReport{
-	                .FullDocumentDiagnosticReport =
+	                .FullDocumentDiagnosticReport = std::shared_ptr<
+	                    lsproto::RelatedFullDocumentDiagnosticReport>(
 	                    new lsproto::RelatedFullDocumentDiagnosticReport{
 	                        .Items = toLSPDiagnostics(ctx, {diagnostics}),
-	                    },
+	                    }),
 	            }},
 	    nullptr};
 }
 
 // toLSPDiagnostics — diagnostics.go:49.
-std::vector<lsproto::Diagnostic*> LanguageService::toLSPDiagnostics(
+lsp::lsproto::Slice<std::shared_ptr<lsproto::Diagnostic>>
+LanguageService::toLSPDiagnostics(
     const gostd::Context& ctx,
     std::vector<std::vector<Diagnostic*>> diagnostics) {
 	bool reportStyleChecksAsWarnings =
@@ -82,7 +86,7 @@ std::vector<lsproto::Diagnostic*> LanguageService::toLSPDiagnostics(
 	for (auto& diagSlice : diagnostics) {
 		size += diagSlice.size();
 	}
-	std::vector<lsproto::Diagnostic*> lspDiagnostics;
+	std::vector<std::shared_ptr<lsproto::Diagnostic>> lspDiagnostics;
 	lspDiagnostics.reserve(size);
 	// Compiler diagnostics located entirely in a content-mapped file's
 	// synthesized code have no location in the original file. Collect them per
@@ -99,15 +103,17 @@ std::vector<lsproto::Diagnostic*> LanguageService::toLSPDiagnostics(
 				synthesizedByFile.Set(diag->File(), std::move(existing));
 				continue;
 			}
-			lspDiagnostics.push_back(lsconv::DiagnosticToLSPPull(
-			    ctx, converters, diag, reportStyleChecksAsWarnings));
+			lspDiagnostics.push_back(std::shared_ptr<lsproto::Diagnostic>(
+			    lsconv::DiagnosticToLSPPull(
+			        ctx, converters, diag, reportStyleChecksAsWarnings)));
 		}
 	}
 	for (auto* file : synthesizedByFile.Keys()) {
 		auto diags = synthesizedByFile.GetOrZero(file);
 		auto* aggregate = aggregateSynthesizedDiagnostics(file, diags);
-		lspDiagnostics.push_back(lsconv::DiagnosticToLSPPull(
-		    ctx, converters, aggregate, reportStyleChecksAsWarnings));
+		lspDiagnostics.push_back(std::shared_ptr<lsproto::Diagnostic>(
+		    lsconv::DiagnosticToLSPPull(
+		        ctx, converters, aggregate, reportStyleChecksAsWarnings)));
 	}
 	return lspDiagnostics;
 }

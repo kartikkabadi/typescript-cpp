@@ -57,7 +57,7 @@ const std::string importFixID = "fixMissingImport";
 
 // fixInfo — codeactions_importfixes.go:56.
 struct fixInfo {
-	autoimport::Fix* fix = nullptr;
+	std::unique_ptr<autoimport::Fix> fix;
 	std::string symbolName;
 	std::string errorIdentifierText;
 	bool isJsxNamespaceFix = false;
@@ -137,7 +137,7 @@ std::pair<std::vector<CodeAction*>, gostd::Error> getImportCodeActions(
 	for (auto* fixInfo_ : info) {
 		auto [edits, description, ok] = fixInfo_->fix->Edits(
 		    ctx, fixContext->SourceFile, fixContext->Program->Options(),
-		    fixContext->LS->FormatOptions(), fixContext->LS->converters,
+		    fixContext->LS->FormatOptions(), fixContext->LS->Converters(),
 		    fixContext->LS->UserPreferences());
 
 		if (ok) {
@@ -189,7 +189,7 @@ std::pair<CombinedCodeActions*, gostd::Error> getAllImportCodeActions(
 
 	auto importAdder = autoimport::NewImportAdder(
 	    ctx, fixContext->Program, ch, fixContext->SourceFile, view,
-	    fixContext->LS->FormatOptions(), fixContext->LS->converters,
+	    fixContext->LS->FormatOptions(), fixContext->LS->Converters(),
 	    fixContext->LS->UserPreferences());
 
 	for (auto* diag : importDiags) {
@@ -233,7 +233,7 @@ gostd::Error addImportFromDiagnostic(const gostd::Context& ctx,
 		return err;
 	}
 	if (infos.size() > 0) {
-		importAdder->AddImportFix(infos[0]->fix);
+		importAdder->AddImportFix(std::move(infos[0]->fix));
 	}
 	return nullptr;
 }
@@ -285,7 +285,7 @@ std::pair<std::vector<fixInfo*>, gostd::Error> getFixInfos(
 			                                    symbolToken, sn.name, ch);
 			if (fix != nullptr) {
 				allTypeOnlyFixes.push_back(new fixInfo{
-				    .fix = fix,
+				    .fix = std::unique_ptr<autoimport::Fix>(fix),
 				    .symbolName = sn.name,
 				    .errorIdentifierText = symbolToken->text(),
 				});
@@ -345,19 +345,19 @@ std::vector<fixInfo*> getFixesInfoForUMDImport(Node* token,
 		return {};
 	}
 
-	auto* export_ = autoimport::SymbolToExport(umdSymbol, ch);
+	auto export_ = autoimport::SymbolToExport(umdSymbol, ch);
 	auto isValidTypeOnlyUseSite =
 	    isValidTypeOnlyAliasUseSite(token);
 
 	std::vector<fixInfo*> result;
-	for (auto* fix : view->GetFixes(export_, false,
+	for (auto& fix : view->GetFixes(export_.get(), false,
 	                                isValidTypeOnlyUseSite, nullptr)) {
 		std::string errorIdentifierText;
 		if (isIdentifier(token)) {
 			errorIdentifierText = token->text();
 		}
 		result.push_back(new fixInfo{
-		    .fix = fix,
+		    .fix = std::move(fix),
 		    .symbolName = umdSymbol->name,
 		    .errorIdentifierText = errorIdentifierText,
 		});
@@ -419,7 +419,7 @@ std::vector<fixInfo*> getFixesInfoForNonUMDImport(
 	std::vector<fixInfo*> allInfo;
 
 	// Compute usage position for JSDoc import type fixes
-	auto [usagePosition, fidelity] = fixContext->LS->converters->ToLSPPosition(
+	auto [usagePosition, fidelity] = fixContext->LS->Converters()->ToLSPPosition(
 	    fixContext->SourceFile,
 	    TextPos(getTokenPosOfNode(symbolToken, fixContext->SourceFile,
 	                              false)));
@@ -459,9 +459,9 @@ std::vector<fixInfo*> getFixesInfoForNonUMDImport(
 			auto fixes =
 			    view->GetFixes(export_, isJSXTagName,
 			                   isValidTypeOnlyUseSite, &usagePosition);
-			for (auto* fix : fixes) {
+			for (auto& fix : fixes) {
 				allInfo.push_back(new fixInfo{
-				    .fix = fix,
+				    .fix = std::move(fix),
 				    .symbolName = symbolName,
 				    .isJsxNamespaceFix =
 				        symbolName != symbolToken->text(),
@@ -601,7 +601,7 @@ std::vector<fixInfo*> sortFixInfo(std::vector<fixInfo*> fixes,
 		              c != 0) {
 			          return c < 0;
 		          }
-		          return view->CompareFixesForSorting(a->fix, b->fix) < 0;
+		          return view->CompareFixesForSorting(a->fix.get(), b->fix.get()) < 0;
 	          });
 
 	return sorted;

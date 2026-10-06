@@ -116,10 +116,10 @@ int findIndentationColumn(std::string_view text, int lineStart, int memberStart,
 // needSemicolonBetween — trackerimpl.go:392
 bool needSemicolonBetween(Node* a, Node* b) {
 	return (isPropertySignatureDeclaration(a) || isPropertyDeclaration(a)) &&
-			   lsutil::isClassOrTypeElement(b) &&
+			   lsutil::detail::isClassOrTypeElement(b) &&
 			   b->name()->kind == Kind::ComputedPropertyName ||
-		   lsutil::isStatementButNotDeclaration(a) &&
-			   lsutil::isStatementButNotDeclaration(b);
+		   lsutil::detail::isStatementButNotDeclaration(a) &&
+			   lsutil::detail::isStatementButNotDeclaration(b);
 }
 
 } // namespace
@@ -797,7 +797,7 @@ NodeOptions Tracker::getInsertNodeAfterOptions(SourceFile* sourceFile, Node* nod
 		options.Prefix = " ";
 		break;
 	default:
-		if (!(isStatement(node) || lsutil::isClassOrTypeElement(node))) {
+		if (!(isStatement(node) || lsutil::detail::isClassOrTypeElement(node))) {
 			// Else we haven't handled this kind of node yet -- add it
 			TSC_UNREACHABLE("unimplemented node type in changeTracker.getInsertNodeAfterOptions");
 		}
@@ -815,7 +815,7 @@ NodeOptions Tracker::getInsertNodeAfterOptions(SourceFile* sourceFile, Node* nod
 // getOptionsForInsertNodeBefore — tracker.go:677
 NodeOptions Tracker::getOptionsForInsertNodeBefore(Node* before, Node* inserted,
 												   bool blankLineBetween) {
-	if (isStatement(before) || lsutil::isClassOrTypeElement(before)) {
+	if (isStatement(before) || lsutil::detail::isClassOrTypeElement(before)) {
 		if (blankLineBetween) {
 			NodeOptions o;
 			o.Suffix = newLine + newLine;

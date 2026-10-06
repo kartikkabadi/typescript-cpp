@@ -172,7 +172,7 @@ std::vector<::tsc::Node*> aggregateOwnedThrowStatements(::tsc::Node* node,
 	while (child->parent != nullptr) {
 		::tsc::Node* parent = child->parent;
 
-		if (lsutil::isFunctionBlock(parent) ||
+		if (lsutil::detail::isFunctionBlock(parent) ||
 			parent->kind == Kind::SourceFile) {
 			return parent;
 		}
@@ -435,7 +435,7 @@ std::vector<::tsc::Node*> getThrowOccurrences(::tsc::Node* node,
 
 	// If the "owner" is a function, then we equate 'return' and 'throw' statements in their
 	// ability to "jump out" of the function, and include occurrences for both
-	if (lsutil::isFunctionBlock(owner)) {
+	if (lsutil::detail::isFunctionBlock(owner)) {
 		forEachReturnStatement(owner, [&](::tsc::Node* ret) -> bool {
 			::tsc::Node* keyword = astnav::findChildOfKind(
 				ret, Kind::ReturnKeyword, sourceFile);
@@ -634,39 +634,43 @@ std::vector<::tsc::Node*> getYieldOccurrences(::tsc::Node* node,
 lsp::lsproto::MultiDocumentHighlightsOrNull combineMultiDocumentHighlights(
 	const std::vector<lsp::lsproto::MultiDocumentHighlightsOrNull>& results) {
 	std::unordered_map<lsp::lsproto::DocumentUri,
-					   lsp::lsproto::MultiDocumentHighlight*>
+					   std::shared_ptr<lsp::lsproto::MultiDocumentHighlight>>
 		byURI;
 	std::unordered_map<lsp::lsproto::DocumentUri,
 					   collections::Set<lsp::lsproto::Range>>
 		seen;
-	std::vector<lsp::lsproto::MultiDocumentHighlight*> combinedDocuments;
+	std::vector<std::shared_ptr<lsp::lsproto::MultiDocumentHighlight>> combinedDocuments;
 	for (auto& result : results) {
 		if (result.MultiDocumentHighlights == nullptr) {
 			continue;
 		}
-		for (auto* document : *result.MultiDocumentHighlights) {
-			lsp::lsproto::MultiDocumentHighlight* combinedDocument = nullptr;
+		for (auto& document : **result.MultiDocumentHighlights) {
+			std::shared_ptr<lsp::lsproto::MultiDocumentHighlight>
+			    combinedDocument;
 			auto it = byURI.find(document->Uri);
 			if (it == byURI.end()) {
-				combinedDocument = new lsp::lsproto::MultiDocumentHighlight;
+				combinedDocument =
+					std::make_shared<lsp::lsproto::MultiDocumentHighlight>();
 				combinedDocument->Uri = document->Uri;
+				combinedDocument->Highlights = std::vector<
+				    std::shared_ptr<lsp::lsproto::DocumentHighlight>>{};
 				byURI[document->Uri] = combinedDocument;
 				combinedDocuments.push_back(combinedDocument);
 			} else {
 				combinedDocument = it->second;
 			}
 			auto& ranges = seen[document->Uri];
-			for (auto* highlight : document->Highlights) {
+			for (auto& highlight : *document->Highlights) {
 				if (ranges.AddIfAbsent(highlight->Range)) {
-					combinedDocument->Highlights.push_back(highlight);
+					combinedDocument->Highlights->push_back(highlight);
 				}
 			}
 		}
 	}
 	lsp::lsproto::MultiDocumentHighlightsOrNull out;
-	out.MultiDocumentHighlights =
-		new std::vector<lsp::lsproto::MultiDocumentHighlight*>(
-			std::move(combinedDocuments));
+	out.MultiDocumentHighlights = std::make_shared<lsp::lsproto::Slice<
+	    std::shared_ptr<lsp::lsproto::MultiDocumentHighlight>>>(
+	    std::move(combinedDocuments));
 	return out;
 }
 
@@ -686,20 +690,20 @@ lsp::lsproto::DocumentHighlightResponse LanguageService::ProvideDocumentHighligh
 		return lsp::lsproto::DocumentHighlightsOrNull{};
 	}
 	// Extract highlights for the current file only.
-	std::vector<lsp::lsproto::DocumentHighlight*> documentHighlights;
+	std::vector<std::shared_ptr<lsp::lsproto::DocumentHighlight>> documentHighlights;
 	if (result.MultiDocumentHighlights != nullptr) {
-		for (auto* mh : *result.MultiDocumentHighlights) {
+		for (auto& mh : **result.MultiDocumentHighlights) {
 			if (mh->Uri == documentUri) {
 				documentHighlights.insert(documentHighlights.end(),
-										  mh->Highlights.begin(),
-										  mh->Highlights.end());
+										  (*mh->Highlights).begin(),
+										  (*mh->Highlights).end());
 			}
 		}
 	}
 	lsp::lsproto::DocumentHighlightsOrNull out;
-	out.DocumentHighlights =
-		new std::vector<lsp::lsproto::DocumentHighlight*>(
-			std::move(documentHighlights));
+	out.DocumentHighlights = std::make_shared<lsp::lsproto::Slice<
+	    std::shared_ptr<lsp::lsproto::DocumentHighlight>>>(
+	    std::move(documentHighlights));
 	return out;
 }
 
@@ -758,8 +762,8 @@ LanguageService::provideDocumentHighlightsAtPosition(
 			closingElement =
 				node->parent->parent->as<JsxElement>()->ClosingElement;
 		}
-		std::vector<lsp::lsproto::DocumentHighlight*> highlights;
-		auto* kind = new lsp::lsproto::DocumentHighlightKind(
+		std::vector<std::shared_ptr<lsp::lsproto::DocumentHighlight>> highlights;
+		auto kind = std::make_shared<lsp::lsproto::DocumentHighlightKind>(
 			lsp::lsproto::DocumentHighlightKindRead);
 		if (openingElement != nullptr) {
 			if (auto [lspRange, fidelity] =
@@ -767,7 +771,7 @@ LanguageService::provideDocumentHighlightsAtPosition(
 						openingElement, sourceFile,
 						spanmap::FeatureDocumentHighlights);
 				!fidelity.IsNone()) {
-				auto* dh = new lsp::lsproto::DocumentHighlight;
+				auto dh = std::make_shared<lsp::lsproto::DocumentHighlight>();
 				dh->Range = lspRange;
 				dh->Kind = kind;
 				highlights.push_back(dh);
@@ -779,20 +783,24 @@ LanguageService::provideDocumentHighlightsAtPosition(
 						closingElement, sourceFile,
 						spanmap::FeatureDocumentHighlights);
 				!fidelity.IsNone()) {
-				auto* dh = new lsp::lsproto::DocumentHighlight;
+				auto dh = std::make_shared<lsp::lsproto::DocumentHighlight>();
 				dh->Range = lspRange;
 				dh->Kind = kind;
 				highlights.push_back(dh);
 			}
 		}
-		auto* multiHighlights =
-			new std::vector<lsp::lsproto::MultiDocumentHighlight*>;
-		auto* mh = new lsp::lsproto::MultiDocumentHighlight;
+		std::vector<std::shared_ptr<lsp::lsproto::MultiDocumentHighlight>>
+		    multiHighlights;
+		auto mh =
+			std::make_shared<lsp::lsproto::MultiDocumentHighlight>();
 		mh->Uri = documentUri;
 		mh->Highlights = std::move(highlights);
-		multiHighlights->push_back(mh);
+		multiHighlights.push_back(mh);
 		lsp::lsproto::MultiDocumentHighlightsOrNull out;
-		out.MultiDocumentHighlights = multiHighlights;
+		out.MultiDocumentHighlights =
+			std::make_shared<lsp::lsproto::Slice<std::shared_ptr<
+			    lsp::lsproto::MultiDocumentHighlight>>>(
+			    std::move(multiHighlights));
 		return out;
 	}
 
@@ -800,7 +808,7 @@ LanguageService::provideDocumentHighlightsAtPosition(
 	std::vector<SourceFile*> sourceFiles;
 	collections::Set<std::string> seenFiles;
 	for (auto& uri : filesToSearch) {
-		std::string fileName = uri.FileName();
+		std::string fileName = lsp::lsproto::documentUriFileName(uri);
 		if (!seenFiles.AddIfAbsent(fileName)) {
 			continue;
 		}
@@ -819,21 +827,22 @@ LanguageService::provideDocumentHighlightsAtPosition(
 		auto syntacticHighlights =
 			getSyntacticDocumentHighlights(node, sourceFile);
 		if (!syntacticHighlights.empty()) {
-			auto* mh = new lsp::lsproto::MultiDocumentHighlight;
+			auto mh =
+				std::make_shared<lsp::lsproto::MultiDocumentHighlight>();
 			mh->Uri = documentUri;
 			mh->Highlights = std::move(syntacticHighlights);
 			multiHighlights = {mh};
 		}
 	}
 	lsp::lsproto::MultiDocumentHighlightsOrNull out;
-	out.MultiDocumentHighlights =
-		new std::vector<lsp::lsproto::MultiDocumentHighlight*>(
-			std::move(multiHighlights));
+	out.MultiDocumentHighlights = std::make_shared<lsp::lsproto::Slice<
+	    std::shared_ptr<lsp::lsproto::MultiDocumentHighlight>>>(
+	    std::move(multiHighlights));
 	return out;
 }
 
 // documenthighlights.go:137
-std::vector<lsp::lsproto::MultiDocumentHighlight*>
+std::vector<std::shared_ptr<lsp::lsproto::MultiDocumentHighlight>>
 LanguageService::getSemanticDocumentHighlights(
 	gostd::Context ctx, int position, ::tsc::Node* node,
 	compiler::SimpleProgram* program,
@@ -848,7 +857,7 @@ LanguageService::getSemanticDocumentHighlights(
 
 	// Group highlights by file
 	std::unordered_map<std::string,
-					   std::vector<lsp::lsproto::DocumentHighlight*>>
+					   std::vector<std::shared_ptr<lsp::lsproto::DocumentHighlight>>>
 		fileHighlights;
 	for (auto* entry : referenceEntries) {
 		for (auto* ref : entry->references) {
@@ -860,12 +869,13 @@ LanguageService::getSemanticDocumentHighlights(
 		}
 	}
 
-	std::vector<lsp::lsproto::MultiDocumentHighlight*> result;
+	std::vector<std::shared_ptr<lsp::lsproto::MultiDocumentHighlight>> result;
 	for (auto* sf : sourceFiles) {
 		std::string fileName = sf->OriginalFileName();
 		auto it = fileHighlights.find(fileName);
 		if (it != fileHighlights.end()) {
-			auto* mh = new lsp::lsproto::MultiDocumentHighlight;
+			auto mh =
+				std::make_shared<lsp::lsproto::MultiDocumentHighlight>();
 			mh->Uri = lsconv::FileNameToDocumentURI(fileName);
 			mh->Highlights = it->second;
 			result.push_back(mh);
@@ -875,13 +885,13 @@ LanguageService::getSemanticDocumentHighlights(
 }
 
 // documenthighlights.go:164
-std::pair<std::string, lsp::lsproto::DocumentHighlight*>
+std::pair<std::string, std::shared_ptr<lsp::lsproto::DocumentHighlight>>
 LanguageService::toDocumentHighlight(ReferenceEntry* entry) {
 	entry = resolveEntry(entry);
 	std::string fileName = entry->sourceFile->OriginalFileName();
 
-	auto* kind =
-		new lsp::lsproto::DocumentHighlightKind(
+	auto kind =
+		std::make_shared<lsp::lsproto::DocumentHighlightKind>(
 			lsp::lsproto::DocumentHighlightKindRead);
 	auto [lspRange, ok] = getRangeOfEntryForFeature(
 		entry, spanmap::FeatureDocumentHighlights);
@@ -889,7 +899,7 @@ LanguageService::toDocumentHighlight(ReferenceEntry* entry) {
 		return {fileName, nullptr};
 	}
 	if (entry->kind == entryKindRange) {
-		auto* dh = new lsp::lsproto::DocumentHighlight;
+		auto dh = std::make_shared<lsp::lsproto::DocumentHighlight>();
 		dh->Range = lspRange;
 		dh->Kind = kind;
 		return {fileName, dh};
@@ -900,7 +910,7 @@ LanguageService::toDocumentHighlight(ReferenceEntry* entry) {
 		*kind = lsp::lsproto::DocumentHighlightKindWrite;
 	}
 
-	auto* dh = new lsp::lsproto::DocumentHighlight;
+	auto dh = std::make_shared<lsp::lsproto::DocumentHighlight>();
 	dh->Range = lspRange;
 	dh->Kind = kind;
 
@@ -908,7 +918,7 @@ LanguageService::toDocumentHighlight(ReferenceEntry* entry) {
 }
 
 // documenthighlights.go:193
-std::vector<lsp::lsproto::DocumentHighlight*>
+std::vector<std::shared_ptr<lsp::lsproto::DocumentHighlight>>
 LanguageService::getSyntacticDocumentHighlights(::tsc::Node* node,
 											  SourceFile* sourceFile) {
 	switch (node->kind) {
@@ -995,7 +1005,7 @@ LanguageService::getSyntacticDocumentHighlights(::tsc::Node* node,
 }
 
 // documenthighlights.go:250
-std::vector<lsp::lsproto::DocumentHighlight*> LanguageService::useParent(
+std::vector<std::shared_ptr<lsp::lsproto::DocumentHighlight>> LanguageService::useParent(
 	::tsc::Node* node, std::function<bool(::tsc::Node*)> nodeTest,
 	std::function<std::vector<::tsc::Node*>(::tsc::Node*, SourceFile*)>
 		getNodes,
@@ -1007,14 +1017,14 @@ std::vector<lsp::lsproto::DocumentHighlight*> LanguageService::useParent(
 }
 
 // documenthighlights.go:257
-std::vector<lsp::lsproto::DocumentHighlight*>
+std::vector<std::shared_ptr<lsp::lsproto::DocumentHighlight>>
 LanguageService::highlightSpans(std::vector<::tsc::Node*> nodes,
 								SourceFile* sourceFile) {
 	if (nodes.empty()) {
 		return {};
 	}
-	std::vector<lsp::lsproto::DocumentHighlight*> highlights;
-	auto* kind = new lsp::lsproto::DocumentHighlightKind(
+	std::vector<std::shared_ptr<lsp::lsproto::DocumentHighlight>> highlights;
+	auto kind = std::make_shared<lsp::lsproto::DocumentHighlightKind>(
 		lsp::lsproto::DocumentHighlightKindRead);
 	for (auto* node : nodes) {
 		if (node != nullptr) {
@@ -1023,7 +1033,7 @@ LanguageService::highlightSpans(std::vector<::tsc::Node*> nodes,
 						node, sourceFile,
 						spanmap::FeatureDocumentHighlights);
 				!fidelity.IsNone()) {
-				auto* dh = new lsp::lsproto::DocumentHighlight;
+				auto dh = std::make_shared<lsp::lsproto::DocumentHighlight>();
 				dh->Range = lspRange;
 				dh->Kind = kind;
 				highlights.push_back(dh);
@@ -1034,7 +1044,7 @@ LanguageService::highlightSpans(std::vector<::tsc::Node*> nodes,
 }
 
 // documenthighlights.go:273
-std::vector<lsp::lsproto::DocumentHighlight*>
+std::vector<std::shared_ptr<lsp::lsproto::DocumentHighlight>>
 LanguageService::getFromAllDeclarations(
 	std::function<bool(::tsc::Node*)> nodeTest, std::vector<Kind> keywords,
 	::tsc::Node* node, SourceFile* sourceFile) {
@@ -1071,14 +1081,14 @@ LanguageService::getFromAllDeclarations(
 }
 
 // documenthighlights.go:301
-std::vector<lsp::lsproto::DocumentHighlight*>
+std::vector<std::shared_ptr<lsp::lsproto::DocumentHighlight>>
 LanguageService::getIfElseOccurrences(IfStatement* ifStatement,
 									SourceFile* sourceFile) {
 	std::vector<::tsc::Node*> keywords =
 		getIfElseKeywords(ifStatement, sourceFile);
-	auto* kind = new lsp::lsproto::DocumentHighlightKind(
+	auto kind = std::make_shared<lsp::lsproto::DocumentHighlightKind>(
 		lsp::lsproto::DocumentHighlightKindRead);
-	std::vector<lsp::lsproto::DocumentHighlight*> highlights;
+	std::vector<std::shared_ptr<lsp::lsproto::DocumentHighlight>> highlights;
 
 	// We'd like to highlight else/ifs together if they are only separated by whitespace
 	// (i.e. the keywords are separated by no comments, no newlines).
@@ -1109,7 +1119,7 @@ LanguageService::getIfElseOccurrences(IfStatement* ifStatement,
 											int(elseKeyword->pos()))),
 					int(ifKeyword->end()), sourceFile);
 				if (!fidelity.IsNone()) {
-					auto* dh = new lsp::lsproto::DocumentHighlight;
+					auto dh = std::make_shared<lsp::lsproto::DocumentHighlight>();
 					dh->Range = lspRange;
 					dh->Kind = kind;
 					highlights.push_back(dh);
@@ -1124,7 +1134,7 @@ LanguageService::getIfElseOccurrences(IfStatement* ifStatement,
 					keywords[i], sourceFile,
 					spanmap::FeatureDocumentHighlights);
 			!fidelity.IsNone()) {
-			auto* dh = new lsp::lsproto::DocumentHighlight;
+			auto dh = std::make_shared<lsp::lsproto::DocumentHighlight>();
 			dh->Range = lspRange;
 			dh->Kind = kind;
 			highlights.push_back(dh);

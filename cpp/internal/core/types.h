@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "internal/tspath/tspath.h"
+#include "internal/gostd/gostd.h"
 
 // === slice: api === — forward decls for encoding/json integration used by
 // the api slice's proto marshalers.
@@ -78,6 +79,29 @@ enum class ScriptTarget : int32_t {
 	Latest = ESNext,
 	LatestStandard = ES2026,
 };
+
+// ScriptTarget.String — scripttarget_stringer_generated.go (stringer table).
+inline std::string_view String(ScriptTarget t) {
+	switch (t) {
+	case ScriptTarget::None: return "None";
+	case ScriptTarget::ES5: return "ES5";
+	case ScriptTarget::ES2015: return "ES2015";
+	case ScriptTarget::ES2016: return "ES2016";
+	case ScriptTarget::ES2017: return "ES2017";
+	case ScriptTarget::ES2018: return "ES2018";
+	case ScriptTarget::ES2019: return "ES2019";
+	case ScriptTarget::ES2020: return "ES2020";
+	case ScriptTarget::ES2021: return "ES2021";
+	case ScriptTarget::ES2022: return "ES2022";
+	case ScriptTarget::ES2023: return "ES2023";
+	case ScriptTarget::ES2024: return "ES2024";
+	case ScriptTarget::ES2025: return "ES2025";
+	case ScriptTarget::ES2026: return "ES2026";
+	case ScriptTarget::ESNext: return "ESNext";
+	case ScriptTarget::JSON: return "JSON";
+	default: return "";
+	}
+}
 
 enum class Tristate : int32_t {
 	// tristate.go — Go order; zero value is Unknown so zero-init options
@@ -149,6 +173,58 @@ enum class JsxEmit : int32_t {
 	ReactJSX = 4,
 	ReactJSXDev = 5,
 };
+
+// ModuleKind.String — modulekind_stringer_generated.go (stringer table).
+inline std::string_view String(ModuleKind m) {
+	switch (m) {
+	case ModuleKind::None: return "None";
+	case ModuleKind::CommonJS: return "CommonJS";
+	case ModuleKind::AMD: return "AMD";
+	case ModuleKind::UMD: return "UMD";
+	case ModuleKind::System: return "System";
+	case ModuleKind::ES2015: return "ES2015";
+	case ModuleKind::ES2020: return "ES2020";
+	case ModuleKind::ES2022: return "ES2022";
+	case ModuleKind::ESNext: return "ESNext";
+	case ModuleKind::Node16: return "Node16";
+	case ModuleKind::Node18: return "Node18";
+	case ModuleKind::Node20: return "Node20";
+	case ModuleKind::NodeNext: return "NodeNext";
+	case ModuleKind::Preserve: return "Preserve";
+	default: return "";
+	}
+}
+
+// ModuleResolutionKind.String — compileroptions.go:463.
+inline std::string_view String(ModuleResolutionKind m) {
+	switch (m) {
+	case ModuleResolutionKind::Unknown:
+		TSC_UNREACHABLE("should not use zero value of ModuleResolutionKind");
+	case ModuleResolutionKind::Classic: return "Classic";
+	case ModuleResolutionKind::Node10: return "Node10";
+	case ModuleResolutionKind::Node16: return "Node16";
+	case ModuleResolutionKind::NodeNext: return "NodeNext";
+	case ModuleResolutionKind::Bundler: return "Bundler";
+	default:
+		TSC_UNREACHABLE("unhandled case in ModuleResolutionKind.String");
+	}
+}
+
+// JsxEmit.String — compileroptions.go:545.
+inline std::string_view String(JsxEmit j) {
+	switch (j) {
+	case JsxEmit::None:
+		TSC_UNREACHABLE("should not use zero value of JsxEmit");
+	case JsxEmit::Preserve: return "preserve";
+	case JsxEmit::ReactNative: return "react-native";
+	case JsxEmit::React: return "react";
+	case JsxEmit::ReactJSX: return "react-jsx";
+	case JsxEmit::ReactJSXDev: return "react-jsxdev";
+	default:
+		TSC_UNREACHABLE("unhandled case in JsxEmit.String");
+	}
+}
+
 
 enum class NewLineKind : int32_t {
 	// === slice: tsoptions === — numbered to match Go NewLineKind (compileroptions.go:485).

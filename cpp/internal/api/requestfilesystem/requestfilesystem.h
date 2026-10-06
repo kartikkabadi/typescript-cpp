@@ -217,13 +217,14 @@ struct requestFileSystem final : project::LayeredFileSystem,
 
 	vfs::FS* baseFileSystem() const { return base.get(); }
 
-	std::shared_ptr<vfs::FS> BaseFileSystem() override { return base; }
-	std::shared_ptr<project::LayeredFileSystem> WithBaseFileSystem(
-	    std::shared_ptr<vfs::FS> base) override;
-	std::map<tspath::Path, std::shared_ptr<project::Overlay>>
+	vfs::FS* BaseFileSystem() override { return base.get(); }
+	project::LayeredFileSystem* WithBaseFileSystem(
+	    vfs::FS* base) override;
+	std::unordered_map<tspath::Path, project::Overlay*>
 	Overlays() override;
 
-	requestFileSystem applyTo(requestFileSystem base);
+	std::shared_ptr<requestFileSystem> applyTo(
+	    const requestFileSystem& base);
 	bool blocksFallback(const std::string& path) const;
 	std::string toAbsolutePath(const std::string& path) const;
 	std::string toAbsolutePathFrom(const std::string& path,
@@ -259,10 +260,9 @@ struct requestFileSystem final : project::LayeredFileSystem,
 
 	// vfs::FS.
 	bool UseCaseSensitiveFileNames() override;
-	std::shared_ptr<project::FileHandle>
-	GetFile(const std::string& fileName) override;
-	std::shared_ptr<project::FileHandle>
-	GetFileByPath(const std::string& fileName, tspath::Path path) override;
+	project::FileHandle* GetFile(const std::string& fileName) override;
+	project::FileHandle* GetFileByPath(const std::string& fileName,
+	                                   const tspath::Path& path) override;
 	std::pair<std::string, bool> ReadFile(const std::string& fileName) override;
 	bool FileExists(const std::string& fileName) override;
 	bool DirectoryExists(const std::string& directoryName) override;

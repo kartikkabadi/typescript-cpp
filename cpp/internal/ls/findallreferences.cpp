@@ -386,94 +386,6 @@ bool isNewExpressionTarget(Node* node, bool includeElementAccess,
 	    skipPastOuterExpressions_);
 }
 
-// tryGetImportFromModuleSpecifier — utilities.go:4203.
-Node* tryGetImportFromModuleSpecifier(Node* node) {
-	switch (node->parent->kind) {
-	case Kind::ImportDeclaration:
-	case Kind::JSImportDeclaration:
-	case Kind::ExportDeclaration:
-		return node->parent;
-	case Kind::ExternalModuleReference:
-		return node->parent->parent;
-	case Kind::CallExpression:
-		if (isImportCall(node->parent) ||
-		    isRequireCall(node->parent,
-		                  /*requireStringLiteralLikeArgument*/ false)) {
-			return node->parent;
-		}
-		return nullptr;
-	case Kind::LiteralType:
-		if (!isStringLiteral(node)) {
-			return nullptr;
-		}
-		if (isImportTypeNode(node->parent->parent)) {
-			return node->parent->parent;
-		}
-		return nullptr;
-	}
-	return nullptr;
-}
-
-// getMeaningFromDeclaration — utilities.go:2250.
-SemanticMeaning getMeaningFromDeclaration(Node* node) {
-	switch (node->kind) {
-	case Kind::VariableDeclaration:
-		return SemanticMeaningValue;
-	case Kind::Parameter:
-	case Kind::BindingElement:
-	case Kind::PropertyDeclaration:
-	case Kind::PropertySignature:
-	case Kind::PropertyAssignment:
-	case Kind::ShorthandPropertyAssignment:
-	case Kind::MethodDeclaration:
-	case Kind::MethodSignature:
-	case Kind::Constructor:
-	case Kind::GetAccessor:
-	case Kind::SetAccessor:
-	case Kind::FunctionDeclaration:
-	case Kind::FunctionExpression:
-	case Kind::ArrowFunction:
-	case Kind::CatchClause:
-	case Kind::JsxAttribute:
-		return SemanticMeaningValue;
-
-	case Kind::TypeParameter:
-	case Kind::InterfaceDeclaration:
-	case Kind::TypeAliasDeclaration:
-	case Kind::JSTypeAliasDeclaration:
-	case Kind::TypeLiteral:
-		return SemanticMeaningType;
-	case Kind::EnumMember:
-	case Kind::ClassDeclaration:
-		return SemanticMeaningValue | SemanticMeaningType;
-
-	case Kind::ModuleDeclaration:
-		if (isAmbientModule(node)) {
-			return SemanticMeaningNamespace | SemanticMeaningValue;
-		} else if (getModuleInstanceState(node) ==
-		           ModuleInstanceState::Instantiated) {
-			return SemanticMeaningNamespace | SemanticMeaningValue;
-		} else {
-			return SemanticMeaningNamespace;
-		}
-
-	case Kind::EnumDeclaration:
-	case Kind::NamedImports:
-	case Kind::ImportSpecifier:
-	case Kind::ImportEqualsDeclaration:
-	case Kind::ImportDeclaration:
-	case Kind::JSImportDeclaration:
-	case Kind::ExportAssignment:
-	case Kind::ExportDeclaration:
-		return SemanticMeaningAll;
-
-	// An external module can be a Value
-	case Kind::SourceFile:
-		return SemanticMeaningNamespace | SemanticMeaningValue;
-	}
-
-	return SemanticMeaningAll;
-}
 
 } // namespace
 
@@ -508,7 +420,7 @@ std::vector<ReferenceEntry*> getReferencesForNonModule(
 Symbol* getMergedAliasedSymbolOfNamespaceExportDeclaration(
     Node* node, Symbol* symbol, checker::Checker* checker);
 std::string getSpecialSearchKind(Node* node);
-std::vector<HeritageClauseElement*> getAllSuperTypeNodes(Node* node);
+std::vector<Node*> getAllSuperTypeNodes(Node* node);
 struct refState;
 refState* newState(const gostd::Context& ctx,
                    compiler::SimpleProgram* program,
@@ -592,14 +504,14 @@ bool SymbolAndEntries::canUseDefinitionSymbol() const {
 
 // getRangeOfEntry — findallreferences.go:168.
 lsproto::Range LanguageService::getRangeOfEntry(ReferenceEntry* entry) {
-	return resolveEntry(entry)->lspRange->Range_;
+	return resolveEntry(entry)->lspRange->Range;
 }
 
 // getRangeOfEntryForFeature — findallreferences.go:172.
 std::pair<lsproto::Range, bool> LanguageService::getRangeOfEntryForFeature(
     ReferenceEntry* entry, spanmap::Feature feature) {
 	auto [location, ok] = getLocationOfEntryForFeature(entry, feature);
-	return {location.Range_, ok};
+	return {location.Range, ok};
 }
 
 // getFileNameOfEntry — findallreferences.go:177.
@@ -621,7 +533,7 @@ LanguageService::getLocationOfEntryForFeature(ReferenceEntry* entry,
 // resolveEntrySource — findallreferences.go:187.
 void LanguageService::resolveEntrySource(ReferenceEntry* entry) {
 	if (entry->sourceFile == nullptr) {
-		TSC_ASSERT(entry->node != nullptr,
+		debug::assert(entry->node != nullptr,
 		           "reference entry must have a node or source file");
 		entry->sourceFile = getSourceFileOfNode(entry->node);
 	}
@@ -1336,9 +1248,15 @@ LanguageService::symbolAndEntriesToReferences(
 		    symbol, params->Context->IncludeDeclaration,
 		    spanmap::FeatureReferences);
 		locations = combineLocationArray<lsproto::Location>(
-		    std::move(locations), &symbolLocations, &seenLocations);
+		    std::move(locations),
+		    std::make_shared<lsproto::Slice<lsproto::Location>>(
+		        std::move(symbolLocations)),
+		    &seenLocations);
 	}
-	return {lsproto::LocationsOrNull{&locations}, nullptr};
+	return {lsproto::LocationsOrNull{
+	            std::make_shared<lsproto::Slice<lsproto::Location>>(
+	                std::move(locations))},
+	        nullptr};
 }
 
 // symbolAndEntriesToVSReferences — findallreferences.go:800.
@@ -1346,11 +1264,11 @@ std::pair<lsproto::VSReferencesResponse, gostd::Error>
 LanguageService::symbolAndEntriesToVSReferences(
     const gostd::Context& ctx, lsproto::ReferenceParams* params,
     SymbolAndEntriesData data, symbolEntryTransformOptions options) {
-	const auto* caps = lsproto::GetClientCapabilities(ctx);
+	auto caps = lsproto::getClientCapabilities(ctx);
 	bool vsCapability = caps->VSSupportsVisualStudioExtensions;
-	std::vector<lsproto::VSReferenceItem*> items;
+	std::vector<std::shared_ptr<lsproto::VSReferenceItem>> items;
 	int32_t id = 0;
-	std::string projectName = projectID->String();
+	std::string projectName = projectID()->String();
 
 	for (auto* s : data.SymbolsAndEntries) {
 		if (s->definition == nullptr) {
@@ -1368,16 +1286,21 @@ LanguageService::symbolAndEntriesToVSReferences(
 		// Create the definition item
 		int32_t definitionId = id;
 		std::string emptyStr;
-		auto* defItem = new lsproto::VSReferenceItem{
-		    /*VSId*/ definitionId,
-		    /*VSDefinitionId*/ nullptr,
-		    /*VSKind*/ new std::vector<lsproto::VSReferenceKind>{
-		        lsproto::VSReferenceKindUnknown},
-		    /*VSLocation*/ defInfo->location,
-		    /*VSDefinitionText*/ defInfo->displayText,
-		    /*VSProjectName*/ new std::string(projectName),
-		    /*VSContainingType*/ new std::string(emptyStr)};
-		items.push_back(defItem);
+		auto* defItem = new lsproto::VSReferenceItem;
+		defItem->VSId = definitionId;
+		defItem->VSDefinitionId = std::nullopt;
+		defItem->VSKind = std::make_shared<
+			lsproto::Slice<lsproto::VSReferenceKind>>(
+			std::vector<lsproto::VSReferenceKind>{
+			    lsproto::VSReferenceKindUnknown});
+		defItem->VSLocation = defInfo->location;
+		defItem->VSDefinitionText =
+		    std::shared_ptr<lsproto::VSClassifiedTextElement>(
+		        defInfo->displayText);
+		defItem->VSProjectName = projectName;
+		defItem->VSContainingType = emptyStr;
+		items.push_back(
+		    std::shared_ptr<lsproto::VSReferenceItem>(defItem));
 		id++;
 
 		// Create reference items grouped under the definition
@@ -1402,19 +1325,24 @@ LanguageService::symbolAndEntriesToVSReferences(
 				kind = lsproto::VSReferenceKindWrite;
 			}
 
-			auto* refItem = new lsproto::VSReferenceItem{
-			    /*VSId*/ id,
-			    /*VSDefinitionId*/ new int32_t(definitionId),
-			    /*VSKind*/ new std::vector<lsproto::VSReferenceKind>{kind},
-			    /*VSLocation*/ refLocation};
-			refItem->VSProjectName = new std::string(projectName);
-			items.push_back(refItem);
+			auto* refItem = new lsproto::VSReferenceItem;
+			refItem->VSId = id;
+			refItem->VSDefinitionId = definitionId;
+			refItem->VSKind = std::make_shared<
+				lsproto::Slice<lsproto::VSReferenceKind>>(
+				std::vector<lsproto::VSReferenceKind>{kind});
+			refItem->VSLocation = refLocation;
+			refItem->VSProjectName = projectName;
+			items.push_back(
+			    std::shared_ptr<lsproto::VSReferenceItem>(refItem));
 			id++;
 		}
 	}
 
 	return {lsproto::VSReferencesResponse{
-	            new lsproto::VSReferenceItems(items)},
+	            std::make_shared<lsproto::Slice<
+	                std::shared_ptr<lsproto::VSReferenceItem>>>(
+	                std::move(items))},
 	        nullptr};
 }
 
@@ -1465,10 +1393,11 @@ LanguageService::definitionToReferencedSymbolDefinitionInfo(
 		return new referencedSymbolDefinitionInfo{
 		    node, loc,
 		    new lsproto::VSClassifiedTextElement{
-		        /*Runs*/ {new lsproto::VSClassifiedTextRun{
-		            /*ClassificationTypeName*/
-		            lsproto::ClassificationTypeText, /*Text*/
-		            node->text()}}}};
+		        /*Runs*/ std::vector<std::shared_ptr<lsproto::VSClassifiedTextRun>>{std::make_shared<lsproto::VSClassifiedTextRun>(
+		            lsproto::VSClassifiedTextRun{
+		                /*ClassificationTypeName*/
+		                lsproto::ClassificationTypeNameText, /*Text*/
+		                node->text()})}}};
 	}
 
 	case definitionKindKeyword: {
@@ -1485,9 +1414,11 @@ LanguageService::definitionToReferencedSymbolDefinitionInfo(
 		return new referencedSymbolDefinitionInfo{
 		    node, loc,
 		    new lsproto::VSClassifiedTextElement{
-		        /*Runs*/ {new lsproto::VSClassifiedTextRun{
-		            /*ClassificationTypeName*/
-		            lsproto::ClassificationTypeKeyword, /*Text*/ name}}}};
+		        /*Runs*/ std::vector<std::shared_ptr<lsproto::VSClassifiedTextRun>>{std::make_shared<lsproto::VSClassifiedTextRun>(
+		            lsproto::VSClassifiedTextRun{
+		                /*ClassificationTypeName*/
+		                lsproto::ClassificationTypeNameKeyword,
+		                /*Text*/ name})}}};
 	}
 
 	case definitionKindThis: {
@@ -1522,10 +1453,11 @@ LanguageService::definitionToReferencedSymbolDefinitionInfo(
 		return new referencedSymbolDefinitionInfo{
 		    node, loc,
 		    new lsproto::VSClassifiedTextElement{
-		        /*Runs*/ {new lsproto::VSClassifiedTextRun{
-		            /*ClassificationTypeName*/
-		            lsproto::ClassificationTypeStringLiteral, /*Text*/
-		            node->text()}}}};
+		        /*Runs*/ std::vector<std::shared_ptr<lsproto::VSClassifiedTextRun>>{std::make_shared<lsproto::VSClassifiedTextRun>(
+		            lsproto::VSClassifiedTextRun{
+		                /*ClassificationTypeName*/
+		                lsproto::ClassificationTypeNameString, /*Text*/
+		                node->text()})}}};
 	}
 
 	case definitionKindTripleSlashReference: {
@@ -1542,12 +1474,13 @@ LanguageService::definitionToReferencedSymbolDefinitionInfo(
 		return new referencedSymbolDefinitionInfo{
 		    node, loc,
 		    new lsproto::VSClassifiedTextElement{
-		        /*Runs*/ {new lsproto::VSClassifiedTextRun{
-		            /*ClassificationTypeName*/
-		            lsproto::ClassificationTypeStringLiteral,
-		            /*Text*/ "\"" +
-		                def->tripleSlashFileRef->reference->FileName +
-		                "\""}}}};
+		        /*Runs*/ std::vector<std::shared_ptr<lsproto::VSClassifiedTextRun>>{std::make_shared<lsproto::VSClassifiedTextRun>(
+		            lsproto::VSClassifiedTextRun{
+		                /*ClassificationTypeName*/
+		                lsproto::ClassificationTypeNameString,
+		                /*Text*/ "\"" +
+		                    def->tripleSlashFileRef->reference->FileName +
+		                    "\""})}}};
 	}
 
 	default:
@@ -1578,9 +1511,11 @@ LanguageService::getDefinitionKindAndDisplayParts(
 	// Fallback: single unclassified run with the full text
 	std::string text = info.displayParts->String();
 	return new lsproto::VSClassifiedTextElement{
-	    /*Runs*/ {new lsproto::VSClassifiedTextRun{
-	        /*ClassificationTypeName*/
-	        lsproto::ClassificationTypeText, /*Text*/ text}}};
+	    /*Runs*/ std::vector<std::shared_ptr<lsproto::VSClassifiedTextRun>>{
+	        std::make_shared<lsproto::VSClassifiedTextRun>(
+	            lsproto::VSClassifiedTextRun{
+	                /*ClassificationTypeName*/
+	                lsproto::ClassificationTypeNameText, /*Text*/ text})}};
 }
 
 // ProvideImplementations — findallreferences.go:1016.
@@ -1646,18 +1581,23 @@ LanguageService::symbolAndEntriesToImplementations(
 	}
 
 	if (!options.requireLocationsResult &&
-	    lsproto::GetClientCapabilities(ctx)
+	    lsproto::getClientCapabilities(ctx)
 	        ->TextDocument.Implementation.LinkSupport) {
 		auto links = convertEntriesToLocationLinks(
 		    entries, spanmap::FeatureImplementation);
 		return {lsproto::LocationOrLocationsOrDefinitionLinksOrNull{
-		            nullptr, nullptr, &links},
+		            nullptr, nullptr,
+		            std::make_shared<lsproto::Slice<
+		                std::shared_ptr<lsproto::LocationLink>>>(
+		                std::move(links))},
 		        nullptr};
 	}
 	auto locations = convertEntriesToLocations(
 	    entries, spanmap::FeatureImplementation);
 	return {lsproto::LocationOrLocationsOrDefinitionLinksOrNull{
-	            nullptr, &locations},
+	            nullptr,
+	            std::make_shared<lsproto::Slice<lsproto::Location>>(
+	                std::move(locations))},
 	        nullptr};
 }
 
@@ -1723,10 +1663,10 @@ std::vector<lsproto::Location> LanguageService::convertEntriesToLocations(
 }
 
 // convertEntriesToLocationLinks — findallreferences.go:1111.
-std::vector<lsproto::LocationLink*>
+std::vector<std::shared_ptr<lsproto::LocationLink>>
 LanguageService::convertEntriesToLocationLinks(
     const std::vector<ReferenceEntry*>& entries, spanmap::Feature feature) {
-	std::vector<lsproto::LocationLink*> links;
+	std::vector<std::shared_ptr<lsproto::LocationLink>> links;
 	links.reserve(entries.size());
 	for (auto* entry : entries) {
 
@@ -1735,7 +1675,7 @@ LanguageService::convertEntriesToLocationLinks(
 		if (!ok) {
 			continue;
 		}
-		lsproto::Range targetSelectionRange = loc.Range_;
+		lsproto::Range targetSelectionRange = loc.Range;
 		lsproto::Range targetRange = targetSelectionRange;
 
 		// For entries with nodes, compute ranges directly from the node
@@ -1750,17 +1690,18 @@ LanguageService::convertEntriesToLocationLinks(
 				        entry->sourceFile, *contextTextRange, feature);
 				if (!fidelity.IsNone() &&
 				    contextLocation.Uri == loc.Uri) {
-					targetRange = contextLocation.Range_;
+					targetRange = contextLocation.Range;
 				}
 			}
 		}
 
-		links.push_back(new lsproto::LocationLink{
-		    /*OriginSelectionRange*/ nullptr,
-		    /*TargetUri*/ lsconv::FileNameToDocumentURI(
-		        entry->sourceFile->OriginalFileName()),
-		    /*TargetRange*/ targetRange,
-		    /*TargetSelectionRange*/ targetSelectionRange});
+		links.push_back(std::make_shared<lsproto::LocationLink>(
+		    lsproto::LocationLink{
+		        /*OriginSelectionRange*/ nullptr,
+		        /*TargetUri*/ lsconv::FileNameToDocumentURI(
+		            entry->sourceFile->OriginalFileName()),
+		        /*TargetRange*/ targetRange,
+		        /*TargetSelectionRange*/ targetSelectionRange}));
 	}
 	return links;
 }
@@ -2566,7 +2507,7 @@ LanguageService::getReferencedSymbolsForModule(
     Symbol* symbol, bool excludeImportTypeOfExportEquals,
     const std::vector<SourceFile*>& sourceFiles,
     collections::Set<std::string>* sourceFilesSet) {
-	TSC_ASSERT(symbol->valueDeclaration != nullptr, "");
+	debug::assert(symbol->valueDeclaration != nullptr, "");
 
 	auto [checker, done] = program->GetTypeCheckerForFileExclusive(nullptr);
 	doneGuard doneGuard_{done};
@@ -2667,7 +2608,7 @@ LanguageService::getReferencedSymbolsForModule(
 					// Find the export keyword
 					node = astnav::findChildOfKind(
 					    decl, Kind::ExportKeyword, sourceFile);
-					TSC_ASSERT(node != nullptr,
+					debug::assert(node != nullptr,
 					           "Expected to find export keyword");
 				} else {
 					node = getNameOfDeclaration(decl);
@@ -2700,7 +2641,7 @@ std::string getSpecialSearchKind(Node* node) {
 		return "constructor";
 	case Kind::Identifier:
 		if (isClassLike(node->parent)) {
-			TSC_ASSERT(node->parent->name() == node, "");
+			debug::assert(node->parent->name() == node, "");
 			return "class";
 		}
 		[[fallthrough]];
@@ -3388,7 +3329,7 @@ void refState::getReferencesAtExportSpecifier(Node* referenceLocation,
                                               refSearch* search,
                                               bool addReferencesHere,
                                               bool alwaysGetReferences) {
-	TSC_ASSERT(
+	debug::assert(
 	    !alwaysGetReferences || options.useAliasesForRename,
 	    "If alwaysGetReferences is true, then prefix/suffix text must be enabled");
 
@@ -3427,7 +3368,7 @@ void refState::getReferencesAtExportSpecifier(Node* referenceLocation,
 		if (addReferencesHere && options.use != referenceUseRename &&
 		    markSeenReExportRHS(name)) {
 			Symbol* exportSymbol = exportSpecifier->Symbol;
-			TSC_ASSERT(exportSymbol != nullptr,
+			debug::assert(exportSymbol != nullptr,
 			           "exportSpecifier.Symbol() should not be nil");
 			addReference(name, exportSymbol, entryKindNode);
 		}
@@ -3447,7 +3388,7 @@ void refState::getReferencesAtExportSpecifier(Node* referenceLocation,
 			exportKind = ExportKindDefault;
 		}
 		Symbol* exportSymbol = exportSpecifier->Symbol;
-		TSC_ASSERT(exportSymbol != nullptr,
+		debug::assert(exportSymbol != nullptr,
 		           "exportSpecifier.Symbol() should not be nil");
 		ExportInfo* exportInfo =
 		    getExportInfo(exportSymbol, exportKind, checker);
@@ -3815,7 +3756,7 @@ void refState::forEachRelatedSymbol(
 		auto [paramProp1, paramProp2] =
 		    checker->GetSymbolsOfParameterPropertyDeclaration(
 		        symbol->valueDeclaration, symbol->name);
-		TSC_ASSERT(
+		debug::assert(
 		    paramProp1->flags & SymbolFlagsFunctionScopedVariable &&
 		        paramProp2->flags & SymbolFlagsClassMember,
 		    "GetSymbolsOfParameterPropertyDeclaration must return "
@@ -3873,7 +3814,7 @@ void refState::forEachRelatedSymbol(
 		return;
 	}
 
-	TSC_ASSERT(isForRenamePopulateSearchSymbolSet, "");
+	debug::assert(isForRenamePopulateSearchSymbolSet, "");
 
 	// due to the above assert and the arguments at the uses of this
 	// function, (onlyIncludeBindingElementAtReferenceLocation <=>
@@ -3924,9 +3865,9 @@ bool refState::explicitlyInheritsFrom(Symbol* symbol, Symbol* parent) {
 
 	bool inherits = some(symbol->declarations, [&](Node* declaration) {
 		auto superTypeNodes = getAllSuperTypeNodes(declaration);
-		return some(superTypeNodes, [&](HeritageClauseElement* typeReference) {
+		return some(superTypeNodes, [&](Node* typeReference) {
 			checker::Type* typ = checker->GetTypeAtLocation(
-			    reinterpret_cast<Node*>(typeReference));
+			    typeReference);
 			return typ != nullptr && typ->symbol != nullptr &&
 			       explicitlyInheritsFrom(typ->symbol, parent);
 		});
@@ -3997,183 +3938,5 @@ std::vector<SymbolAndEntries*> getReferencedSymbolsForSymbol(
 	return state->result;
 }
 
-
-// === dep stubs — removed when owner slice lands ===
-
-// getAdjustedLocation — utilities.go (ls-coreA).
-Node* getAdjustedLocation(Node* node, bool forRename, SourceFile* sourceFile) {
-	TSC_UNREACHABLE("getAdjustedLocation — owned by ls-coreA");
-}
-Node* getAdjustedRenameLocation(Node* node) {
-	TSC_UNREACHABLE("getAdjustedRenameLocation — owned by ls-coreA");
-}
-
-// nodeIsEligibleForRename — rename.go (ls-coreC).
-bool nodeIsEligibleForRename(Node* node) {
-	TSC_UNREACHABLE("nodeIsEligibleForRename — owned by ls-coreC");
-}
-
-// getContextualTypeFromParentOrAncestorTypeNode — utilities.go (ls-coreA).
-checker::Type* getContextualTypeFromParentOrAncestorTypeNode(
-    Node* node, checker::Checker* checker) {
-	TSC_UNREACHABLE(
-	    "getContextualTypeFromParentOrAncestorTypeNode — owned by ls-coreA");
-}
-
-// getMeaningFromLocation — utilities.go:807 (ls-coreA).
-SemanticMeaning getMeaningFromLocation(Node* node) {
-	TSC_UNREACHABLE("getMeaningFromLocation — owned by ls-coreA");
-}
-
-// getIntersectingMeaningFromDeclarations — utilities.go:881 (ls-coreA).
-SemanticMeaning getIntersectingMeaningFromDeclarations(
-    Node* node, Symbol* symbol, SemanticMeaning defaultMeaning) {
-	TSC_UNREACHABLE(
-	    "getIntersectingMeaningFromDeclarations — owned by ls-coreA");
-}
-
-// getContainingObjectLiteralElement — utilities.go:1261 (ls-coreA).
-Node* getContainingObjectLiteralElement(Node* node) {
-	TSC_UNREACHABLE(
-	    "getContainingObjectLiteralElement — owned by ls-coreA");
-}
-
-// isImplementation / isImplementationExpression — utilities.go:396/409
-// (ls-coreA).
-bool isImplementation(Node* node) {
-	TSC_UNREACHABLE("isImplementation — owned by ls-coreA");
-}
-bool isImplementationExpression(Node* node) {
-	TSC_UNREACHABLE("isImplementationExpression — owned by ls-coreA");
-}
-
-// getContainingNodeIfInHeritageClause — utilities.go:436 (ls-coreA).
-Node* getContainingNodeIfInHeritageClause(Node* node) {
-	TSC_UNREACHABLE("getContainingNodeIfInHeritageClause — owned by ls-coreA");
-}
-
-// getPropertySymbolsFromBaseTypes — utilities.go:963 (ls-coreA).
-Symbol* getPropertySymbolsFromBaseTypes(
-    Symbol* symbol, const std::string& propertyName, checker::Checker* checker,
-    const std::function<Symbol*(Symbol*)>& cb) {
-	TSC_UNREACHABLE("getPropertySymbolsFromBaseTypes — owned by ls-coreA");
-}
-
-// getParentSymbolsOfPropertyAccess — utilities.go:935 (ls-coreA).
-std::vector<Symbol*> getParentSymbolsOfPropertyAccess(
-    Node* location, Symbol* symbol, checker::Checker* ch) {
-	TSC_UNREACHABLE("getParentSymbolsOfPropertyAccess — owned by ls-coreA");
-}
-
-// getNonModuleSymbolOfMergedModuleSymbol — utilities.go:62 (ls-coreA).
-Symbol* getNonModuleSymbolOfMergedModuleSymbol(Symbol* symbol) {
-	TSC_UNREACHABLE(
-	    "getNonModuleSymbolOfMergedModuleSymbol — owned by ls-coreA");
-}
-
-// getPropertySymbolFromBindingElement — utilities.go:996 (ls-coreA).
-Symbol* getPropertySymbolFromBindingElement(checker::Checker* checker,
-                                            Node* bindingElement) {
-	TSC_UNREACHABLE(
-	    "getPropertySymbolFromBindingElement — owned by ls-coreA");
-}
-
-// getContainerNode — utilities.go:448 (ls-coreA).
-Node* getContainerNode(Node* node) {
-	TSC_UNREACHABLE("getContainerNode — owned by ls-coreA");
-}
-
-// isTypeKeyword — utilities.go:345 (ls-coreA).
-bool isTypeKeyword(Kind kind) {
-	TSC_UNREACHABLE("isTypeKeyword — owned by ls-coreA");
-}
-
-// isReadonlyTypeOperator — utilities.go:420 (ls-coreA).
-bool isReadonlyTypeOperator(Node* node) {
-	TSC_UNREACHABLE("isReadonlyTypeOperator — owned by ls-coreA");
-}
-
-// isJumpStatementTarget / isLabelOfLabeledStatement / getTargetLabel —
-// utilities.go:424/428/1011 (ls-coreA).
-bool isJumpStatementTarget(Node* node) {
-	TSC_UNREACHABLE("isJumpStatementTarget — owned by ls-coreA");
-}
-bool isLabelOfLabeledStatement(Node* node) {
-	TSC_UNREACHABLE("isLabelOfLabeledStatement — owned by ls-coreA");
-}
-Node* getTargetLabel(Node* referenceNode, const std::string& labelName) {
-	TSC_UNREACHABLE("getTargetLabel — owned by ls-coreA");
-}
-
-// isThis — utilities.go:240 (ls-coreA).
-bool isThis(Node* node) {
-	TSC_UNREACHABLE("isThis — owned by ls-coreA");
-}
-
-// isLiteralNameOfPropertyDeclarationOrIndexAccess /
-// isNameOfModuleDeclaration /
-// isExpressionOfExternalModuleImportEqualsDeclaration —
-// utilities.go:353/191/198 (ls-coreA).
-bool isLiteralNameOfPropertyDeclarationOrIndexAccess(Node* node) {
-	TSC_UNREACHABLE(
-	    "isLiteralNameOfPropertyDeclarationOrIndexAccess — owned by ls-coreA");
-}
-bool isNameOfModuleDeclaration(Node* node) {
-	TSC_UNREACHABLE("isNameOfModuleDeclaration — owned by ls-coreA");
-}
-bool isExpressionOfExternalModuleImportEqualsDeclaration(Node* node) {
-	TSC_UNREACHABLE(
-	    "isExpressionOfExternalModuleImportEqualsDeclaration — owned by "
-	    "ls-coreA");
-}
-
-// isObjectBindingElementWithoutPropertyName — utilities.go:377 (ls-coreA).
-bool isObjectBindingElementWithoutPropertyName(Node* bindingElement) {
-	TSC_UNREACHABLE(
-	    "isObjectBindingElementWithoutPropertyName — owned by ls-coreA");
-}
-
-// isStaticSymbol — utilities.go:388 (ls-coreA).
-bool isStaticSymbol(Symbol* symbol) {
-	TSC_UNREACHABLE("isStaticSymbol — owned by ls-coreA");
-}
-
-// getReferenceAtPosition — utilities.go:1312 (ls-coreA).
-refInfo* getReferenceAtPosition(SourceFile* sourceFile, int position,
-                                compiler::SimpleProgram* program) {
-	TSC_UNREACHABLE("getReferenceAtPosition — owned by ls-coreA");
-}
-
-// getLocalSymbolForExportSpecifier — utilities.go:73 (ls-coreA).
-Symbol* getLocalSymbolForExportSpecifier(Node* referenceLocation,
-                                         Symbol* referenceSymbol,
-                                         ExportSpecifier* exportSpecifier,
-                                         checker::Checker* ch) {
-	TSC_UNREACHABLE("getLocalSymbolForExportSpecifier — owned by ls-coreA");
-}
-
-// toContextRange — utilities.go:1300 (ls-coreA).
-TextRange* toContextRange(TextRange* textRange, SourceFile* contextFile,
-                          Node* context) {
-	TSC_UNREACHABLE("toContextRange — owned by ls-coreA");
-}
-
-// isModuleSpecifierLike — utilities.go:48 (ls-coreA).
-bool isModuleSpecifierLike(Node* node) {
-	TSC_UNREACHABLE("isModuleSpecifierLike — owned by ls-coreA");
-}
-
-// getAllSuperTypeNodes — utilities.go:922 (ls-coreA).
-std::vector<HeritageClauseElement*> getAllSuperTypeNodes(Node* node) {
-	TSC_UNREACHABLE("getAllSuperTypeNodes — owned by ls-coreA");
-}
-
-// getQuickInfoAndDeclarationAtLocation — hover.go:426 (ls-coreC).
-symbolDisplayInfo getQuickInfoAndDeclarationAtLocation(
-    checker::Checker* c, Symbol* symbol, Node* node,
-    checker::VerbosityContext* vc, bool vsCapability,
-    SemanticMeaning meaning) {
-	TSC_UNREACHABLE("getQuickInfoAndDeclarationAtLocation — owned by ls-coreC");
-}
 
 } // namespace tsc::ls

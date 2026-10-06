@@ -1,5 +1,6 @@
 // === slice: ls-coreC ===
 // symbols.cpp — symbols.go: document symbols + workspace/symbol.
+#include "internal/astnav/tokens.h"
 #include "internal/ls/ls.h"
 
 #include "internal/stringutil/stringutil.h"
@@ -245,13 +246,13 @@ struct DeclarationInfo {
 // seen-key for deduping document symbols across projections.
 struct docSymbolKey {
 	std::string name;
-	lsp::lsproto::SymbolKind kind = 0;
+	lsp::lsproto::SymbolKind kind = lsp::lsproto::SymbolKind(0);
 	lsp::lsproto::Range rng;
 	bool operator==(const docSymbolKey&) const = default;
 };
 struct docSymbolKeyHash {
 	size_t operator()(const docSymbolKey& k) const {
-		return std::hash<std::string>{}(k.name) * 131 + k.kind * 8191 +
+		return std::hash<std::string>{}(k.name) * 131 + int(k.kind) * 8191 +
 			   std::hash<uint32_t>{}(k.rng.Start.Line) * 131 +
 			   k.rng.Start.Character * 17 + k.rng.End.Line * 7 +
 			   k.rng.End.Character;
@@ -260,27 +261,30 @@ struct docSymbolKeyHash {
 
 // symbols.go:65 — flattenDocumentSymbols
 std::vector<lsp::lsproto::SymbolInformation> flattenDocumentSymbols(
-	const std::vector<lsp::lsproto::DocumentSymbol*>& docSymbols,
+	const std::vector<std::shared_ptr<lsp::lsproto::DocumentSymbol>>& docSymbols,
 	lsp::lsproto::DocumentUri documentURI) {
 	std::vector<lsp::lsproto::SymbolInformation> result;
-	std::function<void(const std::vector<lsp::lsproto::DocumentSymbol*>&,
-					   std::string*)>
-		flatten = [&](const std::vector<lsp::lsproto::DocumentSymbol*>& symbols,
-					  std::string* containerName) {
-			for (auto* symbol : symbols) {
+	std::function<void(const std::vector<std::shared_ptr<lsp::lsproto::DocumentSymbol>>&,
+					   const std::string*)>
+		flatten = [&](const std::vector<std::shared_ptr<lsp::lsproto::DocumentSymbol>>& symbols,
+					  const std::string* containerName) {
+			for (auto& symbol : symbols) {
 				lsp::lsproto::SymbolInformation info;
 				info.Name = symbol->Name;
 				info.Kind = symbol->Kind;
 				info.Location.Uri = documentURI;
 				info.Location.Range = symbol->Range;
-				info.ContainerName = containerName;
+				if (containerName != nullptr) {
+					info.ContainerName = *containerName;
+				}
 				info.Tags = symbol->Tags;
 				info.Deprecated = symbol->Deprecated;
 				result.push_back(info);
 
 				// Recursively flatten children with this symbol as container
-				if (symbol->Children != nullptr && !symbol->Children->empty()) {
-					flatten(*symbol->Children, &symbol->Name);
+				if (symbol->Children != nullptr &&
+				    !(*symbol->Children)->empty()) {
+					flatten(**symbol->Children, &symbol->Name);
 				}
 			}
 		};
@@ -298,23 +302,24 @@ bool isPrototypeExpando(::tsc::Node* target) {
 }
 
 // symbols.go:410/424 — mergeChildren / isAnonymousName (fwd decls)
-void mergeChildren(lsp::lsproto::DocumentSymbol* target,
-				   lsp::lsproto::DocumentSymbol* source);
+void mergeChildren(
+	const std::shared_ptr<lsp::lsproto::DocumentSymbol>& target,
+	const std::shared_ptr<lsp::lsproto::DocumentSymbol>& source);
 bool isAnonymousName(const std::string& name);
 
 // Merges expando symbols into their target symbols, and namespaces of same name.
 // Modifies the input vector.
 // symbols.go:351
-std::vector<lsp::lsproto::DocumentSymbol*> mergeExpandos(
-	std::vector<lsp::lsproto::DocumentSymbol*>& symbols) {
-	std::vector<lsp::lsproto::DocumentSymbol*> mergedSymbols;
+std::vector<std::shared_ptr<lsp::lsproto::DocumentSymbol>> mergeExpandos(
+	std::vector<std::shared_ptr<lsp::lsproto::DocumentSymbol>>& symbols) {
+	std::vector<std::shared_ptr<lsp::lsproto::DocumentSymbol>> mergedSymbols;
 	mergedSymbols.reserve(symbols.size());
 	// Collect symbols that can be an expando target.
 	collections::MultiMap<std::string, int> nameToExpandoTargetIndex;
 	// Collect namespaces.
 	std::unordered_map<std::string, int> nameToNamespaceIndex;
 	for (size_t i = 0; i < symbols.size(); i++) {
-		auto* symbol = symbols[i];
+		auto& symbol = symbols[i];
 		if (isAnonymousName(symbol->Name)) {
 			continue;
 		}
@@ -331,9 +336,9 @@ std::vector<lsp::lsproto::DocumentSymbol*> mergeExpandos(
 		}
 	}
 	for (size_t i = 0; i < symbols.size(); i++) {
-		auto* symbol = symbols[i];
+		auto& symbol = symbols[i];
 		if (symbol->Children != nullptr) {
-			auto children = mergeExpandos(*symbol->Children);
+			auto children = mergeExpandos(**symbol->Children);
 			*symbol->Children = std::move(children);
 		}
 
@@ -348,7 +353,7 @@ std::vector<lsp::lsproto::DocumentSymbol*> mergeExpandos(
 				nameToExpandoTargetIndex.Get(symbol->Name);
 			for (auto it = symbolsWithSameName.rbegin();
 				 it != symbolsWithSameName.rend(); ++it) {
-				lsp::lsproto::DocumentSymbol* targetSymbol = symbols[*it];
+				auto& targetSymbol = symbols[*it];
 				mergeChildren(targetSymbol, symbol);
 				// Mark this symbol as merged.
 				symbols[i] = nullptr;
@@ -358,14 +363,14 @@ std::vector<lsp::lsproto::DocumentSymbol*> mergeExpandos(
 		if (symbol->Kind == lsp::lsproto::SymbolKindNamespace) {
 			auto it = nameToNamespaceIndex.find(symbol->Name);
 			if (it != nameToNamespaceIndex.end() && it->second != int(i)) {
-				lsp::lsproto::DocumentSymbol* targetSymbol = symbols[it->second];
+				auto& targetSymbol = symbols[it->second];
 				mergeChildren(targetSymbol, symbol);
 				// Mark this symbol as merged.
 				symbols[i] = nullptr;
 			}
 		}
 	}
-	for (auto* symbol : symbols) {
+	for (auto& symbol : symbols) {
 		if (symbol != nullptr) {
 			mergedSymbols.push_back(symbol);
 		}
@@ -374,20 +379,23 @@ std::vector<lsp::lsproto::DocumentSymbol*> mergeExpandos(
 }
 
 // symbols.go:410 — mergeChildren
-void mergeChildren(lsp::lsproto::DocumentSymbol* target,
-				   lsp::lsproto::DocumentSymbol* source) {
+void mergeChildren(
+	const std::shared_ptr<lsp::lsproto::DocumentSymbol>& target,
+	const std::shared_ptr<lsp::lsproto::DocumentSymbol>& source) {
 	if (source->Children != nullptr) {
 		if (target->Children == nullptr) {
 			target->Children = source->Children;
 		} else {
-			target->Children->insert(target->Children->end(),
-									 source->Children->begin(),
-									 source->Children->end());
-			auto merged = mergeExpandos(*target->Children);
+			(*target->Children)
+				->insert((*target->Children)->end(),
+				         (*source->Children)->begin(),
+				         (*source->Children)->end());
+			auto merged = mergeExpandos(**target->Children);
 			*target->Children = std::move(merged);
-			std::sort(target->Children->begin(), target->Children->end(),
-					  [](lsp::lsproto::DocumentSymbol* a,
-						 lsp::lsproto::DocumentSymbol* b) {
+			std::sort((*target->Children)->begin(),
+			          (*target->Children)->end(),
+					  [](const std::shared_ptr<lsp::lsproto::DocumentSymbol>& a,
+						 const std::shared_ptr<lsp::lsproto::DocumentSymbol>& b) {
 						  return lsp::lsproto::CompareRanges(a->Range, b->Range) <
 								 0;
 					  });
@@ -731,10 +739,11 @@ lsp::lsproto::SymbolKind getSymbolKindFromNode(::tsc::Node* node) {
 // getDocumentSymbolInformations / ProvideDocumentSymbols
 // ============================================================================
 // symbols.go:292
-lsp::lsproto::DocumentSymbol* LanguageService::newDocumentSymbol(
+std::shared_ptr<lsp::lsproto::DocumentSymbol>
+LanguageService::newDocumentSymbol(
 	::tsc::Node* node, ::tsc::Node* name,
-	std::vector<lsp::lsproto::DocumentSymbol*> children) {
-	auto* result = new lsp::lsproto::DocumentSymbol;
+	std::vector<std::shared_ptr<lsp::lsproto::DocumentSymbol>> children) {
+	auto result = std::make_shared<lsp::lsproto::DocumentSymbol>();
 	SourceFile* file = getSourceFileOfNode(node);
 	int nodeStartPos = tsc::skipTrivia(file->Text(), int(node->pos()));
 	if (name == nullptr) {
@@ -793,24 +802,25 @@ lsp::lsproto::DocumentSymbol* LanguageService::newDocumentSymbol(
 	}
 	result->Range = symbolRange;
 	result->SelectionRange = selectionRange;
-	result->Children =
-		new std::vector<lsp::lsproto::DocumentSymbol*>(std::move(children));
+	result->Children = std::make_shared<lsp::lsproto::Slice<
+	    std::shared_ptr<lsp::lsproto::DocumentSymbol>>>(
+	    std::move(children));
 	return result;
 }
 
 // symbols.go:94
-std::vector<lsp::lsproto::DocumentSymbol*>
+std::vector<std::shared_ptr<lsp::lsproto::DocumentSymbol>>
 LanguageService::getDocumentSymbolsForChildren(gostd::Context ctx,
 											 ::tsc::Node* node,
 											 SourceFile* file) {
-	std::vector<lsp::lsproto::DocumentSymbol*> symbols;
+	std::vector<std::shared_ptr<lsp::lsproto::DocumentSymbol>> symbols;
 	collections::Set<std::string> expandoTargets;
 
 	auto addSymbolForNode = [&](::tsc::Node* node, ::tsc::Node* name,
-								std::vector<lsp::lsproto::DocumentSymbol*>
+								std::vector<std::shared_ptr<lsp::lsproto::DocumentSymbol>>
 									children) {
 		if ((node->flags & NodeFlagsReparsed) == 0) {
-			lsp::lsproto::DocumentSymbol* symbol =
+			auto symbol =
 				newDocumentSymbol(node, name, std::move(children));
 			if (symbol != nullptr) {
 				symbols.push_back(symbol);
@@ -821,8 +831,8 @@ LanguageService::getDocumentSymbolsForChildren(gostd::Context ctx,
 	std::function<bool(::tsc::Node*)> visit;
 
 	auto getSymbolsForChildren =
-		[&](::tsc::Node* node) -> std::vector<lsp::lsproto::DocumentSymbol*> {
-		std::vector<lsp::lsproto::DocumentSymbol*> result;
+		[&](::tsc::Node* node) -> std::vector<std::shared_ptr<lsp::lsproto::DocumentSymbol>> {
+		std::vector<std::shared_ptr<lsp::lsproto::DocumentSymbol>> result;
 		if (node != nullptr) {
 			auto saveExpandoTargets = expandoTargets;
 			expandoTargets = collections::Set<std::string>{};
@@ -857,8 +867,8 @@ LanguageService::getDocumentSymbolsForChildren(gostd::Context ctx,
 	};
 
 	auto getSymbolsForNode =
-		[&](::tsc::Node* node) -> std::vector<lsp::lsproto::DocumentSymbol*> {
-		std::vector<lsp::lsproto::DocumentSymbol*> result;
+		[&](::tsc::Node* node) -> std::vector<std::shared_ptr<lsp::lsproto::DocumentSymbol>> {
+		std::vector<std::shared_ptr<lsp::lsproto::DocumentSymbol>> result;
 		if (node != nullptr) {
 			auto saveSymbols = std::move(symbols);
 			symbols.clear();
@@ -1100,10 +1110,10 @@ lsp::lsproto::DocumentSymbolResponse LanguageService::ProvideDocumentSymbols(
 		projections.insert(projections.end(), supplemental->begin(),
 						   supplemental->end());
 	}
-	std::vector<lsp::lsproto::DocumentSymbol*> symbols;
+	std::vector<std::shared_ptr<lsp::lsproto::DocumentSymbol>> symbols;
 	std::unordered_set<docSymbolKey, docSymbolKeyHash> seen;
 	for (auto* projection : projections) {
-		for (auto* symbol :
+		for (auto& symbol :
 			 getDocumentSymbolsForChildren(ctx, projection, projection)) {
 			docSymbolKey key{symbol->Name, symbol->Kind, symbol->Range};
 			if (seen.insert(key).second) {
@@ -1112,20 +1122,25 @@ lsp::lsproto::DocumentSymbolResponse LanguageService::ProvideDocumentSymbols(
 		}
 	}
 	lsp::lsproto::SymbolInformationsOrDocumentSymbolsOrNull out;
-	if (lsp::lsproto::GetClientCapabilities(ctx)
+	if (lsp::lsproto::getClientCapabilities(ctx)
 			->TextDocument.DocumentSymbol.HierarchicalDocumentSymbolSupport) {
-		out.DocumentSymbols =
-			new std::vector<lsp::lsproto::DocumentSymbol*>(std::move(symbols));
+		out.DocumentSymbols = std::make_shared<lsp::lsproto::Slice<
+		    std::shared_ptr<lsp::lsproto::DocumentSymbol>>>(
+		    std::move(symbols));
 		return out;
 	}
 	// Client doesn't support hierarchical document symbols, return flat SymbolInformation array
 	auto symbolInfos = flattenDocumentSymbols(symbols, documentURI);
-	auto* symbolInfoPtrs = new std::vector<lsp::lsproto::SymbolInformation*>;
-	symbolInfoPtrs->reserve(symbolInfos.size());
+	std::vector<std::shared_ptr<lsp::lsproto::SymbolInformation>>
+	    symbolInfoPtrs;
+	symbolInfoPtrs.reserve(symbolInfos.size());
 	for (auto& info : symbolInfos) {
-		symbolInfoPtrs->push_back(new lsp::lsproto::SymbolInformation(info));
+		symbolInfoPtrs.push_back(
+		    std::make_shared<lsp::lsproto::SymbolInformation>(info));
 	}
-	out.SymbolInformations = symbolInfoPtrs;
+	out.SymbolInformations = std::make_shared<lsp::lsproto::Slice<
+	    std::shared_ptr<lsp::lsproto::SymbolInformation>>>(
+	    std::move(symbolInfoPtrs));
 	return out;
 }
 
@@ -1175,7 +1190,7 @@ ProvideWorkspaceSymbols(gostd::Context ctx,
 				  return compareDeclarationInfos(a, b) < 0;
 			  });
 	size_t count = std::min(infos.size(), size_t(256));
-	std::vector<lsp::lsproto::SymbolInformation*> symbols;
+	std::vector<std::shared_ptr<lsp::lsproto::SymbolInformation>> symbols;
 	symbols.reserve(count);
 	for (size_t i = 0; i < count; i++) {
 		auto& info = infos[i];
@@ -1201,17 +1216,20 @@ ProvideWorkspaceSymbols(gostd::Context ctx,
 			// The name has no counterpart in the original text, so there is nothing to navigate to.
 			continue;
 		}
-		auto* symbol = new lsp::lsproto::SymbolInformation;
+		auto symbol = std::make_shared<lsp::lsproto::SymbolInformation>();
 		symbol->Name = info.name;
 		symbol->Kind = getSymbolKindFromNode(info.declaration);
 		symbol->Location = location;
-		symbol->ContainerName = containerName;
+		if (containerName != nullptr) {
+			symbol->ContainerName = *containerName;
+		}
 		symbols.push_back(symbol);
 	}
 
 	lsp::lsproto::SymbolInformationsOrWorkspaceSymbolsOrNull out;
-	out.SymbolInformations =
-		new std::vector<lsp::lsproto::SymbolInformation*>(std::move(symbols));
+	out.SymbolInformations = std::make_shared<lsp::lsproto::Slice<
+	    std::shared_ptr<lsp::lsproto::SymbolInformation>>>(
+	    std::move(symbols));
 	return {out, nullptr};
 }
 

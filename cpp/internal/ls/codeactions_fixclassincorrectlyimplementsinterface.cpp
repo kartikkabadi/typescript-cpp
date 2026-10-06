@@ -127,24 +127,30 @@ createImportAdder(const gostd::Context& ctx, CodeFixContext* fixContext,
 	            ctx, fixContext->Program, typeChecker,
 	            fixContext->SourceFile, view,
 	            fixContext->LS->FormatOptions(),
-	            fixContext->LS->converters,
+	            fixContext->LS->Converters(),
 	            fixContext->LS->UserPreferences()),
 	        nullptr};
 }
 
 // getChanges — codeactions_fixclassincorrectlyimplementsinterface.go:136.
-std::vector<lsproto::TextEdit*> getChanges(
+std::vector<std::shared_ptr<lsproto::TextEdit>> getChanges(
     change::Tracker* changeTracker, autoimport::ImportAdder* importAdder,
     SourceFile* sourceFile) {
 	auto [changes, unmappable] = changeTracker->GetChanges();
 	if (unmappable.size() != 0) {
 		return {};
 	}
-	auto fileChanges = changes[sourceFile->OriginalFileName()];
+	std::vector<std::shared_ptr<lsproto::TextEdit>> fileChanges;
+	for (auto& e : changes[sourceFile->OriginalFileName()]) {
+		fileChanges.push_back(std::make_shared<lsproto::TextEdit>(e));
+	}
 	if (importAdder != nullptr && importAdder->HasFixes()) {
 		auto edits = importAdder->Edits();
-		fileChanges.insert(fileChanges.end(), edits.begin(),
-		                   edits.end());
+		if (edits.has_value()) {
+			for (auto& e : *edits) {
+				fileChanges.push_back(e);
+			}
+		}
 	}
 	return fileChanges;
 }
@@ -244,9 +250,9 @@ getCodeActionsToFixClassIncorrectlyImplementsInterface(
 
 	std::vector<CodeAction*> actions;
 	for (auto* implementedTypeNode : implementsTypes) {
-		auto* changeTracker = change::NewTracker(
-		    ctx, fixContext->Program->Options(),
-		    fixContext->LS->FormatOptions(), fixContext->LS->converters);
+		auto* changeTracker = new change::Tracker(
+		    format::FormatRequestContext{}, fixContext->Program->Options(),
+		    fixContext->LS->FormatOptions(), fixContext->LS->Converters());
 		auto [importAdder, err] =
 		    createImportAdder(ctx, fixContext, typeChecker);
 		if (err != nullptr) {
@@ -288,9 +294,9 @@ getAllCodeActionsToFixClassIncorrectlyImplementsInterface(
 		~doneGuard() { if (f) f(); }
 	} _done{done};
 
-	auto* changeTracker = change::NewTracker(
-	    ctx, fixContext->Program->Options(), fixContext->LS->FormatOptions(),
-	    fixContext->LS->converters);
+	auto* changeTracker = new change::Tracker(
+	    format::FormatRequestContext{}, fixContext->Program->Options(),
+	    fixContext->LS->FormatOptions(), fixContext->LS->Converters());
 	auto [importAdder, err] = createImportAdder(ctx, fixContext, typeChecker);
 	if (err != nullptr) {
 		return {nullptr, err};

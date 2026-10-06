@@ -22,7 +22,7 @@ lsproto::VSReferencesResponse combineVSReferences(
     const std::function<void(
         const std::function<bool(lsproto::VSReferencesResponse&)>&)>&
         resultsSeq) {
-	std::vector<lsproto::VSReferenceItem*> combined;
+	std::vector<std::shared_ptr<lsproto::VSReferenceItem>> combined;
 	int32_t nextId = 0;
 	resultsSeq([&](lsproto::VSReferencesResponse& resp) -> bool {
 		if (resp.VSReferenceItems == nullptr) {
@@ -30,26 +30,26 @@ lsproto::VSReferencesResponse combineVSReferences(
 		}
 		// Map old IDs to new IDs for this batch
 		std::unordered_map<int32_t, int32_t> idMap;
-		for (auto* item : *resp.VSReferenceItems) {
+		for (auto& item : **resp.VSReferenceItems) {
 			auto oldId = item->VSId;
 			auto newId = nextId;
 			idMap[oldId] = newId;
 			nextId++;
 
-			auto* newItem = new lsproto::VSReferenceItem(*item);
+			auto newItem =
+				std::make_shared<lsproto::VSReferenceItem>(*item);
 			newItem->VSId = newId;
-			if (item->VSDefinitionId != nullptr) {
+			if (item->VSDefinitionId.has_value()) {
 				auto newDefId = idMap[*item->VSDefinitionId];
-				newItem->VSDefinitionId =
-				    new int32_t(newDefId);
+				newItem->VSDefinitionId = newDefId;
 			}
 			combined.push_back(newItem);
 		}
 		return true;
 	});
 	return lsproto::VSReferenceItemsOrNull{
-	    .VSReferenceItems =
-	        new std::vector<lsproto::VSReferenceItem*>(combined)};
+	    .VSReferenceItems = std::make_shared<lsproto::Slice<
+	        std::shared_ptr<lsproto::VSReferenceItem>>>(combined)};
 }
 
 // combineImplementations — crossproject.go:354.
@@ -57,7 +57,7 @@ lsproto::ImplementationResponse combineImplementations(
     const std::function<void(
         const std::function<bool(lsproto::ImplementationResponse&)>&)>&
         resultsSeq) {
-	std::vector<lsproto::LocationLink*> combined;
+	std::vector<std::shared_ptr<lsproto::LocationLink>> combined;
 	collections::Set<lsproto::Location> seenLocations;
 	std::optional<lsproto::ImplementationResponse> early;
 	resultsSeq(
@@ -83,8 +83,8 @@ lsproto::ImplementationResponse combineImplementations(
 		return *early;
 	}
 	return lsproto::LocationOrLocationsOrDefinitionLinksOrNull{
-	    .DefinitionLinks =
-	        new std::vector<lsproto::LocationLink*>(combined)};
+	    .DefinitionLinks = std::make_shared<lsproto::Slice<
+	        std::shared_ptr<lsproto::LocationLink>>>(combined)};
 }
 
 // combineRenameResponse — crossproject.go:367.
@@ -92,13 +92,10 @@ lsproto::RenameResponse combineRenameResponse(
     const std::function<void(
         const std::function<bool(lsproto::RenameResponse&)>&)>&
         resultsSeq) {
-	std::unordered_map<lsproto::DocumentUri,
-	                   std::vector<lsproto::TextEdit*>,
-	                   lsproto::DocumentUriHash>
+	lsproto::Map<lsproto::DocumentUri,
+	             lsproto::Slice<std::shared_ptr<lsproto::TextEdit>>>
 	    combined;
-	std::unordered_map<lsproto::DocumentUri,
-	                   collections::Set<lsproto::Range>*,
-	                   lsproto::DocumentUriHash>
+	lsproto::Map<lsproto::DocumentUri, collections::Set<lsproto::Range>*>
 	    seenChanges;
 	std::vector<
 	    lsproto::TextDocumentEditOrCreateFileOrRenameFileOrDeleteFile>
@@ -109,12 +106,11 @@ lsproto::RenameResponse combineRenameResponse(
 		if (resp.WorkspaceEdit != nullptr &&
 		    resp.WorkspaceEdit->DocumentChanges != nullptr) {
 			for (auto& change :
-			     *resp.WorkspaceEdit->DocumentChanges) {
+			     **resp.WorkspaceEdit->DocumentChanges) {
 				if (change.RenameFile != nullptr) {
 					std::string key =
-					    change.RenameFile->OldUri.String() +
-					    "\x1f" +
-					    change.RenameFile->NewUri.String();
+					    change.RenameFile->OldUri + "\x1f" +
+					    change.RenameFile->NewUri;
 					if (!seenRenames.Has(key)) {
 						seenRenames.Add(key);
 						documentChanges.push_back(change);
@@ -138,10 +134,14 @@ lsproto::RenameResponse combineRenameResponse(
 					seenSet = it->second;
 				}
 				auto& changesForDoc = combined[doc];
-				for (auto* change : changes) {
+				if (!changesForDoc.has_value()) {
+					changesForDoc = std::vector<
+					    std::shared_ptr<lsproto::TextEdit>>{};
+				}
+				for (auto& change : *changes) {
 					if (!seenSet->Has(change->Range)) {
 						seenSet->Add(change->Range);
-						changesForDoc.push_back(change);
+						changesForDoc->push_back(change);
 					}
 				}
 			}
@@ -149,19 +149,19 @@ lsproto::RenameResponse combineRenameResponse(
 		return true;
 	});
 	if (!documentChanges.empty() || !combined.empty()) {
-		auto* workspaceEdit = new lsproto::WorkspaceEdit();
+		auto workspaceEdit = std::make_shared<lsproto::WorkspaceEdit>();
 		if (!documentChanges.empty()) {
 			workspaceEdit->DocumentChanges =
-			    new std::vector<lsproto::
-			                        TextDocumentEditOrCreateFileOrRenameFileOrDeleteFile>(
-			        documentChanges);
+			    std::make_shared<lsproto::Slice<lsproto::
+			                                      TextDocumentEditOrCreateFileOrRenameFileOrDeleteFile>>(
+			        std::move(documentChanges));
 		}
 		if (!combined.empty()) {
 			workspaceEdit->Changes =
-			    new std::unordered_map<
+			    std::make_shared<lsproto::Map<
 			        lsproto::DocumentUri,
-			        std::vector<lsproto::TextEdit*>,
-			        lsproto::DocumentUriHash>(combined);
+			        lsproto::Slice<std::shared_ptr<lsproto::TextEdit>>>>(
+			        std::move(combined));
 		}
 		return lsproto::RenameResponse{
 		    .WorkspaceEdit = workspaceEdit,
@@ -176,13 +176,14 @@ lsproto::CallHierarchyIncomingCallsResponse combineIncomingCalls(
         const std::function<
             bool(lsproto::CallHierarchyIncomingCallsResponse&)>&)>&
         resultsSeq) {
-	std::vector<lsproto::CallHierarchyIncomingCall*> combined;
+	std::vector<std::shared_ptr<lsproto::CallHierarchyIncomingCall>>
+	    combined;
 	collections::Set<lsproto::Location> seenCalls;
 	resultsSeq(
 	    [&](lsproto::CallHierarchyIncomingCallsResponse& resp) -> bool {
 		    if (resp.CallHierarchyIncomingCalls != nullptr) {
-			    for (auto* call :
-			         *resp.CallHierarchyIncomingCalls) {
+			    for (auto& call :
+			         **resp.CallHierarchyIncomingCalls) {
 				    auto callLoc = call->From->GetLocation();
 				    if (!seenCalls.Has(callLoc)) {
 					    seenCalls.Add(callLoc);
@@ -194,8 +195,8 @@ lsproto::CallHierarchyIncomingCallsResponse combineIncomingCalls(
 	    });
 	return lsproto::CallHierarchyIncomingCallsOrNull{
 	    .CallHierarchyIncomingCalls =
-	        new std::vector<lsproto::CallHierarchyIncomingCall*>(
-	            combined)};
+	        std::make_shared<lsproto::Slice<std::shared_ptr<
+	            lsproto::CallHierarchyIncomingCall>>>(combined)};
 }
 
 } // namespace tsc::ls

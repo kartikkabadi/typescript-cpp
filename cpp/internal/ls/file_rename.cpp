@@ -68,14 +68,15 @@ LanguageService::GetEditsForFileRename(const gostd::Context& ctx,
                                        lsproto::DocumentUri oldURI,
                                        lsproto::DocumentUri newURI) {
 	auto* program = GetProgram();
-	auto oldPath = oldURI.FileName();
-	auto newPath = newURI.FileName();
+	auto oldPath = lsproto::documentUriFileName(oldURI);
+	auto newPath = lsproto::documentUriFileName(newURI);
 
 	auto oldToNew = createPathUpdater(oldPath, newPath);
 
 	auto* changeTracker =
-	    change::NewTracker(ctx, program->Options(), FormatOptions(),
-	                       converters);
+	    new change::Tracker(format::FormatRequestContext{},
+	                        program->Options(), FormatOptions(),
+	                        converters);
 	updateTsconfigFiles(program, changeTracker, oldToNew, oldPath,
 	                    newPath);
 	updateImportsForFileRename(program, changeTracker, oldToNew);
@@ -108,14 +109,15 @@ LanguageService::GetEditsForFileRename(const gostd::Context& ctx,
 					    lsproto::
 					        TextDocumentEditOrCreateFileOrRenameFileOrDeleteFile{
 					            .RenameFile =
-					                new lsproto::RenameFile{
-					                    .OldUri = lsconv::
-					                        FileNameToDocumentURI(
-					                            oldOriginalPath),
-					                    .NewUri = lsconv::
-					                        FileNameToDocumentURI(
-					                            newOriginalPath),
-					                },
+					                std::shared_ptr<lsproto::RenameFile>(
+					                    new lsproto::RenameFile{
+					                        .OldUri = lsconv::
+					                            FileNameToDocumentURI(
+					                                oldOriginalPath),
+					                        .NewUri = lsconv::
+					                            FileNameToDocumentURI(
+					                                newOriginalPath),
+					                    }),
 					        });
 				}
 			}
@@ -129,22 +131,26 @@ LanguageService::GetEditsForFileRename(const gostd::Context& ctx,
 		    lsproto::TextEditOrAnnotatedTextEditOrSnippetTextEdit>
 		    lspEdits;
 		lspEdits.reserve(edits.size());
-		for (auto* edit : edits) {
+		for (auto& edit : edits) {
 			lspEdits.push_back(
 			    lsproto::
 			        TextEditOrAnnotatedTextEditOrSnippetTextEdit{
-			            .TextEdit = edit,
+			            .TextEdit =
+			                std::make_shared<lsproto::TextEdit>(
+			                    std::move(edit)),
 			        });
 		}
 		documentChanges.push_back(
 		    lsproto::
 		        TextDocumentEditOrCreateFileOrRenameFileOrDeleteFile{
-		            .TextDocumentEdit = new lsproto::TextDocumentEdit{
-		                .TextDocument = lsproto::
-		                    OptionalVersionedTextDocumentIdentifier{
-		                        .Uri = uri},
-		                .Edits = lspEdits,
-		            },
+		            .TextDocumentEdit =
+		                std::shared_ptr<lsproto::TextDocumentEdit>(
+		                    new lsproto::TextDocumentEdit{
+		                        .TextDocument = lsproto::
+		                            OptionalVersionedTextDocumentIdentifier{
+		                                .Uri = uri},
+		                        .Edits = lspEdits,
+		                    }),
 		        });
 	}
 
@@ -235,7 +241,7 @@ void LanguageService::updateTsconfigFiles(
 						    changeTracker->InsertNodeAfter(
 						        configFile,
 						        elements[elements.size() - 1],
-						        changeTracker->NodeFactory
+						        changeTracker->nodeFactory
 						            ->newStringLiteral(
 						                relativePathFromDirectory(
 						                    configDir,
@@ -355,7 +361,8 @@ bool tryUpdateConfigString(SourceFile* configFile,
 	              element->end() - 1};
 	auto [lspRange, fidelity] =
 	    converters->ToLSPRange(configFile, textRange);
-	TSC_ASSERT(fidelity.IsExact(), "config files are not content-mapped");
+	debug::assert(fidelity.IsExact(),
+	              "config files are not content-mapped");
 	changeTracker->ReplaceRangeWithText(
 	    configFile, lspRange,
 	    relativePathFromDirectory(configDir, updated,
