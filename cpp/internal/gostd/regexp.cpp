@@ -4,12 +4,23 @@
 namespace tsc::gostd::regexp {
 
 Regexp::Regexp(std::string_view pattern) {
-	if (pattern.starts_with("(?m)")) {
-		multiline_ = true;
-		pattern.remove_prefix(4);
+	bool icase = false;
+	while (pattern.starts_with("(?") ) {
+		auto close = pattern.find(')');
+		if (close == std::string_view::npos) break;
+		auto flags = pattern.substr(2, close - 2);
+		bool any = false;
+		for (char f : flags) {
+			if (f == 'm') multiline_ = true, any = true;
+			else if (f == 'i') icase = true, any = true;
+		}
+		if (!any) break;
+		pattern.remove_prefix(close + 1);
 	}
 	pattern_ = std::string(pattern);
-	re_ = std::regex(pattern_, std::regex::ECMAScript);
+	auto flags = std::regex::ECMAScript;
+	if (icase) flags |= std::regex::icase;
+	re_ = std::regex(pattern_, flags);
 }
 
 std::vector<std::string> Regexp::findIn(const std::string& s) const {
@@ -106,6 +117,92 @@ std::vector<std::string> Regexp::Split(const std::string& s, int n) const {
 		last = it->position() + it->length();
 	}
 	out.push_back(s.substr(last));
+	return out;
+}
+
+// expandTemplate — Go's replacement-template rules: $$ literal $; $1/$99
+// numbered groups (all digits consumed); ${name} named groups; a bare $ not
+// followed by a valid name is emitted literally.
+static std::string expandTemplate(const std::smatch& m,
+                                  const std::string& repl) {
+	std::string out;
+	for (size_t i = 0; i < repl.size();) {
+		char c = repl[i];
+		if (c != '$' || i + 1 >= repl.size()) {
+			out += c;
+			i++;
+			continue;
+		}
+		size_t j = i + 1;
+		if (repl[j] == '$') {
+			out += '$';
+			i = j + 1;
+			continue;
+		}
+		bool braces = repl[j] == '{';
+		size_t nameStart = braces ? j + 1 : j;
+		size_t k = nameStart;
+		while (k < repl.size() &&
+		       (std::isalnum((unsigned char)repl[k]) || repl[k] == '_'))
+			k++;
+		if (braces) {
+			if (k == nameStart || k >= repl.size() || repl[k] != '}') {
+				out += '$';
+				i++;
+				continue;
+			}
+		} else if (k == nameStart) {
+			out += '$';
+			i++;
+			continue;
+		}
+		std::string name = repl.substr(nameStart, k - nameStart);
+		bool allDigits = !name.empty() &&
+		    std::all_of(name.begin(), name.end(), [](char ch) {
+			    return std::isdigit((unsigned char)ch) != 0;
+		    });
+		if (allDigits) {
+			int idx = std::atoi(name.c_str());
+			if (idx >= 0 && idx < (int)m.size()) out += m[idx].str();
+		}
+		// Named groups are not used by ported callers; an unrecognized
+		// (non-numeric) name expands to empty like Go's absent group.
+		i = braces ? k + 1 : k;
+	}
+	return out;
+}
+
+std::string Regexp::replaceAllIn(const std::string& s,
+                                 const std::string& repl) const {
+	std::string out;
+	size_t last = 0;
+	for (auto it = std::sregex_iterator(s.begin(), s.end(), re_);
+	     it != std::sregex_iterator(); ++it) {
+		out += s.substr(last, it->position() - last);
+		out += expandTemplate(*it, repl);
+		last = it->position() + it->length();
+	}
+	out += s.substr(last);
+	return out;
+}
+
+std::string Regexp::ReplaceAllString(const std::string& s,
+                                     const std::string& repl) const {
+	if (!multiline_) {
+		return replaceAllIn(s, repl);
+	}
+	// (?m): per-line, mirroring MatchString/FindStringSubmatch.
+	std::string out;
+	size_t start = 0;
+	while (start <= s.size()) {
+		size_t nl = s.find('\n', start);
+		std::string line = s.substr(
+		    start, nl == std::string::npos ? nl : nl - start);
+		out += replaceAllIn(line, repl);
+		if (nl == std::string::npos) break;
+		out += '\n';
+		start = nl + 1;
+	}
 	return out;
 }
 

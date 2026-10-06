@@ -1,8 +1,5 @@
 // Declarations for tsc/internal/testutil/harnessutil — the Go test-harness
-// utility package. Only the surface consumed by the testrunner slice is
-// declared. Bodies live in testrunner_deps.cpp: a few are real dep-impls
-// (small helpers on the ported functions' unconditional paths); the rest are
-// TSC_UNREACHABLE dep-stubs to be replaced when the testutil slice lands.
+// utility package.
 #pragma once
 
 #include <string>
@@ -15,6 +12,7 @@
 #include "internal/gostd/gostd.h"
 #include "internal/gostd/regexp.h"
 #include "internal/gostd/testing.h"
+#include "internal/vfs/vfs.h"
 
 namespace tsc::compiler {
 class CompilerHost;
@@ -99,6 +97,27 @@ struct CompilationResult {
 	    inputsAndOutputs;
 	std::string Trace;
 	compiler::CompilerHost* Host = nullptr;
+
+	// getOutputPath — harnessutil.go:836.
+	std::string getOutputPath(const std::string& path,
+	                          const std::string& ext);
+	// FS — harnessutil.go:861.
+	std::shared_ptr<vfs::FS> FS();
+	// GetNumberOfJSFiles — harnessutil.go:865.
+	int GetNumberOfJSFiles(bool includeJson);
+	// Inputs — harnessutil.go:877.
+	const std::vector<TestFile*>& Inputs() { return inputs; }
+	// Outputs — harnessutil.go:881.
+	const std::vector<TestFile*>& Outputs() { return outputs; }
+	// GetInputsAndOutputsForFile — harnessutil.go:885.
+	CompilationOutput* GetInputsAndOutputsForFile(const std::string& path);
+	// GetInputsForFile — harnessutil.go:889.
+	std::vector<TestFile*> GetInputsForFile(const std::string& path);
+	// GetOutput — harnessutil.go:897 (kind: "js" | "dts" | "map").
+	TestFile* GetOutput(const std::string& path,
+	                    const std::string& kind);
+	// GetSourceMapRecord — harnessutil.go:914.
+	std::string GetSourceMapRecord();
 };
 
 // CompileFiles — harnessutil.go:81.
@@ -109,6 +128,18 @@ CompilationResult* CompileFiles(
     tsoptions::ParsedCommandLine* tsconfig,
     const std::string& currentDirectory,
     const std::unordered_map<std::string, std::string>& symlinks);
+
+// CompileFilesEx — harnessutil.go:119.
+CompilationResult* CompileFilesEx(
+    gostd::testing::T* t, const std::vector<TestFile*>& inputFiles,
+    const std::vector<TestFile*>& otherFiles, HarnessOptions* harnessOptions,
+    CompilerOptions* compilerOptions, const std::string& currentDirectory,
+    const std::unordered_map<std::string, std::string>& symlinks,
+    tsoptions::ParsedCommandLine* tsconfig);
+
+// NewOutputRecorderFS — recorderfs.go:18.
+std::shared_ptr<vfs::FS>
+NewOutputRecorderFS(const std::shared_ptr<vfs::FS>& fs);
 
 // SetOptionsFromTestConfig — harnessutil.go:291.
 void SetOptionsFromTestConfig(gostd::testing::T* t,

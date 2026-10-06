@@ -409,6 +409,9 @@ struct CompilerOptions {
 	bool IsIncremental() const {
 		return tristateIsTrue(Incremental) || tristateIsTrue(Composite);
 	}
+	// === slice: testutil ===
+	// Clone — compileroptions.go:183. Shallow copy like Go's field copy.
+	CompilerOptions* Clone() const { return new CompilerOptions(*this); }
 	bool GetEmitStandardClassFields() const {
 		return UseDefineForClassFields != Tristate::False &&
 			   GetEmitScriptTarget() >= ScriptTarget::ES2022;
