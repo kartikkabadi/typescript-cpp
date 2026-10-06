@@ -146,7 +146,8 @@ std::vector<const tsoptions::CommandLineOption*> getOptionsForHelp(
 	opts.push_back(&tsoptions::TscBuildOption());
 
 	if (tristateIsTrue(commandLine->CompilerOptions()->All)) {
-		std::sort(opts.begin(), opts.end(),
+		// help.go:33 — name ties keep declaration order ("-h" before "-?").
+		std::stable_sort(opts.begin(), opts.end(),
 		          [](const tsoptions::CommandLineOption* a,
 		             const tsoptions::CommandLineOption* b) {
 			          std::string al = a->Name, bl = b->Name;

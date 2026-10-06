@@ -234,6 +234,9 @@ struct toBuildInfo {
 	}
 
 	void setFileInfoAndEmitSignatures() {
+		// Go assigns via core.Map — non-nil (so marshalled) even when
+		// empty.
+		buildInfo->fileInfosAssigned = true;
 		for (auto* file : program->GetSourceFiles()) {
 			auto [info, _] =
 			    snapshot->fileInfos.Load(file->Path());

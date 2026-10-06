@@ -84,6 +84,8 @@ add_library(tsc STATIC
 	internal/parser/jsdoc.cpp
 	internal/parser/reparser.cpp
 	internal/parser/references.cpp
+	# === slice: patience ===
+	internal/patience/patience.cpp
 	# === slice: printer ===
 	internal/printer/changetrackerwriter.cpp
 	internal/printer/textwriter.cpp
@@ -426,3 +428,12 @@ target_link_libraries(tsc PUBLIC z) # zlib — pprof profile writer
 
 add_executable(tscpp cmd/tscpp/main.cpp cmd/tscpp/sys.cpp cmd/tscpp/lsp.cpp cmd/tscpp/api.cpp)
 target_link_libraries(tscpp PRIVATE tsc)
+
+# tsctestrunner — scenario-runner binary for the ported tscInput tests.
+# Scenarios self-register via REGISTER_TSCTEST; enumerate them with glob
+# so adding a tests/*.cpp file needs no list maintenance.
+file(GLOB tsctestrunner_tests CONFIGURE_DEPENDS
+	internal/execute/tsctests/tests/*.cpp)
+add_executable(tsctestrunner cmd/tsctestrunner/main.cpp
+	${tsctestrunner_tests})
+target_link_libraries(tsctestrunner PRIVATE tsc)

@@ -30,9 +30,9 @@ void writeJsonString(std::string& out, std::string_view s) {
 	size_t i = 0;
 	while (i < s.size()) {
 		uint8_t c = static_cast<uint8_t>(s[i]);
-		// Fast path: printable ASCII except " and \.
-		if (c >= 0x20 && c <= 0x7e && c != '"' && c != '\\' && c != '<' &&
-		    c != '>' && c != '&') {
+		// Fast path: printable ASCII except " and \. (encoding/json/v2
+		// does not HTML-escape <, >, &.)
+		if (c >= 0x20 && c <= 0x7e && c != '"' && c != '\\') {
 			out += static_cast<char>(c);
 			i++;
 			continue;
@@ -56,18 +56,6 @@ void writeJsonString(std::string& out, std::string_view s) {
 			continue;
 		case '\t':
 			out += "\\t";
-			i++;
-			continue;
-		case '<':
-			out += "\\u003c";
-			i++;
-			continue;
-		case '>':
-			out += "\\u003e";
-			i++;
-			continue;
-		case '&':
-			out += "\\u0026";
 			i++;
 			continue;
 		default:
@@ -521,7 +509,7 @@ std::string marshalBuildInfo(const BuildInfo* b) {
 	      [&] { writeStringArray(out, b->ContentMapperIdentities); });
 	field("fileNames", !b->FileNames.empty(),
 	      [&] { writeStringArray(out, b->FileNames); });
-	field("fileInfos", !b->FileInfos.empty(), [&] {
+	field("fileInfos", b->fileInfosAssigned, [&] {
 		out += '[';
 		for (size_t i = 0; i < b->FileInfos.size(); i++) {
 			if (i) out += ',';
@@ -1340,6 +1328,7 @@ BuildInfo* unmarshalBuildInfo(std::string_view data) {
 	if (field(root, "fileInfos", f)) {
 		auto* arr = f.get<tsoptions::JsonArray>();
 		if (arr == nullptr) return nullptr;
+		b->fileInfosAssigned = true;
 		for (const auto& elem : *arr) {
 			auto* info = new BuildInfoFileInfo();
 			std::string err;
@@ -1528,6 +1517,9 @@ FileInfo* BuildInfoFileInfo::GetFileInfo() const {
 	f->impliedNodeFormat = fileInfo->impliedNodeFormat;
 	return f;
 }
+
+// buildInfo.go:154 HasSignature.
+bool BuildInfoFileInfo::HasSignature() const { return !signature.empty(); }
 
 // buildInfo.go:359 toEmitSignature.
 emitSignature* BuildInfoEmitSignature::toEmitSignature(

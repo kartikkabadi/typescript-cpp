@@ -343,7 +343,7 @@ SimpleProgram::SimpleProgram(CompilerHost* host_,
 	// fileLoader{} setup (processAllProgramFiles body, fileloader.go:152)
 	filesLoader loader;
 	filesParser parser;
-	includeProcessor_.processingDiagArena.clear();
+	includeProcessor_.processingDiagArena->clear();
 	loader.opts = &opts_;
 	loader.host = host;
 	loader.compilerOptions = &options;
@@ -354,7 +354,10 @@ SimpleProgram::SimpleProgram(CompilerHost* host_,
 	loader.tracing = tr_;
 	loader.defaultLibraryPath = tspath::getNormalizedAbsolutePath(
 	    host->DefaultLibraryPath(), host->GetCurrentDirectory());
-	loader.useCaseSensitiveFileNames = true; // POSIX FS — vfs UseCaseSensitiveFileNames
+	// fileloader.go:168 — the host FS decides case sensitivity (a VFS may be
+	// case-insensitive; hard-coding true desyncs filesByPath keys from
+	// SimpleProgram::toPath lookups).
+	loader.useCaseSensitiveFileNames = host->FS()->UseCaseSensitiveFileNames();
 	// fileloader.go:178 — extensions the configured content mappers claim.
 	loader.contentMapperExtensions = commandLine_->ContentMapperExtensions();
 	loader.supportedExtensions =
@@ -948,21 +951,28 @@ std::vector<Diagnostic*> SimpleProgram::GetGlobalDiagnostics() {
 	return checker_->diagnostics.GetGlobalDiagnostics();
 }
 
-// program.go:1454 GetDeclarationDiagnostics
+// program.go:1467 GetDeclarationDiagnostics — collectDiagnostics fan-out;
+// per-file body is getDeclarationDiagnosticsForFile (program.go:1618).
 std::vector<Diagnostic*> SimpleProgram::GetDeclarationDiagnostics(
     SourceFile* sourceFile) {
-	// Memoization is used in order to avoid emitting the declaration file
-	// twice
-	if (auto it = declarationDiagnosticCache.find(sourceFile);
-	    it != declarationDiagnosticCache.end()) {
-		return it->second;
-	}
+	return collectDiagnostics(
+	    sourceFile, [this](SourceFile* file) -> std::vector<Diagnostic*> {
+		    if (file->IsDeclarationFile) {
+			    return {};
+		    }
+		    // Memoization is used in order to avoid emitting the declaration
+		    // file twice
+		    if (auto it = declarationDiagnosticCache.find(file);
+		        it != declarationDiagnosticCache.end()) {
+			    return it->second;
+		    }
 
-	auto [eh, done] = newEmitHost(this, sourceFile);
-	auto diags = getDeclarationDiagnostics(eh.get(), sourceFile);
-	done();
-	declarationDiagnosticCache[sourceFile] = diags;
-	return diags;
+		    auto [eh, done] = newEmitHost(this, file);
+		    auto diags = getDeclarationDiagnostics(eh.get(), file);
+		    done();
+		    declarationDiagnosticCache[file] = diags;
+		    return diags;
+	    });
 }
 
 // --- program.go: file/path accessors ---
@@ -2914,9 +2924,20 @@ std::tuple<SimpleProgram*, SourceFile*, bool> SimpleProgram::ReuseProgram(
 	result->finishedProcessing = finishedProcessing;
 	result->fileNameList = fileNameList;
 	result->syntheticImportArena = syntheticImportArena;
-	// includeProcessor is rebuilt below by updateFileIncludeProcessor
-	// (program.go:431) — Go drops its sync maps when re-keying against
-	// the new program.
+	// includeProcessor — program.go:408: the processedFiles embed copies
+	// the *includeProcessor pointer, so the splice shares this program's
+	// reasons (the GC owns them). updateFileIncludeProcessor
+	// (program.go:431) then re-keys a fresh processor on the new program
+	// keeping only the maps; the arenas are shared_ptr so the pointers the
+	// maps hold stay valid while either program lives.
+	result->includeProcessor_.fileIncludeReasons =
+	    includeProcessor_.fileIncludeReasons;
+	result->includeProcessor_.processingDiagnostics =
+	    includeProcessor_.processingDiagnostics;
+	result->includeProcessor_.reasonArena = includeProcessor_.reasonArena;
+	result->includeProcessor_.processingDiagArena =
+	    includeProcessor_.processingDiagArena;
+	result->includeProcessor_.diagArena = includeProcessor_.diagArena;
 	result->unresolvedImports.tryReuse(&unresolvedImports);
 	result->knownSymlinks.tryReuse(&knownSymlinks);
 	result->packageNames_.tryReuse(&packageNames_);

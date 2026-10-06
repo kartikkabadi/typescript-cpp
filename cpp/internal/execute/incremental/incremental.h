@@ -358,6 +358,10 @@ struct BuildInfo {
 	std::vector<std::string> MissingPackageJsons;
 	std::vector<std::string> ContentMapperIdentities;
 	std::vector<std::string> FileNames;
+	// Go marshals fileInfos with `omitzero`: a nil slice is omitted but
+	// an assigned empty slice still prints as `"fileInfos":[]`. This flag
+	// records "was assigned" (setFileInfoAndEmitSignatures or unmarshal).
+	bool fileInfosAssigned = false;
 	std::vector<BuildInfoFileInfo*> FileInfos;
 	std::vector<std::vector<BuildInfoFileId>> FileIdsList;
 	tsoptions::JsonObjectPtr Options;

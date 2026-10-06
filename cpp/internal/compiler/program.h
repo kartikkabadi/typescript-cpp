@@ -305,15 +305,23 @@ struct includeProcessor {
 	    fileIncludeReasons;
 	std::vector<processingDiagnostic*> processingDiagnostics;
 
-	// arenas for stable pointers
-	std::vector<std::unique_ptr<FileIncludeReason>> reasonArena;
-	std::vector<std::unique_ptr<processingDiagnostic>> processingDiagArena;
-	std::vector<std::unique_ptr<Diagnostic>> diagArena;
+	// arenas for stable pointers — shared_ptr because ReuseProgram's
+	// splice shares the old program's processor with the new one (Go: the
+	// processedFiles embed carries the *includeProcessor pointer, and the
+	// GC keeps the reasons alive across both programs).
+	std::shared_ptr<std::vector<std::unique_ptr<FileIncludeReason>>>
+	    reasonArena = std::make_shared<
+	        std::vector<std::unique_ptr<FileIncludeReason>>>();
+	std::shared_ptr<std::vector<std::unique_ptr<processingDiagnostic>>>
+	    processingDiagArena = std::make_shared<
+	        std::vector<std::unique_ptr<processingDiagnostic>>>();
+	std::shared_ptr<std::vector<std::unique_ptr<Diagnostic>>> diagArena =
+	    std::make_shared<std::vector<std::unique_ptr<Diagnostic>>>();
 
 	const FileIncludeReason* newReason(FileIncludeKind kind,
 	                                   FileIncludeReason::DataV data) {
 		return reasonArena
-		    .emplace_back(
+		    ->emplace_back(
 		        std::make_unique<FileIncludeReason>(FileIncludeReason{kind,
 		                                                            data}))
 		    .get();
@@ -323,7 +331,7 @@ struct includeProcessor {
 	    std::variant<const FileIncludeReason*, includeExplainingDiagnostic>
 	        d) {
 		return processingDiagArena
-		    .emplace_back(
+		    ->emplace_back(
 		        std::make_unique<processingDiagnostic>(
 		            processingDiagnostic{k, std::move(d)}))
 		    .get();
