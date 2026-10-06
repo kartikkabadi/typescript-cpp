@@ -76,7 +76,7 @@ tsoptions::ParsedCommandLine* GetParsedCommandLine(
 	auto host = NewVFSParseConfigHost(files, currentDirectory,
 	                                  useCaseSensitiveFileNames);
 	std::string configFileName =
-	    tspath::combinePaths(currentDirectory, "tsconfig.json");
+	    tspath::combinePaths(currentDirectory, {"tsconfig.json"});
 	auto* tsconfigSourceFile = tsoptions::NewTsconfigSourceFileFromFilePath(
 	    configFileName,
 	    tspath::toPath(configFileName, currentDirectory,

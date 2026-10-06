@@ -1,0 +1,9 @@
+max RSS (KB), tsc -p tsconfig.json --noEmit, 3 runs
+go run1: 160128 KB
+go run2: 161024 KB
+go run3: 160000 KB
+go median RSS: 160128 KB
+cpp run1: 359076 KB
+cpp run2: 359208 KB
+cpp run3: 358948 KB
+cpp median RSS: 359076 KB
