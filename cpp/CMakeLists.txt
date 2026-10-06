@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(tscpp CXX)
+project(tscpp CXX C)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -16,6 +16,23 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
 endif()
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+
+# mimalloc drop-in allocator (vendored third_party/mimalloc, v2.1.7).
+# static.c compiles the whole allocator as one TU; alloc-override.c
+# interposes the C malloc family; malloc_override.cpp interposes C++
+# operator new/delete. Static link puts our symbols ahead of libc's.
+option(TSCPP_MIMALLOC "Route all heap allocation through mimalloc" ON)
+if(TSCPP_MIMALLOC)
+	add_library(tsc_mimalloc STATIC
+		third_party/mimalloc/src/static.c
+		cmd/malloc_override.cpp)
+	target_include_directories(tsc_mimalloc PUBLIC third_party/mimalloc/include)
+	target_compile_definitions(tsc_mimalloc PRIVATE MI_MALLOC_OVERRIDE)
+	set_target_properties(tsc_mimalloc PROPERTIES C_STANDARD 11)
+	set(tsc_alloc_lib tsc_mimalloc)
+else()
+	set(tsc_alloc_lib "")
+endif()
 
 add_library(tsc STATIC
 	internal/ast/ast.cpp
@@ -428,7 +445,7 @@ add_library(tsc STATIC
 target_link_libraries(tsc PUBLIC z) # zlib — pprof profile writer
 
 add_executable(tscpp cmd/tscpp/main.cpp cmd/tscpp/sys.cpp cmd/tscpp/lsp.cpp cmd/tscpp/api.cpp)
-target_link_libraries(tscpp PRIVATE tsc)
+target_link_libraries(tscpp PRIVATE ${tsc_alloc_lib} tsc)
 
 # tsctestrunner — scenario-runner binary for the ported tscInput tests.
 # Scenarios self-register via REGISTER_TSCTEST; enumerate them with glob
@@ -437,4 +454,4 @@ file(GLOB tsctestrunner_tests CONFIGURE_DEPENDS
 	internal/execute/tsctests/tests/*.cpp)
 add_executable(tsctestrunner cmd/tsctestrunner/main.cpp
 	${tsctestrunner_tests})
-target_link_libraries(tsctestrunner PRIVATE tsc)
+target_link_libraries(tsctestrunner PRIVATE ${tsc_alloc_lib} tsc)
