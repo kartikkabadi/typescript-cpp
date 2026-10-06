@@ -88,7 +88,7 @@ CompileAndEmitResult EmitFilesAndReportErrors(const EmitInput& input) {
 		        std::function<void()> tracePop;
 		        if (auto* tr = input.Tracing; tr != nullptr) {
 			        tracePop = tr->Push(tracing::PhaseBind,
-			                            "bindSourceFiles", {}, true);
+			                            "bindSourceFiles", tracing::TraceArgs{}, true);
 		        }
 		        auto bindStart = input.Sys->Now();
 		        auto diags = input.ProgramLike->GetBindDiagnostics(file);
@@ -104,7 +104,7 @@ CompileAndEmitResult EmitFilesAndReportErrors(const EmitInput& input) {
 		        std::function<void()> tracePop;
 		        if (auto* tr = input.Tracing; tr != nullptr) {
 			        tracePop = tr->Push(tracing::PhaseCheck,
-			                            "checkSourceFiles", {}, true);
+			                            "checkSourceFiles", tracing::TraceArgs{}, true);
 		        }
 		        auto checkStart = input.Sys->Now();
 		        auto diags = input.ProgramLike->GetSemanticDiagnostics(file);

@@ -441,8 +441,16 @@ Type* Checker::instantiateTypeWithAlias(Type* t, TypeMapper* m, TypeAlias* alias
 		// We have reached 100 recursive type instantiations, or 5M type instantiations caused by the same statement
 		// or expression. There is a very high likelihood we're dealing with a combination of infinite generic types
 		// that perpetually generate new type identities, so we stop the recursion here by yielding the error type.
-		// TRACING: tr.Instant(tracing.PhaseCheckTypes, "instantiateType_DepthLimit",
-		//   {"typeId": t->id, "instantiationDepth": instantiationStack.size(), "instantiationCount": instantiationCount})
+		// checker.go:22508 — `tr.Instant(PhaseCheckTypes,
+		// "instantiateType_DepthLimit", {...})`.
+		if (tracer != nullptr) {
+			tracer->Instant(
+			    tracing::PhaseCheckTypes, "instantiateType_DepthLimit",
+			    tracing::TraceArgs{
+			        {"typeId", t->id},
+			        {"instantiationDepth", (int)instantiationStack.size()},
+			        {"instantiationCount", instantiationCount}});
+		}
 		std::vector<std::string> circularTypeNames = getCircularTypeNames();
 		if (circularTypeNames.size() == 1) {
 			error(currentNode, Instantiations_of_type_0_appear_infinitely_circular,

@@ -212,6 +212,7 @@ add_library(tsc STATIC
 	internal/osutil/osutil.cpp
 	internal/pprof/pprof.cpp
 	internal/repo/paths.cpp
+	internal/tracing/tracing.cpp
 	# === slice: incremental ===
 	internal/execute/incremental/affectedfileshandler.cpp
 	internal/execute/incremental/buildinfo.cpp

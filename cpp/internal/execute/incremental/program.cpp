@@ -329,7 +329,7 @@ void Program::collectSemanticDiagnosticsOfAffectedFiles(SourceFile* file) {
 compiler::EmitResult* Program::emitBuildInfo(compiler::EmitOptions* options) {
 	std::function<void()> trPop;
 	if (auto* tr = program_->Tracing(); tr != nullptr) {
-		trPop = tr->Push(tracing::PhaseEmit, "emitBuildInfo", {},
+		trPop = tr->Push(tracing::PhaseEmit, "emitBuildInfo", tracing::TraceArgs{},
 		                 true);
 	}
 	auto trDone = [&]() {

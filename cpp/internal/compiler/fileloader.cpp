@@ -115,6 +115,11 @@ LibFile* filesLoader::pathForLibFile(const std::string& name) {
 		std::string libraryName = getLibraryNameFromLibFileName(name);
 		std::string resolveFrom = getInferredLibraryNameResolveFrom(
 		    compilerOptions, host->GetCurrentDirectory(), name);
+		// fileloader.go:989 — resolveLibrary's `defer tr.Push(PhaseProgram,
+		// "resolveLibrary", {"resolveFrom"}, false)()`.
+		tracing::TraceScope traceResolveLibrary(
+		    tracing, tracing::PhaseProgram, "resolveLibrary",
+		    tracing::TraceArgs{{"resolveFrom", resolveFrom}}, false);
 		module::ResolvedModule* resolution = resolver->ResolveModuleName(
 		    libraryName, resolveFrom, ModuleKind::CommonJS, nullptr).first.get();
 		if (resolution != nullptr && resolution->IsResolved()) {
@@ -193,6 +198,11 @@ SourceFileMetaData filesLoader::loadSourceFileMetaData(
 
 // fileloader.go:417 parseSourceFile
 SourceFile* filesLoader::parseSourceFile(parseTask* t) {
+	// fileloader.go:415 — `defer p.opts.Tracing.Push(PhaseParse,
+	// "createSourceFile", {"path"}, true)()`.
+	tracing::TraceScope traceCreateSourceFile(
+	    tracing, tracing::PhaseParse, "createSourceFile",
+	    tracing::TraceArgs{{"path", t->normalizedFilePath}}, true);
 	tspath::Path path = toPath(t->normalizedFilePath);
 	CompilerOptions* options = compilerOptions; // no project-reference redirect
 	SourceFileParseOptions parseOptions{
@@ -720,6 +730,14 @@ void filesLoader::resolveTypeReferenceDirectives(parseTask* t) {
 	SourceFile* file = t->file;
 	if (file->TypeReferenceDirectives.empty())
 		return;
+	// fileloader.go:781 — `defer p.opts.Tracing.Push(PhaseProgram,
+	// "resolveTypeReferenceDirectiveNamesWorker",
+	// {"containingFileName"}, false)()`.
+	tracing::TraceScope traceResolveWorker(
+	    tracing, tracing::PhaseProgram,
+	    "resolveTypeReferenceDirectiveNamesWorker",
+	    tracing::TraceArgs{{"containingFileName", file->FileName()}},
+	    false);
 	SourceFileMetaData meta = t->metadata;
 
 	auto typeResolutionsInFile =
@@ -734,6 +752,21 @@ void filesLoader::resolveTypeReferenceDirectives(parseTask* t) {
 		module::ResolvedTypeReferenceDirective* resolved =
 		    resolver->ResolveTypeReferenceDirective(
 		        ref->FileName, file->FileName(), resolutionMode, nullptr).first.get();
+		// fileloader.go:793 — non-defer `traceDone = p.opts.Tracing.Push(...)`;
+		// invoked at the end of the iteration.
+		std::function<void()> traceDone;
+		if (tracing != nullptr) {
+			traceDone = tracing->Push(
+			    tracing::PhaseProgram, "processTypeReferenceDirective",
+			    tracing::TraceArgs{
+			        {"directive", ref->FileName},
+			        {"hasResolved",
+			         resolved != nullptr && resolved->IsResolved()},
+			        {"refKind",
+			         (int)FileIncludeKind::TypeReferenceDirective},
+			        {"refPath", std::string(t->path)}},
+			    false);
+		}
 		typeResolutionsInFile[module::ModeAwareCacheKey{ref->FileName,
 		                                              resolutionMode}] =
 		    resolved;
@@ -753,6 +786,9 @@ void filesLoader::resolveTypeReferenceDirectives(parseTask* t) {
 			t->processingDiagnostics.push_back(ip->newProcessingDiagnostic(
 			    processingDiagnosticKind::UnknownReference, includeReason));
 		}
+		if (traceDone) {
+			traceDone();
+		}
 	}
 
 	t->typeResolutionsInFile = std::move(typeResolutionsInFile);
@@ -763,6 +799,12 @@ void filesLoader::resolveTypeReferenceDirectives(parseTask* t) {
 static const char* externalHelpersModuleNameText = "tslib";
 
 void filesLoader::resolveImportsAndModuleAugmentations(parseTask* t) {
+	// fileloader.go:832 — `defer p.opts.Tracing.Push(PhaseProgram,
+	// "resolveModuleNamesWorker", {"containingFileName"}, false)()`.
+	tracing::TraceScope traceResolveModules(
+	    tracing, tracing::PhaseProgram, "resolveModuleNamesWorker",
+	    tracing::TraceArgs{{"containingFileName", t->file->FileName()}},
+	    false);
 	SourceFile* file = t->file;
 	SourceFileMetaData meta = t->metadata;
 
@@ -927,6 +969,11 @@ void filesLoader::addAutomaticTypeDirectiveTasks() {
 
 // fileloader.go:299 resolveAutomaticTypeDirectives
 void filesLoader::resolveAutomaticTypeDirectives(parseTask* t) {
+	// filesparser.go:197 — `defer loader.opts.Tracing.Push(PhaseProgram,
+	// "processTypeReferences", nil, false)()` (wraps the
+	// loadAutomaticTypeDirectives equivalent).
+	tracing::TraceScope traceProcessTypeRefs(
+	    tracing, tracing::PhaseProgram, "processTypeReferences", {}, false);
 	std::vector<std::string> automaticTypeDirectiveNames =
 	    module::GetAutomaticTypeDirectiveNames(*compilerOptions, host);
 	if (!automaticTypeDirectiveNames.empty()) {
@@ -939,6 +986,21 @@ void filesLoader::resolveAutomaticTypeDirectives(parseTask* t) {
 			module::ResolvedTypeReferenceDirective* resolved =
 			    resolver->ResolveTypeReferenceDirective(
 			        name, t->normalizedFilePath, resolutionMode, nullptr).first.get();
+			// fileloader.go:304 — `traceDone = opts.Tracing.Push(PhaseProgram,
+			// "processTypeReferenceDirective", {...}, false)` — non-defer;
+			// called at the end of the iteration.
+			std::function<void()> traceDone;
+			if (tracing != nullptr) {
+				traceDone = tracing->Push(
+				    tracing::PhaseProgram, "processTypeReferenceDirective",
+				    tracing::TraceArgs{
+				        {"directive", name},
+				        {"hasResolved",
+				         resolved != nullptr && resolved->IsResolved()},
+				        {"refKind",
+				         (int)FileIncludeKind::AutomaticTypeDirectiveFile}},
+				    false);
+			}
 			t->typeResolutionsInFile[module::ModeAwareCacheKey{
 			    name, resolutionMode}] = resolved;
 			if (resolved != nullptr && resolved->IsResolved()) {
@@ -967,6 +1029,9 @@ void filesLoader::resolveAutomaticTypeDirectives(parseTask* t) {
 				            
 				                Cannot_find_type_definition_file_for_0,
 				        {name}}));
+			}
+			if (traceDone) {
+				traceDone();
 			}
 		}
 	}
@@ -1020,6 +1085,12 @@ void filesParser::load(parseTask* t) {
 		// task exists only to carry its processing diagnostic.
 		return;
 	}
+
+	// filesparser.go:71 — `defer loader.opts.Tracing.Push(PhaseProgram,
+	// "findSourceFile", {"fileName"}, false)()`.
+	tracing::TraceScope traceFindSourceFile(
+	    loader->tracing, tracing::PhaseProgram, "findSourceFile",
+	    tracing::TraceArgs{{"fileName", t->normalizedFilePath}}, false);
 
 	if (!t->isContentMapperSupplemental &&
 	    tspath::hasExtension(t->normalizedFilePath)) {
@@ -1500,6 +1571,11 @@ ResolutionMode getModeForUsageLocation(
 // task, then the parser run and collection.
 void filesLoader::processAllProgramFiles(
     const std::vector<std::string>& rootFileNames) {
+	// fileloader.go:194 — `defer opts.Tracing.Push(PhaseProgram,
+	// "processRootFiles", {"count"}, false)()`.
+	tracing::TraceScope traceProcessRootFiles(
+	    tracing, tracing::PhaseProgram, "processRootFiles",
+	    tracing::TraceArgs{{"count", (int)rootFileNames.size()}}, false);
 	for (size_t index = 0; index < rootFileNames.size(); index++) {
 		addRootFileTask(
 		    rootFileNames[index], nullptr,

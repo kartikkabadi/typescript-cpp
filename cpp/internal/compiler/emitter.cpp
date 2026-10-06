@@ -87,6 +87,11 @@ std::pair<std::unique_ptr<emitHost>, std::function<void()>> newEmitHost(
 
 // emitter.go:45 emit
 void emitter::emit() {
+	// emitter.go:48 — `defer e.tr.Push(..., "emit", {"path"}, true)()`.
+	tracing::TraceScope traceEmit(
+	    tr, tracing::PhaseEmit, "emit",
+	    tracing::TraceArgs{{"path", std::string(sourceFile->Path())}},
+	    true);
 	emitJSFile(sourceFile, paths->JsFilePath(), paths->SourceMapFilePath());
 	emitDeclarationFile(sourceFile, paths->DeclarationFilePath(),
 	                    paths->DeclarationMapPath());
@@ -114,6 +119,11 @@ emitter::getDeclarationTransformers(printer::EmitContext* emitContext,
 // emitter.go:72 runScriptTransformers
 SourceFile* emitter::runScriptTransformers(printer::EmitContext* emitContext,
                                          SourceFile* sourceFile) {
+	// emitter.go:70 — `defer e.tr.Push(..., "transformNodes", {"path"}, false)()`.
+	tracing::TraceScope traceTransform(
+	    tr, tracing::PhaseEmit, "transformNodes",
+	    tracing::TraceArgs{{"path", std::string(sourceFile->Path())}},
+	    false);
 	for (auto* transformer :
 	     getScriptTransformers(emitContext, host, sourceFile)) {
 		sourceFile = transformer->transformSourceFile(sourceFile);
@@ -127,6 +137,11 @@ emitter::runDeclarationTransformers(printer::EmitContext* emitContext,
                                     SourceFile* sourceFile,
                                     const std::string& declarationFilePath,
                                     const std::string& declarationMapPath) {
+	// emitter.go:80 — `defer e.tr.Push(..., "transformNodes", {"path"}, false)()`.
+	tracing::TraceScope traceTransform(
+	    tr, tracing::PhaseEmit, "transformNodes",
+	    tracing::TraceArgs{{"path", std::string(sourceFile->Path())}},
+	    false);
 	std::vector<Diagnostic*> diags;
 	for (auto* transformer :
 	     getDeclarationTransformers(emitContext, sourceFile,
@@ -270,6 +285,12 @@ void emitter::emitJSFile(SourceFile* sourceFile, const std::string& jsFilePath,
 		return;
 	}
 
+	// emitter.go:194 — `defer e.tr.Push(..., "emitJsFileOrBundle",
+	// {"jsFilePath"}, true)()`.
+	tracing::TraceScope traceEmitJs(
+	    tr, tracing::PhaseEmit, "emitJsFileOrBundle",
+	    tracing::TraceArgs{{"jsFilePath", jsFilePath}}, true);
+
 	auto [emitContext, putEmitContext] = printer::GetEmitContext();
 
 	sourceFile = runScriptTransformers(emitContext, sourceFile);
@@ -310,6 +331,13 @@ void emitter::emitDeclarationFile(SourceFile* sourceFile,
 	    emitOnly != EmitOnly::EmitOnlyBuilderSignature &&
 	    options->DeclarationMap == Tristate::True;
 	SourceFile* contentMappedSource = sourceFile;
+
+	// emitter.go:231 — `defer e.tr.Push(..., "emitDeclarationFileOrBundle",
+	// {"declarationFilePath"}, true)()`.
+	tracing::TraceScope traceEmitDecl(
+	    tr, tracing::PhaseEmit, "emitDeclarationFileOrBundle",
+	    tracing::TraceArgs{{"declarationFilePath", declarationFilePath}},
+	    true);
 
 	auto [emitContext, putEmitContext] = printer::GetEmitContext();
 	auto [sf, diags] =

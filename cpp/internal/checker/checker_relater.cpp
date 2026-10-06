@@ -2210,26 +2210,37 @@ std::vector<VarianceFlags> Checker::getVariancesWorker(
 	Symbol* symbol, const std::vector<Type*>& typeParameters) {
 	VarianceLinks* links = varianceLinks.Get(symbol);
 	if (!links->variances.has_value()) {
-		tsc::tracing::TraceArgs traceArgs;
+		std::shared_ptr<tsc::tracing::TraceArgs> traceArgs;
 		std::function<void()> popFn;
 		if (Tracer* tr = tracer; tr != nullptr) {
-			traceArgs = {{"arity", static_cast<int>(typeParameters.size())},
-						 {"id", getDeclaredTypeOfSymbol(symbol)->id}};
+			traceArgs = std::make_shared<tsc::tracing::TraceArgs>(tsc::tracing::TraceArgs{
+				{"arity", static_cast<int>(typeParameters.size())},
+				{"id", getDeclaredTypeOfSymbol(symbol)->id}});
 			popFn = tr->Push(tsc::tracing::PhaseCheckTypes, "getVariancesWorker",
 							 traceArgs, true);
 		}
-		// Mirrors the Go `defer func() { traceArgs["variances"] = formatted;
-		// popFn() }()`. NOTE: TraceArgs are copied into the pushed trace scope,
-		// so the post-computation "variances" arg Go adds here is lost — trace
-		// output only, no behavioral divergence.
+		// relater.go:1342-1348 — `defer func() { traceArgs["variances"] =
+		// formatted; popFn() }()`: the shared args map means the mutation
+		// reaches the "E" event.
 		struct TracePopGuard {
+			std::shared_ptr<tsc::tracing::TraceArgs> traceArgs;
 			std::function<void()> popFn;
+			VarianceLinks* links;
 			~TracePopGuard() {
-				if (popFn != nullptr) {
-					popFn();
+				if (popFn == nullptr) {
+					return;
 				}
+				std::vector<std::string> formatted;
+				if (links->variances.has_value()) {
+					formatted.reserve(links->variances->size());
+					for (VarianceFlags v : *links->variances) {
+						formatted.push_back(VarianceFlagsString(v));
+					}
+				}
+				(*traceArgs)["variances"] = std::move(formatted);
+				popFn();
 			}
-		} tracePopGuard{popFn};
+		} tracePopGuard{traceArgs, popFn, links};
 		(void)tracePopGuard;
 		int stackIndex = getVarianceStackIndex(symbol);
 		if (stackIndex < 0) {

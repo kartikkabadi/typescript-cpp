@@ -168,8 +168,14 @@ void Checker::checkSourceFile(SourceFile* sourceFile, bool checkUnused) {
 	// getDiagnostics can hide ones a pooled Go checker would have orphaned
 	// on a different checker instance (see Diagnostic::producedDuringCheckOf).
 	activeCheckFile = sourceFile;
+	// checker.go:2241 — `defer tr.Push(PhaseCheck, "checkSourceFile",
+	// {"path"}, true)()`; declared at fn scope so the pop runs after
+	// deferredNodes.clear() like Go's defer.
+	std::optional<tracing::TraceScope> traceCheckSourceFile;
 	if (!links->typeChecked) {
-		// TRACING: defer tr.Push(tracing.PhaseCheck, "checkSourceFile", {"path": sourceFile.FileName()}, true)
+		traceCheckSourceFile.emplace(
+		    tracer, tracing::PhaseCheck, "checkSourceFile",
+		    tracing::TraceArgs{{"path", sourceFile->FileName()}}, true);
 		checkGrammarSourceFile(sourceFile);
 		renamedBindingElementsInTypes.clear();
 		checkSourceElements(sourceFile->Statements->nodes);
@@ -556,7 +562,16 @@ void Checker::checkDeferredNodes(SourceFile* context) {
 }
 
 void Checker::checkDeferredNode(Node* node) {
-	// TRACING: defer tr.Push(tracing.PhaseCheck, "checkDeferredNode", {"kind": node.Kind, "pos": node.Pos(), "end": node.End(), "path": ast.GetSourceFileOfNode(node).FileName()}, false)
+	// checker.go:2546 — `defer tr.Push(PhaseCheck, "checkDeferredNode",
+	// {"kind","pos","end","path"}, false)()`.
+	tracing::TraceScope traceDeferredNode(
+	    tracer, tracing::PhaseCheck, "checkDeferredNode",
+	    tracing::TraceArgs{
+	        {"kind", node->kind},
+	        {"pos", node->pos()},
+	        {"end", node->end()},
+	        {"path", getSourceFileOfNode(node)->FileName()}},
+	    false);
 	Node* saveCurrentNode = currentNode;
 	currentNode = node;
 	instantiationCount = 0;
@@ -811,7 +826,16 @@ Type* Checker::getContextFreeTypeOfExpression(Node* node) {
 }
 
 Type* Checker::checkExpressionEx(Node* node, CheckMode checkMode) {
-	// TRACING: defer tr.Push(tracing.PhaseCheck, "checkExpression", {"kind": node.Kind, "pos": node.Pos(), "end": node.End(), "path": ast.GetSourceFileOfNode(node).FileName()}, false)
+	// checker.go:7731 — `defer tr.Push(PhaseCheck, "checkExpression",
+	// {"kind","pos","end","path"}, false)()`.
+	tracing::TraceScope traceCheckExpression(
+	    tracer, tracing::PhaseCheck, "checkExpression",
+	    tracing::TraceArgs{
+	        {"kind", node->kind},
+	        {"pos", node->pos()},
+	        {"end", node->end()},
+	        {"path", getSourceFileOfNode(node)->FileName()}},
+	    false);
 	Node* saveCurrentNode = currentNode;
 	currentNode = node;
 	instantiationCount = 0;

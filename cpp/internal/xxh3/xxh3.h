@@ -185,6 +185,27 @@ inline uint64_t xxh3Avalanche(uint64_t x) {
 	return x;
 }
 
+// utils.go:92 — the small-input avalanche used by Hash64 (xxh64AvalancheSmall
+// is identical; kept under the Go name).
+inline uint64_t xxhAvalancheSmall(uint64_t x) {
+	x ^= x >> 33;
+	x *= prime64_2;
+	x ^= x >> 29;
+	x *= prime64_3;
+	x ^= x >> 32;
+	return x;
+}
+
+// utils.go:117 — the 4-8 byte path's finalization mixer.
+inline uint64_t rrmxmx(uint64_t h64, uint64_t len) {
+	h64 ^= rotl64(h64, 49) ^ rotl64(h64, 24);
+	h64 *= 0x9fb21c651e98df25ull;
+	h64 ^= (h64 >> 35) + len;
+	h64 *= 0x9fb21c651e98df25ull;
+	h64 ^= (h64 >> 28);
+	return h64;
+}
+
 inline uint64_t mulFold64(uint64_t x, uint64_t y) {
 	auto [hi, lo] = mul64(x, y);
 	return hi ^ lo;
@@ -512,6 +533,130 @@ inline Uint128 hash128(std::string_view sv) {
 	acc.Hi = xxh3Avalanche(acc.Hi);
 
 	return acc;
+}
+
+// Hash64 returns the 64-bit hash of the byte slice — zeebo hash64.go:6 Hash /
+// hashAny. Scalar path; identical results to the SIMD paths.
+inline uint64_t hash64(std::string_view sv) {
+	using namespace detail;
+	const uint8_t* p = reinterpret_cast<const uint8_t*>(sv.data());
+	uint64_t l = sv.size();
+	uint64_t acc;
+
+	if (l <= 16) {
+		if (l > 8) { // 9-16
+			uint64_t inputlo = readU64(p, 0) ^ (key64_024 ^ key64_032);
+			uint64_t inputhi = readU64(p, l - 8) ^ (key64_040 ^ key64_048);
+			uint64_t folded = mulFold64(inputlo, inputhi);
+			return xxh3Avalanche(l + bswap64(inputlo) + inputhi + folded);
+		}
+		if (l > 3) { // 4-8
+			uint64_t input1 = readU32(p, 0);
+			uint64_t input2 = readU32(p, l - 4);
+			uint64_t input64 = input2 + (input1 << 32);
+			uint64_t keyed = input64 ^ (key64_008 ^ key64_016);
+			return rrmxmx(keyed, l);
+		}
+		if (l == 3) { // 3
+			uint64_t c12 = readU16(p, 0);
+			uint64_t c3 = readU8(p, 2);
+			acc = (c12 << 16) + c3 + (3 << 8);
+		} else if (l > 1) { // 2
+			uint64_t c12 = readU16(p, 0);
+			acc = (c12 * ((1 << 24) + 1) >> 8) + (2 << 8);
+		} else if (l == 1) { // 1
+			uint64_t c1 = readU8(p, 0);
+			acc = c1 * ((1 << 24) + (1 << 16) + 1) + (1 << 8);
+		} else { // 0
+			return 0x2d06800538d394c2ull; // xxh_avalanche(key64_056 ^ key64_064)
+		}
+
+		acc ^= uint64_t(key32_000 ^ key32_004);
+		return xxhAvalancheSmall(acc);
+	}
+
+	if (l <= 128) {
+		acc = l * prime64_1;
+
+		if (l > 32) {
+			if (l > 64) {
+				if (l > 96) {
+					acc += mulFold64(readU64(p, 6 * 8) ^ key64_096,
+					                 readU64(p, 7 * 8) ^ key64_104);
+					acc += mulFold64(readU64(p, l - 8 * 8) ^ key64_112,
+					                 readU64(p, l - 7 * 8) ^ key64_120);
+				} // 96
+				acc += mulFold64(readU64(p, 4 * 8) ^ key64_064,
+				                 readU64(p, 5 * 8) ^ key64_072);
+				acc += mulFold64(readU64(p, l - 6 * 8) ^ key64_080,
+				                 readU64(p, l - 5 * 8) ^ key64_088);
+			} // 64
+			acc += mulFold64(readU64(p, 2 * 8) ^ key64_032,
+			                 readU64(p, 3 * 8) ^ key64_040);
+			acc += mulFold64(readU64(p, l - 4 * 8) ^ key64_048,
+			                 readU64(p, l - 3 * 8) ^ key64_056);
+		} // 32
+		acc += mulFold64(readU64(p, 0 * 8) ^ key64_000,
+		                 readU64(p, 1 * 8) ^ key64_008);
+		acc += mulFold64(readU64(p, l - 2 * 8) ^ key64_016,
+		                 readU64(p, l - 1 * 8) ^ key64_024);
+
+		return xxh3Avalanche(acc);
+	}
+
+	if (l <= 240) {
+		acc = l * prime64_1;
+
+		acc += mulFold64(readU64(p, 0 * 16 + 0) ^ key64_000,
+		                 readU64(p, 0 * 16 + 8) ^ key64_008);
+		acc += mulFold64(readU64(p, 1 * 16 + 0) ^ key64_016,
+		                 readU64(p, 1 * 16 + 8) ^ key64_024);
+		acc += mulFold64(readU64(p, 2 * 16 + 0) ^ key64_032,
+		                 readU64(p, 2 * 16 + 8) ^ key64_040);
+		acc += mulFold64(readU64(p, 3 * 16 + 0) ^ key64_048,
+		                 readU64(p, 3 * 16 + 8) ^ key64_056);
+		acc += mulFold64(readU64(p, 4 * 16 + 0) ^ key64_064,
+		                 readU64(p, 4 * 16 + 8) ^ key64_072);
+		acc += mulFold64(readU64(p, 5 * 16 + 0) ^ key64_080,
+		                 readU64(p, 5 * 16 + 8) ^ key64_088);
+		acc += mulFold64(readU64(p, 6 * 16 + 0) ^ key64_096,
+		                 readU64(p, 6 * 16 + 8) ^ key64_104);
+		acc += mulFold64(readU64(p, 7 * 16 + 0) ^ key64_112,
+		                 readU64(p, 7 * 16 + 8) ^ key64_120);
+
+		// avalanche
+		acc = xxh3Avalanche(acc);
+
+		// trailing groups after 128
+		uint64_t top = l & ~uint64_t(15);
+		for (uint64_t i = 8 * 16; i < top; i += 16) {
+			acc += mulFold64(readU64(p, i + 0) ^ readU64(key, i - 125),
+			                 readU64(p, i + 8) ^ readU64(key, i - 117));
+		}
+
+		// last 16 bytes
+		acc += mulFold64(readU64(p, l - 16) ^ key64_119,
+		                 readU64(p, l - 8) ^ key64_127);
+
+		return xxh3Avalanche(acc);
+	}
+
+	// l > 240 — scalar accumulator.
+	acc = l * prime64_1;
+
+	uint64_t accs[8] = {
+		prime32_3, prime64_1, prime64_2, prime64_3,
+		prime64_4, prime32_2, prime64_5, prime32_1,
+	};
+	accumScalar(accs, p, l);
+
+	// merge accs
+	acc += mulFold64(accs[0] ^ key64_011, accs[1] ^ key64_019);
+	acc += mulFold64(accs[2] ^ key64_027, accs[3] ^ key64_035);
+	acc += mulFold64(accs[4] ^ key64_043, accs[5] ^ key64_051);
+	acc += mulFold64(accs[6] ^ key64_059, accs[7] ^ key64_067);
+
+	return xxh3Avalanche(acc);
 }
 
 } // namespace tsc::xxh3

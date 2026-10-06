@@ -374,6 +374,10 @@ Type* Checker::newType(TypeFlags flags, ObjectFlags objectFlags, TypeBase* data)
 	t->id = static_cast<TypeId>(TypeCount);
 	t->checker = this;
 	t->data = data;
+	// checker.go:25477 — `if c.tracer != nil { c.tracer.RecordType(t) }`.
+	if (tracer != nullptr) {
+		tracer->RecordType(t);
+	}
 	return t;
 }
 
@@ -1257,6 +1261,15 @@ std::vector<Type*> Checker::removeSubtypes(std::vector<Type*> types, bool hasObj
 					if (count == 100000) {
 						size_t estimatedCount = (count / (length - i)) * length;
 						if (estimatedCount > 1000000) {
+							// checker.go:26460 — `tr.Instant(PhaseCheckTypes,
+							// "removeSubtypes_DepthLimit", {"estimatedCount"})`.
+							if (tracer != nullptr) {
+								tracer->Instant(
+								    tracing::PhaseCheckTypes,
+								    "removeSubtypes_DepthLimit",
+								    tracing::TraceArgs{
+								        {"estimatedCount", estimatedCount}});
+							}
 							error(currentNode,
 								Expression_produces_a_union_type_that_is_too_complex_to_represent);
 							removedSubtypesFailed = true;
@@ -1821,11 +1834,23 @@ bool Checker::isGenericStringLikeType(Type* t) {
 }
 
 bool Checker::checkCrossProductUnion(const std::vector<Type*>& types) {
-	bool ok = getCrossProductUnionSize(types) < 100000;
-	if (!ok) {
-		error(currentNode, Expression_produces_a_union_type_that_is_too_complex_to_represent);
+	// checker.go:27116 — Go binds `size` for the trace arg; restructured to
+	// match (was `getCrossProductUnionSize(types) < 100000` inline).
+	int64_t size = getCrossProductUnionSize(types);
+	if (size >= 100000) {
+		// checker.go:27118 — `tr.Instant(PhaseCheckTypes,
+		// "checkCrossProductUnion_DepthLimit", {"size"})`.
+		if (tracer != nullptr) {
+			tracer->Instant(
+			    tracing::PhaseCheckTypes,
+			    "checkCrossProductUnion_DepthLimit",
+			    tracing::TraceArgs{{"size", size}});
+		}
+		error(currentNode,
+			  Expression_produces_a_union_type_that_is_too_complex_to_represent);
+		return false;
 	}
-	return ok;
+	return true;
 }
 
 int64_t Checker::getCrossProductUnionSize(const std::vector<Type*>& types) {

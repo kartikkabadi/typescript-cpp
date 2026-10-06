@@ -159,6 +159,37 @@ std::vector<std::string> FormatTypeFlags(TypeFlags flags) {
 	return result;
 }
 
+// types.go:574 — VarianceFlags.String
+std::string VarianceFlagsString(VarianceFlags v) {
+	VarianceFlags variance = v & VarianceFlagsVarianceMask;
+	std::string result;
+	switch (variance) {
+	case VarianceFlagsInvariant:
+		result = "in out";
+		break;
+	case VarianceFlagsBivariant:
+		result = "[bivariant]";
+		break;
+	case VarianceFlagsContravariant:
+		result = "in";
+		break;
+	case VarianceFlagsCovariant:
+		result = "out";
+		break;
+	case VarianceFlagsIndependent:
+		result = "[independent]";
+		break;
+	default:
+		break;
+	}
+	if ((v & VarianceFlagsUnmeasurable) != 0) {
+		result += " (unmeasurable)";
+	} else if ((v & VarianceFlagsUnreliable) != 0) {
+		result += " (unreliable)";
+	}
+	return result;
+}
+
 // Forward decls — defined at the bottom of this file (tracer.go:350-366).
 tsc::tracing::TracedType* wrapType(Type* t);
 std::vector<tsc::tracing::TracedType*> wrapTypes(const std::vector<Type*>& types);
@@ -182,22 +213,24 @@ void Tracer::RecordType(Type* typ) {
 	recorder->RecordType(wrapType(typ));
 }
 
-// tracer.go:29 — `args` is taken by value so the separateBeginAndEnd closure can
-// safely mutate its own copy on pop, mirroring the Go map's lifetime.
+// tracer.go:29 — `args` is the caller's live map: the B event is written with
+// checkerId injected and the "E" closure re-injects it and serializes the map
+// at pop time, so post-Push mutations (relater.go:1346 `variances`) appear.
 std::function<void()> Tracer::Push(tsc::tracing::Phase phase, const std::string& name,
-								   tsc::tracing::TraceArgs args, bool separateBeginAndEnd) {
+								   std::shared_ptr<tsc::tracing::TraceArgs> args,
+								   bool separateBeginAndEnd) {
 	if (!separateBeginAndEnd) {
-		return tracing->Push(std::move(phase), name, copyWithCheckerIndex(args),
+		return tracing->Push(std::move(phase), name, copyWithCheckerIndex(*args),
 							 separateBeginAndEnd);
 	}
 
-	std::function<void()> restore = temporarilyAddCheckerIndex(args);
+	std::function<void()> restore = temporarilyAddCheckerIndex(*args);
 	std::function<void()> pop =
 		tracing->Push(std::move(phase), name, args, separateBeginAndEnd);
 	restore();
 
 	return [this, args = std::move(args), pop = std::move(pop)]() mutable {
-		std::function<void()> restoreEndArgs = temporarilyAddCheckerIndex(args);
+		std::function<void()> restoreEndArgs = temporarilyAddCheckerIndex(*args);
 		pop();
 		restoreEndArgs();
 	};

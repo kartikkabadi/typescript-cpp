@@ -894,8 +894,19 @@ struct Tracer {
 	int checkerIndex{};
 
 	void RecordType(Type* typ);
+	// tracer.go:29 — shared_ptr args = the caller's live map (Go map captured by
+	// the pop closure); separateBeginAndEnd "E" events observe later mutations
+	// (e.g. relater.go:1346's `variances`). The by-value overload forwards a
+	// copy for callers that never mutate after Push.
 	std::function<void()> Push(tsc::tracing::Phase phase, const std::string& name,
-							   tsc::tracing::TraceArgs args, bool separateBeginAndEnd);
+							   std::shared_ptr<tsc::tracing::TraceArgs> args,
+							   bool separateBeginAndEnd);
+	std::function<void()> Push(tsc::tracing::Phase phase, const std::string& name,
+							   tsc::tracing::TraceArgs args, bool separateBeginAndEnd) {
+		return Push(std::move(phase), name,
+					std::make_shared<tsc::tracing::TraceArgs>(std::move(args)),
+					separateBeginAndEnd);
+	}
 	void Instant(tsc::tracing::Phase phase, const std::string& name,
 				 const tsc::tracing::TraceArgs& args);
 	tsc::tracing::TraceArgs copyWithCheckerIndex(const tsc::tracing::TraceArgs& args);
@@ -4674,6 +4685,7 @@ void clearCachedInferences(std::vector<InferenceInfo*>& inferences);
 // === slice: tracer ===
 Tracer* newTracer(tsc::tracing::Tracing* tr, int checkerIndex);
 std::vector<std::string> FormatTypeFlags(TypeFlags flags); // types.go:556
+std::string VarianceFlagsString(VarianceFlags v);            // types.go:574
 
 // === slice: jsdoc ===
 std::vector<Node*> getAllJSDocTags(Node* node);

@@ -20,23 +20,6 @@
 #include "internal/pprof/pprof.h"
 #include "internal/tspath/tspath.h"
 
-// ---------------------------------------------------------------------------
-// dep-stub: tracing — owned by tracing
-// ---------------------------------------------------------------------------
-namespace tsc::tracing {
-
-std::pair<Tracing*, gostd::Error> StartTracing(
-    vfs::FS* fs, const std::string& traceDir,
-    const std::string& configFilePath, bool deterministic) {
-	TSC_UNREACHABLE("tracing::StartTracing — owned by tracing");
-}
-
-gostd::Error StopTracing(Tracing* tr) {
-	TSC_UNREACHABLE("tracing::StopTracing — owned by tracing");
-}
-
-}  // namespace tsc::tracing
-
 namespace tsc::pprof {
 
 // dep-stub: pprof.h forward-declares ProfileSession without members; the

@@ -23,18 +23,6 @@
 
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
-// dep-stub: tracing — owned by tracing
-// tracing.StartTracing (tracing.go:152) and Tracing.StopTracing
-// (tracing.go:437); the file-writing tracing implementation is not ported.
-// ---------------------------------------------------------------------------
-namespace tsc::tracing {
-
-std::pair<Tracing*, gostd::Error> StartTracing(
-    vfs::FS* fs, const std::string& traceDir,
-    const std::string& configFilePath, bool deterministic);
-gostd::Error StopTracing(Tracing* tr);
-
-}  // namespace tsc::tracing
 
 namespace tsc::execute {
 

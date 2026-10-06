@@ -190,6 +190,7 @@ struct emitter {
 	printer::EmitTextWriter* writer{};
 	std::optional<outputpaths::OutputPaths> paths;
 	SourceFile* sourceFile{};
+	tracing::Tracing* tr{}; // emitter.go:36
 	EmitResult emitResult;
 	bool forceEmit = false;
 	WriteFile writeFile;

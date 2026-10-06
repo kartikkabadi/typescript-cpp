@@ -1,6 +1,6 @@
 // Port of tsc/internal/tracing — interface surface consumed by the checker.
-// The tracing session itself (event/file writing, type dumping) is ported
-// separately; only the types and API the checker calls are declared here.
+// The session implementation (event/file writing, type dumping) lives in
+// tracing.cpp; only the types and API the checker calls are declared here.
 #pragma once
 
 #include <any>
@@ -8,11 +8,16 @@
 #include <functional>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "internal/ast/ast.h"
+#include "internal/gostd/gostd.h"
 
 namespace tsc {
+
+namespace vfs { struct FS; }
+
 namespace tracing {
 
 // Phase — Go `type Phase string`.
@@ -89,12 +94,59 @@ public:
 class Tracing {
 public:
 	virtual ~Tracing() = default;
+	// Push takes the args as a shared_ptr: in Go the map is captured by the
+	// pop closure, so for separateBeginAndEnd events mutations the caller
+	// makes after Push (e.g. relater's `variances` arg) appear in the "E"
+	// event. Callers that don't mutate can use the by-value overload below.
 	virtual std::function<void()> Push(Phase phase, const std::string& name,
-									   const TraceArgs& args,
+									   std::shared_ptr<TraceArgs> args,
 									   bool separateBeginAndEnd) = 0;
+	std::function<void()> Push(Phase phase, const std::string& name,
+							   const TraceArgs& args, bool separateBeginAndEnd) {
+		return Push(std::move(phase), name,
+					std::make_shared<TraceArgs>(args), separateBeginAndEnd);
+	}
 	virtual void Instant(Phase phase, const std::string& name, const TraceArgs& args) = 0;
 	virtual Tracer* NewTypeTracer(int checkerIndex) = 0;
 };
+
+// TraceScope — RAII helper emulating Go's `defer tr.Push(phase, name, args,
+// sep)()` at call sites. Null-tracing and empty closures are safe.
+class TraceScope {
+public:
+	// `Pusher` is any type with `Push(Phase, name, TraceArgs, bool)` —
+	// tracing::Tracing or checker::Tracer (whose Push adds checkerId).
+	template <class Pusher>
+	TraceScope(Pusher* tr, Phase phase, const std::string& name,
+	           const TraceArgs& args, bool separateBeginAndEnd)
+	    : pop_(tr != nullptr
+	               ? tr->Push(phase, name, args, separateBeginAndEnd)
+	               : std::function<void()>()) {}
+	// For callers whose Push already returns the pop closure (e.g.
+	// checker::Tracer::Push).
+	explicit TraceScope(std::function<void()> pop)
+	    : pop_(std::move(pop)) {}
+	~TraceScope() {
+		if (pop_) {
+			pop_();
+		}
+	}
+	TraceScope(const TraceScope&) = delete;
+	TraceScope& operator=(const TraceScope&) = delete;
+
+private:
+	std::function<void()> pop_;
+};
+
+// StartTracing — tracing.go:152. Creates a tracing session writing
+// trace.json/legend.json/types_N.json under traceDir; deterministic mode
+// substitutes a monotonic counter for wall-clock timestamps (test baselines).
+std::pair<Tracing*, gostd::Error> StartTracing(
+    vfs::FS* fs, const std::string& traceDir,
+    const std::string& configFilePath, bool deterministic);
+
+// StopTracing — tracing.go:437.
+gostd::Error StopTracing(Tracing* tr);
 
 }  // namespace tracing
 }  // namespace tsc

@@ -106,18 +106,20 @@ inline int getEncodedRootLength(std::string_view path) {
 	auto schemeEnd = path.find(urlSchemeSeparator);
 	if (schemeEnd != std::string_view::npos) {
 		int authorityStart = (int)schemeEnd + (int)urlSchemeSeparator.size();
+		// Go: strings.Index(path[authorityStart:], "/") is RELATIVE to the
+		// substring; find(pos) is absolute — it IS authorityEnd.
 		auto authorityLength = path.find('/', authorityStart);
 		if (authorityLength != std::string_view::npos) {
 			// URL: "file:///", "file://server/", "file://server/path"
-			int authorityEnd = authorityStart + (int)authorityLength;
+			int authorityEnd = (int)authorityLength;
 
 			// For local "file" URLs, include the leading DOS volume (if
 			// present). Per https://www.ietf.org/rfc/rfc1738.txt, a host of
 			// "" or "localhost" is a special case interpreted as "the
 			// machine from which the URL is being interpreted".
 			std::string_view scheme = path.substr(0, schemeEnd);
-			std::string_view authority =
-				path.substr(authorityStart, authorityLength);
+			std::string_view authority = path.substr(
+				authorityStart, authorityEnd - authorityStart);
 			if (scheme == "file" &&
 			    (authority.empty() || authority == "localhost") &&
 			    ((int)path.size() > authorityEnd + 2) &&

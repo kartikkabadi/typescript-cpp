@@ -450,6 +450,10 @@ struct filesLoader {
 		return {useCaseSensitiveFileNames, host->GetCurrentDirectory()};
 	}
 
+	// fileloader.go — p.opts.Tracing; seeded from the program's opts
+	// before loadFiles runs.
+	tracing::Tracing* tracing{};
+
 	void addRootTask(const std::string& fileName, LibFile* libFile,
 	                 const FileIncludeReason* includeReason);
 	void addRootFileTask(const std::string& fileName, LibFile* libFile,
@@ -611,11 +615,14 @@ public:
 	              bool skipModuleResolution = false);
 	// Shared implementation for the two public ctors: a non-null `config`
 	// is borrowed as the program's opts.Config; nullptr synthesizes a bare
-	// ParsedCommandLine from `options`/`rootFileNames`.
+	// ParsedCommandLine from `options`/`rootFileNames`. `tracing` seeds
+	// tr_ BEFORE files load (Go program.go:302 — opts.Tracing is set on
+	// the program before loadFiles runs).
 	SimpleProgram(CompilerHost* host, const CompilerOptions& options,
 	              std::vector<std::string> rootFileNames,
 	              tsoptions::ParsedCommandLine* config,
-	              bool skipModuleResolution);
+	              bool skipModuleResolution,
+	              tracing::Tracing* tracing = nullptr);
 
 	// --- checker.Program interface ---
 	const CompilerOptions* Options() override { return &options; }

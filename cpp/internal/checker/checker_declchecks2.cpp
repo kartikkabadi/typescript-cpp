@@ -1415,7 +1415,16 @@ void Checker::checkVariableDeclarationList(Node* node) {
 
 // checker.go:5946 — checkVariableDeclaration
 void Checker::checkVariableDeclaration(Node* node) {
-	// TRACING: defer tr.Push(tracing.PhaseCheck, "checkVariableDeclaration", {"kind": node->kind, "pos": node->pos(), "end": node->end(), "path": getSourceFileOfNode(node)->FileName()}, false)
+	// checker.go:5948 — `defer tr.Push(PhaseCheck,
+	// "checkVariableDeclaration", {"kind","pos","end","path"}, false)()`.
+	tracing::TraceScope traceCheckVariableDeclaration(
+	    tracer, tracing::PhaseCheck, "checkVariableDeclaration",
+	    tracing::TraceArgs{
+	        {"kind", node->kind},
+	        {"pos", node->pos()},
+	        {"end", node->end()},
+	        {"path", getSourceFileOfNode(node)->FileName()}},
+	    false);
 	checkGrammarVariableDeclaration(node->as<VariableDeclaration>());
 	checkVariableLikeDeclaration(node);
 }

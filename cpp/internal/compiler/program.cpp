@@ -312,8 +312,10 @@ SimpleProgram::SimpleProgram(CompilerHost* host_,
                              const CompilerOptions& opts,
                              std::vector<std::string> rootFileNames,
                              tsoptions::ParsedCommandLine* config,
-                             bool skipModuleResolution_)
-	: options(opts), skipModuleResolution(skipModuleResolution_) {
+                             bool skipModuleResolution_,
+                             tracing::Tracing* tracing_)
+	: options(opts), skipModuleResolution(skipModuleResolution_),
+	  tr_(tracing_) {
 	host = host_;
 	host->compilerOptions = &options;
 
@@ -339,6 +341,7 @@ SimpleProgram::SimpleProgram(CompilerHost* host_,
 	loader.program = this;
 	loader.ip = &includeProcessor_;
 	loader.skipModuleResolution = skipModuleResolution;
+	loader.tracing = tr_;
 	loader.defaultLibraryPath = tspath::getNormalizedAbsolutePath(
 	    host->DefaultLibraryPath(), host->GetCurrentDirectory());
 	loader.useCaseSensitiveFileNames = true; // POSIX FS — vfs UseCaseSensitiveFileNames
@@ -402,6 +405,11 @@ SimpleProgram::SimpleProgram(CompilerHost* host_,
 void SimpleProgram::BindSourceFiles() {
 	for (auto* file : files) {
 		if (!file->isBound.load(std::memory_order_relaxed)) {
+			// program.go:578 — `defer tr.Push(..., "bindSourceFile", ...)`.
+			tracing::TraceScope tracePop(
+			    tr_, tracing::PhaseBind, "bindSourceFile",
+			    tracing::TraceArgs{{"path", std::string(file->Path())}},
+			    true);
 			bindSourceFile(file);
 		}
 	}
@@ -412,6 +420,12 @@ void SimpleProgram::BindSourceFiles() {
 checker::Checker* SimpleProgram::getChecker() {
 	if (!checker_) {
 		checker_ = std::make_unique<checker::Checker>();
+		// checkerpool.go createCheckers / checker.go:916 — Go passes the
+		// tracer into NewChecker so it is set BEFORE the intrinsic types are
+		// created; otherwise types 1..N would never be RecordType'd.
+		if (tr_ != nullptr) {
+			checker_->tracer = checker::newTracer(tr_, 0);
+		}
 		checker_->init(this);
 	}
 	return checker_.get();
@@ -1207,6 +1221,10 @@ bool SimpleProgram::SourceFileMayBeEmitted(SourceFile* sourceFile,
 // program.go:1867 Emit — Go runs file emits through a WorkGroup; this port
 // emits sequentially (identical observable results).
 EmitResult* SimpleProgram::Emit(EmitOptions* options) {
+	// program.go:1868 — `defer tr.Push(PhaseEmit, "emit", nil, true)()`.
+	tracing::TraceScope emitTraceGuard(tr_, tracing::PhaseEmit, "emit", {},
+	                                   true);
+
 	if (!options->ForceEmit &&
 	    options->EmitOnly != EmitOnly::EmitOnlyBuilderSignature) {
 		// Go passes options.TargetSourceFiles (nil when unset); an empty
@@ -1243,6 +1261,7 @@ EmitResult* SimpleProgram::Emit(EmitOptions* options) {
 		e->emitOnly = options->EmitOnly;
 		e->forceEmit = options->ForceEmit;
 		e->writeFile = options->WriteFile;
+		e->tr = tr_; // program.go:1903
 
 		auto [host, done] = newEmitHost(this, sourceFile);
 		e->host = host.get();
@@ -2229,7 +2248,8 @@ SimpleProgram* NewProgram(const ProgramOptions& opts) {
 	auto* p = new SimpleProgram(opts.Host,
 	                            *opts.Config->ParsedConfig->CompilerOptions,
 	                            opts.Config->ParsedConfig->FileNames,
-	                            opts.Config, opts.SkipModuleResolution);
+	                            opts.Config, opts.SkipModuleResolution,
+	                            opts.Tracing);
 	p->opts_ = opts;
 	if (tracePop) {
 		tracePop();
