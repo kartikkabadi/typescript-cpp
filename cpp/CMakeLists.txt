@@ -236,6 +236,26 @@ add_library(tsc STATIC
 	internal/vfs/vfstest/vfstest.cpp
 	# === slice: transpile ===
 	internal/transpile/transpile.cpp
+	# === slice: api ===
+	internal/api/encoder/encoder.cpp
+	internal/api/encoder/encoder_generated.cpp
+	internal/api/encoder/decoder.cpp
+	internal/api/encoder/decoder_generated.cpp
+	internal/api/requestfilesystem/requestfilesystem.cpp
+	internal/api/requestfilesystem/pathtree.cpp
+	internal/api/requestfilesystem/filechanges.cpp
+	internal/api/proto.cpp
+    internal/api/protocol_msgpack.cpp
+    internal/api/callbackfs.cpp
+	internal/api/module_resolution.cpp
+	internal/api/session.cpp
+	internal/api/server.cpp
+	internal/execute/build/build.cpp
+	internal/project/project.cpp
+	internal/lsp/lsproto/lsproto.cpp
+	internal/ls/ls.cpp
+	internal/ls/lsconv/lsconv.cpp
+	internal/ls/autoimport/autoimport.cpp
 	# === slice: fswatch ===
 	internal/fswatch/debounce.cpp
 	internal/fswatch/event.cpp

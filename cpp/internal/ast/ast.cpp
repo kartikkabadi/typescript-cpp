@@ -2573,4 +2573,12 @@ bool SourceFile::IsContentMapperSupplemental() const {
 	return CanonicalSourceFile() != nullptr;
 }
 
+// === slice: api ===
+// ast.go:2394-2401 — global counter backing NewSourceFileDataKey.
+SourceFileDataKey newSourceFileDataKey() {
+	static std::atomic<uint64_t> sourceFileDataKeyCounter{0};
+	return sourceFileDataKeyCounter.fetch_add(1) + 1;
+}
+// === end slice: api ===
+
 }  // namespace tsc

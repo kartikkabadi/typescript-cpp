@@ -16,6 +16,7 @@
 #include "internal/execute/incremental/incremental.h"
 #include "internal/execute/tsc/compile.h"
 #include "internal/execute/tsc/diagnostics.h"
+#include "internal/execute/tsc/statistics.h"
 #include "internal/gostd/gostd.h"
 #include "internal/locale/locale.h"
 #include "internal/tracing/tracing.h"
@@ -26,6 +27,10 @@
 // build.NewOrchestrator + Options + Orchestrator.Start, per
 // tsc/internal/execute/build/orchestrator.go.
 // ---------------------------------------------------------------------------
+namespace tsc::ast {
+struct Diagnostic;  // fwd — OrchestratorResult below
+}  // namespace tsc::ast
+
 namespace tsc::execute::build {
 
 struct Options {
@@ -34,13 +39,32 @@ struct Options {
 	tsc::CommandLineTesting* Testing = nullptr;
 };
 
+struct OrchestratorResult; // === slice: api === fwd
+
 struct Orchestrator {
 	Options opts;
 	explicit Orchestrator(Options opts) : opts(std::move(opts)) {}
 	tsc::CommandLineResult Start(gostd::Context ctx);
+	// === slice: api ===
+	// orchestrator.go:295/301/354/359 — all owned by execute-build.
+	OrchestratorResult* Build(gostd::Context ctx, std::string_view project);
+	OrchestratorResult* BuildReferences(gostd::Context ctx, std::string_view project);
+	OrchestratorResult* Clean(std::string_view project);
+	OrchestratorResult* CleanReferences(std::string_view project);
+	// === end slice: api ===
 };
 
 Orchestrator NewOrchestrator(Options opts);
+
+// === slice: api ===
+// OrchestratorResult — orchestrator.go:32.
+struct OrchestratorResult {
+	tsc::CommandLineResult Result;
+	std::vector<::tsc::Diagnostic*> Errors;
+	tsc::Statistics Statistics;
+	std::vector<std::string> FilesToDelete;
+};
+// === end slice: api ===
 
 }  // namespace tsc::execute::build
 

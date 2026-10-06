@@ -239,4 +239,30 @@ bool PositionIsASICandidate(int /*position*/, Node* /*context*/, SourceFile* /*c
 	TSC_UNREACHABLE("lsutil::PositionIsASICandidate — owned by ls slice");
 }
 
+// === slice: api ===
+// NewDefaultUserPreferences — userpreferences.go:16.
+UserPreferences NewDefaultUserPreferences() {
+	UserPreferences p;
+	p.FormatCodeSettings = GetDefaultFormatCodeSettings();
+
+	p.IncludeCompletionsForModuleExports = Tristate::True;
+	p.IncludeCompletionsForImportStatements = Tristate::True;
+	p.EnableAutoClosingTags = Tristate::True;
+	p.EnableJSDocCompletions = Tristate::True;
+	p.GenerateReturnInDocTemplate = Tristate::True;
+
+	p.AllowRenameOfImportPath = Tristate::True;
+	p.ProvideRefactorNotApplicableReason = Tristate::True;
+	p.EnableFormatting = Tristate::True;
+	p.EnableValidation = Tristate::True;
+	p.DisplayPartsForJSDoc = Tristate::True;
+	p.DisableLineTextInReferences = Tristate::True;
+	p.ReportStyleChecksAsWarnings = Tristate::True;
+
+	p.ExcludeLibrarySymbolsInNavTo = Tristate::True;
+	p.WorkspaceSymbolsScope = WorkspaceSymbolsScopeAllOpenProjects;
+	return p;
+}
+// === end slice: api ===
+
 } // namespace tsc::lsutil

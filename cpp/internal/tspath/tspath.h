@@ -157,6 +157,16 @@ inline bool isRootedDiskPath(std::string_view path) {
 	return getEncodedRootLength(path) > 0;
 }
 
+// === slice: api ===
+// IsDiskPathRoot — path.go:43. Determines whether a path consists only of a
+// path root.
+inline bool isDiskPathRoot(std::string_view path) {
+	int rootLength = getEncodedRootLength(path);
+	return rootLength > 0 &&
+	       static_cast<size_t>(rootLength) == path.size();
+}
+// === end slice: api ===
+
 // === slice: vfs ===
 // isUrl — path.go IsUrl: path starts with a URL scheme (e.g. http://).
 inline bool isUrl(std::string_view path) {

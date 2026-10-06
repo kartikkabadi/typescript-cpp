@@ -15,6 +15,7 @@
 #include "internal/core/text.h"
 #include "internal/core/textchange.h"
 #include "internal/core/types.h"
+#include "internal/modulespecifiers/types.h" // === slice: api === (UserPreferences)
 #include "internal/scanner/scanner.h"
 
 namespace tsc::lsutil {
@@ -81,6 +82,181 @@ FormatCodeSettings GetDefaultFormatCodeSettings();
 bool PositionBelongsToNode(Node* candidate, int position, SourceFile* file);
 Node* GetFirstToken(Node* node, SourceFile* sourceFile);
 bool PositionIsASICandidate(int pos, Node* context, SourceFile* file);
+
+// === slice: api ===
+// The remaining lsutil types the api dep-declares (userpreferences.go). Pure
+// data; ported faithfully. The ls slice should adopt these when it lands.
+
+// QuotePreference (userpreferences.go:230).
+using QuotePreference = std::string;
+inline const QuotePreference QuotePreferenceUnknown{""};
+inline const QuotePreference QuotePreferenceAuto{"auto"};
+inline const QuotePreference QuotePreferenceDouble{"double"};
+inline const QuotePreference QuotePreferenceSingle{"single"};
+
+// WorkspaceSymbolsScope (userpreferences.go:232).
+using WorkspaceSymbolsScope = std::string;
+inline const WorkspaceSymbolsScope WorkspaceSymbolsScopeAllOpenProjects{"allOpenProjects"};
+inline const WorkspaceSymbolsScope WorkspaceSymbolsScopeCurrentProject{"currentProject"};
+
+// JsxAttributeCompletionStyle (userpreferences.go:246).
+using JsxAttributeCompletionStyle = std::string;
+inline const JsxAttributeCompletionStyle JsxAttributeCompletionStyleUnknown{""};
+inline const JsxAttributeCompletionStyle JsxAttributeCompletionStyleAuto{"auto"};
+inline const JsxAttributeCompletionStyle JsxAttributeCompletionStyleBraces{"braces"};
+inline const JsxAttributeCompletionStyle JsxAttributeCompletionStyleNone{"none"};
+
+// IncludeInlayParameterNameHints (userpreferences.go:255).
+using IncludeInlayParameterNameHints = std::string;
+inline const IncludeInlayParameterNameHints IncludeInlayParameterNameHintsNone{""};
+inline const IncludeInlayParameterNameHints IncludeInlayParameterNameHintsAll{"all"};
+inline const IncludeInlayParameterNameHints IncludeInlayParameterNameHintsLiterals{"literals"};
+
+// OrganizeImportsSort (userpreferences.go:263).
+using OrganizeImportsSort = int;
+inline constexpr OrganizeImportsSort OrganizeImportsSortAuto = 0;
+inline constexpr OrganizeImportsSort OrganizeImportsSortOrdinal = 1;
+inline constexpr OrganizeImportsSort OrganizeImportsSortOrdinalIgnoreCase = 2;
+inline constexpr OrganizeImportsSort OrganizeImportsSortNatural = 3;
+inline constexpr OrganizeImportsSort OrganizeImportsSortNaturalIgnoreCase = 4;
+
+// OrganizeImportsCollation (userpreferences.go:273).
+using OrganizeImportsCollation = bool;
+inline constexpr OrganizeImportsCollation OrganizeImportsCollationOrdinal = false;
+inline constexpr OrganizeImportsCollation OrganizeImportsCollationUnicode = true;
+
+// OrganizeImportsCaseFirst (userpreferences.go:280).
+using OrganizeImportsCaseFirst = int;
+inline constexpr OrganizeImportsCaseFirst OrganizeImportsCaseFirstFalse = 0;
+inline constexpr OrganizeImportsCaseFirst OrganizeImportsCaseFirstLower = 1;
+inline constexpr OrganizeImportsCaseFirst OrganizeImportsCaseFirstUpper = 2;
+
+// OrganizeImportsTypeOrder (userpreferences.go:288).
+using OrganizeImportsTypeOrder = int;
+inline constexpr OrganizeImportsTypeOrder OrganizeImportsTypeOrderAuto = 0;
+inline constexpr OrganizeImportsTypeOrder OrganizeImportsTypeOrderLast = 1;
+inline constexpr OrganizeImportsTypeOrder OrganizeImportsTypeOrderInline = 2;
+inline constexpr OrganizeImportsTypeOrder OrganizeImportsTypeOrderFirst = 3;
+
+// InlayHintsPreferences (userpreferences.go:209).
+struct InlayHintsPreferences {
+	IncludeInlayParameterNameHints IncludeInlayParameterNameHints;
+	Tristate IncludeInlayParameterNameHintsWhenArgumentMatchesName = Tristate::Unknown;
+	Tristate IncludeInlayFunctionParameterTypeHints = Tristate::Unknown;
+	Tristate IncludeInlayVariableTypeHints = Tristate::Unknown;
+	Tristate IncludeInlayVariableTypeHintsWhenTypeMatchesName = Tristate::Unknown;
+	Tristate IncludeInlayPropertyDeclarationTypeHints = Tristate::Unknown;
+	Tristate IncludeInlayFunctionLikeReturnTypeHints = Tristate::Unknown;
+	Tristate IncludeInlayEnumMemberValueHints = Tristate::Unknown;
+};
+
+// CodeLensUserPreferences (userpreferences.go:220).
+struct CodeLensUserPreferences {
+	Tristate ReferencesCodeLensEnabled = Tristate::Unknown;
+	Tristate ImplementationsCodeLensEnabled = Tristate::Unknown;
+	Tristate ReferencesCodeLensShowOnAllFunctions = Tristate::Unknown;
+	Tristate ImplementationsCodeLensShowOnInterfaceMethods = Tristate::Unknown;
+	Tristate ImplementationsCodeLensShowOnAllClassMethods = Tristate::Unknown;
+};
+
+// UserPreferences (userpreferences.go:47).
+struct UserPreferences {
+	FormatCodeSettings FormatCodeSettings;
+
+	QuotePreference QuotePreference;
+	Tristate LazyConfiguredProjectsFromExternalProject = Tristate::Unknown;
+
+	// A positive integer indicating the maximum length of a hover text before
+	// it is truncated. Default: `500`.
+	int MaximumHoverLength = 0;
+
+	// ------- Completions -------
+	Tristate IncludeCompletionsForModuleExports = Tristate::Unknown;
+	Tristate IncludeCompletionsForImportStatements = Tristate::Unknown;
+	Tristate IncludeAutomaticOptionalChainCompletions = Tristate::Unknown;
+	Tristate IncludeCompletionsWithClassMemberSnippets = Tristate::Unknown;
+	Tristate IncludeCompletionsWithObjectLiteralMethodSnippets = Tristate::Unknown;
+	JsxAttributeCompletionStyle JsxAttributeCompletionStyle;
+	Tristate EnableAutoClosingTags = Tristate::Unknown;
+	Tristate EnableJSDocCompletions = Tristate::Unknown;
+	Tristate GenerateReturnInDocTemplate = Tristate::Unknown;
+
+	// ------- AutoImports -------
+	modulespecifiers::ImportModuleSpecifierPreference ImportModuleSpecifierPreference;
+	modulespecifiers::ImportModuleSpecifierEndingPreference ImportModuleSpecifierEnding;
+	std::vector<std::string> AutoImportSpecifierExcludeRegexes;
+	std::vector<std::string> AutoImportFileExcludePatterns;
+	Tristate AutoImportEntrypointDirectorySearch = Tristate::Unknown;
+	Tristate PreferTypeOnlyAutoImports = Tristate::Unknown;
+
+	// ------- OrganizeImports -------
+	OrganizeImportsSort OrganizeImportsSort{};
+	Tristate OrganizeImportsIgnoreCase = Tristate::Unknown;
+	OrganizeImportsCollation OrganizeImportsCollation{};
+	std::string OrganizeImportsLocale;
+	Tristate OrganizeImportsNumericCollation = Tristate::Unknown;
+	Tristate OrganizeImportsAccentCollation = Tristate::Unknown;
+	OrganizeImportsCaseFirst OrganizeImportsCaseFirst{};
+	OrganizeImportsTypeOrder OrganizeImportsTypeOrder{};
+
+	// ------- MoveToFile -------
+	Tristate AllowTextChangesInNewFiles = Tristate::Unknown;
+
+	// ------- Rename -------
+	Tristate UseAliasesForRename = Tristate::Unknown;
+	Tristate AllowRenameOfImportPath = Tristate::Unknown;
+
+	// ------- CodeFixes/Refactors -------
+	Tristate ProvideRefactorNotApplicableReason = Tristate::Unknown;
+
+	// ------- InlayHints -------
+	InlayHintsPreferences InlayHints;
+
+	// ------- CodeLens -------
+	CodeLensUserPreferences CodeLens;
+
+	// ------- Definition -------
+	bool PreferGoToSourceDefinition = false;
+
+	// ------- Symbols -------
+	Tristate ExcludeLibrarySymbolsInNavTo = Tristate::Unknown;
+	WorkspaceSymbolsScope WorkspaceSymbolsScope;
+
+	// ------- Misc -------
+	Tristate EnableFormatting = Tristate::Unknown;
+	Tristate EnableValidation = Tristate::Unknown;
+	Tristate DisableSuggestions = Tristate::Unknown;
+	Tristate DisableLineTextInReferences = Tristate::Unknown;
+	Tristate DisplayPartsForJSDoc = Tristate::Unknown;
+	Tristate ReportStyleChecksAsWarnings = Tristate::Unknown;
+	std::string Locale;
+
+	// ------- ATA -------
+	Tristate DisableAutomaticTypeAcquisition = Tristate::Unknown;
+	Tristate AutomaticTypeAcquisitionEnabled = Tristate::Unknown;
+
+	// ------- Project Configuration -------
+	std::string CustomConfigFileName;
+
+	// ModuleSpecifierPreferences (userpreferences.go:877).
+	modulespecifiers::UserPreferences ModuleSpecifierPreferences() const {
+		return modulespecifiers::UserPreferences{
+			ImportModuleSpecifierPreference, ImportModuleSpecifierEnding,
+			AutoImportSpecifierExcludeRegexes};
+	}
+
+	// IsATADisabled (userpreferences.go:200).
+	bool IsATADisabled() const {
+		if (AutomaticTypeAcquisitionEnabled != Tristate::Unknown) {
+			return AutomaticTypeAcquisitionEnabled != Tristate::True;
+		}
+		return DisableAutomaticTypeAcquisition == Tristate::True;
+	}
+};
+
+// NewDefaultUserPreferences (userpreferences.go:16).
+UserPreferences NewDefaultUserPreferences();
+// === end slice: api ===
 // === end dep decls for ls slice ===
 } // namespace tsc::lsutil
 

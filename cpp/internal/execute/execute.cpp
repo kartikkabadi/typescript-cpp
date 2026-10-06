@@ -32,6 +32,21 @@ tsc::CommandLineResult Orchestrator::Start(gostd::Context ctx) {
 	TSC_UNREACHABLE("build::Orchestrator::Start — owned by execute-build");
 }
 
+// === slice: api ===
+OrchestratorResult* Orchestrator::Build(gostd::Context /*ctx*/, std::string_view /*project*/) {
+	TSC_UNREACHABLE("build::Orchestrator::Build — owned by execute-build");
+}
+OrchestratorResult* Orchestrator::BuildReferences(gostd::Context /*ctx*/, std::string_view /*project*/) {
+	TSC_UNREACHABLE("build::Orchestrator::BuildReferences — owned by execute-build");
+}
+OrchestratorResult* Orchestrator::Clean(std::string_view /*project*/) {
+	TSC_UNREACHABLE("build::Orchestrator::Clean — owned by execute-build");
+}
+OrchestratorResult* Orchestrator::CleanReferences(std::string_view /*project*/) {
+	TSC_UNREACHABLE("build::Orchestrator::CleanReferences — owned by execute-build");
+}
+// === end slice: api ===
+
 }  // namespace tsc::execute::build
 
 // ---------------------------------------------------------------------------
