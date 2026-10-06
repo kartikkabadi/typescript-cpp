@@ -210,37 +210,6 @@ Node* createToken(Kind kind, SourceFile* file, int pos, int end,
 	}
 }
 
-// ast.go:2904 — SourceFile.GetOrCreateToken. Gets a token from the file's token
-// cache, or creates it if it does not already exist. This function should NOT
-// be used for creating synthetic tokens that are not in the file in the first
-// place.
-Node* getOrCreateToken(SourceFile* file, Kind kind, int pos, int end,
-                       Node* parent, TokenFlags flags) {
-	std::lock_guard<std::mutex> lock(file->tokenCacheMu);
-	TextRange loc{pos, end};
-	TokenCacheKey key{parent, loc};
-	if (auto it = file->tokenCache.find(key); it != file->tokenCache.end()) {
-		Node* token = it->second;
-		if (token->kind != kind) {
-			std::string msg = "Token cache mismatch: " +
-				std::string(kindToString(token->kind)) +
-				" != " + std::string(kindToString(kind));
-			TSC_UNREACHABLE(msg.c_str());
-		}
-		return token;
-	}
-	if ((parent->flags & NodeFlagsReparsed) != 0) {
-		std::string msg = "Cannot create token from reparsed node of kind " +
-			std::string(kindToString(parent->kind));
-		TSC_UNREACHABLE(msg.c_str());
-	}
-	Node* token = createToken(kind, file, pos, end, flags);
-	token->loc = loc;
-	token->parent = parent;
-	file->tokenCache[key] = token;
-	return token;
-}
-
 // ---------------------------------------------------------------------------
 // tokens.go — file-private functions
 // ---------------------------------------------------------------------------
@@ -806,6 +775,38 @@ bool shouldSkipChild(Node* node) {
 // ---------------------------------------------------------------------------
 // tokens.go — exported functions
 // ---------------------------------------------------------------------------
+
+// ast.go:2904 — SourceFile.GetOrCreateToken. Gets a token from the file's token
+// cache, or creates it if it does not already exist. This function should NOT
+// be used for creating synthetic tokens that are not in the file in the first
+// place.
+Node* getOrCreateToken(SourceFile* file, Kind kind, int pos, int end,
+                       Node* parent, TokenFlags flags) {
+	std::lock_guard<std::mutex> lock(file->tokenCacheMu);
+	TextRange loc{pos, end};
+	TokenCacheKey key{parent, loc};
+	if (auto it = file->tokenCache.find(key); it != file->tokenCache.end()) {
+		Node* token = it->second;
+		if (token->kind != kind) {
+			std::string msg = "Token cache mismatch: " +
+				std::string(kindToString(token->kind)) +
+				" != " + std::string(kindToString(kind));
+			TSC_UNREACHABLE(msg.c_str());
+		}
+		return token;
+	}
+	if ((parent->flags & NodeFlagsReparsed) != 0) {
+		std::string msg = "Cannot create token from reparsed node of kind " +
+			std::string(kindToString(parent->kind));
+		TSC_UNREACHABLE(msg.c_str());
+	}
+	Node* token = createToken(kind, file, pos, end, flags);
+	token->loc = loc;
+	token->parent = parent;
+	file->tokenCache[key] = token;
+	return token;
+}
+
 
 Node* getTouchingPropertyName(SourceFile* sourceFile, int position) {
 	return getTokenAtPositionImpl(

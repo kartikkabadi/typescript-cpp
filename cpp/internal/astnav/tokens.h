@@ -36,5 +36,12 @@ Node* findNextToken(Node* previousToken, Node* parent, SourceFile* file);
 // intervening tokens to find the first match.
 Node* findChildOfKind(Node* containingNode, Kind kind, SourceFile* sourceFile);
 
+// ast.go:2904 — SourceFile.GetOrCreateToken. Gets a token from the file's token
+// cache, or creates it if it does not already exist. This function should NOT
+// be used for creating synthetic tokens that are not in the file in the first
+// place.
+Node* getOrCreateToken(SourceFile* file, Kind kind, int pos, int end,
+					   Node* parent, TokenFlags flags);
+
 }  // namespace astnav
 }  // namespace tsc

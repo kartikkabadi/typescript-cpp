@@ -586,6 +586,13 @@ public:
 	ProgramOptions opts_;
 	// === end slice: execute-tsc ===
 
+	// === slice: ls-foundation ===
+	// program.go:98 usesUriStyleNodeCoreModules — declared and copied by
+	// updateProgram but never assigned anywhere in the oracle; always
+	// TSUnknown.
+	Tristate usesUriStyleNodeCoreModules{};
+	// === end slice: ls-foundation ===
+
 	// program.go: hasEmitBlockingDiagnostics / sourceFilesToEmit (+Once).
 	std::unordered_set<tspath::Path> hasEmitBlockingDiagnostics;
 	bool sourceFilesToEmitComputed_{};
@@ -645,6 +652,13 @@ public:
 		}
 		return {it->second.moduleReference, it->second.specifier};
 	}
+	// === slice: ls-foundation ===
+	// program.go:235 UsesUriStyleNodeCoreModules
+	Tristate UsesUriStyleNodeCoreModules() const {
+		return usesUriStyleNodeCoreModules;
+	}
+	// === end slice: ls-foundation ===
+
 	// GetRedirectForResolution / GetProjectReferenceFromSource: base-class
 	// nullptr defaults — Go-equivalent (no project references).
 

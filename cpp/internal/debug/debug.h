@@ -16,6 +16,12 @@
 #include "internal/ast/ast.h" // tscUnreachable
 #include "internal/ast/kind.h"
 
+// <cassert> (pulled by ast.h) defines a function-like `assert` macro that
+// would clobber debug::assert below.
+#ifdef assert
+#undef assert
+#endif
+
 namespace tsc::debug {
 
 namespace detail {
