@@ -6146,11 +6146,14 @@ int Checker::compareSymbolChainsWorker(const std::vector<Symbol*>& a,
 }
 
 // ---------------------------------------------------------------------------
-// Checker::init — NewChecker (checker.go:911) minus program.BindSourceFiles
+// Checker::init — NewChecker (checker.go:911)
 // ---------------------------------------------------------------------------
 
 void Checker::init(Program* p) {
 	static std::atomic<uint32_t> nextCheckerId{0};
+	// checker.go:912 — the checker binds every file up front so the globals
+	// merge in initializeChecker sees all files' locals.
+	p->BindSourceFiles();
 	id = nextCheckerId.fetch_add(1) + 1;
 	program = p;
 	compilerOptions = p->Options();

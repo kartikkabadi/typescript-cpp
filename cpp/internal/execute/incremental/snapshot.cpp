@@ -397,11 +397,11 @@ Hash128 xxh3_128bits(std::string_view input) {
 // hashWithText appends "-" + text.
 std::string ComputeHash(std::string_view text, bool hashWithText) {
 	auto h = xxh3_128bits(text);
-	char buf[32];
+	char buf[33];
 	std::snprintf(buf, sizeof(buf), "%016llx%016llx",
 	              static_cast<unsigned long long>(h.hi),
 	              static_cast<unsigned long long>(h.lo));
-	std::string hash(buf, sizeof(buf));
+	std::string hash(buf, 32);
 	if (hashWithText) {
 		hash += "-";
 		hash += text;

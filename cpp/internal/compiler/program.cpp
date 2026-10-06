@@ -388,6 +388,10 @@ SimpleProgram::SimpleProgram(CompilerHost* host_,
 	sourceFilesFoundSearchingNodeModules =
 	    std::move(parser.sourceFilesFoundSearchingNodeModules);
 	libFiles = std::move(parser.libFiles);
+	// filesparser.go:565 — Go's GC keeps the LibFile objects (owned by the
+	// loader's pathForLibFileCache) alive for the program's lifetime; move
+	// the owning cache so libFiles' values don't dangle.
+	pathForLibFileCache = std::move(loader.pathForLibFileCache);
 	missingFiles = std::move(parser.missingFiles);
 	redirectTargetsMap = std::move(parser.redirectTargetsMap);
 	redirectFilesByPath = std::move(parser.redirectFilesByPath);

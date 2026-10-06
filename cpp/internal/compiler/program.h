@@ -558,6 +558,12 @@ public:
 	Arena syntheticImportArena;
 	std::unordered_set<tspath::Path> sourceFilesFoundSearchingNodeModules;
 	std::unordered_map<tspath::Path, LibFile*> libFiles;
+	// The LibFile objects libFiles points into are owned by the loader's
+	// pathForLibFileCache (Go: GC keeps them alive for the program's
+	// lifetime). Moved into the program when loading completes — without
+	// this the libFiles values dangle after createProgram returns.
+	std::unordered_map<std::string, std::unique_ptr<LibFile>>
+	    pathForLibFileCache;
 	std::vector<std::string> missingFiles;
 	std::unordered_map<tspath::Path, std::vector<std::string>>
 	    redirectTargetsMap;
