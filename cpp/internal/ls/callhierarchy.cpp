@@ -1137,7 +1137,10 @@ LanguageService::convertCallSiteGroupToIncomingCall(
 	}
 
 	std::sort(fromRanges.begin(), fromRanges.end(),
-			  lsp::lsproto::CompareRanges);
+			  [](const lsp::lsproto::Range& a,
+			     const lsp::lsproto::Range& b) {
+				  return lsp::lsproto::CompareRanges(a, b) < 0;
+			  });
 
 	auto call = std::make_shared<lsp::lsproto::CallHierarchyIncomingCall>();
 	call->From = from;
@@ -1283,7 +1286,10 @@ LanguageService::convertCallSiteGroupToOutgoingCall(
 	}
 
 	std::sort(fromRanges.begin(), fromRanges.end(),
-			  lsp::lsproto::CompareRanges);
+			  [](const lsp::lsproto::Range& a,
+			     const lsp::lsproto::Range& b) {
+				  return lsp::lsproto::CompareRanges(a, b) < 0;
+			  });
 
 	auto call = std::make_shared<lsp::lsproto::CallHierarchyOutgoingCall>();
 	call->To = to;
@@ -1389,7 +1395,7 @@ LanguageService::ProvideCallHierarchyIncomingCalls(
 	gostd::Context ctx, lsp::lsproto::CallHierarchyItem* item,
 	CrossProjectOrchestrator* orchestrator) {
 	compiler::SimpleProgram* program = GetProgram();
-	std::string fileName = item->Uri;
+	std::string fileName = lsp::lsproto::documentUriFileName(item->Uri);
 	SourceFile* file = program->GetSourceFile(fileName);
 	if (file == nullptr) {
 		return lsp::lsproto::CallHierarchyIncomingCallsOrNull{};
@@ -1447,7 +1453,7 @@ lsp::lsproto::CallHierarchyOutgoingCallsResponse
 LanguageService::ProvideCallHierarchyOutgoingCalls(
 	gostd::Context ctx, lsp::lsproto::CallHierarchyItem* item) {
 	compiler::SimpleProgram* program = GetProgram();
-	std::string fileName = item->Uri;
+	std::string fileName = lsp::lsproto::documentUriFileName(item->Uri);
 	SourceFile* file = program->GetSourceFile(fileName);
 	if (file == nullptr) {
 		return lsp::lsproto::CallHierarchyOutgoingCallsOrNull{};

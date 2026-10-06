@@ -87,7 +87,7 @@ struct compilerHost : compiler::CompilerHost {
 
 	// Trace — compilerhost.go:167. Implements compiler.CompilerHost.
 	void Trace(const DiagnosticMessage* msg,
-	           const std::vector<std::string>& args);
+	           const std::vector<std::string>& args) override;
 };
 
 // newCompilerHost — compilerhost.go:31.

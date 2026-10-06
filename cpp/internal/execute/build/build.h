@@ -437,7 +437,7 @@ struct compilerHost : compiler::CompilerHost {
 
 	// compilerHost.go:33 Trace.
 	void Trace(const DiagnosticMessage* msg,
-	           const std::vector<std::string>& args) {
+	           const std::vector<std::string>& args) override {
 		trace(msg, args);
 	}
 
