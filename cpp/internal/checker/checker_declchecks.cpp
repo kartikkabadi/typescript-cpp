@@ -1233,7 +1233,7 @@ void Checker::checkFunctionOrMethodDeclaration(Node* node) {
 
 // checker.go:3489
 void Checker::checkFunctionOrConstructorSymbol(Symbol* symbol) {
-	// Only check the symbol once (per check file — see checkFileTagStale)
+	// Only check the symbol once (per check file — see staleForCheckFile)
 	ValueSymbolLinks* links = valueSymbolLinks.Get(symbol);
 	if (!links->functionOrConstructorChecked || staleForCheckFile(links->functionOrConstructorCheckedFor)) {
 		links->functionOrConstructorChecked = true;

@@ -476,7 +476,7 @@ void Checker::checkInterfaceDeclaration(Node* node) {
 	checkExportsOnMergedDeclarations(node);
 	Symbol* symbol = getSymbolOfDeclaration(node);
 	checkTypeParameterListsIdentical(symbol);
-	// Only check this symbol once (per check file — see checkFileTagStale:
+	// Only check this symbol once (per check file — see staleForCheckFile:
 	// the checks below report errors on declarations that may live in other
 	// files when the symbol is merged, so each file's check must re-run them).
 	if (DeclaredTypeLinks* links = declaredTypeLinks.Get(symbol);
@@ -1311,7 +1311,7 @@ void Checker::checkExternalModuleExports(Node* node) {
 	Symbol* moduleSymbol = getSymbolOfDeclaration(node);
 	ModuleSymbolLinks* links = moduleSymbolLinks.Get(moduleSymbol);
 	// Per-checker once-flag: re-run under each distinct check file (see
-	// checkFileTagStale).
+	// staleForCheckFile).
 	if (!links->exportsChecked || staleForCheckFile(links->exportsCheckedFor)) {
 		links->exportsCheckedFor = checkFileTag();
 		Symbol* exportEqualsSymbol = nullptr;

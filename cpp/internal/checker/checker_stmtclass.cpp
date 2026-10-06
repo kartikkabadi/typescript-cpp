@@ -955,7 +955,7 @@ void Checker::checkTypeParameterListsIdentical(Symbol* symbol) {
 	auto* links = declaredTypeLinks.Get(symbol);
 	// Per-checker once-flag: re-run under each distinct check file so the
 	// errors below re-fire on declarations owned by that file
-	// (checkFileTagStale).
+	// (staleForCheckFile).
 	if (!links->typeParametersChecked || staleForCheckFile(links->typeParametersCheckedFor)) {
 		links->typeParametersChecked = true;
 		links->typeParametersCheckedFor = checkFileTag();
@@ -1707,7 +1707,7 @@ void Checker::checkIndexConstraintForIndexSignature(Type* t, IndexInfo* checkInf
 
 // checker.go:4987
 void Checker::checkClassOrInterfaceForDuplicateIndexSignatures(Node* node) {
-	// Only check the type once (per check file — see checkFileTagStale: the
+	// Only check the type once (per check file — see staleForCheckFile: the
 	// merged index symbol's declarations may live in other files)
 	auto* links = declaredTypeLinks.Get(getSymbolOfDeclaration(node));
 	if (!links->indexSignaturesChecked || staleForCheckFile(links->indexSignaturesCheckedFor)) {
