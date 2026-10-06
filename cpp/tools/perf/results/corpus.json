@@ -1,0 +1,29 @@
+{
+  "files": 500,
+  "runs": 3,
+  "flags": [
+    "--noEmit",
+    "--pretty",
+    "false"
+  ],
+  "hardware": {
+    "nproc": 8,
+    "mem_total_kb": 32865196,
+    "clang": "Ubuntu clang version 15.0.7",
+    "kernel": "6.8.0-1061-aws",
+    "cpu_model": "INTEL(R) XEON(R) PLATINUM 8559C"
+  },
+  "go_times_s": [
+    88.9492348409999,
+    87.48759699599987,
+    88.59661864300006
+  ],
+  "go_median_s": 88.59661864300006,
+  "cpp_times_s": [
+    195.09134420100008,
+    193.22515157499993,
+    193.15359573800015
+  ],
+  "cpp_median_s": 193.22515157499993,
+  "ratio": 2.1809540198548705
+}

@@ -1,0 +1,31 @@
+{
+  "checked": 20,
+  "identical_with_output": 13,
+  "identical_clean": 3,
+  "divergent": [
+    {
+      "file": "tsc/testdata/tests/cases/compiler/accessorParameterAccessibilityModifier.ts",
+      "go_exit": 2,
+      "cpp_exit": 2,
+      "diff_head": "--- \n+++ \n@@ -1,6 +1,6 @@\n-tsc/testdata/tests/cases/compiler/accessorParameterAccessibilityModifier.ts(5,9): error TS7032: Property 'X' implicitly has type 'any', because its set accessor lacks a parameter type annotation.\n+tsc/testdata/tests/cases/compiler/accessorParameterAccessibilityModifier.ts(5,9): error TS7032: Property 'C.X' implicitly has type 'any', because its set accessor lacks a parameter type annotation.\n tsc/testdata/tests/cases/compiler/accessorParameterAccessibilityModifier.ts(5,11): error TS2369: A parameter property is only allowed in a constructor implementation.\n tsc/testdata/tests/cases/compiler/accessorParameterAccessibilityModifier.ts(5,11): error TS7006: Parameter 'v' implicitly has an 'any' type.\n-tsc/testdata/tests/cases/compiler/accessorParameterAccessibilityModifier.ts(6,16): error TS7032: Property 'X' implicitly has type 'any', because its set accessor lacks a parameter type annotation.\n+tsc/testdata/tests/cases/compiler/accessorParameterAccessibilityModifier.ts(6,16): error TS7032: Property 'C.X' implicitly has type 'any', because its set accessor lacks a parameter type annotation.\n tsc/testdata/tests/cases/compiler/accessorParameterAccessibilityModifier.ts(6,18): error TS2369: A parameter property is only allowed in a constructor implementation.\n tsc/testdata/tests/cases/compiler/accessorParameterAccessibilityModifier.ts(6,18): error TS7006: Parameter 'v2' implicitly has an 'any' type."
+    },
+    {
+      "file": "tsc/testdata/tests/cases/compiler/accessorWithInitializer.ts",
+      "go_exit": 2,
+      "cpp_exit": 2,
+      "diff_head": "--- \n+++ \n@@ -1,4 +1,4 @@\n tsc/testdata/tests/cases/compiler/accessorWithInitializer.ts(5,9): error TS1052: A 'set' accessor parameter cannot have an initializer.\n-tsc/testdata/tests/cases/compiler/accessorWithInitializer.ts(5,9): error TS7032: Property 'X' implicitly has type 'any', because its set accessor lacks a parameter type annotation.\n+tsc/testdata/tests/cases/compiler/accessorWithInitializer.ts(5,9): error TS7032: Property 'C.X' implicitly has type 'any', because its set accessor lacks a parameter type annotation.\n tsc/testdata/tests/cases/compiler/accessorWithInitializer.ts(6,16): error TS1052: A 'set' accessor parameter cannot have an initializer.\n-tsc/testdata/tests/cases/compiler/accessorWithInitializer.ts(6,16): error TS7032: Property 'X' implicitly has type 'any', because its set accessor lacks a parameter type annotation.\n+tsc/testdata/tests/cases/compiler/accessorWithInitializer.ts(6,16): error TS7032: Property 'C.X' implicitly has type 'any', because its set accessor lacks a parameter type annotation."
+    },
+    {
+      "file": "tsc/testdata/tests/cases/compiler/addMoreOverloadsToBaseSignature.ts",
+      "go_exit": 2,
+      "cpp_exit": 2,
+      "diff_head": "--- \n+++ \n@@ -1,4 +1,4 @@\n tsc/testdata/tests/cases/compiler/addMoreOverloadsToBaseSignature.ts(6,11): error TS2430: Interface 'Bar' incorrectly extends interface 'Foo'.\n-  Types of property 'f' are incompatible.\n+  Types of property 'Foo.f' are incompatible.\n     Type '(key: string) => string' is not assignable to type '() => string'.\n       Target signature provides too few arguments. Expected 1 or more, but got 0."
+    },
+    {
+      "file": "tsc/testdata/tests/cases/compiler/aliasUsageInAccessorsOfClass.ts",
+      "go_exit": 2,
+      "cpp_exit": 2,
+      "diff_head": "--- \n+++ \n@@ -1,10 +1,10 @@\n tsc/testdata/tests/cases/compiler/aliasUsageInAccessorsOfClass.ts(5,12): error TS2564: Property 'someData' has no initializer and is not definitely assigned in the constructor.\n-tsc/testdata/tests/cases/compiler/aliasUsageInAccessorsOfClass.ts(9,1): error TS1202: Import assignment cannot be used when targeting ECMAScript modules. Consider using 'import * as ns from \"mod\"', 'import {a} from \"mod\"', 'import d from \"mod\"', or another module format instead.\n+tsc/testdata/tests/cases/compiler/aliasUsageInAccessorsOfClass.ts(9,1): error TS1202: Import assignment cannot be used when targeting ECMAScript modules. Consider using 'import * as ns from \\\"mod\\\"', 'import {a} from \\\"mod\\\"', 'import d from \\\"mod\\\"', or another module format instead.\n tsc/testdata/tests/cases/compiler/aliasUsageInAccessorsOfClass.ts(9,8): error TS2300: Duplicate identifier 'Backbone'.\n tsc/testdata/tests/cases/compiler/aliasUsageInAccessorsOfClass.ts(9,27): error TS2307: Cannot find module './aliasUsage1_backbone' or its corresponding type declarations.\n-tsc/testdata/tests/cases/compiler/aliasUsageInAccessorsOfClass.ts(15,1): error TS1202: Import assignment cannot be used when targeting ECMAScript modules. Consider using 'import * as ns from \"mod\"', 'import {a} from \"mod\"', 'import d from \"mod\"', or another module format instead.\n+tsc/testdata/tests/cases/compiler/aliasUsageInAccessorsOfClass.ts(15,1): error TS1202: Import assignment cannot be used when targeting ECMAScript modules. Consider using 'import * as ns from \\\"mod\\\"', 'import {a} from \\\"mod\\\"', 'import d from \\\"mod\\\"', or another module format instead.\n tsc/testdata/tests/cases/compiler/aliasUsageInAccessorsOfClass.ts(15,8): error TS2300: Duplicate identifier 'Backbone'.\n tsc/testdata/tests/cases/compiler/aliasUsageInAccessorsOfClass.ts(15,27): error TS2307: Cannot find module './aliasUsage1_backbone' or its corresponding type declarations."
+    }
+  ]
+}
