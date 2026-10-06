@@ -326,8 +326,11 @@ void Session::DidChangeWatchedFiles(
 		if (!hasRelevantChange) {
 			auto fileName =
 			    lsp::lsproto::documentUriFileName(change->Uri);
-			auto path = tspath::removeTrailingDirectorySeparator(
-			    toPath(fileName));
+			// removeTrailingDirectorySeparator returns a string_view:
+			// bind the toPath() result to an owning Path so the view
+			// (and pathStr below) does not dangle.
+			auto path = tspath::Path{tspath::removeTrailingDirectorySeparator(
+			    toPath(fileName))};
 			std::string pathStr{path};
 			if (contentMapperWatchedFiles->Has(
 			        tspath::Path{pathStr})) {

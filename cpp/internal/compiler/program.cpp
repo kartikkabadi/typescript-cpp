@@ -3235,9 +3235,13 @@ symlinks::KnownSymlinks* SimpleProgram::GetSymlinkCache() {
 				continue;
 			}
 
-			for (auto& dep : info->GetContents()
-			                      ->GetRuntimeDependencyNames()
-			                      .Keys()) {
+			// GetRuntimeDependencyNames returns a Set by value; Keys()
+			// returns a reference into it, so bind it to a named local
+			// before iterating (the range-init does not extend the
+			// temporary's lifetime).
+			auto runtimeDeps =
+			    info->GetContents()->GetRuntimeDependencyNames();
+			for (auto& dep : runtimeDeps.Keys()) {
 				// Skip work in common case: we already saved a
 				// symlink for this package directory in the
 				// node_modules adjacent to this package.json

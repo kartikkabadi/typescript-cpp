@@ -188,6 +188,77 @@ payload is a vector emits `[]`, a map emits `{}`; scalars still emit
 `null`. One edit fixed every `null`-container field on the wire, not
 just `diagnostics`.
 
+### Crash cluster (branch `devin/cpp-fs-crashes2`)
+
+30 of the documented failures now pass (branch suite: 575/718, 143 fail
+— all previously documented, zero regressions). Entries below marked
+**[FIXED]**.
+
+### Crash-cluster root causes
+
+1. **`cmp::ignorePaths` never ignored anything**
+   (`cpp/internal/fourslash/fourslash_deps.h`). Go's `cmp.FilterPath`
+   compares path elements against Go struct field names (`.Kind`,
+   `.SortText`, `.FilterText`, `.Data`, `.AdditionalTextEdits`, ...);
+   the port's `pathIgnored` compares them against JSON member names
+   (`kind`, `sortText`, ...). Every diff Go filters out surfaced as a
+   mismatch. Fix: lowercase the leading char of each `.Segment` in
+   `ignorePaths`. **[FIXED §5a mismatches, §5b, §9, and §4's
+   quickInfoDisplayParts diffs.]** The jsx `ResponseMessage`
+   double-free from §5a no longer reproduces (addressed by the
+   batch-A ownership fixes); the ignore-paths bug was masking the
+   real verification diffs.
+
+2. **`module::resolved::isResolved` is a nil-receiver method in Go**
+   (`r != nil && r.path != ""`); the port has it as a member call on
+   `unique_ptr<resolved>`. Three call sites in
+   `cpp/internal/module/resolver.cpp`
+   (`GetEntrypointsFromPackageJsonInfo` /
+   `loadEntrypointsFromExportMap`) dereferenced it unconditionally
+   when a `package.json` field resolution was absent → SEGV in the
+   auto-import path. Fix: `result != nullptr && result->isResolved()`
+   guards matching the Go nil-receiver semantics. **[FIXED §8 importfix
+   SEGVs.]**
+
+3. **`parallelWorkGroup::Queue` workers outlive the queueing frame** —
+   a `[&]`-capturing lambda queued inside the recursive
+   `ProjectCollectionBuilder::ensureProjectTree`
+   (`cpp/internal/project/projectcollectionbuilder.cpp:1016`)
+   referenced dead stack (the forked `logging::LogTree*` and
+   `projectTreeRequest`) when the worker ran after the frame
+   returned → SEGV at `logging::LogTree::Fork` from
+   `updateProgram`'s "Acquiring config for project" fork. Fix:
+   capture all values (`[this, wg, projectTreeRequest, seenProjects,
+   logger, childConfig, program]`). **[FIXED §7 getEdits SEGV.]**
+
+4. **Range-for over a `.Keys()` reference into a by-value temporary** —
+   `SimpleProgram::GetSymlinkCache` (`cpp/internal/compiler/program.cpp`)
+   iterated `info->GetContents()->GetRuntimeDependencyNames().Keys()`.
+   `Keys()` returns `const unordered_set&` into the `Set` temporary;
+   the range-init binds that reference, not the `Set`, which clang
+   destroys before `begin()` — the loop then iterates a freed bucket
+   array → garbage strings → bad_alloc/SEGV in the auto-import
+   registry (`GetSymlinkCache` is called from
+   `autoimport::registryBuilder::buildProjectBucket`). ASan:
+   stack-use-after-scope. Fix: bind the `Set` to a named local before
+   the loop. **[FIXED §6a `TestCodeFixAddMissingImportForReactJsx1/2`
+   bad_alloc and `TestCodeFixGenerateDefinitions` SEGV; this path is
+   shared with the §8 importfix cluster.]**
+
+5. **`tspath::removeTrailingDirectorySeparator` returns
+   `std::string_view` where Go returns `string`** — two call sites
+   bound/captured the view past the referent's lifetime:
+   - `Session::DidChangeWatchedFiles` (`cpp/internal/project/session.cpp`)
+     stored `removeTrailingDirectorySeparator(toPath(fileName))` — a view
+     into the `toPath` temporary — then built `pathStr` from it (ASan:
+     stack-use-after-scope). Fix: construct an owning `tspath::Path`.
+   - `LanguageService::createPathUpdater`
+     (`cpp/internal/ls/file_rename.cpp`) captured `trimmedOldPath`
+     (a `string_view` into the `oldPath` parameter) by value into the
+     returned `pathUpdater` lambda, which outlives the referent. Fix:
+     copy into a `std::string`. Latent UAFs found by the same ASan run;
+   same crash family.
+
 ### B2. TestOrganizeImportsWithTraceResolution1: `std::bad_function_call`
 Root cause: `compiler::CompilerHost::Trace` was a non-virtual member
 invoking an empty `std::function`. `filesParser::collectFiles`
@@ -264,20 +335,27 @@ the task rules.
   the marshal fix made their `diagnostics`-adjacent fields serialize
   correctly.)
 
-### 2. jsx (14 fail) — 8 crashes + 6 completion mismatches
-- 8 SEGVs across `TestJsxTagNameCompletion*` and
+### 2. jsx (14 fail) — 8 crashes + 6 completion mismatches — [FIXED, all pass]
+- [FIXED — all 8 pass] 8 SEGVs across `TestJsxTagNameCompletion*` and
   `TestJsxAttributeSnippetCompletion*`. Sampled
   `TestJsxTagNameCompletionClosed` under gdb: `double free or corruption`
   in `lsproto::ResponseMessage::~ResponseMessage` — a
   `ResponseMessage`/`AnyValue` is released through two independent
   `shared_ptr` control blocks. Ownership bug in the LSP response path,
   triggered from the JSX completion request.
-- 6 `Completion item mismatch` diffs (`prop_a`, `aria-whatever?` etc.):
-  `filterText`/`data` fields differ on auto-import JSX-attribute
-  completions (e.g. `filterText: "prop_a={$1}"` vs expected `prop_a`,
-  plus `data.fileName` payload differences).
+- [FIXED — all 6 pass] 6 `Completion item mismatch` diffs (`prop_a`,
+  `aria-whatever?` etc.): `filterText`/`data` fields differ on auto-import
+  JSX-attribute completions (e.g. `filterText: "prop_a={$1}"` vs expected
+  `prop_a`, plus `data.fileName` payload differences).
 
 ### 3. codefix — 2 fail
+- (`TestCodeFixAddMissingImportForReactJsx1/2` bad_alloc and
+  `TestCodeFixGenerateDefinitions` SEGV — [FIXED] by the crash-cluster
+  merge; see root causes above.)
+- `TestCodeFixMissingTypeAnnotationOnExports{30,31,56}` — the fix list
+  differs in descriptions/order: e.g. expected `Add satisfies and an
+  inline type assertion with 'Person'` absent; `Add return type`
+  uses `import("./person-code").Person` vs expected `Person`.
 - `TestCodeFixSpellingJs3/8` — unexpected diagnostics surface
   (`Property 'none' may not exist`, `Unused '@ts-expect-error'`) —
   js-diagnostics gate diverges.
@@ -286,19 +364,19 @@ the task rules.
   `unhandled TypeNode:` printer stubs and report SKIP.)
 
 ### 4. getEditsForFileRename — 3 fail
-- `TestGetEditsForFileRenameWithSolutionConfigFile` — SEGV.
+- [FIXED] `TestGetEditsForFileRenameWithSolutionConfigFile` — SEGV.
 - `TestGetEditsForFileRename_cssImport2` — `.css` is not tracked as a
   script info (`Expected script info for /app2.css, but got nil`).
 - `TestGetEditsForFileRename_cssImport3` — css module rename produces
   raw css text instead of the synthesized `.d.ts` declaration
   (`declare const css: {...}; export default css;`).
 
-### 5. importfix — 2 fail, both SEGV
+### 5. importfix — 2 fail, both SEGV — [FIXED, all pass]
 `TestImportFixFromAtTypesWithRealPackage{,Exports}` die in the
 import-fix path (auto-import resolution / new-file-content). The three
 `IndentedImport` SEGVs shared the B5 arena-lifetime bug and now pass.
 
-### 6. tsx — 4 fail: completion-item field diffs
+### 6. tsx — 4 fail: completion-item field diffs — [FIXED, all pass]
 `TestTsxCompletion7/12/13`, `TestTsxCompletionNonTagLessThan`: same
 `filterText`/`data` field divergence family as jsx (§2).
 

@@ -1011,9 +1011,10 @@ void ProjectCollectionBuilder::ensureProjectTree(
 		if (childConfig == nullptr) {
 			continue;
 		}
-		// Capture program by value: this frame can return before the
+		// Capture everything by value: this frame can return before the
 		// queued task runs.
-		wg->Queue([&, childConfig, program] {
+		wg->Queue([this, wg, projectTreeRequest, seenProjects, logger,
+		           childConfig, program] {
 			if (!projectTreeRequest->IsAllProjects() &&
 			    program->RangeResolvedProjectReferenceInChildConfig(
 			        childConfig,
