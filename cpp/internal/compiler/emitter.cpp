@@ -78,8 +78,14 @@ transformers::declarations::OutputPaths* emitHost::GetOutputPathsFor(SourceFile*
 // non-exclusive path).
 std::pair<std::unique_ptr<emitHost>, std::function<void()>> newEmitHost(
     SimpleProgram* program, SourceFile* file) {
+	// Exclusive checkout: emit workers call back INTO the checker
+	// (MarkLinkedReferencesRecursively → markLinkedReferences →
+	// checkExpressionCached → flow analysis → getFlowState/cachedTypes),
+	// which mutates per-checker state — the non-exclusive path is only
+	// safe for read-only use. Two emit workers can otherwise collide on
+	// one checker's free-list/map state (SIGSEGV).
 	auto [checker, done] =
-	    program->GetTypeCheckerForFile(ContextPtr{}, file);
+	    program->GetTypeCheckerForFileExclusive(file);
 	auto host = std::make_unique<emitHost>();
 	host->program = program;
 	host->emitResolver = checker->GetEmitResolver();
@@ -210,63 +216,68 @@ std::vector<Transformer*> getScriptTransformers(
 		                                 binder::ReferenceResolverHooks{});
 	}
 
-	TransformOptions opts;
-	opts.Context = emitContext;
-	opts.CompilerOptions = options;
-	opts.Resolver = referenceResolver;
-	opts.EmitResolver = emitResolver;
-	opts.GetEmitModuleFormatOfFile = [host](SourceFile* f) {
+	// Go: `opts` escapes to the heap — transformers hold `*TransformOptions`
+	// and read fields (e.g. NewESModuleTransformer's copy of
+	// GetEmitModuleFormatOfFile) inside visitSourceFile, after this function
+	// has returned. A stack-local here is use-after-return.
+	auto* opts = new TransformOptions;
+	opts->Context = emitContext;
+	opts->CompilerOptions = options;
+	opts->Resolver = referenceResolver;
+	opts->EmitResolver = emitResolver;
+	opts->GetEmitModuleFormatOfFile = [host](SourceFile* f) {
 		return host->GetEmitModuleFormatOfFile(f);
 	};
+	emitContext->addCleanup([opts] { delete opts; });
 
 	// transform TypeScript syntax
 	{
 		// use type nodes to add metadata decorators
 		if (options->EmitDecoratorMetadata == Tristate::True) {
 			tx.push_back(
-			    transformers::tstransforms::NewMetadataTransformer(&opts));
+			    transformers::tstransforms::NewMetadataTransformer(opts));
 		}
 
 		// erase types
 		tx.push_back(
-		    transformers::tstransforms::NewTypeEraserTransformer(&opts));
+		    transformers::tstransforms::NewTypeEraserTransformer(opts));
 
 		// elide imports
 		if (importElisionEnabled) {
 			tx.push_back(
-			    transformers::tstransforms::NewImportElisionTransformer(&opts));
+			    transformers::tstransforms::NewImportElisionTransformer(opts));
 		}
 
 		// transform `enum`, `namespace`, and parameter properties
 		tx.push_back(
-		    transformers::tstransforms::NewRuntimeSyntaxTransformer(&opts));
+		    transformers::tstransforms::NewRuntimeSyntaxTransformer(opts));
 
 		if (options->ExperimentalDecorators == Tristate::True) {
 			tx.push_back(
 			    transformers::tstransforms::NewLegacyDecoratorsTransformer(
-			        &opts));
+			        opts));
 		}
 	}
 
 	if (jsxTransformEnabled) {
-		tx.push_back(transformers::jsxtransforms::NewJSXTransformer(&opts));
+		tx.push_back(transformers::jsxtransforms::NewJSXTransformer(opts));
 	}
 
 	Transformer* downleveler =
-	    transformers::estransforms::GetESTransformer(&opts);
+	    transformers::estransforms::GetESTransformer(opts);
 	if (downleveler != nullptr) {
 		tx.push_back(downleveler);
 	}
 
-	tx.push_back(transformers::estransforms::NewUseStrictTransformer(&opts));
+	tx.push_back(transformers::estransforms::NewUseStrictTransformer(opts));
 
 	// transform module syntax
-	tx.push_back(getModuleTransformer(&opts));
+	tx.push_back(getModuleTransformer(opts));
 
 	// inlining (formerly done via substitutions)
 	if (!options->GetIsolatedModules()) {
 		tx.push_back(
-		    transformers::inliners::NewConstEnumInliningTransformer(&opts));
+		    transformers::inliners::NewConstEnumInliningTransformer(opts));
 	}
 	return tx;
 }

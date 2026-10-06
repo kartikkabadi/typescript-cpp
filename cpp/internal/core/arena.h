@@ -43,16 +43,23 @@ public:
 		static TraceFn get() { return nullptr; }
 	};
 
-	explicit Arena(size_t blockSize = 1 << 20) : blockSize_(blockSize) {}
+	// Largest block an arena grows to: the historical fixed block size.
+	static constexpr size_t kMaxBlockSize = 1 << 20;
+
+	explicit Arena(size_t blockSize = kMaxBlockSize)
+	    : blockSize_(blockSize),
+	      maxBlockSize_(blockSize > kMaxBlockSize ? blockSize : kMaxBlockSize) {}
 	Arena(const Arena&) = delete;
 	Arena& operator=(const Arena&) = delete;
 	Arena(Arena&& o) noexcept
-	    : blockSize_(o.blockSize_), capacity_(o.capacity_),
+	    : blockSize_(o.blockSize_), blockBytes_(o.blockBytes_),
+	      maxBlockSize_(o.maxBlockSize_), capacity_(o.capacity_),
 	      offset_(o.offset_), cur_(o.cur_), blocks_(std::move(o.blocks_)),
 	      tracked_(o.tracked_), trackedAllocs_(o.trackedAllocs_),
 	      trackedBytesAllocd_(o.trackedBytesAllocd_),
 	      trackedBytesLive_(o.trackedBytesLive_) {
 		o.capacity_ = o.offset_ = 0;
+		o.blockBytes_ = 0;
 		o.cur_ = nullptr;
 		o.trackedAllocs_ = nullptr;
 		o.trackedBytesAllocd_ = o.trackedBytesLive_ = 0;
@@ -61,6 +68,8 @@ public:
 		if (this != &o) {
 			clear();
 			blockSize_ = o.blockSize_;
+			blockBytes_ = o.blockBytes_;
+			maxBlockSize_ = o.maxBlockSize_;
 			capacity_ = o.capacity_;
 			offset_ = o.offset_;
 			cur_ = o.cur_;
@@ -70,6 +79,8 @@ public:
 			trackedBytesAllocd_ = o.trackedBytesAllocd_;
 			trackedBytesLive_ = o.trackedBytesLive_;
 			o.capacity_ = o.offset_ = 0;
+			o.blockBytes_ = 0;
+			o.maxBlockSize_ = kMaxBlockSize;
 			o.cur_ = nullptr;
 			o.trackedAllocs_ = nullptr;
 			o.trackedBytesAllocd_ = o.trackedBytesLive_ = 0;
@@ -83,6 +94,15 @@ public:
 	// Must be called before the first allocation.
 	void setTracked(bool tracked) { tracked_ = tracked; }
 	bool isTracked() const { return tracked_; }
+
+	// Total bytes reserved across all blocks (diagnostics only).
+	size_t blockBytes() const { return blockBytes_; }
+
+	// Initial block size for the NEXT block allocation. Blocks grow
+	// geometrically from here up to maxBlockSize_ (Go's GC-arena span
+	// doubling analog). Only meaningful while the arena is empty.
+	void setBlockSize(size_t n) { blockSize_ = n; }
+	size_t blockSize() const { return blockSize_; }
 
 	template <class T, class... Args>
 	T* alloc(Args&&... args) {
@@ -356,7 +376,15 @@ private:
 		offset_ = (offset_ + align - 1) & ~(align - 1);
 		if (offset_ + size > capacity_) {
 			size_t n = blockSize_ > size + align ? blockSize_ : size + align;
-			blocks_.push_back(std::make_unique<char[]>(n));
+			blockBytes_ += n;
+			// Geometric growth like Go's span/vector doubling: small arenas
+			// stay small; heavy users reach maxBlockSize_ in a few steps.
+			blockSize_ = n * 2 <= maxBlockSize_ ? n * 2 : maxBlockSize_;
+			// make_unique_for_overwrite: arena bytes are dead storage until
+			// written — zero-initializing them costs a full-block memset
+			// (dominated parse profiles at ~80% of instructions) plus an
+			// eager page-fault on every fresh page.
+			blocks_.push_back(std::make_unique_for_overwrite<char[]>(n));
 			capacity_ = n;
 			cur_ = blocks_.back().get();
 			offset_ = 0;
@@ -367,6 +395,8 @@ private:
 	}
 
 	size_t blockSize_;
+	size_t maxBlockSize_ = kMaxBlockSize;
+	size_t blockBytes_ = 0;
 	size_t capacity_ = 0;
 	size_t offset_ = 0;
 	char* cur_ = nullptr;

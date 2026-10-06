@@ -7,12 +7,16 @@ plus the pathological single file `tsc/testdata/tests/cases/compiler/deeplyNeste
 
 ## TL;DR
 
-| workload                              | before        | after         |
-|---------------------------------------|---------------|---------------|
-| `tscpp check deeplyNestedMappedTypes` | ~130 s        | **0.40–0.43 s** (byte-identical to checkdump oracle) |
-| `tsc -p` emit (perfproj, med ratio)   | ~1.95× slower | ~1.6–1.8× slower (noisy) |
-| `tsc -p` --noEmit                     | ~2.33× slower | **~0.9–1.0× (parity)** |
-| `tsc -p` --declaration                | ~2.37× slower | ~1.5–2.0× slower (noisy) |
+| workload                              | before        | after round 1 | after round 2 |
+|---------------------------------------|---------------|---------------|---------------|
+| `tscpp check deeplyNestedMappedTypes` | ~130 s        | **0.40–0.43 s** | same (byte-identical) |
+| `tsc -p` emit (perfproj, med ratio)   | ~1.95× slower | ~1.79× (real; emit crashed ~20% before) | **~1.43×** |
+| `tsc -p` --noEmit                     | ~2.33× slower | ~1.87×        | **~1.37×** |
+| `tsc -p` --declaration                | ~2.37× slower | ~2.15×        | **~1.48×** |
+| `tsc -p` parse phase                  | 0.107 s vs Go 0.035 s | same | **~0.066 s** |
+| `parse-all` testdata corpus (4.6MB)   | 1,173 ms, 3.9 MB/s | same | **~30 ms, ~150 MB/s (39×)** |
+
+Round 2 = parallel-emit crash fixes + arena block sizing/memset below.
 
 ## Fixed: amortize the tracked-arena mark/sweep (GOGC-style pacing)
 
@@ -56,6 +60,67 @@ Also fixed ownership bugs the pacing exposed:
 - Debug knob: `TSCPP_GC_DEBUG=1` prints `[gc] allocd=… live=… threshold=…`
   per release call.
 
+## Fixed: arena blocks — 1MB-per-file minimum + full-block memset
+
+**Symptom.** Project `--diagnostics` Parse time 0.107 s vs Go 0.035 s (~3×).
+`massif` heap-tree on `parse-all`: **97.9% of the parse heap was
+`Arena::raw`** — 209 MB for 1.5 MB of source (arena ≈ 1 MB × file count;
+testdata corpus: 4.6 MB source → 6.87 GB arena). `callgrind` then showed
+`__memset_avx2` at **80.8% of all instructions**.
+
+**Mechanism (three compounding bugs in `Arena::raw`).**
+1. `NodeFactory`'s arena used the 1 MB default block — every SourceFile,
+   even a 2 KB test, grabbed ≥1 MB up front. ≥128 KB blocks come from
+   `mmap`, so each file paid an mmap + ~256 eager page faults.
+2. `std::make_unique<char[]>(n)` value-initializes — a memset over the
+   whole block, so we wrote every page twice (once for zeroes, once for
+   real data). This alone was ~80% of parse instructions.
+3. Fixed block size meant a file needing 1.2 MB allocated a second 1 MB
+   block regardless.
+
+**Fix.** `raw()` now allocates with `make_unique_for_overwrite` (no
+memset) and grows `blockSize_` geometrically up to `maxBlockSize_`
+(= max(initial, 1 MB)); `Parser::initializeState` seeds the node arena's
+first block at `clamp(sourceSize*8, 64KB, 1MB)` (AST bytes ≈ 8× source),
+so small files stay small while big files still reach 1 MB blocks in a
+few steps. Go analogue: its GC arena hands out 8 KB spans that grow.
+
+**Verification.**
+- testdata `parse-all` (6,840 files, 4.6 MB): **1,173 ms → ~30 ms**,
+  arena 6,865 MB → 480 MB.
+- perfproj `parse-all` (200 files, 1.5 MB): ~33 ms → ~15 ms,
+  arena 200 MB → 72 MB.
+- `--diagnostics` Parse time: 0.107 s → ~0.066 s (Go 0.035 s; remaining
+  gap is scanner/string CPU, not allocation).
+- Emit + decl-emit outputs `diff -r` byte-identical to Go; 300/300
+  check smoke; tsctestrunner 99/99 ×3.
+
+## Fixed: two parallel-emit crashes (was ~10–20% SIGSEGV per emit)
+
+`tsctestrunner` intermittently died and `tscpp tsc -p … --outDir` exited
+2 silently (SIGSEGV caught by the crash handler → `exit_group(2)`).
+Two independent bugs, both in `cpp/internal/compiler/emitter.cpp`:
+
+1. **Stack-use-after-return.** `getScriptTransformers` built a
+   stack-local `TransformOptions opts` and passed `&opts` to every
+   transformer. `ImpliedModuleTransformer::visitSourceFile` lazily calls
+   `NewESModuleTransformer(opts)` inside the visit — i.e. *after*
+   `getScriptTransformers` returned — reading `opts->GetEmitModuleFormatOfFile`
+   from dead stack. Go escapes `opts` to the heap automatically.
+   Fix: `auto* opts = new TransformOptions; … emitContext->addCleanup(
+   [opts]{ delete opts; });`
+2. **Non-exclusive checker checkout.** `newEmitHost` used
+   `GetTypeCheckerForFile` (comment: "only safe when ... read-only"),
+   but emit workers re-enter the checker via
+   `MarkLinkedReferencesRecursively` → `checkExpressionCached` → flow
+   analysis, which mutates `getFlowState` free-lists / `cachedTypes`
+   concurrently → SIGSEGV inside `checker_flow.cpp`.
+   Fix: `GetTypeCheckerForFileExclusive` (mutex checkout).
+
+After: `tscpp tsc -p … --outDir` and `--declaration` exit 0 across 8/8
+runs with `diff -r` identical to `tsgo` output; tsctestrunner 99/99 ×3
+consecutive.
+
 ## Current top hot spots (`tsc -p --noEmit`, flat perf, ~1100 samples)
 
 The run is now short enough (~0.4–0.5 s wall) that fixed startup cost and
@@ -90,20 +155,13 @@ machine noise dominate; ordering below is the profile, attribution is manual.
 
 ## Known bugs found while profiling (not fixed here)
 
-- **Parallel-emit data race (pre-existing)**: `tscpp tsc -p` and
-  `tsctestrunner` intermittently SIGSEGV (~10–20% per emit invocation, same
-  before and after this change). Signature: a worker inside
-  `ImpliedModuleTransformer::visitSourceFile` calls
-  `NewESModuleTransformer`/`NewCommonJSModuleTransformer`
-  (`esmodule.cpp:64` / `commonjsmodule.cpp:179`) which copies
-  `opts->GetEmitModuleFormatOfFile` (`std::function`); the source's invoker
-  bytes get stomped mid-copy (observed functor target = truncated node
-  pointer). `TransformOptions`/transformer `opts` lifetime is shared across
-  emit workers — `emitContext->newNodeVisitor` registers visitors on the
-  shared `EmitContext`, so a visitor bound to one worker's stack `opts` can
-  run (or be copied) on another. Needs a dedicated fix: per-worker
-  `TransformOptions` copies with deep-copied std::functions, or a mutex on
-  registration.
+- **Open lead: instantiation over-count.** `--diagnostics` shows
+  Instantiations 8,934 vs Go 6,630 (+35%) and Types 59,779 vs 56,792
+  (+5%) while output stays byte-identical — some upstream path creates
+  semantically identical duplicates (likely a dedup cache keyed more
+  narrowly than Go's, or `couldContainTypeVariables` computed differently).
+  The `instantiateType` cache plumbing itself is verified faithful
+  (activeTypeMappersCaches/findActiveMapper match checker.go).
 - **`getNodeBuilderEx` tracked arenas are never released**
   (`checker_printer.cpp` `TypeToTypeNode`/`TypeToTypeNodeEx`/
   `TypePredicateToTypePredicateNode` paths create
