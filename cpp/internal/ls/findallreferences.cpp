@@ -1173,7 +1173,7 @@ std::pair<SymbolAndEntriesData, bool> LanguageService::provideSymbolsAndEntries(
 			continue;
 		}
 		auto [data, found] = provideSymbolsAndEntriesAtPosition(
-		    ctx, program, mapped.Script_, int(mapped.Position), isRename,
+		    ctx, program, mapped.Script, int(mapped.Position), isRename,
 		    implementations);
 		if (!found) {
 			continue;

@@ -95,7 +95,7 @@ sourceMapSpanWriter* newSourceMapSpanWriter(
 	    !sourceMap->SourcesContent->empty()) {
 		// json.Marshal(sourceMap.SourcesContent) — []json.RawMessage-ish:
 		// each element is either a JSON string or null.
-		std::vector<std::string> els;
+		std::vector<json::Value> els;
 		for (const auto& c : *sourceMap->SourcesContent) {
 			els.push_back(c.has_value() ? json::marshalString(*c) : "null");
 		}

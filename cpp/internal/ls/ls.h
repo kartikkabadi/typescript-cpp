@@ -410,6 +410,643 @@ struct stringLiteralCompletions {
 // sourcemap.Host (l is passed to GetDocumentPositionMapper).
 // === dep decls — owned by the ls-coreB slice (findallreferences.go) ===
 
+// ==================== ls-coreB merged decls ====================
+
+// fwd decls — types declared later in this header (merged ls-coreB sections
+// and sibling-owned dep-stubs kept in their original positions).
+class LanguageService;
+struct SignatureUsage;
+struct callInvocation;
+struct typeArgsInvocation;
+struct contextualInvocation;
+struct invocation;
+struct argumentListInfo;
+
+// === findallreferences.go — shared result types ===
+
+using referenceUse = int;
+inline constexpr referenceUse referenceUseNone = 0;
+inline constexpr referenceUse referenceUseOther = 1;
+inline constexpr referenceUse referenceUseReferences = 2;
+inline constexpr referenceUse referenceUseRename = 3;
+
+struct refOptions {
+	bool findInStrings = false;
+	bool findInComments = false;
+	referenceUse use = 0;
+	bool implementations = false;
+	bool useAliasesForRename = false;
+};
+
+
+
+using DefinitionKind = int;
+inline constexpr DefinitionKind definitionKindSymbol = 0;
+inline constexpr DefinitionKind definitionKindLabel = 1;
+inline constexpr DefinitionKind definitionKindKeyword = 2;
+inline constexpr DefinitionKind definitionKindThis = 3;
+inline constexpr DefinitionKind definitionKindString = 4;
+inline constexpr DefinitionKind definitionKindTripleSlashReference = 5;
+
+struct tripleSlashDefinition {
+	FileReference* reference = nullptr;
+	SourceFile* file = nullptr;
+};
+
+struct Definition {
+	DefinitionKind Kind = definitionKindSymbol;
+	Symbol* symbol = nullptr;
+	Node* node = nullptr;
+	tripleSlashDefinition* tripleSlashFileRef = nullptr;
+};
+
+using entryKind = int;
+inline constexpr entryKind entryKindNone = 0;
+inline constexpr entryKind entryKindRange = 1;
+inline constexpr entryKind entryKindNode = 2;
+inline constexpr entryKind entryKindStringLiteral = 3;
+inline constexpr entryKind entryKindSearchedLocalFoundProperty = 4;
+inline constexpr entryKind entryKindSearchedPropertyFoundLocal = 5;
+
+struct ReferenceEntry {
+	entryKind kind = entryKindNone;
+	Node* node = nullptr;
+	Node* context = nullptr;
+	SourceFile* sourceFile = nullptr;
+	TextRange* textRange = nullptr;
+	lsproto::Location* lspRange = nullptr;
+	bool unmappable = false;
+
+	Node* Node_() const { return node; } // Node() — method renamed (field clash)
+	bool IsNodeEntry() const { return node != nullptr; }
+};
+
+struct SymbolAndEntries {
+	Definition* definition = nullptr;
+	std::vector<ReferenceEntry*> references;
+
+	std::vector<ReferenceEntry*> References() const { return references; }
+	Node* DefinitionNode() const;
+	Symbol* DefinitionSymbol() const;
+	bool canUseDefinitionSymbol() const;
+};
+
+SymbolAndEntries* NewSymbolAndEntries(
+    DefinitionKind kind, Node* node, Symbol* symbol,
+    std::vector<ReferenceEntry*> references);
+
+// position / nonLocalDefinition — findallreferences.go:480.
+struct position {
+	lsproto::DocumentUri uri;
+	lsproto::Position pos;
+
+	lsproto::DocumentUri TextDocumentURI() const { return uri; }
+	lsproto::Position TextDocumentPosition() const { return pos; }
+};
+
+struct nonLocalDefinition : position {
+	// Go: func fields returning lsproto.HasTextDocumentPosition (nil-able).
+	std::function<position*()> GetSourcePosition;
+	std::function<position*()> GetGeneratedPosition;
+};
+
+// symbolEntryTransformOptions / SymbolAndEntriesData — findallreferences.go:631.
+struct symbolEntryTransformOptions {
+	bool requireLocationsResult = false;
+	bool dropOriginNodes = false;
+};
+
+struct SymbolAndEntriesData {
+	Node* OriginalNode = nullptr;
+	std::vector<SymbolAndEntries*> SymbolsAndEntries;
+	int Position = 0;
+};
+
+// referencedSymbolDefinitionInfo — findallreferences.go:866.
+struct referencedSymbolDefinitionInfo {
+	Node* node = nullptr;
+	lsproto::Location location;
+	lsproto::VSClassifiedTextElement* displayText = nullptr;
+};
+
+// SignatureUsage — findallreferences.go:1210.
+struct SignatureUsage {
+	Node* Name = nullptr;
+	Node* Call = nullptr;
+};
+
+// === importTracker.go — shared types ===
+
+using ImpExpKind = int32_t;
+inline constexpr ImpExpKind ImpExpKindUnknown = 0;
+inline constexpr ImpExpKind ImpExpKindImport = 1;
+inline constexpr ImpExpKind ImpExpKindExport = 2;
+
+struct ExportInfo;
+
+struct ImportExportSymbol {
+	ImpExpKind kind = ImpExpKindUnknown;
+	Symbol* symbol = nullptr;
+	ExportInfo* exportInfo = nullptr;
+};
+
+using ExportKind = int;
+inline constexpr ExportKind ExportKindNamed = 0;
+inline constexpr ExportKind ExportKindDefault = 1;
+inline constexpr ExportKind ExportKindExportEquals = 2;
+inline constexpr ExportKind ExportKindUMD = 3;
+inline constexpr ExportKind ExportKindModule = 4;
+
+struct ExportInfo {
+	Symbol* exportingModuleSymbol = nullptr;
+	ExportKind exportKind = ExportKindNamed;
+};
+
+struct LocationAndSymbol {
+	Node* importLocation = nullptr;
+	Symbol* importSymbol = nullptr;
+};
+
+struct ImportsResult {
+	std::vector<LocationAndSymbol> importSearches;
+	std::vector<Node*> singleReferences;
+	std::vector<SourceFile*> indirectUsers;
+};
+
+// ImportTracker — importTracker.go:55.
+using ImportTracker =
+    std::function<ImportsResult*(Symbol* exportSymbol, ExportInfo* exportInfo,
+                                 bool isForRename)>;
+
+using ModuleReferenceKind = int32_t;
+inline constexpr ModuleReferenceKind ModuleReferenceKindImport = 0;
+inline constexpr ModuleReferenceKind ModuleReferenceKindReference = 1;
+inline constexpr ModuleReferenceKind ModuleReferenceKindImplicit = 2;
+
+// ModuleReference — importTracker.go:66.
+struct ModuleReference {
+	ModuleReferenceKind kind = ModuleReferenceKindImport;
+	Node* literal = nullptr; // for import and implicit kinds (StringLiteralLike)
+	SourceFile* referencingFile = nullptr;
+	FileReference* ref = nullptr; // for reference kind
+};
+
+ImportTracker createImportTracker(const gostd::Context& ctx,
+                                  compiler::SimpleProgram* program,
+                                  const std::vector<SourceFile*>& sourceFiles,
+                                  collections::Set<std::string>* sourceFilesSet,
+                                  checker::Checker* checker);
+
+std::vector<ModuleReference> findModuleReferences(
+    compiler::SimpleProgram* program,
+    const std::vector<SourceFile*>& sourceFiles, Symbol* searchModuleSymbol,
+    checker::Checker* checker);
+
+ImportExportSymbol* getImportOrExportSymbol(Node* node, Symbol* symbol,
+                                            checker::Checker* ch,
+                                            bool comingFromExport);
+ExportInfo* getExportInfo(Symbol* exportSymbol, ExportKind exportKind,
+                          checker::Checker* ch);
+
+
+// === codeactions_missingmemberfixer.go — types ===
+using preserveOptionalFlags = int;
+inline constexpr preserveOptionalFlags preserveOptionalFlagsMethod = 1;
+inline constexpr preserveOptionalFlags preserveOptionalFlagsProperty = 2;
+inline constexpr preserveOptionalFlags preserveOptionalFlagsAll =
+    preserveOptionalFlagsMethod | preserveOptionalFlagsProperty;
+
+// missingMemberFixer — codeactions_missingmemberfixer.go:26.
+struct missingMemberFixer {
+	change::Tracker* changeTracker = nullptr;
+	checker::Checker* typeChecker = nullptr;
+	compiler::SimpleProgram* program = nullptr;
+	lsutil::UserPreferences preferences;
+	autoimport::ImportAdder* importAdder = nullptr;
+	locale::Locale loc;
+
+	std::pair<checker::NodeBuilder*,
+	          std::unordered_map<Node*, Symbol*>>
+	createNodeBuilder();
+	std::vector<Node*> createMemberFromSymbol(
+	    Symbol* symbol, Node* enclosingDeclaration, SourceFile* sourceFile,
+	    Node* body, preserveOptionalFlags preserveOptional, bool abstract);
+	std::vector<checker::Signature*> getCallSignatures(checker::Type* t);
+	Node* createTypeNode(
+	    checker::Type* t, Node* enclosingDeclaration,
+	    nodebuilder::Flags flags, checker::NodeBuilder* nodeBuilder,
+	    std::unordered_map<Node*, Symbol*>* idToSymbol);
+	ModifierList* createModifiers(Symbol* symbol, Node* declaration);
+	bool shouldAddOverrideKeyword(Node* declaration);
+	Node* createSignatureDeclarationFromSignature(
+	    checker::Signature* signature, Kind kind, SourceFile* sourceFile,
+	    Node* enclosingDeclaration, Node* body, ModifierList* modifiers,
+	    Node* name, bool optional);
+	Node* createSignatureDeclarationFromSignatures(
+	    const std::vector<checker::Signature*>& signatures, Node* name,
+	    bool optional, ModifierList* modifiers,
+	    lsutil::QuotePreference quotePreference, Node* body,
+	    Node* enclosingDeclaration);
+	Node* getReturnTypeFromSignatures(
+	    const std::vector<checker::Signature*>& signatures,
+	    Node* enclosingDeclaration, checker::NodeBuilder* nodeBuilder,
+	    std::unordered_map<Node*, Symbol*>* idToSymbol);
+	Node* importTypeNode(Node* typeNode,
+	                     std::unordered_map<Node*, Symbol*>* idToSymbol);
+	Symbol* getExportedSymbol(Symbol* symbol);
+	Node* createIndexSignatureDeclarationFromType(
+	    Node* classDeclaration, checker::Type* implementedType,
+	    checker::Type* keyType);
+	Node* createBody(Node* body, lsutil::QuotePreference quotePreference,
+	                 bool signatureOnly);
+	Node* createStubbedMethodBody(lsutil::QuotePreference quotePreference);
+};
+
+missingMemberFixer* newMissingMemberFixer(
+    change::Tracker* changeTracker, compiler::SimpleProgram* program,
+    checker::Checker* typeChecker, const lsutil::UserPreferences& preferences,
+    autoimport::ImportAdder* importAdder, locale::Locale locale);
+
+// === codeactions_fixmissingtypeannotation.go — types ===
+
+// typePrintMode — codeactions_fixmissingtypeannotation.go:80.
+using typePrintMode = int;
+inline constexpr typePrintMode typePrintModeFull = 0;
+inline constexpr typePrintMode typePrintModeRelative = 1;
+inline constexpr typePrintMode typePrintModeWidened = 2;
+
+// isolatedDeclarationsFixer — codeactions_fixmissingtypeannotation.go:216.
+struct isolatedDeclarationsFixer {
+	SourceFile* sourceFile = nullptr;
+	compiler::SimpleProgram* program = nullptr;
+	checker::Checker* checker = nullptr;
+	change::Tracker* changeTracker = nullptr;
+	autoimport::ImportAdder* importAdder = nullptr;
+	locale::Locale loc;
+	std::unordered_map<Node*, bool> fixedNodes;
+	typePrintMode typePrintMode = typePrintModeFull;
+	std::vector<Symbol*> symbolsToImport;
+	bool mutatedTarget = false;
+
+	std::string addTypeAnnotation(TextRange span);
+	std::string createNamespaceForExpandoProperties(Node* expandoFunc);
+	std::string addInlineAssertion(TextRange span);
+	std::string extractAsVariable(TextRange span);
+	std::string fixIsolatedDeclarationError(Node* node);
+	std::string addTypeToSignatureDeclaration(Node* funcNode);
+	std::string transformExportAssignment(Node* defaultExport);
+	std::string transformExtendsClauseWithExpression(Node* classDecl);
+	std::string transformDestructuringPatterns(Node* bindingPattern);
+	void extractBindingElements(Node* bindingPattern, Node* baseExpr,
+	                            std::vector<Node*>* newNodes,
+	                            Node* enclosingVarStmt);
+	void emitBindingElementVariable(NodeFactory* factory, Node* name,
+	                                BindingElement* be, Node* accessExpr,
+	                                std::vector<Node*>* newNodes,
+	                                Node* enclosingVarStmt);
+	ModifierList* getExportModifier(Node* enclosingVarStmt);
+	Node* inferType(Node* node, ::tsc::checker::Type* variableType);
+	nodebuilder::Flags getExtraFlags(Node* node, ::tsc::checker::Type* t);
+	Node* createTypeOfFromEntityNameExpression(Node* node);
+	Node* typeFromArraySpreadElements(ArrayLiteralExpression* node,
+	                                  const std::string& name);
+	Node* typeFromObjectSpreadAssignment(ObjectLiteralExpression* node,
+	                                     const std::string& name);
+	Node* typeFromSpreads(
+	    Node* node, const std::string& name, bool isInConstContext,
+	    const std::function<std::vector<Node*>(Node*)>& getChildren,
+	    const std::function<bool(Node*)>& isSpread,
+	    const std::function<Node*(Node*)>& createSpread,
+	    const std::function<Node*(std::vector<Node*>)>& makeNodeOfKind,
+	    const std::function<Node*(std::vector<Node*>)>& finalType);
+	void makeSpreadVariable(
+	    NodeFactory* factory, const std::string& name,
+	    bool isInConstContext, Node* statement,
+	    const std::function<Node*(Node*)>& createSpread, Node* expression,
+	    std::vector<Node*>* intersectionTypes,
+	    std::vector<Node*>* newSpreads);
+	void finalizesVariablePart(
+	    NodeFactory* factory, const std::string& name,
+	    bool isInConstContext, Node* statement,
+	    const std::function<Node*(std::vector<Node*>)>& makeNodeOfKind,
+	    const std::function<Node*(Node*)>& createSpread,
+	    std::vector<Node*>* currentVariableProperties,
+	    std::vector<Node*>* intersectionTypes,
+	    std::vector<Node*>* newSpreads);
+	Node* relativeType(Node* node);
+	Node* typeToMinimizedReferenceType(::tsc::checker::Type* t,
+	                                   Node* enclosingDecl,
+	                                   nodebuilder::Flags flags);
+	std::string addTypeToVariableLike(Node* decl);
+	void addSymbolToExistingImport(Symbol* sym);
+};
+
+// === codeactions.go — shared types ===
+
+struct CodeAction {
+	std::string Description;
+	std::vector<lsproto::TextEdit*> Changes;
+	std::string FixID;
+	std::string FixAllDescription;
+
+	int Compare(const CodeAction* b) const;
+};
+
+struct CombinedCodeActions {
+	std::string Description;
+	std::vector<lsproto::TextEdit*> Changes;
+};
+
+struct CodeFixContext;
+
+struct CodeFixProvider {
+	std::vector<int32_t> ErrorCodes;
+	std::function<std::pair<std::vector<CodeAction*>, gostd::Error>(
+	    const gostd::Context& ctx, CodeFixContext* fixContext)>
+		GetCodeActions;
+	std::vector<std::string> FixIds;
+	std::function<std::pair<CombinedCodeActions*, gostd::Error>(
+	    const gostd::Context& ctx, CodeFixContext* fixContext)>
+		GetAllCodeActions;
+};
+
+struct CodeFixContext {
+	SourceFile* SourceFile = nullptr;
+	TextRange Span = TextRange::undefined();
+	int32_t ErrorCode = 0;
+	compiler::SimpleProgram* Program = nullptr;
+	LanguageService* LS = nullptr;
+	lsproto::Diagnostic* Diagnostic = nullptr;
+	lsproto::CodeActionParams* Params = nullptr;
+};
+
+// Providers defined by this slice (codeactions_importfixes.go etc.) and by
+// sibling slices; the codeFixProviders table in codeactions.cpp references
+// them.
+extern CodeFixProvider* ImportFixProvider;
+extern CodeFixProvider* IsolatedDeclarationsFixProvider;
+extern CodeFixProvider* FixClassIncorrectlyImplementsInterfaceProvider;
+
+
+// === displaypartswriter.go ===
+// displayPartsWriter implements printer::EmitTextWriter and captures
+// classified text runs for VS colorized labels, while also building a plain
+// string. When vsCapability is false, only the plain string is built; runs
+// are skipped.
+struct displayPartsWriter : printer::EmitTextWriter {
+	std::string builder;
+	std::vector<lsproto::VSClassifiedTextRun*> runs;
+	bool vsCapability = false;
+	std::string lastWritten;
+
+	void addRun(lsproto::ClassificationTypeName classification,
+	            const std::string& text);
+	void WriteClassified(const std::string& text,
+	                     lsproto::ClassificationTypeName classification);
+	void WriteFrom(displayPartsWriter* other);
+	std::vector<lsproto::VSClassifiedTextRun*> GetRuns() const;
+
+	// --- EmitTextWriter ---
+	std::string String() override;
+	void Clear() override;
+	void DecreaseIndent() override;
+	TextPos GetColumn() override;
+	int GetIndent() override;
+	int GetLine() override;
+	int GetTextPos() override;
+	bool HasTrailingComment() override;
+	bool HasTrailingWhitespace() override;
+	void IncreaseIndent() override;
+	bool IsAtStartOfLine() override;
+	void RawWrite(const std::string& s) override;
+	void Write(const std::string& s) override;
+	void WriteComment(const std::string& text) override;
+	void WriteKeyword(const std::string& text) override;
+	void WriteLine() override;
+	void WriteLineForce(bool force) override;
+	void WriteLiteral(const std::string& s) override;
+	void WriteOperator(const std::string& text) override;
+	void WriteParameter(const std::string& text) override;
+	void WriteProperty(const std::string& text) override;
+	void WritePunctuation(const std::string& text) override;
+	void WriteSpace(const std::string& text) override;
+	void WriteStringLiteral(const std::string& text) override;
+	void WriteSymbol(const std::string& text, Symbol* symbol) override;
+	void WriteTrailingSemicolon(const std::string& text) override;
+};
+
+displayPartsWriter* newDisplayPartsWriter(bool vsCapability);
+
+// classificationForSymbol — displaypartswriter.go:168.
+lsproto::ClassificationTypeName classificationForSymbol(Symbol* symbol);
+bool isFirstDeclarationOfSymbolParameter(Symbol* symbol);
+
+// === source_map.go ===
+struct script {
+	std::string fileName;
+	std::string text;
+
+	std::string FileName() const { return fileName; }
+	std::string OriginalFileName() const { return fileName; }
+	std::string Text() const { return text; }
+	std::string OriginalText() const { return text; }
+	spanmap::SpanMap* SpanMap() const { return nullptr; }
+};
+
+// === crossproject.go ===
+struct Project {
+	virtual ~Project() = default;
+	virtual std::string Id() = 0;
+	virtual compiler::SimpleProgram* GetProgram() = 0;
+	virtual bool HasFile(const std::string& fileName) = 0;
+};
+
+struct projectAndTextDocumentPosition {
+	Project* project = nullptr;
+	LanguageService* ls = nullptr;
+	lsproto::DocumentUri Uri;
+	lsproto::Position Position;
+	SymbolAndEntriesData* symbolData = nullptr;
+	bool forOriginalLocation = false;
+};
+
+template <typename Resp>
+struct response {
+	bool complete = false;
+	Resp result;
+	bool forOriginalLocation = false;
+};
+
+struct CrossProjectOrchestrator {
+	virtual ~CrossProjectOrchestrator() = default;
+	virtual Project* GetDefaultProject() = 0;
+	virtual std::vector<Project*> GetAllProjectsForInitialRequest() = 0;
+	virtual LanguageService* GetLanguageServiceForProjectWithFile(
+	    const gostd::Context& ctx, Project* project,
+	    lsproto::DocumentUri uri) = 0;
+	virtual std::pair<std::vector<Project*>, gostd::Error> GetProjectsForFile(
+	    const gostd::Context& ctx, lsproto::DocumentUri uri) = 0;
+	// iter.Seq[Project] — pull-based: call yield until it returns false.
+	virtual void GetProjectsLoadingProjectTree(
+	    const gostd::Context& ctx,
+	    collections::Set<tspath::Path>* requestedProjectTrees,
+	    const std::function<bool(Project*)>& yield) = 0;
+};
+
+// combine helpers — crossproject.go.
+
+// combineLocationArray — crossproject.go:298.
+template <typename T>
+std::vector<T> combineLocationArray(
+    std::vector<T> combined, std::vector<T>* locations,
+    collections::Set<lsproto::Location>* seen) {
+	for (auto& loc : *locations) {
+		lsproto::Location key;
+		if constexpr (std::is_pointer_v<T>) {
+			key = loc->GetLocation();
+		} else {
+			key = loc.GetLocation();
+		}
+		if (!seen->Has(key)) {
+			seen->Add(key);
+			combined.push_back(loc);
+		}
+	}
+	return combined;
+}
+
+template <lsproto::HasLocations T>
+std::vector<lsproto::Location>* combineResponseLocations(
+    const std::function<void(const std::function<bool(T&)>&)>& resultsSeq) {
+	auto* combined = new std::vector<lsproto::Location>();
+	collections::Set<lsproto::Location> seenLocations;
+	resultsSeq([&](T& resp) -> bool {
+		if (auto* locations = resp.GetLocations(); locations != nullptr) {
+			*combined = combineLocationArray(*combined, locations,
+			                                 &seenLocations);
+		}
+		return true;
+	});
+	return combined;
+}
+
+lsproto::ReferencesResponse combineReferences(
+    const std::function<void(
+        const std::function<bool(lsproto::ReferencesResponse&)>&)>& results);
+lsproto::VSReferencesResponse combineVSReferences(
+    const std::function<void(
+        const std::function<bool(lsproto::VSReferencesResponse&)>&)>& results);
+lsproto::ImplementationResponse combineImplementations(
+    const std::function<void(const std::function<bool(
+        lsproto::ImplementationResponse&)>&)>& results);
+lsproto::RenameResponse combineRenameResponse(
+    const std::function<void(
+        const std::function<bool(lsproto::RenameResponse&)>&)>& results);
+lsproto::CallHierarchyIncomingCallsResponse combineIncomingCalls(
+    const std::function<void(const std::function<bool(
+        lsproto::CallHierarchyIncomingCallsResponse&)>&)>& results);
+
+
+// === file_rename.go types ===
+using pathUpdater = std::function<std::pair<std::string, bool>(
+    const std::string& path)>;
+
+struct toImport {
+	std::string newFileName;
+	bool updated = false;
+};
+
+struct movedFile {
+	SourceFile* sourceFile = nullptr;
+	std::string newFileName;
+};
+
+// signaturehelp.go:24 — trigger / retrigger chars shared by the static
+// server capabilities and the dynamic content-mapper registration.
+extern const std::vector<std::string> SignatureHelpTriggerCharacters;
+extern const std::vector<std::string> SignatureHelpRetriggerCharacters;
+
+// === signaturehelp.go — value types needed by method decls ===
+struct signatureInformation {
+	std::string Label;
+	std::string* Documentation = nullptr;
+	std::vector<struct signatureHelpParameter> Parameters;
+	bool IsVariadic = false;
+	std::vector<lsproto::VSClassifiedTextRun*> ColorizedRuns;
+};
+
+struct signatureHelpParameter {
+	lsproto::ParameterInformation* parameterInfo = nullptr;
+	bool isRest = false;
+	bool isOptional = false;
+};
+
+struct signatureHelpItemInfo {
+	bool isVariadic = false;
+	std::vector<signatureHelpParameter> parameters;
+	displayPartsWriter* writer = nullptr;
+};
+
+struct displayPartsWriter;
+
+// === signaturehelp.go — invocation/argument-info types ===
+
+// candidateInfo / CandidateOrTypeInfo — signaturehelp.go:732,736.
+struct candidateInfo {
+	std::vector<checker::Signature*> candidates;
+	checker::Signature* resolvedSignature = nullptr;
+};
+struct CandidateOrTypeInfo {
+	candidateInfo* candidateInfo = nullptr;
+	Symbol* typeInfo = nullptr;
+};
+
+// argumentOrParameterListInfo / argumentOrParameterListAndIndex —
+// signaturehelp.go:1104,1157.
+struct argumentOrParameterListInfo {
+	NodeList* list = nullptr;
+	int argumentIndex = 0;
+	int argumentCount = 0;
+	TextRange argumentsSpan = TextRange::undefined();
+};
+struct argumentOrParameterListAndIndex {
+	NodeList* list = nullptr;
+	int argumentIndex = 0;
+};
+
+// contextualSignatureLocationInfo — signaturehelp.go:1041.
+struct contextualSignatureLocationInfo {
+	checker::Type* contextualType = nullptr;
+	int argumentIndex = 0;
+	int argumentCount = 0;
+	TextRange argumentsSpan = TextRange::undefined();
+};
+
+
+Node* getAdjustedRenameLocation(Node* node);
+// rename.go — ls-coreC
+bool nodeIsEligibleForRename(Node* node);
+
+// symbolDisplayInfo — hover.go:418 (owned by ls-coreC). Only displayParts
+// is read by findallreferences.cpp.
+struct symbolDisplayInfo {
+	displayPartsWriter* displayParts = nullptr;
+};
+symbolDisplayInfo getQuickInfoAndDeclarationAtLocation(
+    checker::Checker* c, Symbol* symbol, Node* node,
+    checker::VerbosityContext* vc, bool vsCapability,
+    SemanticMeaning meaning);
+
+// hover.go:204 — documentationLocationMapper (the callable type).
+
+
+
+
+// hover.go:204 documentationLocationMapper — declared here because jsdoc.go's
+// noMappedLocation implements it (and sibling files consume it).
+using documentationLocationMapper =
+    std::function<std::pair<lsproto::Location, spanmap::Fidelity>(
+        SourceFile*, TextRange)>;
 class LanguageService : public sourcemap::Host {
 public:
 	// languageservice.go:25 NewLanguageService.
@@ -1092,9 +1729,6 @@ private:
 	                compiler::SimpleProgram* program,
 	                lsproto::CodeActionKind kind);
 
-	// --- sibling-owned methods (dep-stubs) ---
-	// utilities.go — ls-coreA
-	template <lsconv::Script S>
 };
 
 // jsdoc_snippet.go:74 isPotentiallyValidJSDocSnippetCompletionPosition —
@@ -1135,11 +1769,7 @@ std::string GetSymbolDocumentationComment(checker::Checker* c, Symbol* symbol);
 // SymbolDisplayPart[]. Tags with no text have an empty Text field. jsdoc.go:51
 std::vector<JSDocTagInfo> GetSymbolJSDocTags(Symbol* symbol);
 
-// hover.go:204 documentationLocationMapper — declared here because jsdoc.go's
-// noMappedLocation implements it (and sibling files consume it).
-using documentationLocationMapper =
-    std::function<std::pair<lsproto::Location, spanmap::Fidelity>(
-        SourceFile*, TextRange)>;
+
 
 // jsdoc.go:310 noMappedLocation.
 std::pair<lsproto::Location, spanmap::Fidelity>
@@ -2053,625 +2683,6 @@ argumentListInfo* getImmediatelyContainingArgumentInfo(
     Node* node, int position, SourceFile* sourceFile, checker::Checker* c);
 
 
-// ==================== ls-coreB merged decls ====================
-
-// === findallreferences.go — shared result types ===
-
-using referenceUse = int;
-inline constexpr referenceUse referenceUseNone = 0;
-inline constexpr referenceUse referenceUseOther = 1;
-inline constexpr referenceUse referenceUseReferences = 2;
-inline constexpr referenceUse referenceUseRename = 3;
-
-struct refOptions {
-	bool findInStrings = false;
-	bool findInComments = false;
-	referenceUse use = 0;
-	bool implementations = false;
-	bool useAliasesForRename = false;
-};
-
-
-
-using DefinitionKind = int;
-inline constexpr DefinitionKind definitionKindSymbol = 0;
-inline constexpr DefinitionKind definitionKindLabel = 1;
-inline constexpr DefinitionKind definitionKindKeyword = 2;
-inline constexpr DefinitionKind definitionKindThis = 3;
-inline constexpr DefinitionKind definitionKindString = 4;
-inline constexpr DefinitionKind definitionKindTripleSlashReference = 5;
-
-struct tripleSlashDefinition {
-	FileReference* reference = nullptr;
-	SourceFile* file = nullptr;
-};
-
-struct Definition {
-	DefinitionKind Kind = definitionKindSymbol;
-	Symbol* symbol = nullptr;
-	Node* node = nullptr;
-	tripleSlashDefinition* tripleSlashFileRef = nullptr;
-};
-
-using entryKind = int;
-inline constexpr entryKind entryKindNone = 0;
-inline constexpr entryKind entryKindRange = 1;
-inline constexpr entryKind entryKindNode = 2;
-inline constexpr entryKind entryKindStringLiteral = 3;
-inline constexpr entryKind entryKindSearchedLocalFoundProperty = 4;
-inline constexpr entryKind entryKindSearchedPropertyFoundLocal = 5;
-
-struct ReferenceEntry {
-	entryKind kind = entryKindNone;
-	Node* node = nullptr;
-	Node* context = nullptr;
-	SourceFile* sourceFile = nullptr;
-	TextRange* textRange = nullptr;
-	lsproto::Location* lspRange = nullptr;
-	bool unmappable = false;
-
-	Node* Node_() const { return node; } // Node() — method renamed (field clash)
-	bool IsNodeEntry() const { return node != nullptr; }
-};
-
-struct SymbolAndEntries {
-	Definition* definition = nullptr;
-	std::vector<ReferenceEntry*> references;
-
-	std::vector<ReferenceEntry*> References() const { return references; }
-	Node* DefinitionNode() const;
-	Symbol* DefinitionSymbol() const;
-	bool canUseDefinitionSymbol() const;
-};
-
-SymbolAndEntries* NewSymbolAndEntries(
-    DefinitionKind kind, Node* node, Symbol* symbol,
-    std::vector<ReferenceEntry*> references);
-
-// position / nonLocalDefinition — findallreferences.go:480.
-struct position {
-	lsproto::DocumentUri uri;
-	lsproto::Position pos;
-
-	lsproto::DocumentUri TextDocumentURI() const { return uri; }
-	lsproto::Position TextDocumentPosition() const { return pos; }
-};
-
-struct nonLocalDefinition : position {
-	// Go: func fields returning lsproto.HasTextDocumentPosition (nil-able).
-	std::function<position*()> GetSourcePosition;
-	std::function<position*()> GetGeneratedPosition;
-};
-
-// symbolEntryTransformOptions / SymbolAndEntriesData — findallreferences.go:631.
-struct symbolEntryTransformOptions {
-	bool requireLocationsResult = false;
-	bool dropOriginNodes = false;
-};
-
-struct SymbolAndEntriesData {
-	Node* OriginalNode = nullptr;
-	std::vector<SymbolAndEntries*> SymbolsAndEntries;
-	int Position = 0;
-};
-
-// referencedSymbolDefinitionInfo — findallreferences.go:866.
-struct referencedSymbolDefinitionInfo {
-	Node* node = nullptr;
-	lsproto::Location location;
-	lsproto::VSClassifiedTextElement* displayText = nullptr;
-};
-
-// SignatureUsage — findallreferences.go:1210.
-
-
-
-// === importTracker.go — shared types ===
-
-using ImpExpKind = int32_t;
-inline constexpr ImpExpKind ImpExpKindUnknown = 0;
-inline constexpr ImpExpKind ImpExpKindImport = 1;
-inline constexpr ImpExpKind ImpExpKindExport = 2;
-
-struct ExportInfo;
-
-struct ImportExportSymbol {
-	ImpExpKind kind = ImpExpKindUnknown;
-	Symbol* symbol = nullptr;
-	ExportInfo* exportInfo = nullptr;
-};
-
-using ExportKind = int;
-inline constexpr ExportKind ExportKindNamed = 0;
-inline constexpr ExportKind ExportKindDefault = 1;
-inline constexpr ExportKind ExportKindExportEquals = 2;
-inline constexpr ExportKind ExportKindUMD = 3;
-inline constexpr ExportKind ExportKindModule = 4;
-
-struct ExportInfo {
-	Symbol* exportingModuleSymbol = nullptr;
-	ExportKind exportKind = ExportKindNamed;
-};
-
-struct LocationAndSymbol {
-	Node* importLocation = nullptr;
-	Symbol* importSymbol = nullptr;
-};
-
-struct ImportsResult {
-	std::vector<LocationAndSymbol> importSearches;
-	std::vector<Node*> singleReferences;
-	std::vector<SourceFile*> indirectUsers;
-};
-
-// ImportTracker — importTracker.go:55.
-using ImportTracker =
-    std::function<ImportsResult*(Symbol* exportSymbol, ExportInfo* exportInfo,
-                                 bool isForRename)>;
-
-using ModuleReferenceKind = int32_t;
-inline constexpr ModuleReferenceKind ModuleReferenceKindImport = 0;
-inline constexpr ModuleReferenceKind ModuleReferenceKindReference = 1;
-inline constexpr ModuleReferenceKind ModuleReferenceKindImplicit = 2;
-
-// ModuleReference — importTracker.go:66.
-struct ModuleReference {
-	ModuleReferenceKind kind = ModuleReferenceKindImport;
-	Node* literal = nullptr; // for import and implicit kinds (StringLiteralLike)
-	SourceFile* referencingFile = nullptr;
-	FileReference* ref = nullptr; // for reference kind
-};
-
-ImportTracker createImportTracker(const gostd::Context& ctx,
-                                  compiler::SimpleProgram* program,
-                                  const std::vector<SourceFile*>& sourceFiles,
-                                  collections::Set<std::string>* sourceFilesSet,
-                                  checker::Checker* checker);
-
-std::vector<ModuleReference> findModuleReferences(
-    compiler::SimpleProgram* program,
-    const std::vector<SourceFile*>& sourceFiles, Symbol* searchModuleSymbol,
-    checker::Checker* checker);
-
-ImportExportSymbol* getImportOrExportSymbol(Node* node, Symbol* symbol,
-                                            checker::Checker* ch,
-                                            bool comingFromExport);
-ExportInfo* getExportInfo(Symbol* exportSymbol, ExportKind exportKind,
-                          checker::Checker* ch);
-
-
-// === codeactions_missingmemberfixer.go — types ===
-using preserveOptionalFlags = int;
-inline constexpr preserveOptionalFlags preserveOptionalFlagsMethod = 1;
-inline constexpr preserveOptionalFlags preserveOptionalFlagsProperty = 2;
-inline constexpr preserveOptionalFlags preserveOptionalFlagsAll =
-    preserveOptionalFlagsMethod | preserveOptionalFlagsProperty;
-
-// missingMemberFixer — codeactions_missingmemberfixer.go:26.
-struct missingMemberFixer {
-	change::Tracker* changeTracker = nullptr;
-	checker::Checker* typeChecker = nullptr;
-	compiler::SimpleProgram* program = nullptr;
-	lsutil::UserPreferences preferences;
-	autoimport::ImportAdder* importAdder = nullptr;
-	locale::Locale loc;
-
-	std::pair<checker::NodeBuilder*,
-	          std::unordered_map<Node*, Symbol*>>
-	createNodeBuilder();
-	std::vector<Node*> createMemberFromSymbol(
-	    Symbol* symbol, Node* enclosingDeclaration, SourceFile* sourceFile,
-	    Node* body, preserveOptionalFlags preserveOptional, bool abstract);
-	std::vector<checker::Signature*> getCallSignatures(checker::Type* t);
-	Node* createTypeNode(
-	    checker::Type* t, Node* enclosingDeclaration,
-	    nodebuilder::Flags flags, checker::NodeBuilder* nodeBuilder,
-	    std::unordered_map<Node*, Symbol*>* idToSymbol);
-	ModifierList* createModifiers(Symbol* symbol, Node* declaration);
-	bool shouldAddOverrideKeyword(Node* declaration);
-	Node* createSignatureDeclarationFromSignature(
-	    checker::Signature* signature, Kind kind, SourceFile* sourceFile,
-	    Node* enclosingDeclaration, Node* body, ModifierList* modifiers,
-	    Node* name, bool optional);
-	Node* createSignatureDeclarationFromSignatures(
-	    const std::vector<checker::Signature*>& signatures, Node* name,
-	    bool optional, ModifierList* modifiers,
-	    lsutil::QuotePreference quotePreference, Node* body,
-	    Node* enclosingDeclaration);
-	Node* getReturnTypeFromSignatures(
-	    const std::vector<checker::Signature*>& signatures,
-	    Node* enclosingDeclaration, checker::NodeBuilder* nodeBuilder,
-	    std::unordered_map<Node*, Symbol*>* idToSymbol);
-	Node* importTypeNode(Node* typeNode,
-	                     std::unordered_map<Node*, Symbol*>* idToSymbol);
-	Symbol* getExportedSymbol(Symbol* symbol);
-	Node* createIndexSignatureDeclarationFromType(
-	    Node* classDeclaration, checker::Type* implementedType,
-	    checker::Type* keyType);
-	Node* createBody(Node* body, lsutil::QuotePreference quotePreference,
-	                 bool signatureOnly);
-	Node* createStubbedMethodBody(lsutil::QuotePreference quotePreference);
-};
-
-missingMemberFixer* newMissingMemberFixer(
-    change::Tracker* changeTracker, compiler::SimpleProgram* program,
-    checker::Checker* typeChecker, const lsutil::UserPreferences& preferences,
-    autoimport::ImportAdder* importAdder, locale::Locale locale);
-
-// === codeactions_fixmissingtypeannotation.go — types ===
-
-// typePrintMode — codeactions_fixmissingtypeannotation.go:80.
-using typePrintMode = int;
-inline constexpr typePrintMode typePrintModeFull = 0;
-inline constexpr typePrintMode typePrintModeRelative = 1;
-inline constexpr typePrintMode typePrintModeWidened = 2;
-
-// isolatedDeclarationsFixer — codeactions_fixmissingtypeannotation.go:216.
-struct isolatedDeclarationsFixer {
-	SourceFile* sourceFile = nullptr;
-	compiler::SimpleProgram* program = nullptr;
-	checker::Checker* checker = nullptr;
-	change::Tracker* changeTracker = nullptr;
-	autoimport::ImportAdder* importAdder = nullptr;
-	locale::Locale loc;
-	std::unordered_map<Node*, bool> fixedNodes;
-	typePrintMode typePrintMode = typePrintModeFull;
-	std::vector<Symbol*> symbolsToImport;
-	bool mutatedTarget = false;
-
-	std::string addTypeAnnotation(TextRange span);
-	std::string createNamespaceForExpandoProperties(Node* expandoFunc);
-	std::string addInlineAssertion(TextRange span);
-	std::string extractAsVariable(TextRange span);
-	std::string fixIsolatedDeclarationError(Node* node);
-	std::string addTypeToSignatureDeclaration(Node* funcNode);
-	std::string transformExportAssignment(Node* defaultExport);
-	std::string transformExtendsClauseWithExpression(Node* classDecl);
-	std::string transformDestructuringPatterns(Node* bindingPattern);
-	void extractBindingElements(Node* bindingPattern, Node* baseExpr,
-	                            std::vector<Node*>* newNodes,
-	                            Node* enclosingVarStmt);
-	void emitBindingElementVariable(NodeFactory* factory, Node* name,
-	                                BindingElement* be, Node* accessExpr,
-	                                std::vector<Node*>* newNodes,
-	                                Node* enclosingVarStmt);
-	ModifierList* getExportModifier(Node* enclosingVarStmt);
-	Node* inferType(Node* node, ::tsc::checker::Type* variableType);
-	nodebuilder::Flags getExtraFlags(Node* node, ::tsc::checker::Type* t);
-	Node* createTypeOfFromEntityNameExpression(Node* node);
-	Node* typeFromArraySpreadElements(ArrayLiteralExpression* node,
-	                                  const std::string& name);
-	Node* typeFromObjectSpreadAssignment(ObjectLiteralExpression* node,
-	                                     const std::string& name);
-	Node* typeFromSpreads(
-	    Node* node, const std::string& name, bool isInConstContext,
-	    const std::function<std::vector<Node*>(Node*)>& getChildren,
-	    const std::function<bool(Node*)>& isSpread,
-	    const std::function<Node*(Node*)>& createSpread,
-	    const std::function<Node*(std::vector<Node*>)>& makeNodeOfKind,
-	    const std::function<Node*(std::vector<Node*>)>& finalType);
-	void makeSpreadVariable(
-	    NodeFactory* factory, const std::string& name,
-	    bool isInConstContext, Node* statement,
-	    const std::function<Node*(Node*)>& createSpread, Node* expression,
-	    std::vector<Node*>* intersectionTypes,
-	    std::vector<Node*>* newSpreads);
-	void finalizesVariablePart(
-	    NodeFactory* factory, const std::string& name,
-	    bool isInConstContext, Node* statement,
-	    const std::function<Node*(std::vector<Node*>)>& makeNodeOfKind,
-	    const std::function<Node*(Node*)>& createSpread,
-	    std::vector<Node*>* currentVariableProperties,
-	    std::vector<Node*>* intersectionTypes,
-	    std::vector<Node*>* newSpreads);
-	Node* relativeType(Node* node);
-	Node* typeToMinimizedReferenceType(::tsc::checker::Type* t,
-	                                   Node* enclosingDecl,
-	                                   nodebuilder::Flags flags);
-	std::string addTypeToVariableLike(Node* decl);
-	void addSymbolToExistingImport(Symbol* sym);
-};
-
-// === codeactions.go — shared types ===
-
-struct CodeAction {
-	std::string Description;
-	std::vector<lsproto::TextEdit*> Changes;
-	std::string FixID;
-	std::string FixAllDescription;
-
-	int Compare(const CodeAction* b) const;
-};
-
-struct CombinedCodeActions {
-	std::string Description;
-	std::vector<lsproto::TextEdit*> Changes;
-};
-
-struct CodeFixContext;
-
-struct CodeFixProvider {
-	std::vector<int32_t> ErrorCodes;
-	std::function<std::pair<std::vector<CodeAction*>, gostd::Error>(
-	    const gostd::Context& ctx, CodeFixContext* fixContext)>
-		GetCodeActions;
-	std::vector<std::string> FixIds;
-	std::function<std::pair<CombinedCodeActions*, gostd::Error>(
-	    const gostd::Context& ctx, CodeFixContext* fixContext)>
-		GetAllCodeActions;
-};
-
-struct CodeFixContext {
-	SourceFile* SourceFile = nullptr;
-	TextRange Span = TextRange::undefined();
-	int32_t ErrorCode = 0;
-	compiler::SimpleProgram* Program = nullptr;
-	LanguageService* LS = nullptr;
-	lsproto::Diagnostic* Diagnostic = nullptr;
-	lsproto::CodeActionParams* Params = nullptr;
-};
-
-// Providers defined by this slice (codeactions_importfixes.go etc.) and by
-// sibling slices; the codeFixProviders table in codeactions.cpp references
-// them.
-extern CodeFixProvider* ImportFixProvider;
-extern CodeFixProvider* IsolatedDeclarationsFixProvider;
-extern CodeFixProvider* FixClassIncorrectlyImplementsInterfaceProvider;
-
-
-// === displaypartswriter.go ===
-// displayPartsWriter implements printer::EmitTextWriter and captures
-// classified text runs for VS colorized labels, while also building a plain
-// string. When vsCapability is false, only the plain string is built; runs
-// are skipped.
-struct displayPartsWriter : printer::EmitTextWriter {
-	std::string builder;
-	std::vector<lsproto::VSClassifiedTextRun*> runs;
-	bool vsCapability = false;
-	std::string lastWritten;
-
-	void addRun(lsproto::ClassificationTypeName classification,
-	            const std::string& text);
-	void WriteClassified(const std::string& text,
-	                     lsproto::ClassificationTypeName classification);
-	void WriteFrom(displayPartsWriter* other);
-	std::vector<lsproto::VSClassifiedTextRun*> GetRuns() const;
-
-	// --- EmitTextWriter ---
-	std::string String() override;
-	void Clear() override;
-	void DecreaseIndent() override;
-	TextPos GetColumn() override;
-	int GetIndent() override;
-	int GetLine() override;
-	int GetTextPos() override;
-	bool HasTrailingComment() override;
-	bool HasTrailingWhitespace() override;
-	void IncreaseIndent() override;
-	bool IsAtStartOfLine() override;
-	void RawWrite(const std::string& s) override;
-	void Write(const std::string& s) override;
-	void WriteComment(const std::string& text) override;
-	void WriteKeyword(const std::string& text) override;
-	void WriteLine() override;
-	void WriteLineForce(bool force) override;
-	void WriteLiteral(const std::string& s) override;
-	void WriteOperator(const std::string& text) override;
-	void WriteParameter(const std::string& text) override;
-	void WriteProperty(const std::string& text) override;
-	void WritePunctuation(const std::string& text) override;
-	void WriteSpace(const std::string& text) override;
-	void WriteStringLiteral(const std::string& text) override;
-	void WriteSymbol(const std::string& text, Symbol* symbol) override;
-	void WriteTrailingSemicolon(const std::string& text) override;
-};
-
-displayPartsWriter* newDisplayPartsWriter(bool vsCapability);
-
-// classificationForSymbol — displaypartswriter.go:168.
-lsproto::ClassificationTypeName classificationForSymbol(Symbol* symbol);
-bool isFirstDeclarationOfSymbolParameter(Symbol* symbol);
-
-// === source_map.go ===
-struct script {
-	std::string fileName;
-	std::string text;
-
-	std::string FileName() const { return fileName; }
-	std::string OriginalFileName() const { return fileName; }
-	std::string Text() const { return text; }
-	std::string OriginalText() const { return text; }
-	spanmap::SpanMap* SpanMap() const { return nullptr; }
-};
-
-// === crossproject.go ===
-struct Project {
-	virtual ~Project() = default;
-	virtual std::string Id() = 0;
-	virtual compiler::SimpleProgram* GetProgram() = 0;
-	virtual bool HasFile(const std::string& fileName) = 0;
-};
-
-struct projectAndTextDocumentPosition {
-	Project* project = nullptr;
-	LanguageService* ls = nullptr;
-	lsproto::DocumentUri Uri;
-	lsproto::Position Position;
-	SymbolAndEntriesData* symbolData = nullptr;
-	bool forOriginalLocation = false;
-};
-
-template <typename Resp>
-struct response {
-	bool complete = false;
-	Resp result;
-	bool forOriginalLocation = false;
-};
-
-struct CrossProjectOrchestrator {
-	virtual ~CrossProjectOrchestrator() = default;
-	virtual Project* GetDefaultProject() = 0;
-	virtual std::vector<Project*> GetAllProjectsForInitialRequest() = 0;
-	virtual LanguageService* GetLanguageServiceForProjectWithFile(
-	    const gostd::Context& ctx, Project* project,
-	    lsproto::DocumentUri uri) = 0;
-	virtual std::pair<std::vector<Project*>, gostd::Error> GetProjectsForFile(
-	    const gostd::Context& ctx, lsproto::DocumentUri uri) = 0;
-	// iter.Seq[Project] — pull-based: call yield until it returns false.
-	virtual void GetProjectsLoadingProjectTree(
-	    const gostd::Context& ctx,
-	    collections::Set<tspath::Path>* requestedProjectTrees,
-	    const std::function<bool(Project*)>& yield) = 0;
-};
-
-// combine helpers — crossproject.go.
-
-// combineLocationArray — crossproject.go:298.
-template <typename T>
-std::vector<T> combineLocationArray(
-    std::vector<T> combined, std::vector<T>* locations,
-    collections::Set<lsproto::Location>* seen) {
-	for (auto& loc : *locations) {
-		lsproto::Location key;
-		if constexpr (std::is_pointer_v<T>) {
-			key = loc->GetLocation();
-		} else {
-			key = loc.GetLocation();
-		}
-		if (!seen->Has(key)) {
-			seen->Add(key);
-			combined.push_back(loc);
-		}
-	}
-	return combined;
-}
-
-template <lsproto::HasLocations T>
-std::vector<lsproto::Location>* combineResponseLocations(
-    const std::function<void(const std::function<bool(T&)>&)>& resultsSeq) {
-	auto* combined = new std::vector<lsproto::Location>();
-	collections::Set<lsproto::Location> seenLocations;
-	resultsSeq([&](T& resp) -> bool {
-		if (auto* locations = resp.GetLocations(); locations != nullptr) {
-			*combined = combineLocationArray(*combined, locations,
-			                                 &seenLocations);
-		}
-		return true;
-	});
-	return combined;
-}
-
-lsproto::ReferencesResponse combineReferences(
-    const std::function<void(
-        const std::function<bool(lsproto::ReferencesResponse&)>&)>& results);
-lsproto::VSReferencesResponse combineVSReferences(
-    const std::function<void(
-        const std::function<bool(lsproto::VSReferencesResponse&)>&)>& results);
-lsproto::ImplementationResponse combineImplementations(
-    const std::function<void(const std::function<bool(
-        lsproto::ImplementationResponse&)>&)>& results);
-lsproto::RenameResponse combineRenameResponse(
-    const std::function<void(
-        const std::function<bool(lsproto::RenameResponse&)>&)>& results);
-lsproto::CallHierarchyIncomingCallsResponse combineIncomingCalls(
-    const std::function<void(const std::function<bool(
-        lsproto::CallHierarchyIncomingCallsResponse&)>&)>& results);
-
-
-// === file_rename.go types ===
-using pathUpdater = std::function<std::pair<std::string, bool>(
-    const std::string& path)>;
-
-struct toImport {
-	std::string newFileName;
-	bool updated = false;
-};
-
-struct movedFile {
-	SourceFile* sourceFile = nullptr;
-	std::string newFileName;
-};
-
-// signaturehelp.go:24 — trigger / retrigger chars shared by the static
-// server capabilities and the dynamic content-mapper registration.
-extern const std::vector<std::string> SignatureHelpTriggerCharacters;
-extern const std::vector<std::string> SignatureHelpRetriggerCharacters;
-
-// === signaturehelp.go — value types needed by method decls ===
-struct signatureInformation {
-	std::string Label;
-	std::string* Documentation = nullptr;
-	std::vector<struct signatureHelpParameter> Parameters;
-	bool IsVariadic = false;
-	std::vector<lsproto::VSClassifiedTextRun*> ColorizedRuns;
-};
-
-struct signatureHelpParameter {
-	lsproto::ParameterInformation* parameterInfo = nullptr;
-	bool isRest = false;
-	bool isOptional = false;
-};
-
-struct signatureHelpItemInfo {
-	bool isVariadic = false;
-	std::vector<signatureHelpParameter> parameters;
-	displayPartsWriter* writer = nullptr;
-};
-
-struct displayPartsWriter;
-
-// === signaturehelp.go — invocation/argument-info types ===
-
-// candidateInfo / CandidateOrTypeInfo — signaturehelp.go:732,736.
-struct candidateInfo {
-	std::vector<checker::Signature*> candidates;
-	checker::Signature* resolvedSignature = nullptr;
-};
-struct CandidateOrTypeInfo {
-	candidateInfo* candidateInfo = nullptr;
-	Symbol* typeInfo = nullptr;
-};
-
-// argumentOrParameterListInfo / argumentOrParameterListAndIndex —
-// signaturehelp.go:1104,1157.
-struct argumentOrParameterListInfo {
-	NodeList* list = nullptr;
-	int argumentIndex = 0;
-	int argumentCount = 0;
-	TextRange argumentsSpan = TextRange::undefined();
-};
-struct argumentOrParameterListAndIndex {
-	NodeList* list = nullptr;
-	int argumentIndex = 0;
-};
-
-// contextualSignatureLocationInfo — signaturehelp.go:1041.
-struct contextualSignatureLocationInfo {
-	checker::Type* contextualType = nullptr;
-	int argumentIndex = 0;
-	int argumentCount = 0;
-	TextRange argumentsSpan = TextRange::undefined();
-};
-
-
-Node* getAdjustedRenameLocation(Node* node);
-// rename.go — ls-coreC
-bool nodeIsEligibleForRename(Node* node);
-
-// symbolDisplayInfo — hover.go:418 (owned by ls-coreC). Only displayParts
-// is read by findallreferences.cpp.
-struct symbolDisplayInfo {
-	displayPartsWriter* displayParts = nullptr;
-};
-symbolDisplayInfo getQuickInfoAndDeclarationAtLocation(
-    checker::Checker* c, Symbol* symbol, Node* node,
-    checker::VerbosityContext* vc, bool vsCapability,
-    SemanticMeaning meaning);
-
-// hover.go:204 — documentationLocationMapper (the callable type).
-
-
-
 namespace detail {
 // local workGroup — core.NewWorkGroup(runSequential=false): Queue collects
 // tasks, RunAndWait spawns them in parallel and drains the queue, including
@@ -3003,9 +3014,8 @@ inline std::pair<Resp, gostd::Error> LanguageService::handleCrossProject(
 
 				    // Enqueue the project and location for further
 				    // processing
-				    if (loadedProject->HasFile(
-				            defaultDefinition->TextDocumentURI()
-				                .FileName())) {
+				    if (loadedProject->HasFile(lsproto::documentUriFileName(
+				            defaultDefinition->TextDocumentURI()))) {
 					    enqueueItem(
 					        projectAndTextDocumentPosition{
 					            .project = loadedProject,
@@ -3019,9 +3029,8 @@ inline std::pair<Resp, gostd::Error> LanguageService::handleCrossProject(
 				                   defaultDefinition
 				                       ->GetSourcePosition();
 				               sourcePos != nullptr &&
-				               loadedProject->HasFile(
-				                   sourcePos->TextDocumentURI()
-				                       .FileName())) {
+				               loadedProject->HasFile(lsproto::documentUriFileName(
+				                   sourcePos->TextDocumentURI()))) {
 					    enqueueItem(
 					        projectAndTextDocumentPosition{
 					            .project = loadedProject,
@@ -3035,10 +3044,8 @@ inline std::pair<Resp, gostd::Error> LanguageService::handleCrossProject(
 				                   defaultDefinition
 				                       ->GetGeneratedPosition();
 				               generatedPos != nullptr &&
-				               loadedProject->HasFile(
-				                   generatedPos
-				                       ->TextDocumentURI()
-				                       .FileName())) {
+				               loadedProject->HasFile(lsproto::documentUriFileName(
+				                   generatedPos->TextDocumentURI()))) {
 					    enqueueItem(
 					        projectAndTextDocumentPosition{
 					            .project = loadedProject,
@@ -3100,6 +3107,7 @@ std::vector<lsproto::CodeActionKind> getOrganizeImportsActionsForKind(
 bool containsErrorCode(const std::vector<int32_t>& codes, int32_t code);
 lsproto::CommandOrCodeAction convertToLSPCodeAction(
     CodeAction* action, lsproto::Diagnostic* diag, lsproto::DocumentUri uri);
+
 
 
 

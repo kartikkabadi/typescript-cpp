@@ -116,17 +116,17 @@ json::Value marshalOptionDiagnosticResult(const cm::OptionDiagnosticResult& d) {
 }
 
 json::Value marshalOpenProjectResult(const cm::OpenProjectResult& r) {
-	std::vector<std::pair<std::string, std::string>> members;
+	std::vector<std::pair<std::string, json::Value>> members;
 	members.emplace_back("configIdentity",
 	                     json::marshalString(r.ConfigIdentity));
 	if (!r.WatchedFiles.empty()) { // `json:"watchedFiles,omitempty"`
-		std::vector<std::string> els;
+		std::vector<json::Value> els;
 		els.reserve(r.WatchedFiles.size());
 		for (const auto& f : r.WatchedFiles) els.push_back(json::marshalString(f));
 		members.emplace_back("watchedFiles", json::marshalArray(els));
 	}
 	if (!r.OptionDiagnostics.empty()) { // `json:"optionDiagnostics,omitempty"`
-		std::vector<std::string> els;
+		std::vector<json::Value> els;
 		els.reserve(r.OptionDiagnostics.size());
 		for (const auto& d : r.OptionDiagnostics) {
 			els.push_back(marshalOptionDiagnosticResult(d));
@@ -137,14 +137,14 @@ json::Value marshalOpenProjectResult(const cm::OpenProjectResult& r) {
 }
 
 json::Value marshalDiagnosticDirectives(const cm::DiagnosticDirectives& dd) {
-	std::vector<std::string> unused;
+	std::vector<json::Value> unused;
 	unused.reserve(dd.UnusedExpectDirectiveDiagnostics.size());
 	for (const auto& u : dd.UnusedExpectDirectiveDiagnostics) {
 		unused.push_back(json::marshalObject(
 		    {{"code", json::marshalInt64(u.Code)},
 		     {"messageText", json::marshalString(u.MessageText)}}));
 	}
-	std::vector<std::string> directives;
+	std::vector<json::Value> directives;
 	directives.reserve(dd.Directives.size());
 	for (const auto& d : dd.Directives) {
 		directives.push_back(d.marshalJSONTo());
@@ -155,7 +155,7 @@ json::Value marshalDiagnosticDirectives(const cm::DiagnosticDirectives& dd) {
 }
 
 json::Value marshalMappedOutput(const cm::MappedOutput& o) {
-	std::vector<std::pair<std::string, std::string>> members;
+	std::vector<std::pair<std::string, json::Value>> members;
 	members.emplace_back("text", json::marshalString(o.Text));
 	members.emplace_back("extension", json::marshalString(o.Extension));
 	if (!o.Mappings.empty()) { // `json:"mappings,omitempty"`
@@ -182,7 +182,7 @@ json::Value marshalTransformResult(const cm::TransformResult& r) {
 	// MappedOutput's members are encoded first; append the TransformResult
 	// members inside the same object.
 	if (!r.Diagnostics.empty() || !r.Supplemental.empty()) {
-		std::vector<std::pair<std::string, std::string>> members;
+		std::vector<std::pair<std::string, json::Value>> members;
 		members.emplace_back("text", json::marshalString(r.Text));
 		members.emplace_back("extension", json::marshalString(r.Extension));
 		if (!r.Mappings.empty()) {
@@ -194,7 +194,7 @@ json::Value marshalTransformResult(const cm::TransformResult& r) {
 			                         *r.DiagnosticDirectives));
 		}
 		if (!r.Diagnostics.empty()) { // `json:"diagnostics,omitempty"`
-			std::vector<std::string> els;
+			std::vector<json::Value> els;
 			els.reserve(r.Diagnostics.size());
 			for (const auto& d : r.Diagnostics) {
 				els.push_back(marshalDiagnostic(d));
@@ -202,7 +202,7 @@ json::Value marshalTransformResult(const cm::TransformResult& r) {
 			members.emplace_back("diagnostics", json::marshalArray(els));
 		}
 		if (!r.Supplemental.empty()) { // `json:"supplemental,omitempty"`
-			std::vector<std::string> els;
+			std::vector<json::Value> els;
 			els.reserve(r.Supplemental.size());
 			for (const auto& s : r.Supplemental) {
 				els.push_back(marshalMappedOutput(s));

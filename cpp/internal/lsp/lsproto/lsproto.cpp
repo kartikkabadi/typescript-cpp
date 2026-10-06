@@ -740,12 +740,12 @@ const std::string kClientCapabilitiesKey = "lsproto.clientCapabilities";
 
 gostd::Context withClientCapabilities(gostd::Context ctx,
 	const std::shared_ptr<ResolvedClientCapabilities>& caps) {
-	return gostd::contextWithValue(std::move(ctx), kClientCapabilitiesKey, caps);
+	return gostd::contextWithValue(std::move(ctx), &kClientCapabilitiesKey, caps);
 }
 
 std::shared_ptr<ResolvedClientCapabilities> getClientCapabilities(gostd::Context ctx) {
-	if (auto v = gostd::ctxValue(ctx, kClientCapabilitiesKey)) {
-		if (auto caps = std::static_pointer_cast<ResolvedClientCapabilities>(v);
+	if (auto* v = ctx ? ctx->value(&kClientCapabilitiesKey) : nullptr) {
+		if (auto caps = std::any_cast<std::shared_ptr<ResolvedClientCapabilities>>(*v);
 			caps != nullptr) {
 			return caps;
 		}

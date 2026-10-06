@@ -284,7 +284,7 @@ LanguageService::ProvideSignatureHelp(
 			continue;
 		}
 		lsproto::SignatureHelp* items = GetSignatureHelpItems(
-		    ctx, projection.Position, program, projection.Script_, context);
+		    ctx, projection.Position, program, projection.Script, context);
 		if (items != nullptr) {
 			return {lsproto::SignatureHelpOrNull{items}, nullptr};
 		}

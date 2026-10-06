@@ -99,7 +99,7 @@ LanguageService::ProvideCodeActions(const gostd::Context& ctx,
 				         file, diag->Range,
 				         spanmap::FeatureCodeActions)) {
 					auto* fixContext = new CodeFixContext{
-					    .SourceFile = mapped.Script_,
+					    .SourceFile = mapped.Script,
 					    .Span = mapped.Span,
 					    .ErrorCode = errorCode,
 					    .Program = program,
