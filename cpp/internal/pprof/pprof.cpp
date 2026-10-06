@@ -526,6 +526,9 @@ std::string CPUProfiler::startCPUProfile(std::string_view profileDir) {
 }
 
 // CPUProfiler::StopCPUProfile — pprof.go:108
+CPUProfiler::CPUProfiler() = default;
+CPUProfiler::~CPUProfiler() = default;
+
 std::pair<std::string, std::string> CPUProfiler::stopCPUProfile() {
     std::lock_guard<std::mutex> lk(mu_);
 

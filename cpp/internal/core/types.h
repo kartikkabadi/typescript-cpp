@@ -4,10 +4,16 @@
 
 #include <cctype>
 #include <cstdint>
+#include <functional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "internal/tspath/tspath.h"
+
+// === slice: api === — forward decls for encoding/json integration used by
+// the api slice's proto marshalers.
+namespace tsc::json { class Decoder; class Encoder; }
 
 namespace tsc {
 
@@ -86,6 +92,12 @@ inline constexpr bool tristateIsFalse(Tristate t) { return t == Tristate::False;
 inline constexpr bool tristateIsTrueOrUnknown(Tristate t) { return t != Tristate::False; }
 inline constexpr bool tristateIsFalseOrUnknown(Tristate t) { return t != Tristate::True; }
 
+// === slice: api ===
+// Tristate.UnmarshalJSON (tristate.go:42) / Tristate.MarshalJSON (tristate.go:52)
+// — ADL hooks picked up by json::unmarshalDecode/marshalInto.
+std::string unmarshalJSONFrom(json::Decoder& dec, Tristate* out);
+std::string marshalJSONTo(json::Encoder& enc, const Tristate& v);
+
 enum class ModuleKind : int32_t {
 	None = 0,
 	CommonJS = 1,
@@ -155,6 +167,11 @@ inline constexpr ResolutionMode ResolutionModeESM = ModuleKind::ESNext;
 // CompilerOptions — port of tsc/internal/core/compileroptions.go.
 struct PluginImport {
 	std::string name;
+
+	// === slice: api ===
+	// encoding/json Marshal/Unmarshal (Name is `json:"name"`).
+	std::string unmarshalJSONFrom(json::Decoder& dec);
+	std::string marshalJSONTo(json::Encoder& enc) const;
 };
 
 struct CompilerOptions {
@@ -476,6 +493,13 @@ struct CompilerOptions {
 	    std::string_view currentDirectory) const;
 	// GetPathsBasePath — "" when Paths is unset.
 	std::string GetPathsBasePath(std::string_view currentDirectory) const;
+
+	// === slice: api ===
+	// encoding/json Marshal/Unmarshal over the `json:`-tagged fields
+	// (all fields except the noCopy marker; internal fields are tagged and
+	// marshaled too, matching encoding/json). Implemented in api/proto.cpp.
+	std::string unmarshalJSONFrom(json::Decoder& dec);
+	std::string marshalJSONTo(json::Encoder& enc) const;
 };
 
 // === slice: tsoptions ===
@@ -545,6 +569,11 @@ struct TypeAcquisition {
 			   DisableFilenameBasedTypeAcquisition ==
 				   other->DisableFilenameBasedTypeAcquisition;
 	}
+
+	// === slice: api ===
+	// encoding/json Marshal/Unmarshal over the tagged fields (api/proto.cpp).
+	std::string unmarshalJSONFrom(json::Decoder& dec);
+	std::string marshalJSONTo(json::Encoder& enc) const;
 };
 
 // buildoptions.go
@@ -557,6 +586,11 @@ struct BuildOptions {
 
 	// Internal fields
 	Tristate Clean{};
+
+	// === slice: api ===
+	// encoding/json Marshal/Unmarshal over the tagged fields (api/proto.cpp).
+	std::string unmarshalJSONFrom(json::Decoder& dec);
+	std::string marshalJSONTo(json::Encoder& enc) const;
 };
 
 // projectreference.go
@@ -567,6 +601,11 @@ struct ProjectReference {
 	std::string OriginalPath;
 	// Circular indicates that this reference is intended to form a circularity.
 	bool Circular = false;
+
+	// === slice: api ===
+	// encoding/json Marshal/Unmarshal over the tagged fields (api/proto.cpp).
+	std::string unmarshalJSONFrom(json::Decoder& dec);
+	std::string marshalJSONTo(json::Encoder& enc) const;
 };
 
 inline std::string ResolveConfigFileNameOfProjectReference(std::string_view path) {
@@ -579,5 +618,125 @@ inline std::string ResolveConfigFileNameOfProjectReference(std::string_view path
 inline std::string ResolveProjectReferencePath(const ProjectReference& ref) {
 	return ResolveConfigFileNameOfProjectReference(ref.Path);
 }
+
+// === slice: api ===
+// core.go:80 — Map applies f to each element and returns the results.
+template <class U, class T, class F>
+std::vector<U> mapVec(const std::vector<T>& slice, F&& f) {
+	std::vector<U> result;
+	result.reserve(slice.size());
+	for (const auto& t : slice) {
+		result.push_back(f(t));
+	}
+	return result;
+}
+
+// binarysearch.go — BinarySearchUniqueFunc: binary search by compare function;
+// returns (index, found) where element order is unique.
+template <class E, class Cmp>
+std::pair<int, bool> binarySearchUniqueFunc(const std::vector<E>& x, Cmp&& cmp) {
+	int lo = 0, hi = static_cast<int>(x.size()) - 1;
+	while (lo <= hi) {
+		int mid = lo + (hi - lo) / 2;
+		int c = cmp(mid, x[mid]);
+		if (c < 0) {
+			lo = mid + 1;
+		} else if (c > 0) {
+			hi = mid - 1;
+		} else {
+			return {mid, true};
+		}
+	}
+	return {lo, false};
+}
+// core.go:36 — Filter returns elements for which f returns true. Returns the
+// original vector unchanged when every element passes (Go aliasing of the
+// backing array is not observable here; the result is a fresh vector).
+template <class T, class F>
+std::vector<T> Filter(const std::vector<T>& slice, F&& f) {
+	bool allMatch = true;
+	for (size_t i = 0; i < slice.size(); i++) {
+		if (!f(slice[i])) {
+			std::vector<T> result(slice.begin(), slice.begin() + i);
+			for (size_t j = i + 1; j < slice.size(); j++) {
+				if (f(slice[j])) {
+					result.push_back(slice[j]);
+				}
+			}
+			return result;
+		}
+	}
+	return slice;
+}
+
+// core.go:775 — DiffMapsFunc compares two maps m1 and m2 and calls the
+// provided callbacks for added, removed, and changed entries. Null
+// std::function callbacks are skipped like Go nil funcs.
+template <class K, class V1, class V2, class Eq>
+void DiffMapsFunc(const std::unordered_map<K, V1>& m1,
+                  const std::unordered_map<K, V2>& m2, Eq&& equalValues,
+                  const std::function<void(K, V2)>& onAdded,
+                  const std::function<void(K, V1)>& onRemoved,
+                  const std::function<void(K, V1, V2)>& onChanged) {
+	if (onAdded) {
+		for (const auto& [k, v2] : m2) {
+			if (m1.find(k) == m1.end()) {
+				onAdded(k, v2);
+			}
+		}
+	}
+	if (!onChanged && !onRemoved) {
+		return;
+	}
+	for (const auto& [k, v1] : m1) {
+		auto it = m2.find(k);
+		if (it != m2.end()) {
+			if (onChanged && !equalValues(v1, it->second)) {
+				onChanged(k, v1, it->second);
+			}
+		} else if (onRemoved) {
+			onRemoved(k, v1);
+		}
+	}
+}
+
+// core.go:771 — DiffMaps with pointer equality for comparable Go values.
+template <class K, class V>
+void DiffMaps(const std::unordered_map<K, V>& m1,
+              const std::unordered_map<K, V>& m2,
+              const std::function<void(K, V)>& onAdded,
+              const std::function<void(K, V)>& onRemoved,
+              const std::function<void(K, V, V)>& onChanged) {
+	DiffMapsFunc<K, V, V>(
+	    m1, m2, [](const V& a, const V& b) { return a == b; }, onAdded,
+	    onRemoved, onChanged);
+}
+
+// Pointer overloads — a nil map acts as empty (Go nil map arguments, e.g.
+// session.go's computeSnapshotChanges diffing two programs' FilesByPath maps
+// where either side may be nil).
+template <class K, class V1, class V2, class Eq>
+void DiffMapsFunc(const std::unordered_map<K, V1>* m1,
+                  const std::unordered_map<K, V2>* m2, Eq&& equalValues,
+                  const std::function<void(K, V2)>& onAdded,
+                  const std::function<void(K, V1)>& onRemoved,
+                  const std::function<void(K, V1, V2)>& onChanged) {
+	static const std::unordered_map<K, V1> emptyM1;
+	static const std::unordered_map<K, V2> emptyM2;
+	DiffMapsFunc(m1 ? *m1 : emptyM1, m2 ? *m2 : emptyM2,
+	             std::forward<Eq>(equalValues), onAdded, onRemoved, onChanged);
+}
+
+template <class K, class V>
+void DiffMaps(const std::unordered_map<K, V>* m1,
+              const std::unordered_map<K, V>* m2,
+              const std::function<void(K, V)>& onAdded,
+              const std::function<void(K, V)>& onRemoved,
+              const std::function<void(K, V, V)>& onChanged) {
+	DiffMapsFunc<K, V, V>(
+	    m1, m2, [](const V& a, const V& b) { return a == b; }, onAdded,
+	    onRemoved, onChanged);
+}
+// === end slice: api ===
 
 }  // namespace tsc

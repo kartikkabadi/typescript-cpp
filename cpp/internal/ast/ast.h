@@ -410,6 +410,26 @@ struct OnceFlag {
 	std::once_flag once_;
 };
 
+// === slice: api ===
+// SourceFileDataKey / sourceFileDataCell (ast.go:2384-2430) — identifies
+// lazily-computed data attached to a SourceFile by another package. Go keys
+// are typed (*SourceFileDataKey[T]); C++ uses a bare uint64 (0 = invalid).
+struct SourceFileDataCellBase {
+	virtual ~SourceFileDataCellBase() = default;
+};
+
+template <typename T>
+struct SourceFileDataCell : SourceFileDataCellBase {
+	OnceFlag once;
+	T* value = nullptr;
+};
+
+using SourceFileDataKey = uint64_t;
+
+// NewSourceFileDataKey — allocates a fresh key (ast.go:2400).
+SourceFileDataKey newSourceFileDataKey();
+// === end slice: api ===
+
 struct TokenCacheKey {
 	const Node* parent;
 	TextRange loc;

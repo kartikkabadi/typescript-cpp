@@ -19,6 +19,9 @@
 #include "internal/semver/semver.h"
 #include "internal/tspath/tspath.h"
 
+// === slice: api ===
+namespace tsc::json { class Decoder; class Encoder; }
+
 namespace tsc::packagejson {
 
 // --- jsonvalue.go — JSONValueType ---
@@ -128,7 +131,13 @@ struct JsonValueBase {
 	}
 };
 
-struct JSONValue : JsonValueBase<JSONValue> {};
+struct JSONValue : JsonValueBase<JSONValue> {
+	// === slice: api ===
+	// unmarshalJSONValueFrom — jsonvalue.go:88. Implemented in api/proto.cpp.
+	std::string unmarshalJSONFrom(json::Decoder& dec);
+	// marshalJSONTo emits the Go reflection layout {"Type":n,"Value":v}.
+	std::string marshalJSONTo(json::Encoder& enc) const;
+};
 
 // --- exportsorimports.go ---
 

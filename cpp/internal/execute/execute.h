@@ -16,6 +16,7 @@
 #include "internal/execute/incremental/incremental.h"
 #include "internal/execute/tsc/compile.h"
 #include "internal/execute/tsc/diagnostics.h"
+#include "internal/execute/tsc/statistics.h"
 #include "internal/gostd/gostd.h"
 #include "internal/locale/locale.h"
 #include "internal/tracing/tracing.h"
@@ -23,6 +24,7 @@
 
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
+
 
 namespace tsc::execute {
 

@@ -811,6 +811,17 @@ public:
 	contentmapper::Project* ContentMapperProject() {
 		return host != nullptr ? host->ContentMapperProject() : nullptr;
 	}
+	// === slice: api ===
+	// program.go ModuleResolutionError (fileloader.go moduleResolutionError).
+	// The C++ compiler slice does not yet populate it; the field exists so the
+	// api slice's moduleResolutionError helper reads the same shape.
+	gostd::Error ModuleResolutionError() const {
+		return moduleResolutionError_;
+	}
+	void setModuleResolutionError(gostd::Error err) {
+		moduleResolutionError_ = err;
+	}
+	// === end slice: api ===
 	// === slice: execute-tsc ===
 	// program.go FilesByPath — the live path→file map (watch-mode fast
 	// path + explainFiles).
@@ -842,6 +853,10 @@ public:
 	bool SingleThreaded() { return options.SingleThreaded == Tristate::True; }
 	// program.go:804 GetSemanticDiagnosticsForIncremental — per-file
 	// bind+check diagnostics with deferred globals, sorted/deduped.
+	// === slice: api ===
+	// fileloader.go moduleResolutionError — see ModuleResolutionError above.
+	gostd::Error moduleResolutionError_;
+	// === end slice: api ===
 	std::vector<std::pair<SourceFile*, std::vector<Diagnostic*>>>
 	GetSemanticDiagnosticsForIncremental(
 	    const std::vector<SourceFile*>& sourceFiles);

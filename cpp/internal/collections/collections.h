@@ -162,6 +162,22 @@ public:
 		std::lock_guard<std::mutex> lock(mu);
 		mp.clear();
 	}
+	// === end slice: vfs ===
+
+	// === slice: api ===
+	// LoadAndDelete — Go's SyncMap.LoadAndDelete: returns (old value, true)
+	// when present, deleting it in one critical section.
+	std::pair<V, bool> LoadAndDelete(const K& key) {
+		std::lock_guard<std::mutex> lock(mu);
+		auto it = mp.find(key);
+		if (it == mp.end()) {
+			return {V{}, false};
+		}
+		V v = std::move(it->second);
+		mp.erase(it);
+		return {std::move(v), true};
+	}
+	// === end slice: api ===
 };
 
 // === slice: modulespecifiers ===
@@ -223,6 +239,7 @@ public:
 	void Add(const T& key) { items.insert(key); }
 	void Delete(const T& key) { items.erase(key); }
 	size_t Size() const { return items.size(); }
+	void Clear() { items.clear(); }
 
 	const std::unordered_set<T>& Keys() const { return items; }
 
@@ -236,8 +253,6 @@ public:
 	// Len — Go's (nil *Set).Len() == 0; callers on Set* must null-check like
 	// Go. On a value Set this is Size().
 	size_t Len() const { return items.size(); }
-
-	void Clear() { items.clear(); }
 
 	// AddIfAbsent — returns true if the key was not already present.
 	bool AddIfAbsent(const T& key) { return items.insert(key).second; }
@@ -286,6 +301,61 @@ inline Set<T> newSetFromItems(std::initializer_list<T> items) {
 	return Set<T>(items);
 }
 // === end slice: ls-autoimport ===
+
+// === slice: api ===
+// set.go:10 — NewSetWithSizeHint.
+template <typename T>
+inline Set<T>* newSetWithSizeHint(size_t hint) {
+	return new Set<T>{hint};
+}
+
+// ordered_map.go:301 — DiffOrderedMapsFunc iterates m2 (then m1) in
+// insertion order. `Entries` in Go is a live view; Keys()+Get reproduces it.
+// Null m1/m2 pointers act as empty maps (Go nil *OrderedMap). Null
+// std::function callbacks are skipped like Go nil funcs.
+template <typename K, typename V, typename Eq>
+void diffOrderedMapsFunc(const OrderedMap<K, V>* m1,
+                         const OrderedMap<K, V>* m2, Eq&& equalValues,
+                         const std::function<void(K, V)>& onAdded,
+                         const std::function<void(K, V)>& onRemoved,
+                         const std::function<void(K, V, V)>& onModified) {
+	if (m2 != nullptr) {
+		for (const K& k : m2->Keys()) {
+			auto [v2, ok2] = m2->Get(k);
+			if (m1 == nullptr || !m1->Get(k).second) {
+				if (onAdded) onAdded(k, *v2);
+			}
+		}
+	}
+	if (m1 != nullptr) {
+		for (const K& k : m1->Keys()) {
+			auto [v1, ok1] = m1->Get(k);
+			if (m2 != nullptr) {
+				auto [v2, ok2] = m2->Get(k);
+				if (ok2) {
+					if (!equalValues(*v1, *v2)) {
+						if (onModified) onModified(k, *v1, *v2);
+					}
+					continue;
+				}
+			}
+			if (onRemoved) onRemoved(k, *v1);
+		}
+	}
+}
+
+// ordered_map.go:295 — DiffOrderedMaps with == equality.
+template <typename K, typename V>
+void diffOrderedMaps(const OrderedMap<K, V>* m1,
+                     const OrderedMap<K, V>* m2,
+                     const std::function<void(K, V)>& onAdded,
+                     const std::function<void(K, V)>& onRemoved,
+                     const std::function<void(K, V, V)>& onModified) {
+	diffOrderedMapsFunc(
+	    m1, m2, [](const V& a, const V& b) { return a == b; }, onAdded,
+	    onRemoved, onModified);
+}
+// === end slice: api ===
 
 // === slice: moduletransforms ===
 

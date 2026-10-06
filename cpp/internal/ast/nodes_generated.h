@@ -1120,7 +1120,9 @@ struct SourceFile : Node {
 	std::vector<::tsc::Node*> resolveJSDoc(::tsc::Node* n);
 	void setHasLazyJSDoc(bool lazy) { hasLazyJSDoc = lazy; }
 	const std::string& FileName() const { return fileName; }
-	const std::string& Path() const { return fileName; }
+	// ast.go:2705 — Path is the in-project path (parseOptions.Path), not the
+	// on-disk fileName.
+	const std::string& Path() const { return parseOptions.Path; }
 	const std::string& Text() const { return text; }
 	::tsc::SourceFileParseOptions ParseOptions() const { return parseOptions; }
 	const std::string& OriginalText() const;
@@ -1195,6 +1197,51 @@ struct SourceFile : Node {
 	std::unordered_map<std::string, int32_t> nameTable;
 	::tsc::OnceFlag positionMapOnce;
 	::tsc::PositionMap* positionMap{};
+
+	// === slice: api ===
+	// ast.go:2452-2464 — per-key lazily-computed data store (Go: data map +
+	// getDataCell under dataMu) plus GetPositionMap/IsBound/BindOnce.
+	std::unordered_map<uint64_t, std::shared_ptr<::tsc::SourceFileDataCellBase>> data_;
+
+	// GetPositionMap returns the PositionMap for this source file, computing it lazily.
+	::tsc::PositionMap* GetPositionMap() {
+		positionMapOnce.run([this] { positionMap = ::tsc::computePositionMap(text); });
+		return positionMap;
+	}
+
+	bool IsBound() const { return isBound.load(); }
+
+	void BindOnce(const std::function<void()>& bind) {
+		bindOnce.run([&] {
+			bind();
+			isBound.store(true);
+		});
+	}
+
+	// GetOrComputeData (ast.go:2404) — returns the cell's computed value,
+	// computing it exactly once per key.
+	template <typename T>
+	T* GetOrComputeData(uint64_t key, const std::function<T*(SourceFile*)>& compute) {
+		if (key == 0) {
+			TSC_UNREACHABLE("invalid SourceFileDataKey; use NewSourceFileDataKey");
+		}
+		std::shared_ptr<::tsc::SourceFileDataCellBase> base;
+		{
+			std::lock_guard<std::mutex> lk(dataMu);
+			auto it = data_.find(key);
+			if (it != data_.end()) {
+				base = it->second;
+			} else {
+				auto cell = std::make_shared<::tsc::SourceFileDataCell<T>>();
+				data_.emplace(key, cell);
+				base = std::move(cell);
+			}
+		}
+		auto* cell = static_cast<::tsc::SourceFileDataCell<T>*>(base.get());
+		cell->once.run([&] { cell->value = compute(this); });
+		return cell->value;
+	}
+	// === end slice: api ===
 };
 
 struct SpreadAssignment : Node {

@@ -65,26 +65,7 @@ int compareBooleans(bool a, bool b) {
 	return 0;
 }
 
-// core.BinarySearchUniqueFunc + core.FirstResult.
-template <class T, class Cmp>
-std::pair<int, bool> binarySearchUniqueFunc(const std::vector<T>& x, Cmp cmp) {
-	size_t n = x.size();
-	if (n == 0) return {0, false};
-	size_t low = 0, high = n - 1;
-	while (low <= high) {
-		size_t middle = low + ((high - low) >> 1);
-		int value = cmp(middle, x[middle]);
-		if (value < 0) {
-			low = middle + 1;
-		} else if (value > 0) {
-			if (middle == 0) break;
-			high = middle - 1;
-		} else {
-			return {static_cast<int>(middle), true};
-		}
-	}
-	return {static_cast<int>(low), false};
-}
+// core.BinarySearchUniqueFunc — canonical def in core/types.h.
 
 // stringutil.CompareStringsCaseInsensitiveEslintCompatible — compare.go:121.
 // (A stringutil dep not yet ported; ported here because it is part of the

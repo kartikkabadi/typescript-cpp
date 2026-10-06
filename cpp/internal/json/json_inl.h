@@ -94,6 +94,10 @@ template <class K>
 std::string mapKeyToString(const K& k) {
     if constexpr (std::is_convertible_v<K, std::string_view>) {
         return std::string(std::string_view(k));
+    } else if constexpr (std::is_convertible_v<K, const std::string&>) {
+        // === slice: api === — wrappers like project::ID convert via
+        // `operator const std::string&`, not string_view.
+        return std::string(k);
     } else {
         return std::to_string(k);
     }
@@ -275,18 +279,27 @@ std::string unmarshalNumber(std::string_view raw, T* out) {
         *out = static_cast<U>(d);
         return {};
     } else {
-        using B = std::conditional_t<std::is_enum_v<U>, std::underlying_type_t<U>, U>;
-        B val{};
-        auto [ptr, ec] = std::from_chars(raw.data(), raw.data() + raw.size(), val);
-        if (ec == std::errc::result_out_of_range) {
-            return "json: cannot unmarshal number " + std::string(raw) + " into Go value (overflow)";
-        }
-        if (ec != std::errc() || ptr != raw.data() + raw.size()) {
-            return "json: cannot unmarshal number into Go value of integer type";
-        }
+        // === slice: api === — split parse/assign so underlying_type is only
+        // named on the enum branch (underlying_type<non-enum> is ill-formed).
         if constexpr (std::is_enum_v<U>) {
+            std::underlying_type_t<U> val{};
+            auto [ptr, ec] = std::from_chars(raw.data(), raw.data() + raw.size(), val);
+            if (ec == std::errc::result_out_of_range) {
+                return "json: cannot unmarshal number " + std::string(raw) + " into Go value (overflow)";
+            }
+            if (ec != std::errc() || ptr != raw.data() + raw.size()) {
+                return "json: cannot unmarshal number into Go value of integer type";
+            }
             *out = static_cast<U>(val);
         } else {
+            U val{};
+            auto [ptr, ec] = std::from_chars(raw.data(), raw.data() + raw.size(), val);
+            if (ec == std::errc::result_out_of_range) {
+                return "json: cannot unmarshal number " + std::string(raw) + " into Go value (overflow)";
+            }
+            if (ec != std::errc() || ptr != raw.data() + raw.size()) {
+                return "json: cannot unmarshal number into Go value of integer type";
+            }
             *out = val;
         }
         return {};

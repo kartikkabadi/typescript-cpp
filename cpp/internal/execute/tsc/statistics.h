@@ -14,6 +14,9 @@
 #include "internal/execute/tsc/emit.h"
 #include "internal/gostd/gostd.h"
 
+// === slice: api ===
+namespace tsc::json { class Encoder; }
+
 namespace tsc::execute::tsc {
 
 struct tableRow {
@@ -65,6 +68,12 @@ struct Statistics {
 	void Aggregate(Statistics* stat);
 	// SetTotalTime — statistics.go:165.
 	void SetTotalTime(gostd::Duration totalTime);
+
+	// === slice: api ===
+	// encoding/json Marshal — only the exported Go fields are tagged for the
+	// api ("Projects", "ProjectsBuilt", "TimestampUpdates" — no explicit tags,
+	// so capitalized field names are used). Implemented in api/proto.cpp.
+	std::string marshalJSONTo(json::Encoder& enc) const;
 };
 
 // statisticsFromProgram — statistics.go:66. `memoryUsed`/`memoryAllocs` take

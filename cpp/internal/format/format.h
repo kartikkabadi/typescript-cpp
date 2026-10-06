@@ -15,6 +15,7 @@
 #include "internal/core/text.h"
 #include "internal/core/textchange.h"
 #include "internal/core/types.h"
+#include "internal/modulespecifiers/types.h" // === slice: api === (UserPreferences)
 #include "internal/scanner/scanner.h"
 #include "internal/ls/lsutil/lsutil.h"
 
@@ -25,6 +26,7 @@ namespace tsc {
 // the lsutil slice; the alias keeps the format package's `lsutil::` spellings.
 namespace lsutil = tsc::ls::lsutil;
 } // namespace tsc
+
 
 
 namespace tsc::format {

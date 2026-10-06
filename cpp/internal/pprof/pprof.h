@@ -28,6 +28,10 @@ ProfileSession* beginProfiling(std::string_view profileDir, std::ostream* logWri
 // CPUProfiler manages on-demand CPU profiling.
 class CPUProfiler {
 public:
+    // Out-of-line ctor/dtor: session_ is unique_ptr to an incomplete type.
+    CPUProfiler();
+    ~CPUProfiler();
+
     // StartCPUProfile starts CPU profiling, writing to the specified
     // directory when stopped.
     std::string startCPUProfile(std::string_view profileDir);

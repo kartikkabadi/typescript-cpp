@@ -534,7 +534,7 @@ void registryBuilder::updateBucketAndDirectoryExistence(RegistryChange& change,
 	}
 
 	auto packageJsonChanged = [&](const std::string& dirName) {
-		lsp::lsproto::DocumentUri uri = lsconv::fileNameToDocumentURI(
+		lsp::lsproto::DocumentUri uri = lsconv::FileNameToDocumentURI(
 		    tspath::combinePaths(dirName, {"package.json"}));
 		return change.Changed.Has(uri) || change.Deleted.Has(uri) ||
 		       change.Created.Has(uri);
