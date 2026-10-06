@@ -25,7 +25,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 TSCPP = os.environ.get("TSCPP", os.path.join(REPO, "cpp", "build", "tscpp"))
-ORACLE_DIR = "/tmp/oracle"
+ORACLE_DIR = os.environ.get("ORACLE_DIR", os.path.expanduser("~/conformance/oracle"))
 TSCPP_DIR = os.environ.get("TSCPP_DIR", "/tmp/tscpp_out")
 os.makedirs(TSCPP_DIR, exist_ok=True)
 

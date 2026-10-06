@@ -251,8 +251,8 @@ void FourslashTest::printStateDiff(gostd::testing::T* t,
 	if (!stateBaseline_->isInitialized) {
 		return;
 	}
-	auto session = client->Server->session();
-	auto snapshot = project::sessionSnapshot(session);
+	auto session = client->Server->Session();
+	auto snapshot = session->Snapshot();
 
 	printProjectsDiff(t, snapshot, w);
 	printOpenFilesDiff(t, snapshot, w);
@@ -272,10 +272,10 @@ void FourslashTest::printProjectsDiff(gostd::testing::T* t,
 	for (auto* project : snapshot->ProjectCollection->Projects()) {
 		auto* program = project->GetProgram();
 		compiler::SimpleProgram* oldProgram = nullptr;
-		currentProjects[std::string(project->ID().v)] = program;
+		currentProjects[std::string(project->ID())] = program;
 		std::string projectChange;
 		auto existingIt = stateBaseline_->serializedProjects.find(
-		    std::string(project->ID().v));
+		    std::string(project->ID()));
 		if (existingIt != stateBaseline_->serializedProjects.end()) {
 			oldProgram = existingIt->second;
 			if (oldProgram != program) {
@@ -287,7 +287,7 @@ void FourslashTest::printProjectsDiff(gostd::testing::T* t,
 			projectsDiffTable->setHasChange();
 		}
 
-		auto projectID = std::string(project->ID().v);
+		auto projectID = std::string(project->ID());
 		projectsDiffTable->add(
 		    projectID,
 		    [projectID, projectChange, program, oldProgram,
@@ -394,7 +394,7 @@ void FourslashTest::printOpenFilesDiff(gostd::testing::T* t,
 		auto newFileInfo = std::make_shared<openFileInfo>();
 		if (defaultProject != nullptr) {
 			newFileInfo->defaultProjectName =
-			    std::string(defaultProject->ID().v);
+			    std::string(defaultProject->ID());
 		}
 		for (auto* project :
 		     snapshot->ProjectCollection->Projects()) {
@@ -402,7 +402,7 @@ void FourslashTest::printOpenFilesDiff(gostd::testing::T* t,
 			    program != nullptr &&
 			    program->GetSourceFileByPath(path) != nullptr) {
 				newFileInfo->allProjects.push_back(
-				    std::string(project->ID().v));
+				    std::string(project->ID()));
 			}
 		}
 		std::sort(newFileInfo->allProjects.begin(),
@@ -474,8 +474,7 @@ void FourslashTest::printConfigFileRegistryDiff(
     gostd::io::Writer* w) {
 	t->Helper();
 	auto* configFileRegistry =
-	    project::projectCollectionConfigFileRegistry(
-	        snapshot->ProjectCollection);
+	    snapshot->ProjectCollection->ConfigFileRegistry();
 
 	auto configDiffsTable = newDiffTableWriter("Config");
 	auto configFileNamesDiffsTable =
@@ -500,7 +499,7 @@ void FourslashTest::printConfigFileRegistryDiff(
 		    if (oldEntry == nullptr) {
 			    configChange = "*new*";
 			    configDiffsTable->setHasChange();
-		    } else if (oldEntry.get() != entry) {
+		    } else if (oldEntry != entry) {
 			    if (!areIterSeqEqual(oldEntry->RetainingProjects,
 			                         entry->RetainingProjects) ||
 			        !areIterSeqEqual(oldEntry->RetainingOpenFiles,

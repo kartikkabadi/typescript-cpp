@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "internal/core/utilities.h"
+#include "internal/gostd/goseq.h"
 #include "internal/project/project.h"
 #include "internal/project/watch.h"
 #include "internal/tsoptions/tsoptions.h"
@@ -134,6 +135,20 @@ struct configFileNames {
 	configFileNames* Clone() const { return new configFileNames(*this); }
 };
 
+// TestConfigEntry — configfileregistry.go:160 (For testing).
+struct TestConfigEntry {
+	std::string FileName;
+	goseq::Seq<project::ID> RetainingProjects;
+	goseq::Seq<tspath::Path> RetainingOpenFiles;
+	goseq::Seq<tspath::Path> RetainingConfigs;
+};
+
+// TestConfigFileNamesEntry — configfileregistry.go:195 (For testing).
+struct TestConfigFileNamesEntry {
+	std::string NearestConfigFileName;
+	std::unordered_map<std::string, std::string> Ancestors;
+};
+
 // ConfigFileRegistry — configfileregistry.go:15.
 struct ConfigFileRegistry {
 	// configs is a map of config file paths to their entries.
@@ -209,6 +224,58 @@ struct ConfigFileRegistry {
 		r->customConfigFileName = customConfigFileName;
 		r->allConfiguredContentMappers = allConfiguredContentMappers;
 		return r;
+	}
+
+	// ForEachTestConfigEntry — configfileregistry.go:168 (For testing).
+	template <typename Cb>
+	void ForEachTestConfigEntry(Cb&& cb) const {
+		for (auto& [path, entry] : configs) {
+			cb(path, new TestConfigEntry{
+			           entry->fileName,
+			           goseq::keysSeq(entry->retainingProjects),
+			           goseq::keysSeq(entry->retainingOpenFiles),
+			           goseq::keysSeq(entry->retainingConfigs),
+			       });
+		}
+	}
+
+	// GetTestConfigEntry — configfileregistry.go:182 (For testing).
+	TestConfigEntry* GetTestConfigEntry(const tspath::Path& path) const {
+		if (auto it = configs.find(path); it != configs.end()) {
+			auto* entry = it->second;
+			return new TestConfigEntry{
+			    entry->fileName,
+			    goseq::keysSeq(entry->retainingProjects),
+			    goseq::keysSeq(entry->retainingOpenFiles),
+			    goseq::keysSeq(entry->retainingConfigs),
+			};
+		}
+		return nullptr;
+	}
+
+	// ForEachTestConfigFileNamesEntry — configfileregistry.go:198
+	// (For testing).
+	template <typename Cb>
+	void ForEachTestConfigFileNamesEntry(Cb&& cb) const {
+		for (auto& [path, entry] : configFileNames) {
+			cb(path, new TestConfigFileNamesEntry{
+			           entry->nearestConfigFileName, entry->ancestors,
+			       });
+		}
+	}
+
+	// GetTestConfigFileNamesEntry — configfileregistry.go:210
+	// (For testing).
+	TestConfigFileNamesEntry*
+	GetTestConfigFileNamesEntry(const tspath::Path& path) const {
+		if (auto it = configFileNames.find(path);
+		    it != configFileNames.end()) {
+			return new TestConfigFileNamesEntry{
+			    it->second->nearestConfigFileName,
+			    it->second->ancestors,
+			};
+		}
+		return nullptr;
 	}
 };
 

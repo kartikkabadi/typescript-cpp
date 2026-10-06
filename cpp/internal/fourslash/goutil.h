@@ -6,6 +6,7 @@
 #pragma once
 
 #include <algorithm>
+#include "internal/gostd/goseq.h"
 #include <condition_variable>
 #include <cstdint>
 #include <deque>
@@ -544,34 +545,8 @@ inline std::string padRight(std::string_view s, int width) {
 
 } // namespace tsc::gostr
 
-// ---------------------------------------------------------------------------
-// iter.Seq[T] — Go's func(yield func(T) bool) sequence.
-// ---------------------------------------------------------------------------
-namespace tsc::goseq {
-template <typename T>
-using Seq = std::function<void(const std::function<bool(T)>&)>;
-
-// Collect iterates a Seq into a vector (slices.Collect).
-template <typename T>
-std::vector<T> collect(const Seq<T>& seq) {
-	std::vector<T> out;
-	if (seq) {
-		seq([&](T v) {
-			out.push_back(std::move(v));
-			return true;
-		});
-	}
-	return out;
-}
-
-// Sorted collects and sorts (slices.Sorted).
-template <typename T>
-std::vector<T> sorted(const Seq<T>& seq) {
-	auto out = collect(seq);
-	std::sort(out.begin(), out.end());
-	return out;
-}
-} // namespace tsc::goseq
+// iter.Seq[T] — canonical definition moved to gostd/goseq.h (shared with
+// project/configfileregistry.h's TestConfigEntry accessors).
 
 // ---------------------------------------------------------------------------
 // defer — Go defer statement scope guard.

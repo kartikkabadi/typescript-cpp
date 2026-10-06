@@ -96,11 +96,12 @@ std::string scriptInfo::GetLineContent(int line) const {
 // ===========================================================================
 
 // parseCache — fourslash.go:154.
-project::ParseCache* parseCache() {
+std::shared_ptr<project::ParseCache> parseCache() {
 	static project::RefCountCacheOptions options{
 	    .DisableDeletion = true,
 	};
-	static project::ParseCache* cache = project::newParseCache(options);
+	static std::shared_ptr<project::ParseCache> cache{
+	    project::newParseCache(options)};
 	return cache;
 }
 
@@ -305,7 +306,7 @@ newFourslash(gostd::testing::T* t, const std::string& content,
 	f->semanticTokenTypes = defaultSemanticTokenTypes();
 	f->semanticTokenModifiers = defaultSemanticTokenModifiers();
 
-	auto clientAndClose = lsptestutil::NewLSPClient(
+	auto clientAndClose = testutil::lsptestutil::NewLSPClient(
 	    t, serverOpts,
 	    [f](gostd::Context ctx,
 	        const std::shared_ptr<lsproto::RequestMessage>& req) {
@@ -482,7 +483,7 @@ void FourslashTest::initialize(
 	// Wait for the initial configuration exchange to complete
 	// The server will send workspace/configuration as part of
 	// handleInitialized
-	client->Server->initComplete()->recv();
+	client->Server->InitComplete()->wait();
 }
 
 // ===========================================================================

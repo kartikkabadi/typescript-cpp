@@ -1011,7 +1011,7 @@ struct textEditSpan {
 // FourslashTest — fourslash.go:46
 // ===========================================================================
 struct FourslashTest {
-	std::shared_ptr<lsptestutil::LSPClient> client;
+	std::shared_ptr<testutil::lsptestutil::LSPClient> client;
 	std::shared_ptr<::tsc::vfs::FS> vfs;
 
 	std::shared_ptr<TestData>
@@ -1588,7 +1588,7 @@ struct FourslashTest {
 inline constexpr std::string_view rootDir = "/";
 
 // parseCache — fourslash.go:154.
-project::ParseCache* parseCache();
+std::shared_ptr<project::ParseCache> parseCache();
 
 // NewFourslash — fourslash.go:160.
 std::pair<std::shared_ptr<FourslashTest>, std::function<void()>> NewFourslash(
