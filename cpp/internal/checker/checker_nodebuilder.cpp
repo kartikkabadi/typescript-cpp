@@ -133,17 +133,16 @@ static bool hasInferredType(Node* node) {
 	case Kind::ElementAccessExpression:
 	case Kind::BinaryExpression:
 	case Kind::CallExpression:
-	case Kind::FunctionExpression:
-	case Kind::ArrowFunction:
-	case Kind::JsxAttribute:
-	case Kind::ShorthandPropertyAssignment:
-	case Kind::PropertyAssignment:
 	case Kind::VariableDeclaration:
-	case Kind::TypeAssertionExpression:
-	case Kind::AsExpression:
+	case Kind::ExportAssignment:
+	case Kind::PropertyAssignment:
+	case Kind::ShorthandPropertyAssignment:
+	case Kind::JSDocParameterTag:
+	case Kind::JSDocPropertyTag:
 		return true;
+	default:
+		return false;
 	}
-	return false;
 }
 
 // isRestParameter (checker.go:28258).

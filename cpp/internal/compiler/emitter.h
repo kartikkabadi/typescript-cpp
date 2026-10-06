@@ -3,6 +3,7 @@
 // to the printer/declarations host surfaces; emitter runs the per-file
 // transform → print → write pipeline.
 
+#include "internal/ast/diagnostics_util.h"
 #include "internal/compiler/program.h"
 #include "internal/outputpaths/outputpaths.h"
 #include "internal/printer/emitcontext.h"
@@ -182,8 +183,10 @@ std::pair<std::unique_ptr<emitHost>, std::function<void()>> newEmitHost(
 struct emitter {
 	emitHost* host{};
 	EmitOnly emitOnly = EmitOnly::EmitAll;
-	// Go ast.DiagnosticsCollection — vector preserves insertion order.
-	std::vector<Diagnostic*> emitterDiagnostics;
+	// emitter.go:33 — Go ast.DiagnosticsCollection; Add() dedupes identical
+	// diagnostics (e.g. private-in-base reports fired by repeated
+	// serialization passes).
+	DiagnosticsCollection emitterDiagnostics;
 	printer::EmitTextWriter* writer{};
 	std::optional<outputpaths::OutputPaths> paths;
 	SourceFile* sourceFile{};

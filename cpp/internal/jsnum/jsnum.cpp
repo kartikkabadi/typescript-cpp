@@ -395,13 +395,24 @@ std::string Number::string() const {
 		}
 	}
 
-	// Shortest round-trip representation, JS-style.
+	// Otherwise, the Go json package handles this correctly.
+	// encoding/json/v2 float formatting: 'f' when 1e-6 <= |v| < 1e21, else
+	// 'e' — shortest round-trip digits in both notations.
+	double abs = std::fabs(v);
 	char buf[40];
-	auto r = std::to_chars(buf, buf + sizeof(buf), v, std::chars_format::general);
+	auto r = std::to_chars(buf, buf + sizeof(buf), v,
+	                       (abs != 0.0 && (abs < 1e-6 || abs >= 1e21))
+	                           ? std::chars_format::scientific
+	                           : std::chars_format::fixed);
 	std::string out(buf, r.ptr);
-	// to_chars emits e.g. "1e+21", "1.5e-7", "0.0001" — all JS-valid forms.
-	// JS exponent uses no leading zeros ("1e-07" would need fixing) and always
-	// a sign; std::to_chars already satisfies both.
+	// to_chars pads the exponent to >=2 digits ("1e-09"); jsontext emits no
+	// leading zeros — strip one from a trailing e±0X (same cleanup Go's
+	// encoder applies to 'e' output).
+	size_t epos = out.find('e');
+	if (epos != std::string::npos && out.size() - epos == 4 &&
+	    out[epos + 2] == '0') {
+		out.erase(epos + 2, 1);
+	}
 	return out;
 }
 

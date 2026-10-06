@@ -5193,11 +5193,12 @@ inline NodeList* deepCloneNodeList(NodeFactory& f,
                                    const NodeList* l,
                                    bool syntheticLocation) {
 	if (l == nullptr) return nullptr;
+	bool trailingComma = l->hasTrailingComma();
 	auto* c = f.arena().alloc<NodeList>(*l);
 	for (auto& n : c->nodes) n = deepCloneNode(f, n, syntheticLocation);
 	if (syntheticLocation) {
 		c->loc = TextRange{-1, -1};
-		if (c->hasTrailingComma()) {
+		if (trailingComma) {
 			c->nodes.back()->loc = TextRange{-2, -2};
 		}
 	}
@@ -5208,12 +5209,13 @@ inline ModifierList* deepCloneModifierList(NodeFactory& f,
                                            const ModifierList* m,
                                            bool syntheticLocation) {
 	if (m == nullptr) return nullptr;
+	bool trailingComma = m->hasTrailingComma();
 	auto* c = f.arena().alloc<ModifierList>(*m);
 	for (auto& n : c->nodes) n = deepCloneNode(f, n, syntheticLocation);
 	c->ModifierFlags = NodeFactory::modifiersToFlags(c->nodes);
 	if (syntheticLocation) {
 		c->loc = TextRange{-1, -1};
-		if (c->hasTrailingComma()) {
+		if (trailingComma) {
 			c->nodes.back()->loc = TextRange{-2, -2};
 		}
 	}
