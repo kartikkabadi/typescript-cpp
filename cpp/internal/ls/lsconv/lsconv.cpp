@@ -1,22 +1,262 @@
 // === dep decls — owned by lsp (ls/lsconv) ===
-// Faithful port of linemap.go + FileNameToDocumentURI (converters.go); see
-// lsconv.h.
+// Faithful port of linemap.go + converters.go's diagnostic converters
+// (DiagnosticToLSPPull/Push and friends); see lsconv.h.
 #include "internal/ls/lsconv/lsconv.h"
+#include "internal/ls/lsdeps.h" // Converters, ScriptOrOriginal, scriptArg
 
 #include <algorithm>
+#include <sstream>
+#include <unordered_set>
 
 #include "internal/bundled/bundled.h"
+#include "internal/diagnostics/messages_generated.h"
+#include "internal/diagnosticwriter/diagnosticwriter.h"
 #include "internal/gostd/gostd.h"
+#include "internal/locale/locale.h"
 #include "internal/tspath/tspath.h"
 
 namespace tsc::lsconv {
 
-// DiagnosticToLSPPull (converters.go:459) — dep-stub: port lands with the
-// lsconv slice.
+namespace {
+
+// diagnosticOptions — converters.go:451.
+struct diagnosticOptions {
+	bool reportStyleChecksAsWarnings = false;
+	bool relatedInformation = false;
+	lsproto::Slice<lsproto::DiagnosticTag> tagValueSet;
+	bool visualStudio = false;
+};
+
+// diagnosticLocalize — ast/diagnostic.go:117 `d.Localize(locale)`.
+std::string diagnosticLocalize(Diagnostic* d, const locale::Locale& locale) {
+	diagnosticwriter::ASTDiagnostic wrapped(d);
+	return wrapped.localize(locale);
+}
+
+// diagnosticScriptAndRange — converters.go:577. Resolves the text basis and
+// range to report a diagnostic against. For a content-mapped file it maps the
+// diagnostic's virtual range back to the original text so the range lines up
+// with what the editor shows; the original text's line map is already what
+// getLineMap returns for the file. A range in synthesized code has no
+// original counterpart, so it is surfaced at the top of the file. Non-mapped
+// files are returned unchanged.
+std::pair<ScriptOrOriginal<SourceFile*>, TextRange> diagnosticScriptAndRange(
+    SourceFile* file, TextRange loc, std::string_view source) {
+	if (file == nullptr || file->SpanMap() == nullptr) {
+		return {file, loc};
+	}
+	originalTextScript original{file->OriginalFileName(), file->OriginalText()};
+	if (!source.empty()) {
+		// A content mapper's own diagnostics already carry original-text
+		// ranges.
+		return {original, loc};
+	}
+	auto [mapped, fidelity] =
+	    spanmap::VirtualToOriginalSpan(file->SpanMap(), loc);
+	if (fidelity == spanmap::FidelityNone) {
+		// Entirely synthesized code has no original location; surface it at
+		// the top of the file.
+		return {original, TextRange{0, 0}};
+	}
+	return {original, mapped};
+}
+
+// diagnosticSeverity — converters.go:608.
+lsproto::DiagnosticSeverity diagnosticSeverity(DiagnosticCategory category) {
+	switch (category) {
+	case DiagnosticCategory::Suggestion:
+		return lsproto::DiagnosticSeverityHint;
+	case DiagnosticCategory::Message:
+		return lsproto::DiagnosticSeverityInformation;
+	case DiagnosticCategory::Warning:
+		return lsproto::DiagnosticSeverityWarning;
+	default:
+		return lsproto::DiagnosticSeverityError;
+	}
+}
+
+// styleCheckDiagnostics — converters.go:482.
+// https://github.com/microsoft/vscode/blob/93e08afe0469712706ca4e268f778cfadf1a43ef/extensions/typescript-language-features/src/typeScriptServiceClientHost.ts#L40C7-L40C29
+const std::unordered_set<int32_t>& styleCheckDiagnostics() {
+	static const std::unordered_set<int32_t> set{
+	    X_0_is_declared_but_never_used->code,
+	    X_0_is_declared_but_its_value_is_never_read->code,
+	    Property_0_is_declared_but_its_value_is_never_read->code,
+	    All_imports_in_import_declaration_are_unused->code,
+	    Unreachable_code_detected->code,
+	    Unused_label->code,
+	    Fallthrough_case_in_switch->code,
+	    Not_all_code_paths_return_a_value->code,
+	};
+	return set;
+}
+
+// messageChainToString — converters.go:621.
+std::string messageChainToString(Diagnostic* diagnostic,
+                                 const locale::Locale& locale) {
+	if (diagnostic->MessageChain().empty()) {
+		return diagnosticLocalize(diagnostic, locale);
+	}
+	std::ostringstream b;
+	diagnosticwriter::writeFlattenedASTDiagnosticMessage(b, diagnostic, "\n",
+	                                                     locale);
+	return b.str();
+}
+
+// ptrToSliceIfNonEmpty — converters.go:630.
+template <typename T>
+std::shared_ptr<lsproto::Slice<T>> ptrToSliceIfNonEmpty(std::vector<T> s) {
+	if (s.empty()) {
+		return nullptr;
+	}
+	return std::make_shared<lsproto::Slice<T>>(std::in_place, std::move(s));
+}
+
+// toLSPRange — the std::visit over a ScriptOrOriginal<SourceFile*> shared by
+// both call sites in diagnosticToLSP.
+std::pair<lsproto::Range, spanmap::Fidelity> toLSPRange(
+    Converters* converters, const ScriptOrOriginal<SourceFile*>& script,
+    TextRange loc) {
+	return std::visit(
+	    [&](auto&& s) { return converters->ToLSPRange(scriptArg(s), loc); },
+	    script);
+}
+
+// diagnosticToLSP — converters.go:493.
+lsproto::Diagnostic* diagnosticToLSP(gostd::Context ctx,
+                                     Converters* converters,
+                                     Diagnostic* diagnostic,
+                                     const diagnosticOptions& opts) {
+	auto loc = locale::fromContext(ctx);
+	auto severity = diagnosticSeverity(diagnostic->Category());
+
+	if (opts.reportStyleChecksAsWarnings &&
+	    severity == lsproto::DiagnosticSeverityError &&
+	    styleCheckDiagnostics().contains(diagnostic->Code())) {
+		severity = lsproto::DiagnosticSeverityWarning;
+	}
+
+	std::vector<std::shared_ptr<lsproto::DiagnosticRelatedInformation>>
+	    relatedInformation;
+	if (opts.relatedInformation) {
+		relatedInformation.reserve(diagnostic->RelatedInformation().size());
+		for (auto* related : diagnostic->RelatedInformation()) {
+			auto scriptAndRange = diagnosticScriptAndRange(
+			    related->File(), related->Loc(), related->Source());
+			auto [relatedRange, fidelity] = toLSPRange(
+			    converters, std::get<0>(scriptAndRange),
+			    std::get<1>(scriptAndRange));
+			if (fidelity.IsNone()) {
+				// Related diagnostic information cannot omit its location.
+				// Use an explicit file-level location instead of presenting
+				// the synthesized span's insertion point as related source.
+				relatedRange = lsproto::Range{};
+			}
+			auto* info = new lsproto::DiagnosticRelatedInformation;
+			info->Location.Uri =
+			    FileNameToDocumentURI(related->File()->OriginalFileName());
+			info->Location.Range = relatedRange;
+			info->Message = diagnosticLocalize(related, loc);
+			relatedInformation.emplace_back(info);
+		}
+	}
+
+	std::vector<lsproto::DiagnosticTag> tags;
+	if (opts.tagValueSet.has_value() && !opts.tagValueSet->empty() &&
+	    (diagnostic->ReportsUnnecessary() || diagnostic->ReportsDeprecated())) {
+		tags.reserve(2);
+		if (diagnostic->ReportsUnnecessary() &&
+		    std::find(opts.tagValueSet->begin(), opts.tagValueSet->end(),
+		              lsproto::DiagnosticTagUnnecessary) !=
+		        opts.tagValueSet->end()) {
+			tags.push_back(lsproto::DiagnosticTagUnnecessary);
+		}
+		if (diagnostic->ReportsDeprecated() &&
+		    std::find(opts.tagValueSet->begin(), opts.tagValueSet->end(),
+		              lsproto::DiagnosticTagDeprecated) !=
+		        opts.tagValueSet->end()) {
+			tags.push_back(lsproto::DiagnosticTagDeprecated);
+		}
+	}
+
+	// For diagnostics without a file (e.g., program diagnostics), use a zero
+	// range.
+	lsproto::Range lspRange{};
+	if (diagnostic->File() != nullptr) {
+		auto scriptAndRange = diagnosticScriptAndRange(
+		    diagnostic->File(), diagnostic->Loc(), diagnostic->Source());
+		auto [rng, fidelity] = toLSPRange(
+		    converters, std::get<0>(scriptAndRange),
+		    std::get<1>(scriptAndRange));
+		lspRange = rng;
+		if (fidelity.IsNone()) {
+			// Diagnostics must carry a range. A zero range honestly means
+			// "this file" when the diagnostic arose entirely in synthesized
+			// code and has no original source span.
+			lspRange = lsproto::Range{};
+		}
+	}
+
+	auto code = std::make_shared<lsproto::IntegerOrString>();
+	std::string sourceText(diagnostic->Source());
+	if (sourceText.empty()) {
+		sourceText = "ts";
+	}
+	if (opts.visualStudio) {
+		code->String = std::make_shared<std::string>(
+		    "TS" + std::to_string(diagnostic->Code()));
+	} else {
+		code->Integer = std::make_shared<int32_t>(diagnostic->Code());
+	}
+
+	auto* result = new lsproto::Diagnostic;
+	result->Range = lspRange;
+	result->Code = code;
+	result->Severity =
+	    std::make_shared<lsproto::DiagnosticSeverity>(severity);
+	result->Message.String = std::make_shared<std::string>(
+	    messageChainToString(diagnostic, loc));
+	result->Source = sourceText;
+	result->RelatedInformation =
+	    ptrToSliceIfNonEmpty(std::move(relatedInformation));
+	result->Tags = ptrToSliceIfNonEmpty(std::move(tags));
+	return result;
+}
+
+} // namespace
+
+// DiagnosticToLSPPull — converters.go:459. Converts a diagnostic for pull
+// diagnostics (textDocument/diagnostic).
 lsproto::Diagnostic* DiagnosticToLSPPull(
     gostd::Context ctx, Converters* converters, Diagnostic* diagnostic,
     bool reportStyleChecksAsWarnings) {
-	TSC_UNREACHABLE("DiagnosticToLSPPull — lsconv slice");
+	auto clientCaps = lsproto::getClientCapabilities(ctx);
+	const auto& clientDiagnosticCaps = clientCaps->TextDocument.Diagnostic;
+	return diagnosticToLSP(
+	    ctx, converters, diagnostic,
+	    diagnosticOptions{
+	        .reportStyleChecksAsWarnings =
+	            reportStyleChecksAsWarnings, // !!! get through context UserPreferences
+	        .relatedInformation = clientDiagnosticCaps.RelatedInformation,
+	        .tagValueSet = clientDiagnosticCaps.TagSupport.ValueSet,
+	        .visualStudio = clientCaps->VSSupportsVisualStudioExtensions,
+	    });
+}
+
+// DiagnosticToLSPPush — converters.go:471. Converts a diagnostic for push
+// diagnostics (textDocument/publishDiagnostics).
+lsproto::Diagnostic* DiagnosticToLSPPush(gostd::Context ctx,
+                                         Converters* converters,
+                                         Diagnostic* diagnostic) {
+	auto clientCaps = lsproto::getClientCapabilities(ctx);
+	const auto& clientDiagnosticCaps = clientCaps->TextDocument.PublishDiagnostics;
+	return diagnosticToLSP(
+	    ctx, converters, diagnostic,
+	    diagnosticOptions{
+	        .relatedInformation = clientDiagnosticCaps.RelatedInformation,
+	        .tagValueSet = clientDiagnosticCaps.TagSupport.ValueSet,
+	        .visualStudio = clientCaps->VSSupportsVisualStudioExtensions,
+	    });
 }
 
 // ComputeLSPLineStarts (linemap.go:19) — like core.ComputeLineStarts, but only

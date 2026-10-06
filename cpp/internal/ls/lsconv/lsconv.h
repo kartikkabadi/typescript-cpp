@@ -1,7 +1,8 @@
-// lsconv — partial port: linemap.go + FileNameToDocumentURI (converters.go)
-// landed with the api slice. The stateful Converters type is dep-declared by
-// internal/ls/change/change.h (the consumer that already existed); the lsp
-// slice owns the real package and will replace these decls when it lands.
+// lsconv — partial port: linemap.go + FileNameToDocumentURI + the
+// diagnostic converters (converters.go). The stateful Converters type's
+// canonical definition lives in internal/ls/lsdeps.h (which includes this
+// header); its SourceFile member bodies and NewConverters are defined in
+// lsdeps.cpp, and the diagnostic converters in lsconv.cpp.
 #pragma once
 
 #include <cstdint>
@@ -35,22 +36,28 @@ LSPLineMap* ComputeLSPLineStarts(const std::string& text);
 // FileNameToDocumentURI (converters.go:332).
 lsproto::DocumentUri FileNameToDocumentURI(const std::string& fileName);
 
-// DiagnosticToLSPPull (converters.go:459) — dep-stub: the full port lands
-// with the lsconv slice (needs the unported localize machinery).
+// FileNameToDocumentURI (converters.go:332) — std::string_view convenience
+// overload; forwards to the real port above.
+inline tsc::lsp::lsproto::DocumentUri FileNameToDocumentURI(
+    std::string_view fileName) {
+	return FileNameToDocumentURI(std::string(fileName));
+}
+
+// DiagnosticToLSPPull (converters.go:459) — defined in lsconv.cpp.
 class Converters;
 lsproto::Diagnostic* DiagnosticToLSPPull(
     gostd::Context ctx, Converters* converters, Diagnostic* diagnostic,
     bool reportStyleChecksAsWarnings);
 
-// LSPLineMap — linemap.go:14. dep-stub — owned by ls/lsconv.
-struct LSPLineMap;
-
-// DiagnosticToLSPPush — owned by ls/lsconv. dep-stub.
-class Converters;
-inline tsc::lsp::lsproto::Diagnostic* DiagnosticToLSPPush(
-    const gostd::Context& ctx, Converters* converters, Diagnostic* diag) {
-	TSC_UNREACHABLE("DiagnosticToLSPPush — owned by ls/lsconv");
+// ComputeLSPLineStarts (linemap.go:19) — std::string_view convenience
+// overload; forwards to the real port above.
+inline LSPLineMap* ComputeLSPLineStarts(std::string_view text) {
+	return ComputeLSPLineStarts(std::string(text));
 }
+
+// DiagnosticToLSPPush (converters.go:469) — defined in lsconv.cpp.
+lsproto::Diagnostic* DiagnosticToLSPPush(
+    gostd::Context ctx, Converters* converters, Diagnostic* diag);
 
 // === dep decls for project — owned by ls/lsconv ===
 
@@ -75,16 +82,16 @@ inline ScriptKind LanguageKindToScriptKind(
 	return ScriptKind::Unknown;
 }
 
-// MappedSpan / MappedPosition — canonical definitions live in
-// lsdeps.h (field-promoted spanmap bases, `T Script` value member);
-// that header includes this one.
+// MappedSpan / MappedPosition and the Converters class — canonical
+// definitions live in lsdeps.h (field-promoted spanmap bases, `T Script`
+// value member); that header includes this one.
 
-// NewConverters — converters.go:52. dep-stub — owned by ls/lsconv.
-inline Converters* NewConverters(
+// NewConverters — converters.go:43. Declared here for project/* headers that
+// do not include lsdeps.h; also declared (canonically) in lsdeps.h and
+// defined in lsdeps.cpp.
+Converters* NewConverters(
 	tsc::lsp::lsproto::PositionEncodingKind positionEncoding,
-	std::function<LSPLineMap*(const std::string&)> getLineMap) {
-	TSC_UNREACHABLE("NewConverters — owned by ls/lsconv");
-}
+	std::function<LSPLineMap*(const std::string&)> getLineMap);
 
 
 } // namespace tsc::lsconv
