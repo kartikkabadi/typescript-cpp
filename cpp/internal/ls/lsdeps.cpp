@@ -96,15 +96,7 @@ namespace tsc::ls {
 // === dep-stubs for sibling ls-slice items declared in ls.h ===
 
 // (deduped: getImmediatelyContainingArgumentInfo defined in cpp/internal/ls/signaturehelp.cpp)
-
-missingMemberFixer* newMissingMemberFixer(
-    change::Tracker* changeTracker, compiler::SimpleProgram* program,
-    checker::Checker* typeChecker, const lsutil::UserPreferences& preferences,
-    autoimport::ImportAdder* importAdder, locale::Locale locale) {
-	TSC_UNREACHABLE(
-	    "newMissingMemberFixer — ls/codeactions_missingmemberfixer slice");
-}
-
+// (deduped: newMissingMemberFixer defined in cpp/internal/ls/codeactions_missingmemberfixer.cpp)
 
 } // namespace tsc::ls
 

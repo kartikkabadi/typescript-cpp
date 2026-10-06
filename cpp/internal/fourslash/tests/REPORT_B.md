@@ -7,9 +7,9 @@
   linked-editing (12), get-edits-for-file-rename (33), organize-imports (90),
   refactors (4), go-to-source-definition (71), quick-info display-parts (41),
   code-fixes (275), import-fixes (10), tsx (64), jsx (23).
-- Whole suite now: **854** registered (93 batch A + 761 batch B) —
-  `537 PASS / 181 FAIL / 136 SKIP`. Batch-A results unchanged (83 pass, 8 fail,
-  2 skip — the same failures documented in REPORT_A.md, no regressions).
+- Whole suite: **854** registered (93 batch A + 761 batch B) —
+  `537 PASS / 181 FAIL / 136 SKIP` at the time this report was written;
+  see "Fixes" below for post-port numbers.
 - Batch-B runner: **454 PASS / 173 FAIL / 134 SKIP**
   (of the 134 skips: 52 are Go's own `t.Skip("Known failing fourslash test")`
   ported verbatim; **82 are port-side stubs** — the `newMissingMemberFixer`
@@ -21,24 +21,79 @@
 - Five Go tests were not ported (needed infra that does not exist on the C++
   side); see "Conversion skips" at the bottom.
 
+## Fixes — missing-member fixer port (branch `devin/cpp-fs-missingmember`)
+
+Post-port full-suite run: **650 PASS / 150 FAIL / 54 SKIP** of 854
+(batch B alone: 559 pass / 150 fail / 52 skip). Changes vs the documented
+baseline above:
+
+- **`newMissingMemberFixer` ported for real** — `ls/lsdeps.cpp` stub replaced
+  by a faithful port of `tsc/internal/ls/codeactions/missingmemberfixer.go`
+  into `cpp/internal/ls/codeactions_missingmemberfixer.cpp` (~830 lines,
+  function-for-function: `codefixMissingMember`, `createNewNode`,
+  `addMoreMembers`, `addMissingMember`/`tryAddMissingMember`,
+  `createMissingMember`/`insertMissingMember`, `addMethod`,
+  `addIndexSignature`, `getMissingMembers`, `synthesizeDeep` family,
+  `createNodeBuilder`/`importTypeNode`, etc.). All **82 stub-skips now run**:
+  80 PASS, 2 FAIL (both documented below — real divergences, not stub panics).
+- **25 previously-documented FAILs fixed** by the two port-level repairs the
+  fixer required (see below): 13 inlayhints, 6 codefix, 3 importfix,
+  3 quickinfodp.
+- **Zero pass→fail regressions** vs the documented baseline lists.
+
+Two cross-cutting bugs surfaced and were fixed while porting:
+
+1. **`NodeBuilderImpl.idToSymbol` must be shared, not copied.** In Go,
+   `newNodeBuilderImpl`'s `idToSymbol map[*ast.IdentifierNode]*ast.Symbol`
+   parameter aliases the caller's map — the builder records identifier→symbol
+   links the caller reads afterwards (`missingMemberFixer.importTypeNode`,
+   inlay-hint `location` links, hover symbol locations). The C++ port copied
+   the map into the builder (`b->idToSymbol = *idToSymbol`), leaving callers'
+   maps empty — `import("./I").J` instead of `J` + a real import, missing
+   `location` fields on inlay hints, etc. Fixed by making the member a
+   pointer (`unordered_map<Node*,Symbol*>*`) populated by the caller
+   (`checker/checker.h`, `checker_nodebuilder.cpp::newNodeBuilderImpl`, plus
+   call sites in `codeactions_missingmemberfixer.cpp`,
+   `codeactions_fixmissingtypeannotation.cpp`, `hover.cpp`,
+   `inlay_hints.cpp`).
+2. **`NodeFactory` arena must outlive nodes built for emission.** Go relies
+   on GC; `TryGetAutoImportableReferenceFromTypeNode` had a stack-local
+   `NodeFactory` whose arena freed the returned reference/type nodes, so the
+   printer saw garbage `kind` (`panic: unhandled TypeNode`). Fixed by
+   threading a `NodeFactory* factory` parameter through
+   `TypeToAutoImportableTypeNode`, `TypeNodeToAutoImportableTypeNode`, and
+   `TryGetAutoImportableReferenceFromTypeNode`
+   (`ls/autoimport/autoimport.h`, `import_adder.cpp`); callers pass the
+   change tracker's factory. This also repaired the SEGV import-fix tests.
+
+Remaining divergences in the converted group (2 FAILs, both real): see
+divergence entries 6b (MemberOrdering — stale Go-side baseline vs
+upstream/canonical ordering) and 6c (NoTruncationProperties — intermittent
+`std::system_error: Resource deadlock avoided` in the threaded session
+infra; 16/16 clean solo and under gdb, ~1-in-3 under batch load; the ported
+fixer itself is single-threaded).
+
 ## Per-file outcomes
 
 | `tests_*.cpp` | ported | PASS | FAIL | SKIP(go) | SKIP(stub) |
 |---|---|---|---|---|---|
 | callhierarchy | 38 | 10 | 28 | 0 | 0 |
-| inlayhints | 64 | 51 | 13 | 0 | 0 |
+| inlayhints | 64 | ~~51~~ **64** | ~~13~~ **0** | 0 | 0 |
 | smartselection | 36 | 34 | 2 | 0 | 0 |
 | linkediting | 12 | 12 | 0 | 0 | 0 |
 | getedits | 33 | 29 | 3 | 1 | 0 |
 | organizeimports | 90 | 0 | 90 | 0 | 0 |
 | refactor | 4 | 3 | 0 | 1 | 0 |
 | gotosourcedef | 71 | 71 | 0 | 0 | 0 |
-| quickinfodp | 41 | 34 | 6 | 1 | 0 |
-| codefix | 275 | 142 | 8 | 43 | 82 |
-| importfix | 10 | 4 | 5 | 1 | 0 |
+| quickinfodp | 41 | ~~34~~ **37** | ~~6~~ **3** | 1 | 0 |
+| codefix | 275 | ~~142~~ **228** | ~~8~~ **4** | 43 | ~~82~~ **0** |
+| importfix | 10 | ~~4~~ **7** | ~~5~~ **2** | 1 | 0 |
 | tsx | 64 | 56 | 4 | 4 | 0 |
 | jsx | 23 | 8 | 14 | 1 | 0 |
-| **total** | **761** | **454** | **173** | **52** | **82** |
+| **total** | **761** | ~~454~~ **559** | ~~173~~ **150** | **52** | ~~82~~ **0** |
+
+Struck-through values are the pre-port baseline; bold values are the
+post-port measurement.
 
 ## Per-test outcomes
 
@@ -236,7 +291,25 @@ FAIL:
 
 SKIP (Go `t.Skip` parity): TestQuickInfoDisplayPartsIife
 
-### `codefix` — 142 pass / 8 fail / 125 skip
+### `codefix` — ~~142 pass / 8 fail / 125 skip~~ now 228 pass / 4 fail / 43 skip
+
+Updated counts after the missing-member fixer port (see "Fixes" above).
+The 82 former stub-skips are listed under PASS/FAIL below.
+
+Newly passing (82 former stub-skips, minus 2 divergences): all
+`SKIP (port stub newMissingMemberFixer)` tests now PASS except
+`TestCodeFixClassImplementInterfaceMemberOrdering` and
+`TestCodeFixClassImplementInterfaceNoTruncationProperties` (divergences 6b/6c).
+Also fixed: `TestCodeFixAddMissingImportForReactJsx1`,
+`TestCodeFixAddMissingImportForReactJsx2`, `TestCodeFixGenerateDefinitions`,
+`TestCodeFixMissingTypeAnnotationOnExports30_inline_import`,
+`TestCodeFixMissingTypeAnnotationOnExports31_inline_import_default`,
+`TestCodeFixMissingTypeAnnotationOnExports56_toplevel_import`.
+
+Still FAIL: `TestCodeFixSpellingJs3`, `TestCodeFixSpellingJs8`,
+`TestCodeFixClassImplementInterfaceMemberOrdering` (6b),
+`TestCodeFixClassImplementInterfaceNoTruncationProperties` (6c).
+
 
 PASS: TestCodeFixAddConvertToUnknownForNonOverlappingTypes9, TestCodeFixAddMissingAttributes10, TestCodeFixAddMissingAttributes5, TestCodeFixAddMissingAttributes6, TestCodeFixAddMissingAwait_notAvailableWithoutPromise, TestCodeFixAddMissingAwait_topLevel, TestCodeFixAddMissingConstToArrayDestructuring3, TestCodeFixAddMissingConstToCommaSeparatedInitializer4, TestCodeFixAddMissingEnumMember13, TestCodeFixAddMissingFunctionDeclaration16, TestCodeFixAddMissingFunctionDeclaration19, TestCodeFixAddMissingFunctionDeclaration20, TestCodeFixAddMissingMember21, TestCodeFixAddMissingMember8, TestCodeFixAddMissingParam15, TestCodeFixAddOptionalParam14, TestCodeFixAddOptionalParam15, TestCodeFixAddOptionalParam18, TestCodeFixAddVoidToPromise5, TestCodeFixAddVoidToPromiseJS5, TestCodeFixAwaitInSyncFunction3, TestCodeFixAwaitInSyncFunction4, TestCodeFixAwaitShouldNotCrashIfNotInFunction, TestCodeFixCannotFindModule_suggestion_falsePositive, TestCodeFixClassExtendAbstractPrivateProperty, TestCodeFixClassImplementInterfaceDuplicateMember2, TestCodeFixClassImplementInterfaceIndexSignaturesNoFix, TestCodeFixClassImplementInterfaceMultipleImplementsIntersection2, TestCodeFixClassImplementInterfaceTypeParamInstantiation, TestCodeFixClassSuperMustPrecedeThisAccess_callWithThisInside, TestCodeFixConvertToMappedObjectType13, TestCodeFixConvertToMappedObjectType5, TestCodeFixConvertToTypeOnlyImport1, TestCodeFixConvertToTypeOnlyImport2, TestCodeFixConvertToTypeOnlyImport3, TestCodeFixCorrectReturnValue27, TestCodeFixCorrectReturnValue4, TestCodeFixCorrectReturnValue5, TestCodeFixCorrectReturnValue6, TestCodeFixExpectedComma03, TestCodeFixForgottenThisPropertyAccess04, TestCodeFixImplicitThis_ts_cantFixNonFunction, TestCodeFixImportNonExportedMember4, TestCodeFixImportNonExportedMember5, TestCodeFixImportNonTextualSpecifierText, TestCodeFixInferFromUsageBindingElement, TestCodeFixInferFromUsageCallbackParameter6, TestCodeFixInferFromUsageCallbackParameter7, TestCodeFixInferFromUsageInaccessibleTypes, TestCodeFixInferFromUsage_noCrashOnMissingParens, TestCodeFixMissingTypeAnnotationOnExports10, TestCodeFixMissingTypeAnnotationOnExports11, TestCodeFixMissingTypeAnnotationOnExports12, TestCodeFixMissingTypeAnnotationOnExports13, TestCodeFixMissingTypeAnnotationOnExports14, TestCodeFixMissingTypeAnnotationOnExports15, TestCodeFixMissingTypeAnnotationOnExports17_unique_symbol, TestCodeFixMissingTypeAnnotationOnExports18, TestCodeFixMissingTypeAnnotationOnExports19, TestCodeFixMissingTypeAnnotationOnExports20, TestCodeFixMissingTypeAnnotationOnExports21_params_and_return, TestCodeFixMissingTypeAnnotationOnExports22_formatting, TestCodeFixMissingTypeAnnotationOnExports24_heritage_formatting_2, TestCodeFixMissingTypeAnnotationOnExports26_fn_in_object_literal, TestCodeFixMissingTypeAnnotationOnExports27_non_exported_bidings, TestCodeFixMissingTypeAnnotationOnExports29_inline, TestCodeFixMissingTypeAnnotationOnExports2, TestCodeFixMissingTypeAnnotationOnExports32_inline_short_hand, TestCodeFixMissingTypeAnnotationOnExports33_methods, TestCodeFixMissingTypeAnnotationOnExports34_object_spread, TestCodeFixMissingTypeAnnotationOnExports35_variable_releative, TestCodeFixMissingTypeAnnotationOnExports36_conditional_releative, TestCodeFixMissingTypeAnnotationOnExports37_array_spread, TestCodeFixMissingTypeAnnotationOnExports38_unique_symbol_return, TestCodeFixMissingTypeAnnotationOnExports39_extract_arr_to_variable, TestCodeFixMissingTypeAnnotationOnExports3, TestCodeFixMissingTypeAnnotationOnExports40_extract_other_to_variable, TestCodeFixMissingTypeAnnotationOnExports41_no_computed_enum_members, TestCodeFixMissingTypeAnnotationOnExports42_static_readonly_class_symbol, TestCodeFixMissingTypeAnnotationOnExports43_expando_functions_2, TestCodeFixMissingTypeAnnotationOnExports43_expando_functions_3, TestCodeFixMissingTypeAnnotationOnExports43_expando_functions_4, TestCodeFixMissingTypeAnnotationOnExports43_expando_functions_5, TestCodeFixMissingTypeAnnotationOnExports43_expando_functions, TestCodeFixMissingTypeAnnotationOnExports44_default_export, TestCodeFixMissingTypeAnnotationOnExports45_decorators, TestCodeFixMissingTypeAnnotationOnExports46_decorators_experimental, TestCodeFixMissingTypeAnnotationOnExports47, TestCodeFixMissingTypeAnnotationOnExports48, TestCodeFixMissingTypeAnnotationOnExports49_private_name, TestCodeFixMissingTypeAnnotationOnExports4, TestCodeFixMissingTypeAnnotationOnExports50_generics_with_default, TestCodeFixMissingTypeAnnotationOnExports51_slightly_more_complex_generics_with_default, TestCodeFixMissingTypeAnnotationOnExports52_generics_oversimplification, TestCodeFixMissingTypeAnnotationOnExports53_nested_generic_types, TestCodeFixMissingTypeAnnotationOnExports54_generator_generics, TestCodeFixMissingTypeAnnotationOnExports55_generator_return, TestCodeFixMissingTypeAnnotationOnExports57_generics_doesnt_drop_trailing_unknown, TestCodeFixMissingTypeAnnotationOnExports58_genercs_doesnt_drop_trailing_unknown_2, TestCodeFixMissingTypeAnnotationOnExports59_drops_unneeded_after_unknown, TestCodeFixMissingTypeAnnotationOnExports5, TestCodeFixMissingTypeAnnotationOnExports60_drops_unneeded_non_trailing_unknown, TestCodeFixMissingTypeAnnotationOnExports6, TestCodeFixMissingTypeAnnotationOnExports7, TestCodeFixMissingTypeAnnotationOnExports8, TestCodeFixMissingTypeAnnotationOnExports9, TestCodeFixMissingTypeAnnotationOnExportsTypePredicate1, TestCodeFixMissingTypeAnnotationOnExports_arrowParensParamOnly, TestCodeFixMissingTypeAnnotationOnExports_arrowParens, TestCodeFixMissingTypeAnnotationOnExports_expandoNoDuplicates, TestCodeFixMissingTypeAnnotationOnExports_jsxWhitespaceText, TestCodeFixMissingTypeAnnotationOnExports, TestCodeFixNegativeReplaceQualifiedNameWithIndexedAccessType01, TestCodeFixOverrideModifier18, TestCodeFixPromoteTypeOnlyImportJsxTag, TestCodeFixPromoteTypeOnlyImportJsxTagBothTypeOnly, TestCodeFixPromoteTypeOnlyOrderingCrash, TestCodeFixPropertyOverrideAccess4, TestCodeFixRemoveUnnecessaryAwait_mixedUnion, TestCodeFixRemoveUnnecessaryAwait_notAvailableOnReturn, TestCodeFixRequireInTs3, TestCodeFixRequireInTs5, TestCodeFixSpellingJs5, TestCodeFixSpellingJs6, TestCodeFixSpellingJs7, TestCodeFixSpellingShortName2, TestCodeFixTopLevelAwait_module_blankCompilerOptionsInTsConfig, TestCodeFixTopLevelAwait_module_compatibleCompilerOptionsInTsConfig, TestCodeFixTopLevelAwait_module_missingCompilerOptionsInTsConfig, TestCodeFixTopLevelAwait_module_noTsConfig, TestCodeFixTopLevelAwait_target_compatibleCompilerOptionsInTsConfig, TestCodeFixTopLevelAwait_target_noTsConfig, TestCodeFixTopLevelForAwait_module_blankCompilerOptionsInTsConfig, TestCodeFixTopLevelForAwait_module_compatibleCompilerOptionsInTsConfig, TestCodeFixTopLevelForAwait_module_missingCompilerOptionsInTsConfig, TestCodeFixTopLevelForAwait_module_noTsConfig, TestCodeFixTopLevelForAwait_target_compatibleCompilerOptionsInTsConfig, TestCodeFixTopLevelForAwait_target_noTsConfig, TestCodeFixUnreachableCode_noSuggestionIfDisabled, TestCodeFixUnusedIdentifier_parameter1, TestCodeFixUnusedLabel_noSuggestionIfDisabled, TestCodeFixUseBigIntLiteralWithNumericSeparators
 
@@ -327,12 +400,11 @@ but the incoming/outgoing call enumeration returns empty. Hypothesis:
 `getIncomingCalls`/`getOutgoingCalls` (references-driven caller walk) is
 stubbed or unimplemented on the C++ side.
 
-### 3. inlayHints — 13/64 fail: label-part `location` missing
-Baselines differ only in the `location` link on inlay-hint label parts —
-Go emits `{value, location:{uri,range}}` linking the hint to the
-declaration site; C++ emits `{value}` only. Hypothesis: the
-declaration-location link in `convertTypeToInlayHintParts` (or the
-InlayHintLabelPart location plumbing) is not populated.
+### 3. inlayHints — ~~13/64 fail: label-part `location` missing~~ RESOLVED
+Baselines differed only in the `location` link on inlay-hint label parts.
+Root cause was the `idToSymbol` copy-vs-share bug (Fixes §1): the caller's
+identifier→symbol map stayed empty, so no `location` could be computed.
+All 13 now pass.
 
 ### 4. quickInfoDisplayParts (6) & smartSelection (2) — baseline diffs
 - vSQuickInfo baselines: `SymbolDisplayPart.Id` values differ (`0x1880` vs
@@ -357,19 +429,30 @@ InlayHintLabelPart location plumbing) is not populated.
   completions (e.g. `filterText: "prop_a={$1}"` vs expected `prop_a`,
   plus `data.fileName` payload differences).
 
-### 6. codefix — 8 fail: 3 crashes + description/exact-match diffs
-- `TestCodeFixAddMissingImportForReactJsx1/2` — `std::bad_alloc`:
-  unbounded allocation in the react-jsx missing-import path (same
-  failure family as batch-A `TestAutoImport_node12_node_modules1`).
-- `TestCodeFixGenerateDefinitions` — SEGV in the generate-definitions
-  fixer.
-- `TestCodeFixMissingTypeAnnotationOnExports{30,31,56}` — the fix list
-  differs in descriptions/order: e.g. expected `Add satisfies and an
-  inline type assertion with 'Person'` absent; `Add return type`
-  uses `import("./person-code").Person` vs expected `Person`.
+### 6. codefix — ~~8~~ now 4 fail (2 fixed families + 2 new divergences)
+- FIXED: `TestCodeFixAddMissingImportForReactJsx1/2`,
+  `TestCodeFixGenerateDefinitions`,
+  `TestCodeFixMissingTypeAnnotationOnExports{30,31,56}` — all were the
+  `idToSymbol` copy (Fixes §1) and/or `NodeFactory` arena-lifetime
+  (Fixes §2) bugs; e.g. `import("./person-code").Person` now resolves to
+  the named `Person` import like Go.
 - `TestCodeFixSpellingJs3/8` — unexpected diagnostics surface
   (`Property 'none' may not exist`, `Unused '@ts-expect-error'`) —
-  js-diagnostics gate diverges.
+  js-diagnostics gate diverges (pre-existing).
+- **6b.** `TestCodeFixClassImplementInterfaceMemberOrdering` — real diff:
+  C++ emits members in sorted `1..23` order while the ported Go test's
+  expected baseline has the scrambled `13,23,…,2` order. The scrambled
+  string was captured from typescript-go's own map-iteration output when
+  the test was generated; current Go (`getNamedMembers` + `sortSymbols`
+  in checker.go:22441) and upstream TS v5.9.3 both produce `1..23`,
+  matching the C++ output. Stale oracle baseline, not a port bug.
+- **6c.** `TestCodeFixClassImplementInterfaceNoTruncationProperties` —
+  intermittent `terminate called … std::system_error: Resource deadlock
+  avoided` (a same-thread `std::mutex` re-lock / EDEADLK somewhere in the
+  threaded session infra — `project/session.cpp`/`lspclient.cpp` — not in
+  the single-threaded fixer). Passes reliably solo and under gdb
+  (16/16); flakes ~1-in-3 in batch runs. Previously never exercised
+  because the test skip-panicked before reaching the session path.
 
 ### 7. getEditsForFileRename — 3 fail
 - `TestGetEditsForFileRenameWithSolutionConfigFile` — SEGV.
@@ -379,20 +462,21 @@ InlayHintLabelPart location plumbing) is not populated.
   raw css text instead of the synthesized `.d.ts` declaration
   (`declare const css: {...}; export default css;`).
 
-### 8. importfix — 5 fail, all SEGV
-`TestImportFixFromAtTypesWithRealPackage{,Exports}` and
-`TestImportFix{Before,After}IndentedImport{,WithCarriageReturns}` die in
-the import-fix path (auto-import resolution / new-file-content).
+### 8. importfix — ~~5 fail, all SEGV~~ 2 fail
+FIXED: `TestImportFix{Before,After}IndentedImport{,WithCarriageReturns}`
+(3 of 5) — the `NodeFactory` arena-lifetime bug (Fixes §2) freed the
+synthesized import nodes before printing; they now emit and pass.
+`TestImportFixFromAtTypesWithRealPackage{,Exports}` still SEGV in the
+auto-import/`@types` resolution path.
 
 ### 9. tsx — 4 fail: completion-item field diffs
 `TestTsxCompletion7/12/13`, `TestTsxCompletionNonTagLessThan`: same
 `filterText`/`data` field divergence family as jsx (5b).
 
-### 10. Port-side stub skips — 82
-`ls/lsdeps.cpp: newMissingMemberFixer` is a stub panic
-(`tsc internal error: ... ls/codeactions_missingmemberfixer slice`);
-the fourslash recover harness reports it as SKIP. Affects every
-"implement member/interface" fixer test (codefix). In Go these pass.
+### 10. Port-side stub skips — ~~82~~ RESOLVED
+`newMissingMemberFixer` is now ported (`ls/codeactions_missingmemberfixer.cpp`);
+the `lsdeps.cpp` panic is gone. All 82 tests run: 80 pass, 2 fail
+(divergences 6b/6c above).
 
 ## Conversion skips (not ported)
 - `TestGetEditsForFileRenameLoadsUnopenedCompositeProject` — uses

@@ -847,21 +847,26 @@ std::vector<newImportBinding*> sortedNamedImports(
 lsp::lsproto::AddAsTypeOnly reduceAddAsTypeOnlyValues(lsp::lsproto::AddAsTypeOnly prevValue,
                                                lsp::lsproto::AddAsTypeOnly newValue);
 
-// TypeToAutoImportableTypeNode — import_adder.go:382
+// TypeToAutoImportableTypeNode — import_adder.go:382. Go builds nodes on a
+// fresh NodeFactory under GC; callers must supply a factory whose arena
+// outlives the returned nodes (e.g. the change tracker's).
 Node* TypeToAutoImportableTypeNode(checker::Checker* c, ImportAdder* adder,
-                                   checker::Type* t, Node* contextNode);
+                                   checker::Type* t, Node* contextNode,
+                                   NodeFactory* factory);
 
 // TypeNodeToAutoImportableTypeNode — import_adder.go:398
 Node* TypeNodeToAutoImportableTypeNode(
     Node* typeNode, ImportAdder* adder,
-    std::unordered_map<Node*, Symbol*>* idToSymbol);
+    std::unordered_map<Node*, Symbol*>* idToSymbol,
+    NodeFactory* factory);
 
 // importSymbols — import_adder.go:415
 void importSymbols(ImportAdder* adder, const std::vector<Symbol*>& symbols);
 
 // TryGetAutoImportableReferenceFromTypeNode — import_adder.go:427
 std::pair<Node*, std::vector<Symbol*>> TryGetAutoImportableReferenceFromTypeNode(
-    Node* importTypeNode, std::unordered_map<Node*, Symbol*>* idToSymbol);
+    Node* importTypeNode, std::unordered_map<Node*, Symbol*>* idToSymbol,
+    NodeFactory* factory);
 
 // getNameForExportedSymbol — import_adder.go:465
 std::string getNameForExportedSymbol(Symbol* symbol, bool preferCapitalized);

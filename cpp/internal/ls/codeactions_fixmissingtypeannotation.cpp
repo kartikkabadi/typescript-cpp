@@ -1690,14 +1690,14 @@ Node* isolatedDeclarationsFixer::relativeType(Node* node) {
 Node* isolatedDeclarationsFixer::typeToMinimizedReferenceType(
     ::tsc::checker::Type* t, Node* enclosingDecl,
     nodebuilder::Flags flags) {
-	auto idToSymbol = std::unordered_map<Node*, Symbol*>();
+	auto* idToSymbol = new std::unordered_map<Node*, Symbol*>();
 	// !!! When truncation tracking is supported, check if the type was
 	// truncated and return
 	// factory->newKeywordTypeNode(Kind::AnyKeyword) instead of the truncated
 	// node.
 	auto* typeNode = checker->TypeToTypeNodeEx(
 	    t, enclosingDecl, flags, nodebuilder::InternalFlagsWriteComputedProps,
-	    &idToSymbol);
+	    idToSymbol);
 	if (typeNode == nullptr) {
 		return nullptr;
 	}
@@ -1726,8 +1726,8 @@ Node* isolatedDeclarationsFixer::typeToMinimizedReferenceType(
 	// Convert import type references (e.g. import("./path").Name) to simple
 	// type references and collect symbols that need to be imported
 	auto [referenceTypeNode, importableSymbols] =
-	    autoimport::TryGetAutoImportableReferenceFromTypeNode(typeNode,
-	                                                        &idToSymbol);
+	    autoimport::TryGetAutoImportableReferenceFromTypeNode(
+	        typeNode, idToSymbol, changeTracker->nodeFactory);
 	if (referenceTypeNode != nullptr) {
 		typeNode = referenceTypeNode;
 		symbolsToImport.insert(symbolsToImport.end(),

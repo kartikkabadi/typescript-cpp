@@ -742,9 +742,10 @@ static NodeBuilderImpl* newNodeBuilderImpl(
 	b->f = &e->factory;
 	b->ch = ch;
 	b->e = e;
-	if (idToSymbol != nullptr) {
-		b->idToSymbol = *idToSymbol;
+	if (idToSymbol == nullptr) {
+		idToSymbol = new std::unordered_map<Node*, Symbol*>();
 	}
+	b->idToSymbol = idToSymbol;
 	b->pc = pseudochecker::newPseudoChecker(ch->strictNullChecks,
 	                                      ch->exactOptionalPropertyTypes);
 	NodeBuilderImpl* bp = b;
@@ -2373,9 +2374,9 @@ Node* NodeBuilderImpl::setTextRange(Node* range_, Node* location) {
 			*f); // if `range` is synthesized or originates in another file,
 		// copy it so it definitely has synthetic positions
 		range_->loc = TextRange{-1, -1};
-		auto it = idToSymbol.find(original);
-		if (it != idToSymbol.end()) {
-			idToSymbol[range_] = it->second;
+		auto it = idToSymbol->find(original);
+		if (it != idToSymbol->end()) {
+			(*idToSymbol)[range_] = it->second;
 		}
 	}
 	if (range_ == location || location == nullptr) {
@@ -2792,14 +2793,14 @@ Node* NodeBuilderImpl::parameterToParameterDeclarationName(
 	case Kind::Identifier: {
 		Node* cloned = deepCloneNode(*f, name);
 		e->setEmitFlags(cloned, printer::EFNoAsciiEscaping);
-		idToSymbol[cloned] = parameterSymbol;
+		(*idToSymbol)[cloned] = parameterSymbol;
 		return cloned;
 	}
 	case Kind::QualifiedName: {
 		Node* cloned =
 		    deepCloneNode(*f, name->as<QualifiedName>()->Right);
 		e->setEmitFlags(cloned, printer::EFNoAsciiEscaping);
-		idToSymbol[cloned] = parameterSymbol;
+		(*idToSymbol)[cloned] = parameterSymbol;
 		return cloned;
 	}
 	default:
@@ -5413,7 +5414,7 @@ Node* NodeBuilderImpl::newIdentifier(const std::string& text,
                                      Symbol* symbol) {
 	Node* id = f->newIdentifier(text);
 	if (symbol != nullptr) {
-		idToSymbol[id] = symbol;
+		(*idToSymbol)[id] = symbol;
 	}
 	return id;
 }
@@ -7015,8 +7016,8 @@ std::vector<Node*> NodeBuilderImpl::addClassModifiers(
 		Symbol* memberSymbol = nullptr;
 		Node* memberName = m->name();
 		if (memberName != nullptr) {
-			auto it = idToSymbol.find(memberName);
-			if (it != idToSymbol.end()) {
+			auto it = idToSymbol->find(memberName);
+			if (it != idToSymbol->end()) {
 				memberSymbol = it->second;
 			}
 		}
@@ -7689,7 +7690,7 @@ void NodeBuilder::markEmitRoots(Arena& a) {
 			markTrackedSymbols(entry->trackedSymbols);
 		}
 	}
-	for (auto& [key, sym] : impl->idToSymbol) {
+	for (auto& [key, sym] : *impl->idToSymbol) {
 		markNode(key);
 	}
 	markContext(impl->ctx);

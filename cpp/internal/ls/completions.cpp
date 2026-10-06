@@ -8278,7 +8278,7 @@ LanguageService::getExhaustiveCaseSnippets(
 					tracker->addValue(enumValue);
 				}
 				Node* typeNode = autoimport::TypeToAutoImportableTypeNode(
-				    c, importAdder, t, caseBlock->asNode());
+				    c, importAdder, t, caseBlock->asNode(), &factory);
 				if (typeNode == nullptr) {
 					return {nullptr, nullptr};
 				}
