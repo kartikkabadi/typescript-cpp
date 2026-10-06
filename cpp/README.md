@@ -24,7 +24,9 @@ oracle.
 | Binder | `binder/` | `cpp/internal/binder` | complete |
 | Checker | `checker/` | `cpp/internal/checker` | complete — every Go checker file ported function-by-function: bootstrap, mapper/link store, JSDoc, tracer, grammar checks, node copy, module resolution, statements/class machinery, signatures, members, typenodes, declared types, widening, type ops, contextual typing, control-flow narrowing, inference, expression checks, JSX, module/alias resolution, relater (assignability), nodebuilder (type→TypeNode), emit resolver, services, exports, symbol accessibility (~2,220 `Checker::`/`EmitResolver::`/etc. defs across ~30 files, ~87k lines) |
 | Transformers | `transformers/` | `cpp/internal/transformers` | complete — root package (transformer/chain/modifiervisitor/utilities/destructuring) + all sub-packages: estransforms (17 files incl. classfields 4k, esdecorator, namedevaluation, classthis, async family), jsxtransforms, moduletransforms, inliners, tstransforms (6 files), declarations (transform/diagnostics/tracker/supplementalreferences/util) |
-| Emitter | `printer/`, `compiler/emitter.go`, `compiler/emitHost.go` | `cpp/internal/printer`, `cpp/internal/compiler/emitter.cpp` | emitter + emitHost + `Program::Emit` ported; `tscpp emit`/`tscpp emitdump` wired and byte-identical to the Go `emitdump` oracle on exercised files; sourcemap/spanmap slices in flight |
+| Emitter | `printer/`, `compiler/emitter.go`, `compiler/emitHost.go` | `cpp/internal/printer`, `cpp/internal/compiler/emitter.cpp` | emitter + emitHost + `Program::Emit` ported; `tscpp emit`/`tscpp emitdump` byte-identical to the Go `emitdump` oracle on the full corpus (12,734/12,734); sourcemap/spanmap/contentmapper/incremental landed |
+| Stage-5 | `tsoptions`, `format`, `contentmapper`+`spanmap`, `execute/incremental`, `vfs`, `locale`, `json`, `jsonrpc`, `xxh3`, `gostd`, `transpile` | `cpp/internal/{tsoptions,format,contentmapper,spanmap,execute/incremental,vfs,locale,json,jsonrpc,xxh3,gostd,transpile}` | complete — incl. `tsoptions::ParseCommandLine` CLI wiring (real flag parsing in tscpp), contentmapper→fileloader seam (`parseContentMappedFile` + host mapping + program diagnostics), transpile API (byte-identical to `transpiledump` oracle) |
+| Stage-5 (in flight) | `fswatch`, `ipc`, `execute/tsc`+`build`+`watchmanager`, `ls`, `api`, `project`, `lsp`, `fourslash` | `cpp/internal/...` | ports in flight via parallel slices |
 
 ## Conformance
 
@@ -52,12 +54,16 @@ matching Go oracle.
 the canonical `G <code>` / `F <file>` / `T <code> <pos> <end>` diagnostic
 dump — `tsc/cmd/checkdump` is the matching Go oracle (`tsc --noEmit`).
 
-**Result: 12,715 / 12,734 files (99.9%) produce byte-identical check output**
-(19 divergent files remain — MISSING-DIAG/POSDIFF, fixes in flight).
+**Result: 12,734 / 12,734 files (100%) produce byte-identical check output.**
 
 `tscpp emitdump` runs the emit path and appends `W <file>` + verbatim content
 sections for every emitted file — `tsc/cmd/emitdump` is the matching Go
 oracle (`tsc`).
+
+**Result: 12,734 / 12,734 files (100%) produce byte-identical emit output;**
+**12,697 / 12,734 (99.7%) with `--declaration`** (37 divergent files remain —
+member serialization, default-export aliasing, elided-depth, extra
+diagnostics, numeric formatting; fixes in flight).
 
 ```sh
 # single file
