@@ -24,8 +24,8 @@ namespace tsc::execute::tsctests {
 
 namespace {
 
-// ---- Go encoding/json/v2 writers (same rules as buildinfo.cpp: HTML-unsafe
-// <, >, & escaped, invalid UTF-8 →, shortest round-trip doubles) ----
+// ---- Go encoding/json/v2 writers (same rules as buildinfo.cpp: no HTML
+// escaping for <, >, &, invalid UTF-8 → \ufffd, shortest round-trip doubles) ----
 
 void writeJsonString(std::string& out, std::string_view s) {
 	static const char* hex = "0123456789abcdef";
@@ -33,8 +33,7 @@ void writeJsonString(std::string& out, std::string_view s) {
 	size_t i = 0;
 	while (i < s.size()) {
 		uint8_t c = static_cast<uint8_t>(s[i]);
-		if (c >= 0x20 && c <= 0x7e && c != '"' && c != '\\' && c != '<' &&
-		    c != '>' && c != '&') {
+		if (c >= 0x20 && c <= 0x7e && c != '"' && c != '\\') {
 			out += static_cast<char>(c);
 			i++;
 			continue;
@@ -45,9 +44,6 @@ void writeJsonString(std::string& out, std::string_view s) {
 		case '\n': out += "\\n"; i++; continue;
 		case '\r': out += "\\r"; i++; continue;
 		case '\t': out += "\\t"; i++; continue;
-		case '<': out += "\\u003c"; i++; continue;
-		case '>': out += "\\u003e"; i++; continue;
-		case '&': out += "\\u0026"; i++; continue;
 		default: break;
 		}
 		if (c < 0x20) {
@@ -456,6 +452,9 @@ struct readableBuildInfo {
 
 	// IncrementalProgram info
 	std::vector<std::string> FileNames;
+	// ReadableBuildInfo.FileInfos is json omitzero — emitted when the
+	// underlying BuildInfo.FileInfos was assigned (even when empty).
+	bool fileInfosAssigned = false;
 	std::vector<std::unique_ptr<readableBuildInfoFileInfo>> FileInfos;
 	std::vector<std::vector<std::string>> FileIdsList;
 	tsoptions::JsonObjectPtr Options;
@@ -572,6 +571,8 @@ readableBuildInfo::toReadableBuildInfoDiagnostic(
 }
 
 void readableBuildInfo::setFileInfos() {
+	// Go: core.MapIndex(nil) stays nil; non-nil (even empty) marshals.
+	fileInfosAssigned = buildInfo->fileInfosAssigned;
 	int index = 0;
 	for (auto* original : buildInfo->FileInfos) {
 		std::unique_ptr<incremental::FileInfo> fileInfo(
@@ -931,7 +932,7 @@ void writeReadable(jw& w, const readableBuildInfo* b) {
 	        [&] { w.strArr(b->MissingPackageJsons); });
 	w.field("fileNames", !b->FileNames.empty(),
 	        [&] { w.strArr(b->FileNames); });
-	w.field("fileInfos", !b->FileInfos.empty(), [&] {
+	w.field("fileInfos", b->fileInfosAssigned, [&] {
 		w.beginArr();
 		for (const auto& f : b->FileInfos) {
 			w.sep();

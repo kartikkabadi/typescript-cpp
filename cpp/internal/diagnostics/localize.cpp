@@ -4,7 +4,9 @@
 #include "internal/diagnostics/diagnostics.h"
 
 #include <iterator>
+#include <mutex>
 
+#include "internal/diagnostics/loc_generated.h"
 #include "internal/diagnostics/messages_generated.h"
 #include "internal/locale/locale.h"
 #include "internal/stringutil/stringutil.h"
@@ -34,15 +36,96 @@ const DiagnosticMessage* keyToMessage(std::string_view key) {
 	return it != messagesByKey().end() ? it->second : nullptr;
 }
 
-// getLocalizedMessages — diagnostics.go:101. Localized message tables are
-// generated data (diagnostics/loc_generated.go + the language.Matcher over
-// localeFuncs); no localized tables are ported, so this always finds nothing.
+// getLocalizedMessages — diagnostics.go:101. Localized tables live in
+// loc_generated.h (generated from tsc/internal/diagnostics/loc/*.json by
+// tools/genloc.py); the supported-tag list mirrors loc_generated.go's
+// language.NewMatcher list (English is the nil index-0 entry).
+struct SupportedLocale {
+	locale::detail::Tag tag;
+	const std::unordered_map<Key, std::string>* table;
+};
+
+const std::vector<SupportedLocale>& supportedLocales() {
+	static const std::vector<SupportedLocale> v = [] {
+		std::vector<SupportedLocale> out;
+		auto add = [&](const char* tag,
+		               const std::unordered_map<Key, std::string>* table) {
+			out.push_back({locale::parse(tag).first.tag, table});
+		};
+		add("zh-CN", &localized_messages::zh_CN);
+		add("zh-TW", &localized_messages::zh_TW);
+		add("cs-CZ", &localized_messages::cs_CZ);
+		add("de-DE", &localized_messages::de_DE);
+		add("es-ES", &localized_messages::es_ES);
+		add("fr-FR", &localized_messages::fr_FR);
+		add("it-IT", &localized_messages::it_IT);
+		add("ja-JP", &localized_messages::ja_JP);
+		add("ko-KR", &localized_messages::ko_KR);
+		add("pl-PL", &localized_messages::pl_PL);
+		add("pt-BR", &localized_messages::pt_BR);
+		add("ru-RU", &localized_messages::ru_RU);
+		add("tr-TR", &localized_messages::tr_TR);
+		return out;
+	}();
+	return v;
+}
+
 const std::unordered_map<Key, std::string>* getLocalizedMessages(
 	const locale::Locale& loc) {
 	if (loc == locale::Default) {
 		return nullptr; // language.Und
 	}
-	return nullptr;
+
+	// localizedMessagesCache — diagnostics.go:105.
+	static std::mutex cacheMutex;
+	static std::unordered_map<std::string,
+	                          const std::unordered_map<Key, std::string>*>
+	    cache;
+
+	const std::string cacheKey = loc.tag.str;
+	{
+		std::lock_guard<std::mutex> lock(cacheMutex);
+		if (auto it = cache.find(cacheKey); it != cache.end()) {
+			return it->second;
+		}
+	}
+
+	// Simplified language.Matcher: same-language candidates ranked by
+	// region and script agreement (declared order breaks ties, matching
+	// the matcher list order in loc_generated.go).
+	const locale::detail::Tag& want = loc.tag;
+	const std::unordered_map<Key, std::string>* messages = nullptr;
+	{
+		int bestScore = -1;
+		const locale::detail::Tag hant = locale::parse("zh-Hant").first.tag;
+		const locale::detail::Tag zhCN = locale::parse("zh-CN").first.tag;
+		for (const auto& e : supportedLocales()) {
+			if (e.tag.langID != want.langID) {
+				continue;
+			}
+			int score = 1;
+			if (want.regionID != 0 && e.tag.regionID == want.regionID) {
+				score += 4;
+			}
+			if (want.scriptID != 0 && e.tag.scriptID == want.scriptID) {
+				score += 2;
+			}
+			// zh-Hant* requests prefer zh-TW over zh-CN.
+			if (e.tag.langID == zhCN.langID &&
+			    want.scriptID == hant.scriptID && hant.scriptID != 0 &&
+			    e.tag.regionID == zhCN.regionID) {
+				score -= 1;
+			}
+			if (score > bestScore) {
+				bestScore = score;
+				messages = e.table;
+			}
+		}
+	}
+
+	std::lock_guard<std::mutex> lock(cacheMutex);
+	cache.emplace(cacheKey, messages);
+	return messages;
 }
 
 // Format — diagnostics.go:129 (renamed: `tsc::format` is a namespace).

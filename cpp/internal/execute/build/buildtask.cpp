@@ -562,7 +562,9 @@ upToDateStatus* BuildTask::getUpToDateStatus(Orchestrator* orchestrator,
 	}
 	bool inputTextUnchanged = false;
 	fileAndTime oldestOutputFileAndTime{buildInfoPath, buildInfoTime};
-	fileAndTime newestInputFileAndTime;
+	// buildtask.go:428 — Go's zero time.Time is older than any file mtime;
+	// fileTime{} (epoch) is not, since test mtimes precede the epoch.
+	fileAndTime newestInputFileAndTime{"", fileTime::min()};
 	collections::Set<tspath::Path> seenRoots;
 	auto getBuildInfoRootInfoReader =
 	    memoize<incremental::BuildInfoRootInfoReader*>(
@@ -729,8 +731,8 @@ upToDateStatus* BuildTask::getUpToDateStatus(Orchestrator* orchestrator,
 				    // Output file is older than input file
 				    outputStatus = new upToDateStatus{
 				        upToDateStatusType::InputFileNewer,
-				        inputOutputName{std::string(outputFile),
-				                        newestInputFileAndTime.file}};
+				        inputOutputName{newestInputFileAndTime.file,
+				                        std::string(outputFile)}};
 				    return false;
 			    }
 			    if (outputTime < oldestOutputFileAndTime.time) {

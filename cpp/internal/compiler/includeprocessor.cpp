@@ -278,10 +278,41 @@ Diagnostic* FileIncludeReason::computeDiagnostic(
 		return computeReferenceFileDiagnostic(program, toFileName);
 	}
 	switch (kind) {
-		case FileIncludeKind::RootFile:
-			// No config file in this slice.
+		case FileIncludeKind::RootFile: {
+			// fileInclude.go:172 — a program built from a tsconfig
+			// explains how the root file matched ('files' list, an
+			// 'include' spec or the default spec).
+			if (auto* config = program->CommandLine();
+			    config != nullptr && config->ConfigFile != nullptr) {
+				auto* index = std::get_if<int>(&this->data);
+				std::string fileName =
+				    tspath::getNormalizedAbsolutePath(
+				        config->FileNames()[*index],
+				        program->GetCurrentDirectory());
+				if (std::string matchedFileSpec =
+				        config->GetMatchedFileSpec(fileName);
+				    !matchedFileSpec.empty()) {
+					return tsoptions::newCompilerDiagnostic(
+					    Part_of_files_list_in_tsconfig_json,
+					    {matchedFileSpec,
+					     toFileName(fileName)});
+				}
+				if (auto [matchedIncludeSpec, isDefaultIncludeSpec] =
+				        config->GetMatchedIncludeSpec(fileName);
+				    !matchedIncludeSpec.empty()) {
+					if (isDefaultIncludeSpec) {
+						return tsoptions::newCompilerDiagnostic(
+						    Matched_by_default_include_pattern_Asterisk_Asterisk_Slash_Asterisk);
+					}
+					return tsoptions::newCompilerDiagnostic(
+					    Matched_by_include_pattern_0_in_1,
+					    {matchedIncludeSpec,
+					     toFileName(config->ConfigName())});
+				}
+			}
 			return tsoptions::newCompilerDiagnostic(
 			    Root_file_specified_for_compilation);
+		}
 		case FileIncludeKind::AutomaticTypeDirectiveFile: {
 			auto* data =
 			    std::get_if<automaticTypeDirectiveFileData>(&this->data);
@@ -466,7 +497,122 @@ Diagnostic* FileIncludeReason::toRelatedInfo(SimpleProgram* program) const {
 				    "FileIncludeReason::toRelatedInfo");
 		}
 	}
-	// Config file absent → rootFile/libFile/etc. produce nil.
+	// fileInclude.go:268 — with a tsconfig, non-referenced reasons point at
+	// the spec/property in the config that pulled the file in.
+	if (auto* config = program->CommandLine();
+	    config == nullptr || config->ConfigFile == nullptr) {
+		return nullptr;
+	} else {
+		switch (kind) {
+			case FileIncludeKind::RootFile: {
+				auto* index = std::get_if<int>(&this->data);
+				std::string fileName =
+				    tspath::getNormalizedAbsolutePath(
+				        config->FileNames()[*index],
+				        program->GetCurrentDirectory());
+				if (std::string matchedFileSpec =
+				        config->GetMatchedFileSpec(fileName);
+				    !matchedFileSpec.empty()) {
+					if (auto* filesNode =
+					        tsoptions::GetTsConfigPropArrayElementValue(
+					            config->ConfigFile->SourceFile,
+					            "files", matchedFileSpec);
+					    filesNode != nullptr) {
+						return tsoptions::
+						    CreateDiagnosticForNodeInSourceFile(
+						        config->ConfigFile->SourceFile,
+						        filesNode->asNode(),
+						        File_is_matched_by_files_list_specified_here);
+					}
+				} else if (auto [matchedIncludeSpec,
+				                isDefaultIncludeSpec] =
+				               config->GetMatchedIncludeSpec(
+				                   fileName);
+				           !matchedIncludeSpec.empty() &&
+				           !isDefaultIncludeSpec) {
+					if (auto* includeNode =
+					        tsoptions::GetTsConfigPropArrayElementValue(
+					            config->ConfigFile->SourceFile,
+					            "include", matchedIncludeSpec);
+					    includeNode != nullptr) {
+						return tsoptions::
+						    CreateDiagnosticForNodeInSourceFile(
+						        config->ConfigFile->SourceFile,
+						        includeNode->asNode(),
+						        File_is_matched_by_include_pattern_specified_here);
+					}
+				}
+				break;
+			}
+			case FileIncludeKind::AutomaticTypeDirectiveFile: {
+				if (!program->Options()->UsesWildcardTypes()) {
+					auto* data =
+					    std::get_if<automaticTypeDirectiveFileData>(
+					        &this->data);
+					if (auto* typesSyntax =
+					        tsoptions::GetOptionsSyntaxByArrayElementValue(
+					            program->includeProcessor_
+					                .getCompilerOptionsObjectLiteralSyntax(
+					                    program),
+					            "types", data->typeReference);
+					    typesSyntax != nullptr) {
+						return tsoptions::
+						    CreateDiagnosticForNodeInSourceFile(
+						        config->ConfigFile->SourceFile,
+						        typesSyntax->asNode(),
+						        File_is_entry_point_of_type_library_specified_here);
+					}
+				}
+				break;
+			}
+			case FileIncludeKind::LibFile: {
+				if (auto* index = std::get_if<int>(&this->data);
+				    index != nullptr) {
+					if (auto* libSyntax =
+					        tsoptions::GetOptionsSyntaxByArrayElementValue(
+					            program->includeProcessor_
+					                .getCompilerOptionsObjectLiteralSyntax(
+					                    program),
+					            "lib",
+					            program->Options()->Lib[*index]);
+					    libSyntax != nullptr) {
+						return tsoptions::
+						    CreateDiagnosticForNodeInSourceFile(
+						        config->ConfigFile->SourceFile,
+						        libSyntax->asNode(),
+						        File_is_library_specified_here);
+					}
+				} else if (std::string target =
+				               scriptTargetString(
+				                   program->Options()
+				                       ->GetEmitScriptTarget());
+				           !target.empty()) {
+					if (auto* targetValueSyntax =
+					        tsoptions::ForEachPropertyAssignment<Node>(
+					            program->includeProcessor_
+					                .getCompilerOptionsObjectLiteralSyntax(
+					                    program),
+					            "target",
+					            tsoptions::
+					                GetCallbackForFindingPropertyAssignmentByValue(
+					                    target));
+					    targetValueSyntax != nullptr) {
+						return tsoptions::
+						    CreateDiagnosticForNodeInSourceFile(
+						        config->ConfigFile->SourceFile,
+						        targetValueSyntax,
+						        File_is_default_library_for_target_specified_here);
+					}
+				}
+				break;
+			}
+			case FileIncludeKind::ContentMapperSupplemental:
+				return nullptr;
+			default:
+				TSC_UNREACHABLE("FileIncludeReason::toRelatedInfo — "
+				                "unknown kind");
+		}
+	}
 	return nullptr;
 }
 

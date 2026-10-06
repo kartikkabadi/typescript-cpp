@@ -353,7 +353,7 @@ SimpleProgram::SimpleProgram(CompilerHost* host_,
 	loader.tracing = tr_;
 	loader.defaultLibraryPath = tspath::getNormalizedAbsolutePath(
 	    host->DefaultLibraryPath(), host->GetCurrentDirectory());
-	loader.useCaseSensitiveFileNames = true; // POSIX FS — vfs UseCaseSensitiveFileNames
+	loader.useCaseSensitiveFileNames = host->FS()->UseCaseSensitiveFileNames();
 	// fileloader.go:178 — extensions the configured content mappers claim.
 	loader.contentMapperExtensions = commandLine_->ContentMapperExtensions();
 	loader.supportedExtensions =
@@ -947,21 +947,27 @@ std::vector<Diagnostic*> SimpleProgram::GetGlobalDiagnostics() {
 	return checker_->diagnostics.GetGlobalDiagnostics();
 }
 
-// program.go:1454 GetDeclarationDiagnostics
+// program.go:1454 GetDeclarationDiagnostics — collectDiagnostics(ctx,
+// sourceFile, concurrent, getDeclarationDiagnosticsForFile): a nil file
+// fans out over all source files, each funneled through the per-file
+// memoized path.
 std::vector<Diagnostic*> SimpleProgram::GetDeclarationDiagnostics(
     SourceFile* sourceFile) {
-	// Memoization is used in order to avoid emitting the declaration file
-	// twice
-	if (auto it = declarationDiagnosticCache.find(sourceFile);
-	    it != declarationDiagnosticCache.end()) {
-		return it->second;
-	}
+	return collectDiagnostics(
+	    sourceFile, [this](SourceFile* file) -> std::vector<Diagnostic*> {
+		    // Memoization is used in order to avoid emitting the
+		    // declaration file twice
+		    if (auto it = declarationDiagnosticCache.find(file);
+		        it != declarationDiagnosticCache.end()) {
+			    return it->second;
+		    }
 
-	auto [eh, done] = newEmitHost(this, sourceFile);
-	auto diags = getDeclarationDiagnostics(eh.get(), sourceFile);
-	done();
-	declarationDiagnosticCache[sourceFile] = diags;
-	return diags;
+		    auto [eh, done] = newEmitHost(this, file);
+		    auto diags = getDeclarationDiagnostics(eh.get(), file);
+		    done();
+		    declarationDiagnosticCache[file] = diags;
+		    return diags;
+	    });
 }
 
 // --- program.go: file/path accessors ---
@@ -1485,30 +1491,69 @@ EmitResult* HandleNoEmitOptions(
 
 // ==== verifyCompilerOptions ====  program.go:866+
 void SimpleProgram::verifyCompilerOptions() {
-	// Config-file syntax accessors: no config file in this mode, so
-	// sourceFile()/getCompilerOptionsPropertySyntax()/
-	// getCompilerOptionsObjectLiteralSyntax() are all nil — matching Go's
-	// ForEachTsConfigPropArray(nil)/ForEachPropertyAssignment(nil) no-ops.
+	// program.go:887-916 — config-file syntax accessors. Go memoizes
+	// these; direct calls are cheap enough.
+	tsoptions::TsConfigSourceFile* configFile =
+	    commandLine_ != nullptr ? commandLine_->ConfigFile : nullptr;
+	SourceFile* configSourceFile =
+	    configFile != nullptr ? configFile->SourceFile : nullptr;
+	std::string configFilePath =
+	    configSourceFile != nullptr ? configSourceFile->FileName() : "";
+
+	auto getCompilerOptionsPropertySyntax =
+	    [&]() -> PropertyAssignment* {
+		return tsoptions::ForEachTsConfigPropArray<PropertyAssignment>(
+		    configSourceFile, "compilerOptions",
+		    [](PropertyAssignment* prop) { return prop; });
+	};
+	auto getCompilerOptionsObjectLiteralSyntax =
+	    [&]() -> ObjectLiteralExpression* {
+		auto* compilerOptionsProperty = getCompilerOptionsPropertySyntax();
+		if (compilerOptionsProperty != nullptr &&
+		    compilerOptionsProperty->Initializer != nullptr &&
+		    isObjectLiteralExpression(
+		        compilerOptionsProperty->Initializer)) {
+			return compilerOptionsProperty->Initializer
+			    ->as<ObjectLiteralExpression>();
+		}
+		return nullptr;
+	};
 
 	auto createCompilerOptionsDiagnostic =
 	    [&](const DiagnosticMessage* message,
 	        std::vector<std::string> args = {}) -> Diagnostic* {
-		// compilerOptionsProperty is nil (no config file) →
-		// NewCompilerDiagnostic
-		auto* diag = tsoptions::newCompilerDiagnostic(message,
-		                                              std::move(args));
+		auto* compilerOptionsProperty = getCompilerOptionsPropertySyntax();
+		Diagnostic* diag;
+		if (compilerOptionsProperty != nullptr) {
+			diag = tsoptions::CreateDiagnosticForNodeInSourceFile(
+			    configSourceFile, compilerOptionsProperty->name,
+			    message, std::move(args));
+		} else {
+			diag = tsoptions::newCompilerDiagnostic(message,
+			                                        std::move(args));
+		}
 		programDiagnostics.push_back(diag);
 		return diag;
 	};
 
-	// createOptionDiagnosticInObjectLiteralSyntax — objectLiteral is always
-	// nil here, so it always returns nil (Go: ForEachPropertyAssignment(nil)
-	// → nil).
 	auto createOptionDiagnosticInObjectLiteralSyntax =
-	    [&](void* objectLiteral, bool onKey, const std::string& key1,
-	        const std::string& key2, const DiagnosticMessage* message,
+	    [&](ObjectLiteralExpression* objectLiteral, bool onKey,
+	        const std::string& key1, const std::string& key2,
+	        const DiagnosticMessage* message,
 	        std::vector<std::string> args = {}) -> Diagnostic* {
-		return nullptr; // no config file
+		auto* diag = tsoptions::ForEachPropertyAssignment<Diagnostic>(
+		    objectLiteral, key1,
+		    [&](PropertyAssignment* property) -> Diagnostic* {
+			    return tsoptions::CreateDiagnosticForNodeInSourceFile(
+			        configSourceFile,
+			        onKey ? property->name : property->Initializer,
+			        message, args);
+		    },
+		    key2);
+		if (diag != nullptr) {
+			programDiagnostics.push_back(diag);
+		}
+		return diag;
 	};
 
 	auto createDiagnosticForOption =
@@ -1516,7 +1561,8 @@ void SimpleProgram::verifyCompilerOptions() {
 	        const DiagnosticMessage* message,
 	        std::vector<std::string> args = {}) -> Diagnostic* {
 		Diagnostic* diag = createOptionDiagnosticInObjectLiteralSyntax(
-		    nullptr, onKey, option1, option2, message, args);
+		    getCompilerOptionsObjectLiteralSyntax(), onKey, option1,
+		    option2, message, args);
 		if (diag == nullptr) {
 			diag = createCompilerOptionsDiagnostic(message,
 			                                     std::move(args));
@@ -1570,8 +1616,19 @@ void SimpleProgram::verifyCompilerOptions() {
 	// Removed in TS7
 
 	if (!options.BaseUrl.empty()) {
+		// BaseUrl will have been turned absolute by this point.
 		std::string useInstead;
-		// configFilePath() is "" without a config file → suggestion skipped.
+		if (!configFilePath.empty()) {
+			std::string relative = tspath::getRelativePathFromFile(
+			    configFilePath, options.BaseUrl, comparePathsOptions());
+			if (!(relative.starts_with("./") ||
+			      relative.starts_with("../"))) {
+				relative = "./" + relative;
+			}
+			std::string suggestion =
+			    tspath::combinePaths(relative, {"*"});
+			useInstead = "\"paths\": {\"*\": [\"" + suggestion + "\"]}";
+		}
 		createRemovedOptionDiagnostic("baseUrl", "", useInstead);
 	}
 
@@ -2777,9 +2834,11 @@ std::tuple<SimpleProgram*, SourceFile*, bool> SimpleProgram::ReuseProgram(
 	result->finishedProcessing = finishedProcessing;
 	result->fileNameList = fileNameList;
 	result->syntheticImportArena = syntheticImportArena;
-	// includeProcessor is rebuilt below by updateFileIncludeProcessor
-	// (program.go:431) — Go drops its sync maps when re-keying against
-	// the new program.
+	// includeProcessor rides along on processedFiles in Go
+	// (program.go:409 result literal); move it in before
+	// updateFileIncludeProcessor re-keys its sync maps against the new
+	// program (the arenas make it move-only).
+	result->includeProcessor_ = std::move(includeProcessor_);
 	result->unresolvedImports.tryReuse(&unresolvedImports);
 	result->knownSymlinks.tryReuse(&knownSymlinks);
 	result->packageNames_.tryReuse(&packageNames_);

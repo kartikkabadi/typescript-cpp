@@ -214,7 +214,10 @@ std::vector<Diagnostic*> Program::GetDeclarationDiagnostics(
     SourceFile* file) {
 	panicIfNoProgram("GetDeclarationDiagnostics");
 	compiler::EmitOptions emitOptions;
-	emitOptions.TargetSourceFiles = {file};
+	// core.SingleElementSlice(file): nil file -> empty slice.
+	if (file != nullptr) {
+		emitOptions.TargetSourceFiles = {file};
+	}
 	auto* result = emitFiles(this, emitOptions, true);
 	if (result != nullptr) {
 		return result->Diagnostics;

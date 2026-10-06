@@ -2603,7 +2603,14 @@ resolutionState::getTraceFunc() {
 	if (traceBuilder != nullptr) {
 		return [this](const DiagnosticMessage* m,
 		              const std::vector<std::string>& args) {
-			traceBuilder->write(m, args);
+			// resolver.go:1911 — the Go trace callback takes args ...any;
+			// splat the collected vector instead of storing it as one arg.
+			std::vector<std::any> anyArgs;
+			anyArgs.reserve(args.size());
+			for (const auto& a : args) {
+				anyArgs.emplace_back(a);
+			}
+			traceBuilder->traces.push_back({m, std::move(anyArgs)});
 		};
 	}
 	return {};

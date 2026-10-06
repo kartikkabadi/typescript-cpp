@@ -1034,6 +1034,11 @@ public:
 	// --- program.go methods beyond the interface ---
 	checker::Checker* getChecker(); // lazily created after bind
 	std::vector<Diagnostic*> GetConfigFileParsingDiagnostics() {
+		// program.go:532 — Go reads p.opts.Config.GetConfigFileParsingDiagnostics()
+		// (the ParsedCommandLine's parse + convert errors), not a member.
+		if (commandLine_ != nullptr) {
+			return commandLine_->GetConfigFileParsingDiagnostics();
+		}
 		return configFileParsingDiagnostics;
 	}
 	// program.go:828 collectContentMapperOptionDiagnostics.

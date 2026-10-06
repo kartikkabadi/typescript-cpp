@@ -1589,9 +1589,7 @@ std::string jsonEscape(std::string_view s) {
 		case '\n': out += "\\n"; break;
 		case '\r': out += "\\r"; break;
 		case '\t': out += "\\t"; break;
-		case '<': out += "\\u003c"; break;
-		case '>': out += "\\u003e"; break;
-		case '&': out += "\\u0026"; break;
+		// encoding/json/v2 does not HTML-escape <, >, &.
 		default:
 			if ((unsigned char)c < 0x20) {
 				char buf[8];

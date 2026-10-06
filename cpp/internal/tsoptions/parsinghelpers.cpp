@@ -39,6 +39,11 @@ std::vector<std::string> ParseStringArray(const CompilerOptionsValue& value) {
 		}
 		return result;
 	}
+	// JsonStrList is our homogeneous []any-of-strings — Go type-asserts it
+	// to the same result.
+	if (auto* arr = value.get<JsonStrList>()) {
+		return *arr;
+	}
 	return {};
 }
 

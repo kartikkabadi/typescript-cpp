@@ -249,7 +249,10 @@ void Orchestrator::createBuildTasks(
     collections::SyncMap<tspath::Path, BuildTask*>* oldTasks,
     const std::vector<std::string>& configs, workGroup* wg) {
 	for (auto& config : configs) {
-		wg->Queue([this, &config, oldTasks, wg]() {
+		// Capture config by value: `configs` may be a temporary
+		// (ResolvedProjectReferencePaths()); the queued lambda must own the
+		// string like Go's escaping loop variable does.
+		wg->Queue([this, config, oldTasks, wg]() {
 			auto path = toPath(config);
 			BuildTask* task = nullptr;
 			buildInfoEntry* buildInfo = nullptr;
