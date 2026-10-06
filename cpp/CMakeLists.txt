@@ -184,6 +184,7 @@ add_library(tsc STATIC
 	internal/ls/symbols.cpp
 	internal/ls/callhierarchy.cpp
 	internal/ls/hover.cpp
+	internal/ls/hovericon.cpp
 	# === slice: infra ===
 	internal/locale/locale.cpp
 	# === slice: contentmapper ===

@@ -1962,6 +1962,12 @@ struct JSDocTagInfo {
 	std::string Text;
 };
 
+// languageservice.go:25 NewLanguageService.
+LanguageService* NewLanguageService(autoimport::ProjectID* projectID,
+                                    compiler::SimpleProgram* program,
+                                    ls::Host* host,
+                                    const std::string& activeFile);
+
 // GetSymbolDocumentationComment renders a symbol's documentation comment as
 // plain text. It backs the API's Symbol.getDocumentationComment and mirrors
 // Strada's getJsDocCommentsFromDeclarations: comments are gathered from each
