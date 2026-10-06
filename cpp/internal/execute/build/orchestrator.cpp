@@ -249,8 +249,10 @@ void Orchestrator::createBuildTasks(
     collections::SyncMap<tspath::Path, BuildTask*>* oldTasks,
     const std::vector<std::string>& configs, workGroup* wg) {
 	for (auto& config : configs) {
-		// Capture config by value: the queued closure runs on a worker
-		// thread after the loop advances (Go has per-iteration loop vars).
+		// Capture `config` by value: Go's range loop gives each iteration
+		// its own variable (and the recursive call iterates a temporary
+		// ResolvedProjectReferencePaths() result that dies on return), so
+		// the queued lambda must own its copy of the config name.
 		wg->Queue([this, config, oldTasks, wg]() {
 			auto path = toPath(config);
 			BuildTask* task = nullptr;

@@ -57,6 +57,12 @@ namespace etsc = ::tsc::execute::tsc;
 // are converted via std::chrono::file_clock::from_sys.
 using fileTime = std::filesystem::file_time_type;
 
+// fileTimeZero stands in for Go's time.Time{} zero value: the minimum
+// representable time. `fileTime{}` would be the file_clock *epoch* (a real
+// timestamp that sorts after converted sys times on libstdc++, whose epoch
+// is 2174), so it cannot be used where Go relies on zero-time semantics.
+inline constexpr fileTime fileTimeZero = fileTime::min();
+
 // ===========================================================================
 // parseCache.go — parseCache
 // ===========================================================================
@@ -189,7 +195,7 @@ struct inputOutputName {
 // uptodatestatus.go:59 fileAndTime.
 struct fileAndTime {
 	std::string file;
-	fileTime time{};
+	fileTime time = fileTimeZero;
 };
 
 // uptodatestatus.go:64 inputOutputFileAndTime.
@@ -243,7 +249,7 @@ struct upstreamTask {
 struct buildInfoEntry {
 	incremental::BuildInfo* buildInfo = nullptr;
 	tspath::Path path;
-	fileTime mTime{};
+	fileTime mTime = fileTimeZero;
 	std::optional<fileTime> dtsTime;
 };
 

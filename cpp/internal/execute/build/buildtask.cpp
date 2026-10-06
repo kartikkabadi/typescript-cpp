@@ -573,7 +573,7 @@ upToDateStatus* BuildTask::getUpToDateStatus(Orchestrator* orchestrator,
 	        });
 	for (auto& inputFile : resolved->FileNames()) {
 		auto inputTime = orchestrator->host_->GetMTime(inputFile);
-		if (inputTime == fileTime{}) {
+		if (inputTime == fileTimeZero) {
 			return new upToDateStatus{upToDateStatusType::InputFileMissing,
 			                          inputFile};
 		}
@@ -675,7 +675,7 @@ upToDateStatus* BuildTask::getUpToDateStatus(Orchestrator* orchestrator,
 				continue;
 			}
 			auto inputTime = orchestrator->host_->GetMTime(inputFile);
-			if (inputTime == fileTime{}) {
+			if (inputTime == fileTimeZero) {
 				// Input file that was part of the program is missing (eg:
 				// dependency was removed)
 				return new upToDateStatus{
@@ -718,7 +718,7 @@ upToDateStatus* BuildTask::getUpToDateStatus(Orchestrator* orchestrator,
 		    [&](std::string_view outputFile) -> bool {
 			    auto outputTime =
 			        orchestrator->host_->GetMTime(std::string(outputFile));
-			    if (outputTime == fileTime{}) {
+			    if (outputTime == fileTimeZero) {
 				    // Output file missing
 				    outputStatus = new upToDateStatus{
 				        upToDateStatusType::OutputMissing,
@@ -758,7 +758,7 @@ upToDateStatus* BuildTask::getUpToDateStatus(Orchestrator* orchestrator,
 		auto* refInputOutputFileAndTime =
 		    upstream->task->status->inputOutputFileAndTimeData();
 		if (refInputOutputFileAndTime != nullptr &&
-		    refInputOutputFileAndTime->input.time != fileTime{} &&
+		    refInputOutputFileAndTime->input.time != fileTimeZero &&
 		    refInputOutputFileAndTime->input.time <
 		        oldestOutputFileAndTime.time) {
 			continue;
@@ -780,7 +780,7 @@ upToDateStatus* BuildTask::getUpToDateStatus(Orchestrator* orchestrator,
 		// for a fast rebuild
 		auto newestDtsChangeTime =
 		    upstream->task->getLatestChangedDtsMTime(orchestrator);
-		if (newestDtsChangeTime != fileTime{} &&
+		if (newestDtsChangeTime != fileTimeZero &&
 		    newestDtsChangeTime < oldestOutputFileAndTime.time) {
 			refDtsUnchanged = true;
 			continue;
@@ -825,7 +825,7 @@ upToDateStatus* BuildTask::getUpToDateStatus(Orchestrator* orchestrator,
 		    getBuildInfoDirectory(), [&](const std::string& packageJson) {
 			    auto packageJsonTime =
 			        orchestrator->host_->GetMTime(packageJson);
-			    if (packageJsonTime == fileTime{}) {
+			    if (packageJsonTime == fileTimeZero) {
 				    packageStatus = new upToDateStatus{
 				        upToDateStatusType::InputFileMissing, packageJson};
 				    return false;
@@ -845,7 +845,7 @@ upToDateStatus* BuildTask::getUpToDateStatus(Orchestrator* orchestrator,
 		buildInfo->GetMissingPackageJsons(
 		    getBuildInfoDirectory(), [&](const std::string& packageJson) {
 			    if (orchestrator->host_->GetMTime(packageJson) !=
-			        fileTime{}) {
+			        fileTimeZero) {
 				    packageStatus = new upToDateStatus{
 				        upToDateStatusType::InputFileNewer,
 				        inputOutputName{packageJson,
@@ -1146,7 +1146,7 @@ BuildTask::loadOrStoreBuildInfo(Orchestrator* orchestrator,
 	        ->ReadBuildInfo(resolved),
 	    path,
 	};
-	fileTime mTime{};
+	fileTime mTime = fileTimeZero;
 	if (buildInfoEntry_->buildInfo != nullptr) {
 		mTime = orchestrator->host_->GetMTime(buildInfoFileName);
 	}

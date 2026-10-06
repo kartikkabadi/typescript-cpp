@@ -38,12 +38,15 @@ Host* CreateHost(compiler::CompilerHost* compilerHost) {
 }
 
 // host.go:58 GetMTime — FS().Stat().ModTime(); zero time when stat fails.
+// Go's zero time is the minimum representable instant, so the "no time"
+// sentinel is min(): `file_time_type{}` is the file_clock epoch (2174 on
+// libstdc++), which sorts *after* every real converted sys mtime.
 std::filesystem::file_time_type GetMTime(compiler::CompilerHost* host,
                                          const std::string& fileName) {
 	if (auto stat = host->fs->Stat(fileName)) {
 		return std::chrono::file_clock::from_sys(stat->ModTime());
 	}
-	return std::filesystem::file_time_type{};
+	return std::filesystem::file_time_type::min();
 }
 
 }  // namespace tsc::execute::incremental

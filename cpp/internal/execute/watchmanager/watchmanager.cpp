@@ -380,18 +380,16 @@ void WatchManager::RunLoop(gostd::Context ctx,
 	});
 	for (;;) {
 		{
-			std::lock_guard<std::mutex> lock(mu);
+			// The CV wait must hold mu via the unique_lock alone: a
+			// second lock on the already-held non-recursive mu would
+			// self-deadlock before wait() is ever reached.
+			std::unique_lock<std::mutex> ul(mu);
+			doCycleCv.wait(ul, [&] { return doCyclePending || ctxDone; });
 			if (ctxDone) {
 				CloseAllWatches();
 				return;
 			}
-			if (doCyclePending) {
-				doCyclePending = false;
-			} else {
-				std::unique_lock<std::mutex> ul(mu);
-				doCycleCv.wait(ul, [&] { return doCyclePending || ctxDone; });
-				continue;
-			}
+			doCyclePending = false;
 		}
 		doCycle();
 	}

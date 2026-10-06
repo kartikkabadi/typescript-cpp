@@ -95,13 +95,17 @@ void debounce::fireCallbacks() {
 }
 
 // latchWait — <-waitCh: block until the current wait channel is closed.
+// In Go this is a receive on a *channel*, so it observes the closed state
+// even when the close raced ahead of the wait. `notified` is that closed
+// state; waiting on a generation delta instead would eat any trigger that
+// fired while the loop was still inside fireCallbacks (the bump happens
+// before latchWait captures its `gen`), permanently losing the event.
 void debounce::latchWait() {
 	std::unique_lock<std::mutex> lk(latchMu);
-	uint64_t gen = waitGen;
-	latchCv.wait(lk, [&] { return waitGen != gen; });
+	latchCv.wait(lk, [&] { return notified; });
 }
 
-// latchReset — if notified, reopen waitCh (new channel = bumped generation).
+// latchReset — if notified, reopen waitCh (new channel = notified=false).
 void debounce::latchReset() {
 	std::lock_guard<std::mutex> lk(latchMu);
 	if (notified) {
