@@ -44,7 +44,7 @@ struct CheckerPoolOptions {
 //     operations. Idle-cleaned after IdleTimeout.
 //   - API: a single checker for API operations with stable instance
 //     identity for reference equality on handles. Never idle-cleaned.
-class checkerPool {
+class checkerPool : public compiler::CheckerPool {
 public:
 	CheckerPoolOptions opts;
 	compiler::SimpleProgram* program = nullptr;
@@ -100,7 +100,7 @@ public:
 
 	// GetChecker — checkerpool.go:123 (compiler.CheckerPool iface).
 	std::pair<checker::Checker*, std::function<void()>> GetChecker(
-	    const gostd::Context& ctx, SourceFile* file);
+	    const gostd::Context& ctx, SourceFile* file) override;
 
 	// GetGlobalDiagnostics — checkerpool.go:499.
 	std::vector<Diagnostic*> GetGlobalDiagnostics();

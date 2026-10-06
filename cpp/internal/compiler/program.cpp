@@ -12,6 +12,7 @@
 
 #include "internal/compiler/program.h"
 #include "internal/binder/binder.h"
+#include "internal/compiler/checkerpool.h"
 #include "internal/compiler/emitter.h"
 #include "internal/module/util.h" // === slice: ls-autoimport ===
 #include "internal/modulespecifiers/types.h" // === slice: ls-autoimport ===
@@ -19,6 +20,7 @@
 #include "internal/json/json.h"
 #include "internal/outputpaths/outputpaths.h"
 #include "internal/scanner/scanner.h"
+#include "internal/core/utilities.h"
 
 #include <algorithm>
 #include <cstring>
@@ -416,29 +418,40 @@ SimpleProgram::SimpleProgram(CompilerHost* host_,
 	// resolver interface has no error channel).
 	moduleResolutionError_ = loader.moduleResolutionError;
 
-	// initCheckerPool — lazily: getChecker() materializes the single
-	// checker.
+	// program.go:447 — NewProgram installs the checker pool before
+	// verifyCompilerOptions (the Go initCheckerPool call site).
+	initCheckerPool();
 	verifyCompilerOptions();
 	collectContentMapperOptionDiagnostics();
 }
 
-// program.go:570 BindSourceFiles (single-threaded)
+// program.go:570 BindSourceFiles — per-file bind tasks on a WorkGroup;
+// ast::OnceFlag makes each file bind exactly once across callers.
 void SimpleProgram::BindSourceFiles() {
+	std::unique_ptr<workGroup> wg(newWorkGroup(SingleThreaded()));
 	for (auto* file : files) {
 		if (!file->isBound.load(std::memory_order_relaxed)) {
-			// program.go:578 — `defer tr.Push(..., "bindSourceFile", ...)`.
-			tracing::TraceScope tracePop(
-			    tr_, tracing::PhaseBind, "bindSourceFile",
-			    tracing::TraceArgs{{"path", std::string(file->Path())}},
-			    true);
-			bindSourceFile(file);
+			wg->Queue([this, file] {
+				// program.go:578 — `defer tr.Push(..., "bindSourceFile", ...)`.
+				tracing::TraceScope tracePop(
+				    tr_, tracing::PhaseBind, "bindSourceFile",
+				    tracing::TraceArgs{{"path", std::string(file->Path())}},
+				    true);
+				bindSourceFile(file);
+			});
 		}
 	}
-	bindDone_ = true;
+	wg->RunAndWait();
 }
 
-// program.go: GetTypeChecker — lazy single checker.
+// getChecker — the built-in pool's non-exclusive first checker (Go's
+// getCheckerNonExclusive; equivalent to the old lazy single checker).
+// Under an external (project) pool the legacy lazy checker_ is kept for
+// callers that cannot carry the pool's release func.
 checker::Checker* SimpleProgram::getChecker() {
+	if (compilerCheckerPool_ != nullptr) {
+		return compilerCheckerPool_->getCheckerNonExclusive().first;
+	}
 	if (!checker_) {
 		checker_ = std::make_unique<checker::Checker>();
 		// checkerpool.go createCheckers / checker.go:916 — Go passes the
@@ -540,48 +553,108 @@ SimpleProgram::GetResolvedTypeReferenceDirective(
 	return nullptr;
 }
 
-// program.go:648 collectDiagnostics — single file or all files.
+// program.go:667 collectDiagnostics — collects diagnostics from a single file
+// or all files. If sourceFile is non-nil, returns diagnostics for just that
+// file. If sourceFile is nil, returns diagnostics for all files in the program.
 std::vector<Diagnostic*> SimpleProgram::collectDiagnostics(
-    SourceFile* sourceFile,
+    SourceFile* sourceFile, bool concurrent,
     const std::function<std::vector<Diagnostic*>(SourceFile*)>& collect) {
 	std::vector<Diagnostic*> result;
 	if (sourceFile != nullptr) {
 		result = collect(sourceFile);
 	} else {
-		for (auto* file : files) {
-			auto d = collect(file);
-			result.insert(result.end(), d.begin(), d.end());
+		for (auto& diags :
+		     collectDiagnosticsFromFiles(files, concurrent, collect)) {
+			result.insert(result.end(), diags.begin(), diags.end());
 		}
 	}
 	return filterAndSortDiagnostics(result);
 }
 
-// program.go:697 collectCheckerDiagnostics — same shape with SkipTypeChecking.
+// program.go:678 collectDiagnosticsFromFiles — per-file collect on a
+// WorkGroup; diagnostics are written into per-file slots so the concatenated
+// order matches program file order.
+std::vector<std::vector<Diagnostic*>>
+SimpleProgram::collectDiagnosticsFromFiles(
+    const std::vector<SourceFile*>& sourceFiles, bool concurrent,
+    const std::function<std::vector<Diagnostic*>(SourceFile*)>& collect) {
+	std::vector<std::vector<Diagnostic*>> diagnostics(sourceFiles.size());
+	std::unique_ptr<workGroup> wg(
+	    newWorkGroup(!concurrent || SingleThreaded()));
+	for (int i = 0; i < static_cast<int>(sourceFiles.size()); i++) {
+		wg->Queue([i, &diagnostics, &sourceFiles, &collect] {
+			diagnostics[i] = collect(sourceFiles[i]);
+		});
+	}
+	wg->RunAndWait();
+	return diagnostics;
+}
+
+// program.go:695 collectCheckerDiagnostics — collects diagnostics from a
+// single file or all files using a callback that receives the checker for
+// each file. When the checker pool supports grouped iteration (compiler
+// pool), files are grouped by checker and processed in parallel with one
+// task per checker, reducing contention and improving cache locality.
+// Otherwise, falls back to per-file concurrent collection.
 std::vector<Diagnostic*> SimpleProgram::collectCheckerDiagnostics(
     SourceFile* sourceFile,
-    const std::function<std::vector<Diagnostic*>(SourceFile*)>& collect) {
+    const std::function<std::vector<Diagnostic*>(checker::Checker*,
+                                               SourceFile*)>& collect) {
 	if (sourceFile != nullptr) {
 		if (SkipTypeChecking(sourceFile, false)) {
 			return {};
 		}
-		return filterAndSortDiagnostics(collect(sourceFile));
+		auto [c, done] = GetTypeCheckerForFileExclusive(sourceFile);
+		auto result = collect(c, sourceFile);
+		done();
+		return filterAndSortDiagnostics(std::move(result));
 	}
 	std::vector<Diagnostic*> result;
-	for (auto* file : files) {
-		if (SkipTypeChecking(file, false)) {
-			continue;
-		}
-		auto d = collect(file);
-		result.insert(result.end(), d.begin(), d.end());
+	for (auto& diags :
+	     collectCheckerDiagnosticsFromFiles(files, collect)) {
+		result.insert(result.end(), diags.begin(), diags.end());
 	}
-	return filterAndSortDiagnostics(result);
+	return filterAndSortDiagnostics(std::move(result));
+}
+
+// program.go:727 collectCheckerDiagnosticsFromFiles — grouped-by-checker
+// iteration on the built-in pool, per-file exclusive checkout otherwise.
+std::vector<std::vector<Diagnostic*>>
+SimpleProgram::collectCheckerDiagnosticsFromFiles(
+    const std::vector<SourceFile*>& sourceFiles,
+    const std::function<std::vector<Diagnostic*>(checker::Checker*,
+                                               SourceFile*)>& collect) {
+	std::vector<std::vector<Diagnostic*>> diagnostics(sourceFiles.size());
+	if (compilerCheckerPool_ != nullptr) {
+		compilerCheckerPool_->forEachCheckerGroupDo(
+		    gostd::Context{}, sourceFiles, SingleThreaded(),
+		    [&](checker::Checker* c, int fileIndex, SourceFile* file) {
+			    diagnostics[fileIndex] = collect(c, file);
+		    });
+	} else {
+		std::unique_ptr<workGroup> wg(newWorkGroup(SingleThreaded()));
+		for (int i = 0; i < static_cast<int>(sourceFiles.size()); i++) {
+			if (SkipTypeChecking(sourceFiles[i], false)) {
+				continue;
+			}
+			wg->Queue([this, i, &diagnostics, &sourceFiles, &collect] {
+				auto [c, done] = checkerPool_->GetChecker(
+				    gostd::Context{}, sourceFiles[i]);
+				diagnostics[i] = collect(c, sourceFiles[i]);
+				done();
+			});
+		}
+		wg->RunAndWait();
+	}
+	return diagnostics;
 }
 
 // program.go:743 GetSyntacticDiagnostics
 std::vector<Diagnostic*> SimpleProgram::GetSyntacticDiagnostics(
     SourceFile* sourceFile) {
 	return collectDiagnostics(
-	    sourceFile, [this](SourceFile* file) -> std::vector<Diagnostic*> {
+	    sourceFile, false /*concurrent*/,
+	    [this](SourceFile* file) -> std::vector<Diagnostic*> {
 		    std::vector<Diagnostic*> diags = file->diagnostics;
 		    diags.insert(diags.end(), file->jsDiagnostics.begin(),
 		                 file->jsDiagnostics.end());
@@ -638,7 +711,8 @@ std::vector<Diagnostic*> SimpleProgram::GetBindDiagnostics(
 		BindSourceFiles();
 	}
 	return collectDiagnostics(
-	    sourceFile, [](SourceFile* file) -> std::vector<Diagnostic*> {
+	    sourceFile, false /*concurrent*/,
+	    [](SourceFile* file) -> std::vector<Diagnostic*> {
 		    return file->bindDiagnostics;
 	    });
 }
@@ -648,8 +722,9 @@ std::vector<Diagnostic*> SimpleProgram::GetSemanticDiagnostics(
     SourceFile* sourceFile) {
 	return collectCheckerDiagnostics(
 	    sourceFile,
-	    [this](SourceFile* file) -> std::vector<Diagnostic*> {
-		    return getSemanticDiagnosticsWithChecker(file);
+	    [this](checker::Checker* c, SourceFile* file)
+	        -> std::vector<Diagnostic*> {
+		    return getSemanticDiagnosticsWithChecker(c, file);
 	    });
 }
 
@@ -733,9 +808,10 @@ bool SimpleProgram::canIncludeBindAndCheckDiagnostics(
 
 // program.go:1498 getSemanticDiagnosticsWithChecker
 std::vector<Diagnostic*> SimpleProgram::getSemanticDiagnosticsWithChecker(
-    SourceFile* sourceFile) {
+    checker::Checker* fileChecker, SourceFile* sourceFile) {
 	auto first = filterNoEmitSemanticDiagnostics(
-	    getBindAndCheckDiagnosticsWithChecker(sourceFile), &options);
+	    getBindAndCheckDiagnosticsWithChecker(fileChecker, sourceFile),
+	    &options);
 	auto second = GetIncludeProcessorDiagnostics(sourceFile);
 	first.insert(first.end(), second.begin(), second.end());
 	return first;
@@ -761,13 +837,13 @@ std::vector<Diagnostic*> filterNoEmitSemanticDiagnostics(
 // diagnostics until the file's check, then appends the delta.
 std::vector<Diagnostic*>
 SimpleProgram::getBindAndCheckDiagnosticsWithChecker(
-    SourceFile* sourceFile, bool includeDeferredGlobals) {
+    checker::Checker* fileChecker, SourceFile* sourceFile,
+    bool includeDeferredGlobals) {
 	if (SkipTypeChecking(sourceFile, false)) {
 		return {};
 	}
-	checker::Checker* fileChecker =
-	    getChecker(); // checker creation forces binding
-
+	// Checker creation forces binding, so bind diagnostics will be
+	// populated.
 	std::vector<Diagnostic*> previousGlobals;
 	if (includeDeferredGlobals) {
 		previousGlobals = fileChecker->GetGlobalDiagnostics();
@@ -938,41 +1014,47 @@ std::vector<Diagnostic*> filterAndSortDiagnostics(
 	return sortAndDeduplicateDiagnostics(std::move(diags));
 }
 
-// program.go:1435 GetGlobalDiagnostics
+// program.go:1455 GetGlobalDiagnostics — direct collection on the
+// built-in pool; external pools accumulate globals incrementally.
 std::vector<Diagnostic*> SimpleProgram::GetGlobalDiagnostics() {
 	if (files.empty()) {
 		return {};
 	}
-	// compilerCheckerPool.GetGlobalDiagnostics — our single checker's
-	// collection (empty until the check walker lands).
-	if (checker_ == nullptr) {
-		return {};
+	if (compilerCheckerPool_ != nullptr) {
+		return compilerCheckerPool_->GetGlobalDiagnostics();
 	}
-	return checker_->diagnostics.GetGlobalDiagnostics();
+	// For external pools (project system), global diagnostics are collected
+	// incrementally as checkers are used, not via a bulk query.
+	return {};
 }
 
-// program.go:1467 GetDeclarationDiagnostics — collectDiagnostics fan-out;
-// per-file body is getDeclarationDiagnosticsForFile (program.go:1618).
+// program.go:1467 GetDeclarationDiagnostics
 std::vector<Diagnostic*> SimpleProgram::GetDeclarationDiagnostics(
     SourceFile* sourceFile) {
 	return collectDiagnostics(
-	    sourceFile, [this](SourceFile* file) -> std::vector<Diagnostic*> {
-		    if (file->IsDeclarationFile) {
-			    return {};
-		    }
-		    // Memoization is used in order to avoid emitting the declaration
-		    // file twice
-		    if (auto it = declarationDiagnosticCache.find(file);
-		        it != declarationDiagnosticCache.end()) {
-			    return it->second;
-		    }
-
-		    auto [eh, done] = newEmitHost(this, file);
-		    auto diags = getDeclarationDiagnostics(eh.get(), file);
-		    done();
-		    declarationDiagnosticCache[file] = diags;
-		    return diags;
+	    sourceFile, true /*concurrent*/,
+	    [this](SourceFile* file) -> std::vector<Diagnostic*> {
+		    return getDeclarationDiagnosticsForFile(file);
 	    });
+}
+
+// program.go:1618 getDeclarationDiagnosticsForFile — memoized via the
+// declarationDiagnosticCache SyncMap so the declaration file is never
+// emitted twice.
+std::vector<Diagnostic*> SimpleProgram::getDeclarationDiagnosticsForFile(
+    SourceFile* sourceFile) {
+	if (sourceFile->IsDeclarationFile) {
+		return {};
+	}
+	if (auto [cached, ok] = declarationDiagnosticCache.Load(sourceFile);
+	    ok) {
+		return cached;
+	}
+	auto [eh, done] = newEmitHost(this, sourceFile);
+	auto diags = getDeclarationDiagnostics(eh.get(), sourceFile);
+	diags = declarationDiagnosticCache.LoadOrStore(sourceFile, diags).first;
+	done();
+	return diags;
 }
 
 // --- program.go: file/path accessors ---
@@ -1244,29 +1326,30 @@ bool SimpleProgram::checkSourceFilesBelongToPath(
 	return allFilesBelongToPath;
 }
 
-// program.go:1799 CommonSourceDirectory (memoized).
+// program.go:1799 CommonSourceDirectory — memoized via sync.Once; emit
+// tasks call it from parallel workers.
 std::string SimpleProgram::CommonSourceDirectory() {
-	if (commonSourceDirectory_.has_value()) {
-		return *commonSourceDirectory_;
-	}
-	// files() closure: emitted file names
-	auto files = [this]() -> std::vector<std::string> {
-		std::vector<std::string> emittedFiles;
-		for (auto* file : this->files) {
-			if (sourceFileMayBeEmitted(file, this, false, false) &&
-			    !file->IsDeclarationFile) {
-				emittedFiles.push_back(file->FileName());
+	commonSourceDirectoryOnce_.run([this] {
+		// files() closure: emitted file names
+		auto filesFn = [this]() -> std::vector<std::string> {
+			std::vector<std::string> emittedFiles;
+			for (auto* file : this->files) {
+				if (sourceFileMayBeEmitted(file, this, false, false) &&
+				    !file->IsDeclarationFile) {
+					emittedFiles.push_back(file->FileName());
+				}
 			}
-		}
-		return emittedFiles;
-	};
-	commonSourceDirectory_ = outputpaths::GetCommonSourceDirectory(
-	    Options(), files, GetCurrentDirectory(), UseCaseSensitiveFileNames(),
-	    [this](const std::vector<std::string>& sourceFiles,
-	           std::string_view rootDirectory) {
-		    return checkSourceFilesBelongToPath(
-		        sourceFiles, std::string(rootDirectory));
-	    });
+			return emittedFiles;
+		};
+		commonSourceDirectory_ = outputpaths::GetCommonSourceDirectory(
+		    Options(), filesFn, GetCurrentDirectory(),
+		    UseCaseSensitiveFileNames(),
+		    [this](const std::vector<std::string>& sourceFiles,
+		           std::string_view rootDirectory) {
+			    return checkSourceFilesBelongToPath(
+			        sourceFiles, std::string(rootDirectory));
+		    });
+	});
 	return *commonSourceDirectory_;
 }
 
@@ -1377,7 +1460,27 @@ EmitResult* SimpleProgram::Emit(EmitOptions* options) {
 	    Options()->NewLine == NewLineKind::CarriageReturnLineFeed
 	        ? "\r\n"
 	        : "\n";
-	std::unique_ptr<printer::EmitTextWriter> writer;
+	// program.go:1885 writerPool — sync.Pool of EmitTextWriter.
+	struct emitTextWriterPool {
+		std::mutex mu;
+		std::vector<std::unique_ptr<printer::EmitTextWriter>> pool;
+		const std::string* newLine;
+		printer::EmitTextWriter* Get() {
+			std::lock_guard<std::mutex> lock(mu);
+			if (!pool.empty()) {
+				auto* w = pool.back().release();
+				pool.pop_back();
+				return w;
+			}
+			return printer::NewTextWriter(*newLine, 0);
+		}
+		void Put(printer::EmitTextWriter* w) {
+			std::lock_guard<std::mutex> lock(mu);
+			pool.emplace_back(w);
+		}
+	};
+	emitTextWriterPool writerPool{.newLine = &newLine};
+	std::unique_ptr<workGroup> wg(newWorkGroup(SingleThreaded()));
 	std::vector<std::unique_ptr<emitter>> emitters;
 	bool forceDtsEmit =
 	    options->EmitOnly == EmitOnly::EmitOnlyBuilderSignature ||
@@ -1397,30 +1500,39 @@ EmitResult* SimpleProgram::Emit(EmitOptions* options) {
 		e->writeFile = options->WriteFile;
 		e->tr = tr_; // program.go:1903
 
-		auto [host, done] = newEmitHost(this, sourceFile);
-		e->host = host.get();
+		wg->Queue([this, e, sourceFile, &writerPool, forceDtsEmit,
+		          forceJsEmit, options] {
+			auto [host, done] = newEmitHost(this, sourceFile);
+			e->host = host.get();
 
-		// take an unused writer
-		if (writer == nullptr) {
-			writer.reset(printer::NewTextWriter(newLine, 0));
-		}
-		writer->Clear();
+			// take an unused writer
+			std::unique_ptr<printer::EmitTextWriter> writer(
+			    writerPool.Get());
+			writer->Clear();
 
-		// attach writer and perform emit
-		e->writer = writer.get();
-		e->paths = outputpaths::GetOutputPathsFor(
-		    sourceFile, e->host->Options(), e->host,
-		    outputpaths::ForceEmitPaths{
-		        .Dts = forceDtsEmit,
-		        .Js = forceJsEmit,
-		        .DeclarationMap =
-		            options->ForceEmit &&
-		            options->EmitOnly == EmitOnly::EmitOnlyDts,
-		    });
-		e->emit();
-		e->writer = nullptr;
-		done();
+			// attach writer and perform emit
+			e->writer = writer.get();
+			e->paths = outputpaths::GetOutputPathsFor(
+			    sourceFile, e->host->Options(), e->host,
+			    outputpaths::ForceEmitPaths{
+			        .Dts = forceDtsEmit,
+			        .Js = forceJsEmit,
+			        .DeclarationMap =
+			            options->ForceEmit &&
+			            options->EmitOnly == EmitOnly::EmitOnlyDts,
+			    });
+			e->emit();
+			e->writer = nullptr;
+
+			// put the writer back in the pool
+			writerPool.Put(writer.release());
+
+			done(); // Go: `defer done()` — release the checker last
+		});
 	}
+
+	// wait for emit to complete
+	wg->RunAndWait();
 
 	// collect results from emit, preserving input order
 	std::vector<EmitResult*> results;
@@ -2484,10 +2596,11 @@ std::vector<checker::ResolvedModule> SimpleProgram::GetResolvedModules() {
 	return result;
 }
 
-// program.go GetPackagesMap — lazily-cached package name → bundles types.
+// program.go GetPackagesMap — lazily-cached package name → bundles types;
+// sync.Once like Go's packagesMapOnce (emit tasks race to populate it).
 const std::unordered_map<std::string, bool>&
 SimpleProgram::GetPackagesMap() {
-	if (!packagesMap.has_value()) {
+	packagesMapOnce_.run([this] {
 		packagesMap.emplace();
 		for (auto& [path, resolvedModulesInFile] : resolvedModules) {
 			for (auto& [key, mod] : resolvedModulesInFile) {
@@ -2498,7 +2611,7 @@ SimpleProgram::GetPackagesMap() {
 				}
 			}
 		}
-	}
+	});
 	return *packagesMap;
 }
 
@@ -2507,20 +2620,57 @@ SimpleProgram::GetPackagesMap() {
 // program.go:816 GetSuggestionDiagnostics.
 std::vector<Diagnostic*> SimpleProgram::GetSuggestionDiagnostics(
     SourceFile* sourceFile) {
-	return collectCheckerDiagnostics(sourceFile, [&](SourceFile* file) {
-		// getSuggestionDiagnosticsWithChecker — program.go:1634.
-		if (SkipTypeChecking(file, false)) {
-			return std::vector<Diagnostic*>{};
-		}
-		return getChecker()->GetSuggestionDiagnostics(file);
-	});
+	return collectCheckerDiagnostics(
+	    sourceFile,
+	    [this](checker::Checker* c, SourceFile* file)
+	        -> std::vector<Diagnostic*> {
+		    return getSuggestionDiagnosticsWithChecker(c, file);
+	    });
 }
 
-// program.go:616 GetTypeCheckerForFileExclusive — the Go checker pool
-// hands out the file's dedicated checker; the single-checker port shares
-// the one checker, so DoneForFile is a no-op.
+// program.go:1634 getSuggestionDiagnosticsWithChecker.
+std::vector<Diagnostic*>
+SimpleProgram::getSuggestionDiagnosticsWithChecker(
+    checker::Checker* fileChecker, SourceFile* sourceFile) {
+	if (SkipTypeChecking(sourceFile, false)) {
+		return {};
+	}
+	return fileChecker->GetSuggestionDiagnostics(sourceFile);
+}
+
+// program.go:616 GetTypeCheckerForFileExclusive — the file's checker,
+// locked for the caller; `done` releases it. A null file takes the
+// non-exclusive first checker (Go's GetChecker(ctx, nil) shape — the
+// port keeps the previous shared-checker semantics for nil files).
 std::pair<checker::Checker*, std::function<void()>>
 SimpleProgram::GetTypeCheckerForFileExclusive(SourceFile* file) {
+	if (compilerCheckerPool_ != nullptr) {
+		if (file != nullptr) {
+			return compilerCheckerPool_->getCheckerForFileExclusive(
+			    gostd::Context{}, file);
+		}
+		return compilerCheckerPool_->getCheckerNonExclusive();
+	}
+	if (file != nullptr) {
+		return checkerPool_->GetChecker(gostd::Context{}, file);
+	}
+	return {getChecker(), []() {}};
+}
+
+// program.go:607 GetTypeCheckerForFile — non-exclusive checkout of the
+// file's checker on the built-in pool; external pools go through the
+// CheckerPool interface (exclusive checkout + release).
+std::pair<checker::Checker*, std::function<void()>>
+SimpleProgram::getTypeCheckerForFileNonExclusive(SourceFile* file) {
+	if (compilerCheckerPool_ != nullptr) {
+		if (file != nullptr) {
+			return compilerCheckerPool_->getCheckerForFileNonExclusive(file);
+		}
+		return compilerCheckerPool_->getCheckerNonExclusive();
+	}
+	if (file != nullptr) {
+		return checkerPool_->GetChecker(gostd::Context{}, file);
+	}
 	return {getChecker(), []() {}};
 }
 
@@ -2533,21 +2683,25 @@ void SimpleProgram::PackageJsonCacheEntries(
 	resolver_->PackageJsonCacheEntries(f);
 }
 
-// program.go:804 GetSemanticDiagnosticsForIncremental —
-// collectCheckerDiagnosticsFromFiles run sequentially (single checker):
-// per-file bind+check with deferred globals, then filter+sort.
+// program.go:804 GetSemanticDiagnosticsForIncremental — includes newly
+// discovered globals in each file's cached diagnostics and leaves
+// noEmit filtering to the builder.
 std::vector<std::pair<SourceFile*, std::vector<Diagnostic*>>>
 SimpleProgram::GetSemanticDiagnosticsForIncremental(
     const std::vector<SourceFile*>& sourceFiles) {
+	auto allDiags = collectCheckerDiagnosticsFromFiles(
+	    sourceFiles,
+	    [this](checker::Checker* c, SourceFile* file)
+	        -> std::vector<Diagnostic*> {
+		    return getBindAndCheckDiagnosticsWithChecker(
+		        c, file, true /*includeDeferredGlobals*/);
+	    });
 	std::vector<std::pair<SourceFile*, std::vector<Diagnostic*>>> result;
 	result.reserve(sourceFiles.size());
-	for (auto* file : sourceFiles) {
-		auto [fileChecker, done] = GetTypeCheckerForFileExclusive(file);
-		auto diags = getBindAndCheckDiagnosticsWithChecker(
-		    file, true /*includeDeferredGlobals*/);
-		done();
+	for (int i = 0; i < static_cast<int>(sourceFiles.size()); i++) {
 		result.emplace_back(
-		    file, filterAndSortDiagnostics(std::move(diags)));
+		    sourceFiles[i],
+		    filterAndSortDiagnostics(std::move(allDiags[i])));
 	}
 	return result;
 }
@@ -2582,8 +2736,7 @@ SimpleProgram* NewProgram(const ProgramOptions& opts) {
 	// === slice: project ===
 	// program.go:299 NewProgram -> initCheckerPool: the pool is created
 	// by opts.CreateCheckerPool when non-nil; when nil Go builds its own
-	// checkerPool, whose machinery is unported (the lazy single
-	// checker covers that role here).
+	// checkerPool (checkerpool.go).
 	p->initCheckerPool();
 	// === end slice: project ===
 	if (tracePop) {
@@ -2784,7 +2937,7 @@ std::string SimpleProgram::jsxRuntimeImportSpecifierForFile(
 // is semantic).
 std::tuple<SimpleProgram*, SourceFile*, bool> SimpleProgram::ReuseProgram(
     const tspath::Path& changedFilePath, CompilerHost* newHost,
-    const std::function<void*(SimpleProgram*)>& createCheckerPool,
+    const std::function<CheckerPool*(SimpleProgram*)>& createCheckerPool,
     const std::function<module::Resolver*(const module::ResolverOptions&)>&
         createModuleResolver) {
 	ProgramOptions newOpts = opts_;
@@ -2969,19 +3122,32 @@ std::tuple<SimpleProgram*, SourceFile*, bool> SimpleProgram::ReuseProgram(
 	return {result, newFile, true};
 }
 
-// program.go:435 initCheckerPool — panics when the program hasn't
-// finished processing files; the port's pool is the opaque
-// checkerPool_ slot filled by opts.CreateCheckerPool (the compiler's
-// built-in checkerPool machinery is intentionally unported — the lazy
-// single checker covers that role, program.cpp:2255).
+// program.go:435 initCheckerPool — installs opts_.CreateCheckerPool's
+// pool when set, else the built-in pool (compilerCheckerPool_ set ONLY
+// for the built-in pool, like Go program.go:443-445).
 void SimpleProgram::initCheckerPool() {
 	if (!finishedProcessing) {
 		TSC_UNREACHABLE(
 		    "Program must finish processing files before initializing "
 		    "checker pool");
 	}
+
+	// Go runs this once in NewProgram; the port also calls it from the
+	// SimpleProgram ctor (checkFile/emitFile paths) and from
+	// program.go:299-equivalent NewProgram after opts_ are installed, so
+	// the second call replaces a ctor-installed built-in pool with the
+	// caller's CreateCheckerPool.
+	compilerCheckerPool_ = nullptr;
+	checkerPool_ = nullptr;
+	ownedCheckerPool_.reset();
+
 	if (opts_.CreateCheckerPool) {
 		checkerPool_ = opts_.CreateCheckerPool(this);
+	} else {
+		auto* pool = newCheckerPoolWithTracing(this, opts_.Tracing);
+		ownedCheckerPool_.reset(pool);
+		checkerPool_ = pool;
+		compilerCheckerPool_ = pool;
 	}
 }
 
@@ -3115,7 +3281,7 @@ symlinks::KnownSymlinks* SimpleProgram::GetSymlinkCache() {
 // program built from opts with the host/factories swapped.
 std::tuple<SimpleProgram*, SourceFile*, bool> SimpleProgram::UpdateProgram(
     const tspath::Path& changedFilePath, CompilerHost* newHost,
-    const std::function<void*(SimpleProgram*)>& createCheckerPool,
+    const std::function<CheckerPool*(SimpleProgram*)>& createCheckerPool,
     const std::function<module::Resolver*(const module::ResolverOptions&)>&
         createModuleResolver) {
 	auto reuseResult = ReuseProgram(changedFilePath, newHost,
@@ -3180,27 +3346,36 @@ int SimpleProgram::IdentifierCount() const {
 	return count;
 }
 
-// program.go:1706 SymbolCount — single checker port: files plus the lazy
-// checker's symbol count when it exists.
+// program.go:1706 SymbolCount — file symbols plus every checker's count
+// via ForEachCheckerParallel.
 int SimpleProgram::SymbolCount() const {
 	int count = 0;
 	for (auto* file : files) {
 		count += file->SymbolCount;
 	}
-	if (checker_ != nullptr) {
-		count += static_cast<int>(checker_->SymbolCount);
-	}
-	return count;
+	std::atomic<uint32_t> val{static_cast<uint32_t>(count)};
+	ForEachCheckerParallel([&val](int, checker::Checker* c) {
+		val.fetch_add(c->SymbolCount);
+	});
+	return static_cast<int>(val.load());
 }
 
-// program.go:1719 TypeCount — single checker.
+// program.go:1719 TypeCount — summed across pooled checkers.
 uint32_t SimpleProgram::TypeCount() {
-	return checker_ != nullptr ? checker_->TypeCount : 0;
+	std::atomic<uint32_t> val{0};
+	ForEachCheckerParallel([&val](int, checker::Checker* c) {
+		val.fetch_add(c->TypeCount);
+	});
+	return val.load();
 }
 
-// program.go:1727 InstantiationCount — single checker.
+// program.go:1727 InstantiationCount — summed across pooled checkers.
 uint64_t SimpleProgram::InstantiationCount() {
-	return checker_ != nullptr ? checker_->TotalInstantiationCount : 0;
+	std::atomic<uint32_t> val{0};
+	ForEachCheckerParallel([&val](int, checker::Checker* c) {
+		val.fetch_add(c->TotalInstantiationCount);
+	});
+	return val.load();
 }
 
 // === slice: ls-autoimport ===
@@ -3214,12 +3389,14 @@ bool SimpleProgram::IsGlobalTypingsFile(const std::string& fileName) const {
 	                            comparePathsOptions());
 }
 
-// program.go:590 GetTypeChecker — single checker (the port has no checker
-// pool; getChecker() is the pool-equivalent, and releasing it is a no-op).
+// program.go:590 GetTypeChecker — the built-in pool's non-exclusive
+// first checker; an external pool checks one out via GetChecker.
 std::pair<checker::Checker*, std::function<void()>>
 SimpleProgram::GetTypeChecker(gostd::Context ctx) {
-	(void)ctx;
-	return {getChecker(), []() {}};
+	if (compilerCheckerPool_ != nullptr) {
+		return compilerCheckerPool_->getCheckerNonExclusive();
+	}
+	return checkerPool_->GetChecker(ctx, nullptr);
 }
 
 // === slice: testrunner ===
@@ -3239,12 +3416,13 @@ contentmapper::Mapper* SimpleProgram::GetContentMapper(SourceFile* file) {
 	return nullptr;
 }
 
-// program.go:597 ForEachCheckerParallel — Go iterates the
-// compilerCheckerPool when non-nil. The port's equivalent is the single
-// lazy checker covering all files, so the callback runs once.
+// program.go:597 ForEachCheckerParallel — grouped parallel iteration
+// over the built-in pool; no-op under an external pool, like Go.
 void SimpleProgram::ForEachCheckerParallel(
-    const std::function<void(int, checker::Checker*)>& cb) {
-	cb(0, getChecker());
+    const std::function<void(int, checker::Checker*)>& cb) const {
+	if (compilerCheckerPool_ != nullptr) {
+		compilerCheckerPool_->forEachCheckerParallel(cb);
+	}
 }
 
 // === end slice: testrunner ===

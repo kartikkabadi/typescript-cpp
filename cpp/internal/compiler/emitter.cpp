@@ -73,14 +73,17 @@ transformers::declarations::OutputPaths* emitHost::GetOutputPathsFor(SourceFile*
 	return adapter;
 }
 
-// emitHost.go:38 — GetTypeCheckerForFile maps to the shared lazy checker.
+// emitHost.go:38 — GetTypeCheckerForFile checks out the file's checker;
+// `done` is the pool's release (noop for the built-in pool's
+// non-exclusive path).
 std::pair<std::unique_ptr<emitHost>, std::function<void()>> newEmitHost(
     SimpleProgram* program, SourceFile* file) {
-	checker::Checker* checker = program->getChecker();
+	auto [checker, done] =
+	    program->GetTypeCheckerForFile(ContextPtr{}, file);
 	auto host = std::make_unique<emitHost>();
 	host->program = program;
 	host->emitResolver = checker->GetEmitResolver();
-	return {std::move(host), [] {}};
+	return {std::move(host), std::move(done)};
 }
 
 // --- emitter.go ---

@@ -22,6 +22,7 @@
 #include "internal/ast/ast.h"
 #include "internal/ast/diagnostics_util.h"
 #include "internal/checker/checker.h"
+#include "internal/compiler/checkerpool.h"
 #include "internal/collections/collections.h" // === slice: ls-autoimport ===
 #include "internal/core/context.h"
 #include "internal/core/types.h"
@@ -42,6 +43,10 @@ class Tracing;
 namespace tsc::compiler {
 
 class SimpleProgram;
+// checkerpool.go — CheckerPool interface + the built-in checkerPool
+// (full decls in checkerpool.h; pointers suffice here).
+class CheckerPool;
+class checkerPool;
 // === slice: project ===
 // fileloader.go:89 DuplicateSourceFile — the full struct is
 // dep-declared in project/parsecache.h (which needs its fields); this
@@ -827,10 +832,9 @@ struct ProgramOptions {
 	tsoptions::ParsedCommandLine* Config = nullptr;
 	bool UseSourceOfProjectReference = false;
 	Tristate SingleThreaded;
-	// CreateCheckerPool — Go `func(*Program) CheckerPool`; the pool type is
-	// unported (single-threaded port creates one checker lazily in
-	// getChecker).
-	std::function<void*(SimpleProgram*)> CreateCheckerPool;
+	// CreateCheckerPool — Go `func(*Program) CheckerPool`. When null, the
+	// program constructs the built-in checkerPool itself (initCheckerPool).
+	std::function<CheckerPool*(SimpleProgram*)> CreateCheckerPool;
 	std::string TypingsLocation;
 	std::string ProjectName;
 	tracing::Tracing* Tracing = nullptr;
@@ -930,8 +934,9 @@ public:
 	std::vector<Diagnostic*> configFileParsingDiagnostics;
 
 	std::unique_ptr<checker::Checker> checker_;
-	bool bindDone_{};
 	mutable std::optional<std::string> commonSourceDirectory_;
+	mutable OnceFlag commonSourceDirectoryOnce_;
+	mutable OnceFlag packagesMapOnce_;
 
 	// === slice: incremental ===
 	// program.go — the program's ParsedCommandLine (opts.Config) and tracing
@@ -968,7 +973,10 @@ public:
 	        std::make_shared<std::unordered_set<tspath::Path>>();
 	bool sourceFilesToEmitComputed_{};
 	std::vector<SourceFile*> sourceFilesToEmit_;
-	mutable std::unordered_map<SourceFile*, std::vector<Diagnostic*>>
+	// declarationDiagnosticCache — program.go:103 collections.SyncMap
+	// (Load/LoadOrStore): concurrent declaration diagnostics collect into
+	// it per file.
+	mutable collections::SyncMap<SourceFile*, std::vector<Diagnostic*>>
 	    declarationDiagnosticCache;
 
 	// program.go:405 &Program{...} — the ReuseProgram splice constructs a
@@ -1077,15 +1085,16 @@ public:
 	                                  ResolutionMode mode);
 	// === slice: ls-coreA ===
 	// program.go:590 GetTypeChecker / :607 GetTypeCheckerForFile — Go's
-	// checker pool hands out per-file checkers; the single-checker port
-	// shares the one checker (same as GetTypeCheckerForFileExclusive).
+	// checker pool hands out per-file checkers; the built-in pool returns
+	// the file's associated checker, non-exclusive (getChecker is the
+	// first pool checker, matching Go's checkers[0]).
 	std::pair<checker::Checker*, std::function<void()>> GetTypeChecker(
 	    const ContextPtr& ctx) {
 		return GetTypeCheckerForFileExclusive(nullptr);
 	}
 	std::pair<checker::Checker*, std::function<void()>> GetTypeCheckerForFile(
 	    const ContextPtr& ctx, SourceFile* file) {
-		return GetTypeCheckerForFileExclusive(file);
+		return getTypeCheckerForFileNonExclusive(file);
 	}
 	// program.go:2171 GetResolvedTypeReferenceDirectiveFromTypeReferenceDirective.
 	module::ResolvedTypeReferenceDirective*
@@ -1170,18 +1179,39 @@ public:
 	    const std::string& rootDirectory);
 
 	std::vector<Diagnostic*> collectDiagnostics(
-	    SourceFile* sourceFile,
+	    SourceFile* sourceFile, bool concurrent,
+	    const std::function<std::vector<Diagnostic*>(SourceFile*)>& collect);
+	std::vector<std::vector<Diagnostic*>> collectDiagnosticsFromFiles(
+	    const std::vector<SourceFile*>& sourceFiles, bool concurrent,
 	    const std::function<std::vector<Diagnostic*>(SourceFile*)>& collect);
 	std::vector<Diagnostic*> collectCheckerDiagnostics(
 	    SourceFile* sourceFile,
-	    const std::function<std::vector<Diagnostic*>(SourceFile*)>& collect);
+	    const std::function<std::vector<Diagnostic*>(checker::Checker*,
+	                                               SourceFile*)>& collect);
+	std::vector<std::vector<Diagnostic*>> collectCheckerDiagnosticsFromFiles(
+	    const std::vector<SourceFile*>& sourceFiles,
+	    const std::function<std::vector<Diagnostic*>(checker::Checker*,
+	                                               SourceFile*)>& collect);
 	std::vector<Diagnostic*> getSemanticDiagnosticsWithChecker(
-	    SourceFile* sourceFile);
+	    checker::Checker* fileChecker, SourceFile* sourceFile);
+	std::vector<Diagnostic*> getSuggestionDiagnosticsWithChecker(
+	    checker::Checker* fileChecker, SourceFile* sourceFile);
 	// program.go:1490 — includeDeferredGlobals == Go's
 	// getBindAndCheckDiagnosticsWithChecker(file, true): defers global
 	// diagnostics until the file's check, then appends the delta.
 	std::vector<Diagnostic*> getBindAndCheckDiagnosticsWithChecker(
-	    SourceFile* sourceFile, bool includeDeferredGlobals = false);
+	    checker::Checker* fileChecker, SourceFile* sourceFile,
+	    bool includeDeferredGlobals = false);
+	// program.go:1618 getDeclarationDiagnosticsForFile — memoized
+	// declaration diagnostics per file (SyncMap cache).
+	std::vector<Diagnostic*> getDeclarationDiagnosticsForFile(
+	    SourceFile* sourceFile);
+	// getTypeCheckerForFileNonExclusive — program.go:607
+	// GetTypeCheckerForFile for the ContextPtr (value-only) callers: the
+	// built-in pool returns the file's checker without locking; an external
+	// pool checks the checker out through the CheckerPool interface.
+	std::pair<checker::Checker*, std::function<void()>>
+	getTypeCheckerForFileNonExclusive(SourceFile* file);
 	std::pair<std::vector<Diagnostic*>,
 	          std::unordered_map<int, CommentDirective>>
 	getDiagnosticsWithPrecedingDirectives(
@@ -1195,8 +1225,10 @@ public:
 	SimpleProgram* GetProgram() override { return this; }
 
 	// --- program.go methods the incremental Program delegates to ---
-	// program.go:616 GetTypeCheckerForFileExclusive — single checker; the
-	// release callback is a no-op like Go's when sharing the one checker.
+	// program.go:616 GetTypeCheckerForFileExclusive — the built-in pool
+	// locks the file's checker; the release callback unlocks it. A null
+	// file takes the non-exclusive first checker (Go has no nil-file
+	// caller; keeps the port's previous shared-checker semantics).
 	std::pair<checker::Checker*, std::function<void()>>
 	GetTypeCheckerForFileExclusive(SourceFile* file);
 	// === slice: ls-coreC ===
@@ -1268,7 +1300,7 @@ public:
 	// dep-stub — owned by compiler.
 	std::tuple<SimpleProgram*, SourceFile*, bool> ReuseProgram(
 	    const tspath::Path& changedFilePath, CompilerHost* newHost,
-	    const std::function<void*(SimpleProgram*)>& createCheckerPool,
+	    const std::function<CheckerPool*(SimpleProgram*)>& createCheckerPool,
 	    const std::function<module::Resolver*(const module::ResolverOptions&)>&
 	        createModuleResolver);
 	// program.go statistics helpers — aggregate counts across files.
@@ -1455,9 +1487,8 @@ public:
 		                 ->getResolvedProjectReferences()
 		           : std::vector<tsoptions::ParsedCommandLine*>{};
 	}
-	// program.go:590 GetTypeChecker — the port's checkerPool equivalent is
-	// the lazy single checker (getChecker); the release callback is a
-	// no-op, matching a shared single checker.
+	// program.go:590 GetTypeChecker — the built-in pool's non-exclusive
+	// first checker; an external pool checks one out via GetChecker.
 	std::pair<checker::Checker*, std::function<void()>> GetTypeChecker(
 		gostd::Context ctx);
 	// === end slice: ls-autoimport ===
@@ -1467,26 +1498,26 @@ public:
 	// the given source file, or nullptr when the file was not produced by
 	// a content mapper.
 	contentmapper::Mapper* GetContentMapper(SourceFile* file);
-	// program.go:597 ForEachCheckerParallel — the port has a single lazy
-	// checker covering every file (the checkerPool equivalent); invoke
-	// the callback once with it.
+	// program.go:597 ForEachCheckerParallel — grouped parallel iteration
+	// over the built-in pool (no-op under an external pool, like Go).
 	void ForEachCheckerParallel(
-	    const std::function<void(int, checker::Checker*)>& cb);
+	    const std::function<void(int, checker::Checker*)>& cb) const;
 	// === end slice: testrunner ===
 
 	// === slice: project ===
-	// program.go:450 GetCheckerPool — Go stores the pool opts
-	// .CreateCheckerPool built during initCheckerPool. The port keeps
-	// it as an opaque slot the project's createCheckerPool closure
-	// fills (NewProgram only invokes the closure when non-nil — the
-	// compiler's own checkerPool machinery is unported).
-	void* checkerPool_ = nullptr;
-	void* GetCheckerPool() { return checkerPool_; }
+	// program.go:85-92 checkerPool / compilerCheckerPool — checkerPool is
+	// whichever pool initCheckerPool installed (built-in or the external
+	// pool opts_.CreateCheckerPool returned); compilerCheckerPool is set
+	// ONLY for the built-in pool (Go program.go:443-445).
+	CheckerPool* checkerPool_ = nullptr;
+	checkerPool* compilerCheckerPool_ = nullptr;
+	std::unique_ptr<checkerPool> ownedCheckerPool_;
+	CheckerPool* GetCheckerPool() { return checkerPool_; }
 	// program.go:305 UpdateProgram — ReuseProgram fast path, else a
 	// fresh program with the updated host/factories.
 	std::tuple<SimpleProgram*, SourceFile*, bool> UpdateProgram(
 	    const tspath::Path& changedFilePath, CompilerHost* newHost,
-	    const std::function<void*(SimpleProgram*)>& createCheckerPool,
+	    const std::function<CheckerPool*(SimpleProgram*)>& createCheckerPool,
 	    const std::function<module::Resolver*(
 	        const module::ResolverOptions&)>& createModuleResolver);
 	// program.go:2095 HasSameFileNames — FileName equality over

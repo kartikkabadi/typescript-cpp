@@ -335,7 +335,7 @@ Project::CreateProgramResult Project::CreateProgram() {
 	// captured variable through a stale closure stored in the old
 	// program's options.
 	auto createCheckerPool =
-	    [this](compiler::SimpleProgram* program) -> void* {
+	    [this](compiler::SimpleProgram* program) -> compiler::CheckerPool* {
 		return newCheckerPool(
 		    host->sessionOptions->CheckerPoolOptions, program,
 		    [this](const std::string& msg) { log(msg); });
