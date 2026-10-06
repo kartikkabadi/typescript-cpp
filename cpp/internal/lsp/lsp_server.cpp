@@ -918,7 +918,8 @@ Server::RequestConfiguration(gostd::Context ctx) {
 		return {ls::lsutil::NewDefaultUserPreferences(), nullptr};
 	}
 	auto params = std::make_shared<lsproto::ConfigurationParams>();
-	params->Items = {};
+	// Slice<T> is optional<vector<T>>: `= {}` resets to nullopt (Go nil), NOT an empty list.
+	params->Items.emplace();
 	for (const char* section : {"js/ts", "typescript", "javascript",
 	                            "editor"}) {
 		auto item = std::make_shared<lsproto::ConfigurationItem>();

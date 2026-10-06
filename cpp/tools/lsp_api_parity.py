@@ -7,7 +7,7 @@ Usage:
 
 Prints a unified diff (Go transcript vs C++ transcript); exits 0 iff identical.
 """
-import sys, os, json, difflib
+import sys, os, json, difflib, shlex
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from rpcframe import RpcSession, uri_for, transcript_lines
 
@@ -29,7 +29,7 @@ def lsp_scenario(workdir):
     with open(path, "w") as f:
         f.write(SAMPLE)
     uri = uri_for(path)
-    s = RpcSession([BIN, "--lsp", "--stdio"], cwd=workdir)
+    s = RpcSession(shlex.split(BIN) + ["--lsp", "--stdio"], cwd=workdir)
     s.call("initialize", {
         "processId": None, "rootUri": uri_for(workdir),
         "capabilities": {"textDocument": {
@@ -74,7 +74,7 @@ def api_scenario(workdir):
     path = os.path.join(workdir, "a.ts")
     with open(path, "w") as f:
         f.write(SAMPLE)
-    s = RpcSession([BIN, "--api", "--async"], cwd=workdir)
+    s = RpcSession(shlex.split(BIN) + ["--api", "--async"], cwd=workdir)
     s.call("echo", {"hello": "world", "n": 42}, timeout=30)
     s.call("ping", timeout=30)
     s.call("initialize", {"capabilities": {}}, timeout=60)

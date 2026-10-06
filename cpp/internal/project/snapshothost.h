@@ -7,6 +7,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <unordered_map>
 
 #include "internal/ast/ast.h"
 #include "internal/contentmapper/contentmapper.h"
@@ -58,6 +59,14 @@ struct SnapshotHost {
 	// RetainSnapshot — snapshothost.go:97. Adds a reference to a
 	// snapshot owned by this host.
 	void RetainSnapshot(Snapshot* snapshot);
+
+	// projectIDCache — C++ adapter: Go's autoimport maps are keyed by
+	// the ProjectID interface value; we key by ProjectID* pointer, so
+	// one intern cache must be shared by every clone host built from
+	// this SnapshotHost and by Session::internProjectID.
+	std::unordered_map<ID, std::unique_ptr<ls::autoimport::ProjectID>>
+	    projectIDCache;
+	ls::autoimport::ProjectID* internProjectID(const ID& id);
 
 	// CloneSnapshot — snapshothost.go:102. Derives a snapshot from
 	// baseSnapshot without adopting it as any canonical session state

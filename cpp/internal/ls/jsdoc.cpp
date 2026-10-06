@@ -453,14 +453,6 @@ noMappedLocation(SourceFile* file, TextRange range) {
 	return {lsproto::Location{}, spanmap::FidelityNone};
 }
 
-// --- dep-stub: getDocumentationFromDeclaration — hover.go sibling ---
-
-std::string getDocumentationFromDeclaration(
-    documentationLocationMapper getMappedLocation, checker::Checker* c,
-    Symbol* symbol, Node* declaration, Node* location,
-    lsproto::MarkupKind contentFormat, bool commentOnly) {
-	TSC_UNREACHABLE(
-	    "getDocumentationFromDeclaration — owned by ls hover slice");
-}
+// (deduped: getDocumentationFromDeclaration defined in cpp/internal/ls/hover.cpp)
 
 } // namespace tsc::ls

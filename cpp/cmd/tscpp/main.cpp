@@ -683,7 +683,11 @@ static void parseAll(const char* path, int workers) {
 // a signal death. The alternate stack keeps the handler runnable when the
 // fault is itself stack overflow.
 static void crashExit(int sig) {
-	(void)sig;
+	if (std::getenv("TSCPP_DEBUG_CRASH")) {
+		char b[64];
+		int n = std::snprintf(b, sizeof(b), "TSCPP-CRASH sig=%d\n", sig);
+		(void)!write(STDERR_FILENO, b, n);
+	}
 	if (tsc::tscEmitdumpPanicExit) {
 		// write() is async-signal-safe; mirror the panic path's `EXIT 2`.
 		const char msg[] = "EXIT 2\n";
@@ -693,6 +697,7 @@ static void crashExit(int sig) {
 }
 
 static void installCrashExitHandlers() {
+	if (std::getenv("TSCPP_NO_CRASH_HANDLER")) return;
 	static stack_t altstack;
 	altstack.ss_sp = std::malloc(SIGSTKSZ);
 	altstack.ss_size = SIGSTKSZ;

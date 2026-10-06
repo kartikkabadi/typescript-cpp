@@ -182,11 +182,9 @@ struct Session : ata::TypingsInstallerHost {
 	// WatchedFiles are using each glob.
 	watchRegistry* watches = nullptr;
 
-	// projectIDCache interns project::ID as ls::autoimport::ProjectID
-	// adapters so pointer identity matches Go's interface-keyed
-	// project maps.
-	std::unordered_map<ID, std::unique_ptr<ls::autoimport::ProjectID>>
-	    projectIDCache;
+	// Interned project IDs live on snapshotHost->projectIDCache so the
+	// clone hosts built during snapshot clones produce the same
+	// ProjectID* the session hands to LanguageServices.
 
 	// globalDiagPublishPending is set to true when a global
 	// diagnostics publish task should be enqueued. It is reset when

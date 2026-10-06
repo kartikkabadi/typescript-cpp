@@ -95,11 +95,7 @@ namespace tsc::ls {
 
 // === dep-stubs for sibling ls-slice items declared in ls.h ===
 
-argumentListInfo* getImmediatelyContainingArgumentInfo(
-    Node* node, int position, SourceFile* sourceFile, checker::Checker* c) {
-	TSC_UNREACHABLE(
-	    "getImmediatelyContainingArgumentInfo — ls/signaturehelp slice");
-}
+// (deduped: getImmediatelyContainingArgumentInfo defined in cpp/internal/ls/signaturehelp.cpp)
 
 missingMemberFixer* newMissingMemberFixer(
     change::Tracker* changeTracker, compiler::SimpleProgram* program,

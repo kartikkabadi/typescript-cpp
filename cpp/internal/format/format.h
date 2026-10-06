@@ -493,7 +493,10 @@ struct formatSpanWorker {
 	std::unique_ptr<FormattingContext> formattingContext;
 
 	std::vector<TextChange> edits;
-	TextRangeWithKind previousRange;
+	// Go zero value sentinel: `previousRange == NewTextRangeWithKind(0,0,0)` means "no previous
+	// range yet". TextRange's default is {-1,-1} which would never equal the sentinel, so this
+	// field must be initialized explicitly to the Go zero value.
+	TextRangeWithKind previousRange = NewTextRangeWithKind(0, 0, Kind::Unknown);
 	int previousRangeTriviaEnd = 0;
 	Node* previousParent = nullptr;
 	int previousRangeStartLine = 0;

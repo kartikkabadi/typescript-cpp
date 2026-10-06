@@ -693,23 +693,30 @@ lsp::lsproto::SemanticTokensRangeResponse LanguageService::ProvideSemanticTokens
 // semantictokens.go:109
 lsp::lsproto::SemanticTokensLegend* SemanticTokensLegend(
 	lsp::lsproto::ResolvedSemanticTokensClientCapabilities clientCapabilities) {
+	// slices.Contains(nil, x) is false in Go — a nullopt Slice matches no
+	// entries, so the guards below both avoid UB and keep that behavior.
 	std::vector<std::string> types;
 	types.reserve(tokenTypes.size());
-	for (auto& t : tokenTypes) {
-		if (std::find(clientCapabilities.TokenTypes->begin(),
-					  clientCapabilities.TokenTypes->end(), std::string(t)) !=
-			clientCapabilities.TokenTypes->end()) {
-			types.push_back(std::string(t));
+	if (clientCapabilities.TokenTypes) {
+		for (auto& t : tokenTypes) {
+			if (std::find(clientCapabilities.TokenTypes->begin(),
+						  clientCapabilities.TokenTypes->end(),
+						  std::string(t)) !=
+				clientCapabilities.TokenTypes->end()) {
+				types.push_back(std::string(t));
+			}
 		}
 	}
 	std::vector<std::string> modifiers;
 	modifiers.reserve(tokenModifiers.size());
-	for (auto& m : tokenModifiers) {
-		if (std::find(clientCapabilities.TokenModifiers->begin(),
-					  clientCapabilities.TokenModifiers->end(),
-					  std::string(m)) !=
-			clientCapabilities.TokenModifiers->end()) {
-			modifiers.push_back(std::string(m));
+	if (clientCapabilities.TokenModifiers) {
+		for (auto& m : tokenModifiers) {
+			if (std::find(clientCapabilities.TokenModifiers->begin(),
+						  clientCapabilities.TokenModifiers->end(),
+						  std::string(m)) !=
+				clientCapabilities.TokenModifiers->end()) {
+				modifiers.push_back(std::string(m));
+			}
 		}
 	}
 	auto* legend = new lsp::lsproto::SemanticTokensLegend;

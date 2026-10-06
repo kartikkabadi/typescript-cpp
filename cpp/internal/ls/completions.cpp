@@ -6647,10 +6647,15 @@ lsproto::CompletionItem* LanguageService::createLSPCompletionItem(
 	    .Tags = tags,
 	    .Detail = detail != nullptr ? std::optional<std::string>(*detail)
 	                                : std::nullopt,
-	    .Preselect = preselect,
+	    .Preselect = preselect ? std::optional<bool>(true)
+	                               : std::nullopt,
 	    .SortText = std::string(sortText),
-	    .FilterText = filterTextMut,
-	    .InsertText = insertTextMut,
+	    .FilterText = !filterTextMut.empty()
+	        ? std::optional<std::string>(filterTextMut)
+	        : std::nullopt,
+	    .InsertText = !insertTextMut.empty()
+	        ? std::optional<std::string>(insertTextMut)
+	        : std::nullopt,
 	    .InsertTextFormat = insertTextFormat,
 	    .TextEdit = textEdit,
 	    .CommitCharacters = commitCharacters != nullptr
@@ -7881,7 +7886,9 @@ std::vector<CompletionItem*> getJSDocParameterCompletions(
 			        .Kind = std::make_shared<lsproto::CompletionItemKind>(
 			            lsproto::CompletionItemKindVariable),
 			        .SortText = std::string(SortTextLocationPriority),
-			        .InsertText = snippetText,
+			        .InsertText = !snippetText.empty()
+		            ? std::optional<std::string>(snippetText)
+		            : std::nullopt,
 			        .InsertTextFormat =
 			            isSnippet
 			                ? std::make_shared<lsproto::InsertTextFormat>(
@@ -7935,7 +7942,9 @@ std::vector<CompletionItem*> getJSDocParameterCompletions(
 			        .Kind = std::make_shared<lsproto::CompletionItemKind>(
 			            lsproto::CompletionItemKindVariable),
 			        .SortText = std::string(SortTextLocationPriority),
-			        .InsertText = snippetText,
+			        .InsertText = !snippetText.empty()
+		            ? std::optional<std::string>(snippetText)
+		            : std::nullopt,
 			        .InsertTextFormat =
 			            isSnippet
 			                ? std::make_shared<lsproto::InsertTextFormat>(
@@ -8374,7 +8383,9 @@ LanguageService::getExhaustiveCaseSnippets(
 		                lsproto::CompletionItemKindSnippet),
 		            .SortText =
 		                std::string(SortTextGlobalsOrKeywords),
-		            .InsertText = insertText,
+		            .InsertText = !insertText.empty()
+		                ? std::optional<std::string>(insertText)
+		                : std::nullopt,
 		            .AdditionalTextEdits = additionalTextEdits,
 		            .InsertTextFormat =
 		                clientSupportsItemSnippet(ctx)

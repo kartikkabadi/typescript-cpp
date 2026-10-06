@@ -93,13 +93,14 @@ struct autoImportRegistryCloneHost : ls::autoimport::RegistryCloneHost {
 	std::mutex filesMu;
 	std::vector<ParseCacheKey> files;
 
-	// Interned ProjectID adapters so pointer-identity matches Go's
-	// value-keyed map.
-	std::unordered_map<ID, std::unique_ptr<ls::autoimport::ProjectID>>
-	    projectIDs;
+	// Intern cache shared with the owning SnapshotHost (and the
+	// Session) so ProjectID* identity is stable across clones — Go
+	// keys these maps by the ProjectID interface's value.
+	std::unordered_map<ID, std::unique_ptr<ls::autoimport::ProjectID>>*
+	    projectIDs = nullptr;
 
 	ls::autoimport::ProjectID* internID(const ID& id) {
-		auto [it, inserted] = projectIDs.try_emplace(id);
+		auto [it, inserted] = projectIDs->try_emplace(id);
 		if (inserted) {
 			it->second = std::make_unique<projectIDAdapter>(id);
 		}
@@ -243,10 +244,13 @@ struct autoImportRegistryCloneHost : ls::autoimport::RegistryCloneHost {
 inline autoImportRegistryCloneHost* newAutoImportRegistryCloneHost(
     ProjectCollection* projectCollection, ParseCache* parseCache,
     snapshotFSBuilder* builder, const std::string& currentDirectory,
-    const std::function<tspath::Path(const std::string&)>& toPath) {
+    const std::function<tspath::Path(const std::string&)>& toPath,
+    std::unordered_map<ID, std::unique_ptr<ls::autoimport::ProjectID>>*
+        sharedProjectIDs) {
 	auto* host = new autoImportRegistryCloneHost();
 	host->projectCollection = projectCollection;
 	host->parseCache = parseCache;
+	host->projectIDs = sharedProjectIDs;
 	auto* fs = new autoImportBuilderFS();
 	fs->snapshotFSBuilder_ = builder;
 	host->fs = newSourceFS(false, fs, toPath);
