@@ -560,6 +560,8 @@ static double bigIntToDoubleRounded(const PowUint& x) {
 	double d;
 	std::memcpy(&d, &bits, 8);
 	return d;
+}
+
 Number Number::exponentiate(Number exponent) const {
 	if ((v == 1 || v == -1) && exponent.isInf())
 		return nan();
