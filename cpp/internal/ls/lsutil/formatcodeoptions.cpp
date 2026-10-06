@@ -112,29 +112,3 @@ FormatCodeSettings GetDefaultFormatCodeSettings() {
 }
 
 } // namespace tsc::ls::lsutil
-
-// === dep stubs — removed when owner slice lands ===
-// lsproto/util.go — owned by the lsp slice. These are trivial real ports since
-// nothing else in this package depends on them crashing.
-namespace tsc::lsp::lsproto {
-
-// ComparePositions — util.go:11
-int ComparePositions(Position pos, Position other) {
-	if (pos.Line != other.Line) {
-		return pos.Line < other.Line ? -1 : 1;
-	}
-	if (pos.Character != other.Character) {
-		return pos.Character < other.Character ? -1 : 1;
-	}
-	return 0;
-}
-
-// CompareRanges — util.go:22. Range.Start is compared before Range.End.
-int CompareRanges(Range lsRange, Range other) {
-	if (int startComp = ComparePositions(lsRange.Start, other.Start); startComp != 0) {
-		return startComp;
-	}
-	return ComparePositions(lsRange.End, other.End);
-}
-
-} // namespace tsc::lsp::lsproto

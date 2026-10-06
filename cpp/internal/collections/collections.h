@@ -237,6 +237,12 @@ public:
 
 	bool Has(const T& key) const { return items.count(key) != 0; }
 	void Add(const T& key) { items.insert(key); }
+	// AddIfAbsent — returns true if the key was not already present.
+	// (=== slice: ls-coreA === — mirrors collections.Set.AddIfAbsent.)
+	bool AddIfAbsent(const T& key) { return items.insert(key).second; }
+	// Reserve — capacity hint (=== slice: ls-coreA === — collections.go
+	// NewSetWithSizeHint).
+	void Reserve(size_t hint) { items.reserve(hint); }
 	void Delete(const T& key) { items.erase(key); }
 	size_t Size() const { return items.size(); }
 	void Clear() { items.clear(); }
@@ -253,9 +259,6 @@ public:
 	// Len — Go's (nil *Set).Len() == 0; callers on Set* must null-check like
 	// Go. On a value Set this is Size().
 	size_t Len() const { return items.size(); }
-
-	// AddIfAbsent — returns true if the key was not already present.
-	bool AddIfAbsent(const T& key) { return items.insert(key).second; }
 
 	// Union — adds all of other's keys.
 	void Union(const Set& other) { items.insert(other.items.begin(), other.items.end()); }
@@ -356,6 +359,28 @@ void diffOrderedMaps(const OrderedMap<K, V>* m1,
 	    onRemoved, onModified);
 }
 // === end slice: api ===
+
+
+
+// === slice: ls-coreA ===
+
+// NewSetFromItems — collections.go NewSetFromItems.
+template <typename T, typename... Ts>
+Set<T> NewSetFromItems(Ts... vals) {
+	Set<T> s;
+	(s.Add(vals), ...);
+	return s;
+}
+
+// NewSetWithSizeHint — collections.go NewSetWithSizeHint.
+template <typename T>
+Set<T> NewSetWithSizeHint(size_t hint) {
+	Set<T> s;
+	s.Reserve(hint);
+	return s;
+}
+
+// === end slice: ls-coreA ===
 
 // === slice: moduletransforms ===
 

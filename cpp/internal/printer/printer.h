@@ -305,7 +305,108 @@ int compareEmitHelpers(const EmitHelper* x, const EmitHelper* y);
 
 // --- syntheticfile.go -----------------------------------------------------------
 
-class ChangeTrackerWriter; // dep — changetrackerwriter slice
+// ChangeTrackerWriter (changetrackerwriter.go:12) — an EmitTextWriter that
+// records the last non-trivia text position before/after each emitted node so
+// change tracking can reassign positions to freshly printed nodes.
+class ChangeTrackerWriter : public EmitTextWriter {
+	std::unique_ptr<EmitTextWriter> tw;
+	int lastNonTriviaPosition = 0;
+	// Go: map[triviaPositionKey]int — keys are *ast.Node | *ast.NodeList;
+	// interface identity == pointer identity.
+	std::unordered_map<const void*, int> pos_, end_;
+
+	void setPos(const void* node) { pos_[node] = lastNonTriviaPosition; }
+	void setEnd(const void* node) { end_[node] = lastNonTriviaPosition; }
+	int getPos(const void* node) {
+		if (auto it = pos_.find(node); it != pos_.end()) return it->second;
+		return 0;
+	}
+	int getEnd(const void* node) {
+		if (auto it = end_.find(node); it != end_.end()) return it->second;
+		return 0;
+	}
+	void setLastNonTriviaPosition(const std::string& s, bool force);
+	Node* assignPositionsToNodeWorker(Node* node, NodeVisitor* v);
+	NodeList* assignPositionsToNodeArray(NodeList* nodes, NodeVisitor* v);
+
+public:
+	explicit ChangeTrackerWriter(std::unique_ptr<EmitTextWriter> w) : tw(std::move(w)) {
+		tw->Clear();
+	}
+
+	PrintHandlers GetPrintHandlers();
+	Node* AssignPositionsToNode(Node* node, tsc::NodeFactory* factory);
+
+	void Write(const std::string& s) override {
+		tw->Write(s);
+		setLastNonTriviaPosition(s, false);
+	}
+	void WriteTrailingSemicolon(const std::string& s) override {
+		tw->WriteTrailingSemicolon(s);
+		setLastNonTriviaPosition(s, false);
+	}
+	void WriteComment(const std::string& s) override { tw->WriteComment(s); }
+	void WriteKeyword(const std::string& s) override {
+		tw->WriteKeyword(s);
+		setLastNonTriviaPosition(s, false);
+	}
+	void WriteOperator(const std::string& s) override {
+		tw->WriteOperator(s);
+		setLastNonTriviaPosition(s, false);
+	}
+	void WritePunctuation(const std::string& s) override {
+		tw->WritePunctuation(s);
+		setLastNonTriviaPosition(s, false);
+	}
+	void WriteSpace(const std::string& s) override {
+		tw->WriteSpace(s);
+		setLastNonTriviaPosition(s, false);
+	}
+	void WriteStringLiteral(const std::string& s) override {
+		tw->WriteStringLiteral(s);
+		setLastNonTriviaPosition(s, false);
+	}
+	void WriteParameter(const std::string& s) override {
+		tw->WriteParameter(s);
+		setLastNonTriviaPosition(s, false);
+	}
+	void WriteProperty(const std::string& s) override {
+		tw->WriteProperty(s);
+		setLastNonTriviaPosition(s, false);
+	}
+	void WriteSymbol(const std::string& s, Symbol* symbol) override {
+		tw->WriteSymbol(s, symbol);
+		setLastNonTriviaPosition(s, false);
+	}
+	void WriteLine() override { tw->WriteLine(); }
+	void WriteLineForce(bool force) override { tw->WriteLineForce(force); }
+	void IncreaseIndent() override { tw->IncreaseIndent(); }
+	void DecreaseIndent() override { tw->DecreaseIndent(); }
+	void Clear() override {
+		tw->Clear();
+		lastNonTriviaPosition = 0;
+	}
+	std::string String() override { return tw->String(); }
+	void RawWrite(const std::string& s) override {
+		tw->RawWrite(s);
+		setLastNonTriviaPosition(s, false);
+	}
+	void WriteLiteral(const std::string& s) override {
+		tw->WriteLiteral(s);
+		setLastNonTriviaPosition(s, true);
+	}
+	int GetTextPos() override { return tw->GetTextPos(); }
+	int GetLine() override { return tw->GetLine(); }
+	TextPos GetColumn() override { return tw->GetColumn(); }
+	int GetIndent() override { return tw->GetIndent(); }
+	bool IsAtStartOfLine() override { return tw->IsAtStartOfLine(); }
+	bool HasTrailingComment() override { return tw->HasTrailingComment(); }
+	bool HasTrailingWhitespace() override { return tw->HasTrailingWhitespace(); }
+};
+
+// NewChangeTrackerWriter (changetrackerwriter.go:25).
+ChangeTrackerWriter* NewChangeTrackerWriter(const std::string& newline,
+                                            int indentSize);
 
 // PrintAndPositionNode (syntheticfile.go:15).
 std::pair<std::string, Node*> PrintAndPositionNode(

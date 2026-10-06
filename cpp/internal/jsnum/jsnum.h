@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <string>
 
 namespace tsc {
@@ -107,3 +108,23 @@ PseudoBigInt parseValidBigInt(std::string_view text);
 std::string parsePseudoBigInt(std::string_view stringValue);
 
 }  // namespace tsc
+
+// === slice: ls-coreA ===
+// std::hash specializations so Number/PseudoBigInt can key collections::Set
+// (Go map keys hash structurally).
+namespace std {
+template <>
+struct hash<tsc::Number> {
+	size_t operator()(const tsc::Number& n) const {
+		// -0.0 == 0.0 must hash equal (operator== is IEEE equality).
+		return std::hash<double>{}(n.v == 0.0 ? 0.0 : n.v);
+	}
+};
+template <>
+struct hash<tsc::PseudoBigInt> {
+	size_t operator()(const tsc::PseudoBigInt& b) const {
+		size_t h = std::hash<std::string>{}(b.base10Value);
+		return h ^ (b.negative ? 0x9e3779b97f4a7c15ULL : 0);
+	}
+};
+}  // namespace std

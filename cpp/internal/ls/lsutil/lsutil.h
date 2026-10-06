@@ -23,6 +23,7 @@
 #include "internal/collections/collections.h"
 #include "internal/core/text.h"
 #include "internal/core/types.h"
+#include "internal/lsp/lsproto/lsproto.h" // tsc::lsp::lsproto alias bridge
 
 namespace tsc::checker {
 class Checker;
@@ -36,177 +37,11 @@ struct SpecMatcher;
 namespace tsc::modulespecifiers {
 struct UserPreferences;
 }
-namespace tsc::lsp::lsproto {
-struct FormattingOptions;
-}
 namespace tsc::json {
 class Encoder;
 class Decoder;
 }
 
-namespace tsc::lsp::lsproto {
-
-// === dep decls — owned by lsp slice (tsc/internal/lsp/lsproto) ===
-// Minimal lsproto surface needed by this package. Declared here so both
-// lsutil and ls::change can use them; the lsp slice owns the real package
-// and will replace these decls when it lands.
-
-// lsproto.go — protocol.Position
-struct Position {
-	uint32_t Line = 0;
-	uint32_t Character = 0;
-
-	bool operator==(const Position&) const = default;
-};
-
-// lsproto.go — protocol.Range
-struct Range {
-	Position Start;
-	Position End;
-
-	bool operator==(const Range&) const = default;
-};
-
-// lsproto.go — protocol.TextEdit
-struct TextEdit {
-	Range Range;
-	std::string NewText;
-};
-
-// lsproto.go — protocol.FormattingOptions
-struct FormattingOptions {
-	uint32_t TabSize = 0;
-	bool InsertSpaces = false;
-	std::optional<bool> TrimTrailingWhitespace;
-	std::optional<bool> InsertFinalNewline;
-	std::optional<bool> TrimFinalNewlines;
-};
-
-// util.go:11 — ComparePositions (real port: trivial)
-int ComparePositions(Position pos, Position other);
-// util.go:22 — CompareRanges (real port: trivial)
-int CompareRanges(Range lsRange, Range other);
-
-
-// === dep decls for ls-autoimport — owned by lsp slice ===
-
-// DocumentUri — lsp.go:17 (Go `type DocumentUri string`).
-using DocumentUri = std::string;
-
-// DocumentUri.FileName — lsp.go:19. dep-stub — owned by lsp.
-inline std::string documentUriFileName(const DocumentUri& uri) {
-	TSC_UNREACHABLE("documentUriFileName — owned by lsp");
-}
-// DocumentUri.Path — lsp.go:52. dep-stub — owned by lsp.
-inline tspath::Path documentUriPath(const DocumentUri& uri,
-                                    bool useCaseSensitiveFileNames) {
-	TSC_UNREACHABLE("documentUriPath — owned by lsp");
-}
-
-// FileChangeType — lsp_generated.go:10260.
-enum class FileChangeType : uint32_t {
-	Created = 1,
-	Changed = 2,
-	Deleted = 3,
-};
-inline constexpr FileChangeType FileChangeTypeCreated = FileChangeType::Created;
-inline constexpr FileChangeType FileChangeTypeChanged = FileChangeType::Changed;
-inline constexpr FileChangeType FileChangeTypeDeleted = FileChangeType::Deleted;
-
-// FileEvent — lsp_generated.go:5442.
-struct FileEvent {
-	DocumentUri Uri;
-	FileChangeType Type{};
-};
-
-// LanguageKind — lsp_generated.go:10144.
-using LanguageKind = std::string;
-inline const LanguageKind LanguageKindTypeScript{"typescript"};
-inline const LanguageKind LanguageKindJavaScript{"javascript"};
-
-// PositionEncodingKind — lsp_generated.go:10241.
-using PositionEncodingKind = std::string;
-inline const PositionEncodingKind PositionEncodingKindUTF8{"utf-8"};
-inline const PositionEncodingKind PositionEncodingKindUTF16{"utf-16"};
-inline const PositionEncodingKind PositionEncodingKindUTF32{"utf-32"};
-
-// TextDocumentContentChangePartial — lsp_generated.go:6633.
-struct TextDocumentContentChangePartial {
-	Range range;
-	std::string Text;
-};
-
-// TextDocumentContentChangeWholeDocument — lsp_generated.go:6653.
-struct TextDocumentContentChangeWholeDocument {
-	std::string Text;
-};
-
-// TextDocumentContentChangePartialOrWholeDocument — lsp_generated.go:12178.
-// Go: union {*Partial | *WholeDocument}; nullptr-nullptr == Go nil union.
-struct TextDocumentContentChangePartialOrWholeDocument {
-	TextDocumentContentChangePartial* Partial = nullptr;
-	TextDocumentContentChangeWholeDocument* WholeDocument = nullptr;
-};
-
-// AutoImportFixKind — lsp_generated.go:10667.
-enum class AutoImportFixKind : int32_t {
-	UseNamespace = 0,
-	JsdocTypeImport = 1,
-	AddToExisting = 2,
-	AddNew = 3,
-	PromoteTypeOnly = 4,
-};
-inline constexpr AutoImportFixKind AutoImportFixKindUseNamespace =
-	AutoImportFixKind::UseNamespace;
-inline constexpr AutoImportFixKind AutoImportFixKindJsdocTypeImport =
-	AutoImportFixKind::JsdocTypeImport;
-inline constexpr AutoImportFixKind AutoImportFixKindAddToExisting =
-	AutoImportFixKind::AddToExisting;
-inline constexpr AutoImportFixKind AutoImportFixKindAddNew =
-	AutoImportFixKind::AddNew;
-inline constexpr AutoImportFixKind AutoImportFixKindPromoteTypeOnly =
-	AutoImportFixKind::PromoteTypeOnly;
-
-// ImportKind — lsp_generated.go:10694.
-enum class ImportKind : int32_t {
-	Named = 0,
-	Default = 1,
-	Namespace = 2,
-	CommonJS = 3,
-};
-inline constexpr ImportKind ImportKindNamed = ImportKind::Named;
-inline constexpr ImportKind ImportKindDefault = ImportKind::Default;
-inline constexpr ImportKind ImportKindNamespace = ImportKind::Namespace;
-inline constexpr ImportKind ImportKindCommonJS = ImportKind::CommonJS;
-
-// AddAsTypeOnly — lsp_generated.go:10719. Go's values are a bitmask
-// (Allowed=1, Required=2, NotAllowed=4).
-enum class AddAsTypeOnly : int32_t {
-	Allowed = 1,
-	Required = 2,
-	NotAllowed = 4,
-};
-inline constexpr AddAsTypeOnly AddAsTypeOnlyAllowed = AddAsTypeOnly::Allowed;
-inline constexpr AddAsTypeOnly AddAsTypeOnlyRequired = AddAsTypeOnly::Required;
-inline constexpr AddAsTypeOnly AddAsTypeOnlyNotAllowed =
-	AddAsTypeOnly::NotAllowed;
-
-// AutoImportFix — lsp_generated.go:8811.
-struct AutoImportFix {
-	AutoImportFixKind Kind{};
-	std::string Name;
-	ImportKind ImportKind{};
-	bool UseRequire = false;
-	AddAsTypeOnly AddAsTypeOnly{};
-	std::string ModuleSpecifier;
-	int32_t ImportIndex = 0;
-	Position* UsagePosition = nullptr;
-	std::string NamespacePrefix;
-};
-
-// === end dep decls ===
-
-} // namespace tsc::lsp::lsproto
 
 namespace tsc::ls::lsutil {
 

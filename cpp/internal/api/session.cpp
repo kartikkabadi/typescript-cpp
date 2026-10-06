@@ -46,10 +46,17 @@ namespace autoimport = tsc::ls::autoimport;
 // project.ID satisfies. Adapt it here so project.h stays free of the
 // autoimport dependency (matching the Go package graph).
 struct projectIDAdapter : autoimport::ProjectID {
-	const project::ID& id;
+	project::ID id;
 	explicit projectIDAdapter(const project::ID& id) : id(id) {}
 	std::string String() const override { return id.String(); }
 };
+
+// Go's api session passes its request ctx into the ls API. Our single-checker
+// design has no cancellation to propagate; client capabilities (the only ctx
+// value the ls code reads) are unset on this path, matching Go's defaults.
+tsc::ContextPtr toLSContext(const gostd::Context& /*ctx*/) {
+	return tsc::backgroundContext();
+}
 
 namespace {
 
@@ -883,10 +890,12 @@ struct snapshotLSHost : ls::Host {
 	std::vector<std::string> ReadDirectory(
 	    const std::string& currentDir, const std::string& path,
 	    const std::vector<std::string>& extensions,
-	    const std::vector<std::string>& excludes,
+	    const std::vector<std::string>* excludes,
 	    const std::vector<std::string>& includes, int depth) override {
-		return snapshot->ReadDirectory(currentDir, path, extensions, excludes,
-		                               includes, depth);
+		std::vector<std::string> empty;
+		return snapshot->ReadDirectory(currentDir, path, extensions,
+		                               excludes ? *excludes : empty, includes,
+		                               depth);
 	}
 	std::vector<std::string> GetDirectories(
 	    const std::string& path) override {
@@ -920,8 +929,10 @@ std::pair<ls::LanguageService*, gostd::Error> Session::setupLanguageService(
 		return {nullptr, gostd::errorf("%w: project %s not found",
 		                               {ErrClientError, projectHandle.v})};
 	}
-	return {ls::NewLanguageService(proj->ID().str(), program,
-	                               new snapshotLSHost{snapshot}, activeFile),
+	// projectIDAdapter and the host are leak-tolerant like the rest of the
+	// dep-stubbed snapshot graph.
+	return {new ls::LanguageService(new projectIDAdapter{proj->ID()}, program,
+	                                new snapshotLSHost{snapshot}, activeFile),
 	        nullptr};
 }
 
@@ -6755,7 +6766,7 @@ Session::handleGetSignatureUsages(
 		return {std::vector<SignatureUsageResponse>{}, err4};
 	}
 
-	auto usages = langSvc->GetSignatureUsages(ctx, signatureDecl);
+	auto usages = langSvc->GetSignatureUsages(toLSContext(ctx), signatureDecl);
 	if (usages.empty()) {
 		return {std::vector<SignatureUsageResponse>{}, nullptr};
 	}
@@ -6801,8 +6812,10 @@ Session::handleGetCompletionsAtPosition(
 		int internalPos = sourceFile->GetPositionMap()->UTF16ToUTF8(
 		    int(params->Position));
 		return langSvc->GetCompletionsAtPosition(
-		    ctx, sourceFile, internalPos,
-		    params->TriggerCharacter ? &*params->TriggerCharacter : nullptr,
+		    toLSContext(ctx), sourceFile, internalPos,
+		    params->TriggerCharacter
+		        ? const_cast<std::string*>(&*params->TriggerCharacter)
+		        : nullptr,
 		    params->IncludeSymbol);
 	};
 
@@ -6844,28 +6857,32 @@ Session::handleGetCompletionsAtPosition(
 	std::vector<std::shared_ptr<CompletionEntryResponse>> entries;
 	entries.reserve(result->Items.size());
 	for (auto& item : result->Items) {
+		const auto* ci = item->completionItem;
 		auto entry = std::make_shared<CompletionEntryResponse>();
-		entry->Name = item->Label;
-		if (!item->SortText.empty()) {
-			entry->SortText = item->SortText;
+		entry->Name = ci->Label;
+		if (ci->SortText != nullptr) {
+			entry->SortText = *ci->SortText;
 		}
-		if (!item->InsertText.empty()) {
-			entry->InsertText = item->InsertText;
+		if (ci->InsertText != nullptr) {
+			entry->InsertText = *ci->InsertText;
 		}
-		if (!item->FilterText.empty()) {
-			entry->FilterText = item->FilterText;
+		if (ci->FilterText != nullptr) {
+			entry->FilterText = *ci->FilterText;
 		}
-		if (!item->Detail.empty()) {
-			entry->Detail = item->Detail;
+		if (ci->Detail != nullptr) {
+			entry->Detail = *ci->Detail;
 		}
-		if (item->hasKind) {
-			entry->Kind = uint32_t(item->Kind);
+		if (ci->Kind != nullptr) {
+			entry->Kind = uint32_t(*ci->Kind);
 		}
-		if (item->LabelDetails != nullptr) {
+		if (ci->LabelDetails != nullptr) {
 			auto ld = std::make_shared<CompletionEntryLabelDetailsResponse>();
-			ld->Detail = item->LabelDetails->Detail;
-			if (!item->LabelDetails->Description.empty()) {
-				ld->Description = item->LabelDetails->Description;
+			if (ci->LabelDetails->Detail != nullptr) {
+				ld->Detail = *ci->LabelDetails->Detail;
+			}
+			if (ci->LabelDetails->Description != nullptr &&
+			    !ci->LabelDetails->Description->empty()) {
+				ld->Description = *ci->LabelDetails->Description;
 			}
 			entry->LabelDetails = std::move(ld);
 		}
@@ -6911,7 +6928,7 @@ Session::handleGetReferencedSymbolsForNode(
 	}
 
 	auto sourceFiles = program->GetSourceFiles();
-	auto entries = langSvc->GetReferencedSymbolsForNode(ctx, params->Position,
+	auto entries = langSvc->GetReferencedSymbolsForNode(toLSContext(ctx), params->Position,
 	                                                  node, sourceFiles);
 	if (entries.empty()) {
 		return {std::vector<ReferencedSymbolEntry>{}, nullptr};

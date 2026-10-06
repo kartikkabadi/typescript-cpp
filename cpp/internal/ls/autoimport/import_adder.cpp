@@ -155,10 +155,10 @@ std::vector<newImportBinding*> sortedNamedImports(
 void importAdder::AddImportFix(std::unique_ptr<Fix> fix) {
 	Fix* f = fix.get();
 	ownedFixes.push_back(std::move(fix));
-	const std::string& symbolName = f->autoImportFix.Name;
+	const std::string& symbolName = f->AutoImportFix->Name;
 	const CompilerOptions* compilerOptions = view->program->Options();
 
-	switch (f->autoImportFix.Kind) {
+	switch (f->AutoImportFix->Kind) {
 		case lsp::lsproto::AutoImportFixKindUseNamespace:
 			addToNamespace.push_back(f);
 			break;
@@ -182,7 +182,7 @@ void importAdder::AddImportFix(std::unique_ptr<Fix> fix) {
 				    existingFix->importClauseOrBindingPattern, std::move(e));
 			}
 
-			if (f->autoImportFix.ImportKind == lsp::lsproto::ImportKindNamed) {
+			if (f->AutoImportFix->ImportKind == lsp::lsproto::ImportKindNamed) {
 				lsp::lsproto::AddAsTypeOnly prevTypeOnly{};
 				if (auto it2 = entry->namedImports.find(symbolName);
 				    it2 != entry->namedImports.end()) {
@@ -192,7 +192,7 @@ void importAdder::AddImportFix(std::unique_ptr<Fix> fix) {
 				binding->kind = lsp::lsproto::ImportKindNamed;
 				binding->name = symbolName;
 				binding->addAsTypeOnly = reduceAddAsTypeOnlyValues(
-				    prevTypeOnly, f->autoImportFix.AddAsTypeOnly);
+				    prevTypeOnly, f->AutoImportFix->AddAsTypeOnly);
 				binding->propertyName = existingFix->namedImport->propertyName;
 				entry->namedImports[symbolName] = std::move(binding);
 			} else {
@@ -210,21 +210,21 @@ void importAdder::AddImportFix(std::unique_ptr<Fix> fix) {
 				binding->kind = lsp::lsproto::ImportKindDefault;
 				binding->name = symbolName;
 				binding->addAsTypeOnly = reduceAddAsTypeOnlyValues(
-				    prevTypeOnly, f->autoImportFix.AddAsTypeOnly);
+				    prevTypeOnly, f->AutoImportFix->AddAsTypeOnly);
 				entry->defaultImport = std::move(binding);
 			}
 			break;
 		}
 		case lsp::lsproto::AutoImportFixKindAddNew: {
 			importsCollection* entry = getNewImportEntry(
-			    f->autoImportFix.ModuleSpecifier, f->autoImportFix.ImportKind,
-			    f->autoImportFix.UseRequire, f->autoImportFix.AddAsTypeOnly);
+			    f->AutoImportFix->ModuleSpecifier, f->AutoImportFix->ImportKind,
+			    f->AutoImportFix->UseRequire, f->AutoImportFix->AddAsTypeOnly);
 			debug::assert(
-			    entry->useRequire == f->autoImportFix.UseRequire,
+			    entry->useRequire == f->AutoImportFix->UseRequire,
 			    "(Add new) Tried to add an `import` and a `require` for the "
 			    "same module");
 
-			switch (f->autoImportFix.ImportKind) {
+			switch (f->AutoImportFix->ImportKind) {
 				case lsp::lsproto::ImportKindDefault: {
 					debug::assert(
 					    entry->defaultImport == nullptr ||
@@ -239,7 +239,7 @@ void importAdder::AddImportFix(std::unique_ptr<Fix> fix) {
 					binding->kind = lsp::lsproto::ImportKindDefault;
 					binding->name = symbolName;
 					binding->addAsTypeOnly = reduceAddAsTypeOnlyValues(
-					    prevTypeOnly, f->autoImportFix.AddAsTypeOnly);
+					    prevTypeOnly, f->AutoImportFix->AddAsTypeOnly);
 					entry->defaultImport = std::move(binding);
 					break;
 				}
@@ -253,7 +253,7 @@ void importAdder::AddImportFix(std::unique_ptr<Fix> fix) {
 					binding->kind = lsp::lsproto::ImportKindNamed;
 					binding->name = symbolName;
 					binding->addAsTypeOnly = reduceAddAsTypeOnlyValues(
-					    prevTypeOnly, f->autoImportFix.AddAsTypeOnly);
+					    prevTypeOnly, f->AutoImportFix->AddAsTypeOnly);
 					// !!! propertyName
 					entry->namedImports[symbolName] = std::move(binding);
 					break;
@@ -270,7 +270,7 @@ void importAdder::AddImportFix(std::unique_ptr<Fix> fix) {
 						binding->kind = lsp::lsproto::ImportKindCommonJS;
 						binding->name = symbolName;
 						binding->addAsTypeOnly = reduceAddAsTypeOnlyValues(
-						    prevTypeOnly, f->autoImportFix.AddAsTypeOnly);
+						    prevTypeOnly, f->AutoImportFix->AddAsTypeOnly);
 						// !!! propertyName
 						entry->namedImports[symbolName] = std::move(binding);
 					} else {
@@ -283,7 +283,7 @@ void importAdder::AddImportFix(std::unique_ptr<Fix> fix) {
 						binding->kind = lsp::lsproto::ImportKindCommonJS;
 						binding->name = symbolName;
 						binding->addAsTypeOnly =
-						    f->autoImportFix.AddAsTypeOnly;
+						    f->AutoImportFix->AddAsTypeOnly;
 						entry->namespaceLikeImport = std::move(binding);
 					}
 					break;
@@ -297,7 +297,7 @@ void importAdder::AddImportFix(std::unique_ptr<Fix> fix) {
 					auto binding = std::make_unique<newImportBinding>();
 					binding->kind = lsp::lsproto::ImportKindNamespace;
 					binding->name = symbolName;
-					binding->addAsTypeOnly = f->autoImportFix.AddAsTypeOnly;
+					binding->addAsTypeOnly = f->AutoImportFix->AddAsTypeOnly;
 					entry->namespaceLikeImport = std::move(binding);
 					break;
 				}
@@ -310,7 +310,7 @@ void importAdder::AddImportFix(std::unique_ptr<Fix> fix) {
 		default:
 			debug::fail("Unexpected fix kind: " +
 			            std::to_string(static_cast<int>(
-			                f->autoImportFix.Kind)));
+			                f->AutoImportFix->Kind)));
 	}
 }
 

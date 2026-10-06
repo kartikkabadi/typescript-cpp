@@ -76,4 +76,16 @@ enum class ModuleInstanceState : int32_t {
 	ConstEnumOnly = 3,
 };
 
+// === slice: ls-coreA ===
+
+// utilities.go:2240 — SemanticMeaning (plain int32 + consts, like
+// SymbolFlags, so `&`/`|` work on values).
+using SemanticMeaning = int32_t;
+inline constexpr SemanticMeaning SemanticMeaningNone = 0;
+inline constexpr SemanticMeaning SemanticMeaningValue = 1 << 0;
+inline constexpr SemanticMeaning SemanticMeaningType = 1 << 1;
+inline constexpr SemanticMeaning SemanticMeaningNamespace = 1 << 2;
+inline constexpr SemanticMeaning SemanticMeaningAll =
+	SemanticMeaningValue | SemanticMeaningType | SemanticMeaningNamespace;
+
 } // namespace tsc

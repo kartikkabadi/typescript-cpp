@@ -3,6 +3,7 @@
 // adjustments.
 
 #include "internal/ls/change/change.h"
+#include "internal/ls/lsdeps.h" // lsconv::Converters methods
 
 #include <algorithm>
 #include <string>

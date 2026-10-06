@@ -594,7 +594,9 @@ struct newImportBinding {
 
 // Fix — fix.go:37 (Go: embeds *lsproto.AutoImportFix)
 struct Fix {
-	lsp::lsproto::AutoImportFix autoImportFix;
+	// Go embeds *lsproto.AutoImportFix (pointer embed — promoted field name
+	// stays AutoImportFix).
+	lsp::lsproto::AutoImportFix* AutoImportFix = nullptr;
 
 	modulespecifiers::ResultKind ModuleSpecifierKind =
 	    modulespecifiers::ResultKind::None;

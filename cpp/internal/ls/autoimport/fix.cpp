@@ -59,7 +59,7 @@ std::tuple<std::vector<lsp::lsproto::TextEdit*>, std::string, bool> Fix::Edits(
 	    std::make_unique<ls::change::Tracker>(
 	        format::FormatRequestContext{}, compilerOptions,
 	        formatOptions, converters);
-	switch (autoImportFix.Kind) {
+	switch (AutoImportFix->Kind) {
 		case lsp::lsproto::AutoImportFixKindUseNamespace: {
 			std::string description =
 			    addNamespaceQualifier(this, tracker.get(), file, loc);
@@ -68,7 +68,7 @@ std::tuple<std::vector<lsp::lsproto::TextEdit*>, std::string, bool> Fix::Edits(
 		}
 		case lsp::lsproto::AutoImportFixKindAddToExisting: {
 			if (static_cast<int>(file->imports.size()) <=
-			    autoImportFix.ImportIndex) {
+			    AutoImportFix->ImportIndex) {
 				TSC_UNREACHABLE("import index out of range");
 			}
 			auto existingFix = getAddToExistingImportFix(file, this);
@@ -83,37 +83,37 @@ std::tuple<std::vector<lsp::lsproto::TextEdit*>, std::string, bool> Fix::Edits(
 			auto [edits, safe] = fileEdits(tracker.get(), file);
 			return {edits,
 			        localize(loc, Update_import_from_0,
-			                              "", {autoImportFix.ModuleSpecifier}),
+			                              "", {AutoImportFix->ModuleSpecifier}),
 			        safe};
 		}
 		case lsp::lsproto::AutoImportFixKindAddNew: {
 			std::vector<Node*> declarations;
 			newImportBinding* defaultImport = nullptr;
 			std::unique_ptr<newImportBinding> defaultImportOwner;
-			if (autoImportFix.ImportKind == lsp::lsproto::ImportKindDefault) {
+			if (AutoImportFix->ImportKind == lsp::lsproto::ImportKindDefault) {
 				auto b = std::make_unique<newImportBinding>();
-				b->name = autoImportFix.Name;
-				b->addAsTypeOnly = autoImportFix.AddAsTypeOnly;
+				b->name = AutoImportFix->Name;
+				b->addAsTypeOnly = AutoImportFix->AddAsTypeOnly;
 				defaultImport = b.get();
 				defaultImportOwner = std::move(b);
 			}
 			std::vector<newImportBinding*> namedImports;
 			std::unique_ptr<newImportBinding> namedImportOwner;
-			if (autoImportFix.ImportKind == lsp::lsproto::ImportKindNamed) {
+			if (AutoImportFix->ImportKind == lsp::lsproto::ImportKindNamed) {
 				auto b = std::make_unique<newImportBinding>();
-				b->name = autoImportFix.Name;
-				b->addAsTypeOnly = autoImportFix.AddAsTypeOnly;
+				b->name = AutoImportFix->Name;
+				b->addAsTypeOnly = AutoImportFix->AddAsTypeOnly;
 				namedImportOwner = std::move(b);
 				namedImports.push_back(namedImportOwner.get());
 			}
 			newImportBinding* namespaceLikeImport = nullptr;
 			std::unique_ptr<newImportBinding> namespaceLikeImportOwner;
 			// qualification := f.qualification()
-			if (autoImportFix.ImportKind == lsp::lsproto::ImportKindNamespace ||
-			    autoImportFix.ImportKind == lsp::lsproto::ImportKindCommonJS) {
+			if (AutoImportFix->ImportKind == lsp::lsproto::ImportKindNamespace ||
+			    AutoImportFix->ImportKind == lsp::lsproto::ImportKindCommonJS) {
 				auto b = std::make_unique<newImportBinding>();
-				b->kind = autoImportFix.ImportKind;
-				b->name = autoImportFix.Name;
+				b->kind = AutoImportFix->ImportKind;
+				b->name = AutoImportFix->Name;
 				namespaceLikeImportOwner = std::move(b);
 				namespaceLikeImport = namespaceLikeImportOwner.get();
 				// if qualification != nil && qualification.namespacePref != "" {
@@ -123,14 +123,14 @@ std::tuple<std::vector<lsp::lsproto::TextEdit*>, std::string, bool> Fix::Edits(
 
 			lsutil::QuotePreference quotePreference =
 			    lsutil::GetQuotePreference(file, preferences);
-			if (autoImportFix.UseRequire) {
+			if (AutoImportFix->UseRequire) {
 				declarations = getNewRequires(
-				    tracker.get(), autoImportFix.ModuleSpecifier, quotePreference,
+				    tracker.get(), AutoImportFix->ModuleSpecifier, quotePreference,
 				    defaultImport, namedImports, namespaceLikeImport,
 				    compilerOptions);
 			} else {
 				declarations = getNewImports(
-				    tracker.get(), autoImportFix.ModuleSpecifier, quotePreference,
+				    tracker.get(), AutoImportFix->ModuleSpecifier, quotePreference,
 				    defaultImport, namedImports, namespaceLikeImport,
 				    compilerOptions, preferences);
 			}
@@ -143,7 +143,7 @@ std::tuple<std::vector<lsp::lsproto::TextEdit*>, std::string, bool> Fix::Edits(
 			auto [edits, safe] = fileEdits(tracker.get(), file);
 			return {edits,
 			        localize(loc, Add_import_from_0,
-			                              "", {autoImportFix.ModuleSpecifier}),
+			                              "", {AutoImportFix->ModuleSpecifier}),
 			        safe};
 		}
 		case lsp::lsproto::AutoImportFixKindPromoteTypeOnly: {
@@ -158,7 +158,7 @@ std::tuple<std::vector<lsp::lsproto::TextEdit*>, std::string, bool> Fix::Edits(
 				        localize(
 				            loc,
 				            Remove_type_from_import_of_0_from_1,
-				            "", {autoImportFix.Name, moduleSpec}),
+				            "", {AutoImportFix->Name, moduleSpec}),
 				        safe};
 			}
 			std::string moduleSpec = getModuleSpecifierText(promotedDeclaration);
@@ -206,7 +206,7 @@ std::pair<std::vector<lsp::lsproto::TextEdit*>, bool> fileEdits(
 std::string addImportType(Fix* f, SourceFile* file,
                           const lsutil::UserPreferences& preferences,
                           change::Tracker* tracker, locale::Locale loc) {
-	if (f->autoImportFix.UsagePosition == nullptr) {
+	if (f->AutoImportFix->UsagePosition == nullptr) {
 		TSC_UNREACHABLE("UsagePosition must be set for JSDoc type import fix");
 	}
 	lsutil::QuotePreference quotePreference =
@@ -216,37 +216,37 @@ std::string addImportType(Fix* f, SourceFile* file,
 		quoteChar = "'";
 	}
 	std::string importTypePrefix = "import(" + quoteChar +
-	                               f->autoImportFix.ModuleSpecifier + quoteChar +
+	                               f->AutoImportFix->ModuleSpecifier + quoteChar +
 	                               ").";
-	tracker->InsertText(file, *f->autoImportFix.UsagePosition,
+	tracker->InsertText(file, *f->AutoImportFix->UsagePosition,
 	                    importTypePrefix);
 	return localize(
 	    loc, Change_0_to_1, "",
-	    {f->autoImportFix.Name, importTypePrefix + f->autoImportFix.Name});
+	    {f->AutoImportFix->Name, importTypePrefix + f->AutoImportFix->Name});
 }
 
 // addNamespaceQualifier — fix.go:152
 std::string addNamespaceQualifier(Fix* f, change::Tracker* tracker,
                                   SourceFile* file, locale::Locale loc) {
-	if (f->autoImportFix.UsagePosition == nullptr ||
-	    f->autoImportFix.NamespacePrefix.empty()) {
+	if (f->AutoImportFix->UsagePosition == nullptr ||
+	    f->AutoImportFix->NamespacePrefix.empty()) {
 		TSC_UNREACHABLE("namespace fix requires usage position and prefix");
 	}
 	std::string qualified =
-	    f->autoImportFix.NamespacePrefix + "." + f->autoImportFix.Name;
-	tracker->InsertText(file, *f->autoImportFix.UsagePosition,
-	                    f->autoImportFix.NamespacePrefix + ".");
+	    f->AutoImportFix->NamespacePrefix + "." + f->AutoImportFix->Name;
+	tracker->InsertText(file, *f->AutoImportFix->UsagePosition,
+	                    f->AutoImportFix->NamespacePrefix + ".");
 	return localize(loc, Change_0_to_1, "",
-	                             {f->autoImportFix.Name, qualified});
+	                             {f->AutoImportFix->Name, qualified});
 }
 
 // getAddToExistingImportFix — fix.go:161
 std::unique_ptr<addToExistingImportFix> getAddToExistingImportFix(
     SourceFile* file, Fix* fix) {
-	if (fix->autoImportFix.Kind != lsp::lsproto::AutoImportFixKindAddToExisting) {
+	if (fix->AutoImportFix->Kind != lsp::lsproto::AutoImportFixKindAddToExisting) {
 		TSC_UNREACHABLE("expected add to existing import fix");
 	}
-	Node* moduleSpecifier = file->imports[fix->autoImportFix.ImportIndex];
+	Node* moduleSpecifier = file->imports[fix->AutoImportFix->ImportIndex];
 	Node* importNode = tryGetImportFromModuleSpecifier(moduleSpecifier);
 	if (importNode == nullptr) {
 		TSC_UNREACHABLE("expected import declaration");
@@ -280,18 +280,18 @@ std::unique_ptr<addToExistingImportFix> getAddToExistingImportFix(
 	}
 
 	std::unique_ptr<newImportBinding> defaultImport;
-	if (fix->autoImportFix.ImportKind == lsp::lsproto::ImportKindDefault) {
+	if (fix->AutoImportFix->ImportKind == lsp::lsproto::ImportKindDefault) {
 		defaultImport = std::make_unique<newImportBinding>();
 		defaultImport->kind = lsp::lsproto::ImportKindDefault;
-		defaultImport->name = fix->autoImportFix.Name;
-		defaultImport->addAsTypeOnly = fix->autoImportFix.AddAsTypeOnly;
+		defaultImport->name = fix->AutoImportFix->Name;
+		defaultImport->addAsTypeOnly = fix->AutoImportFix->AddAsTypeOnly;
 	}
 	std::unique_ptr<newImportBinding> namedImport;
-	if (fix->autoImportFix.ImportKind == lsp::lsproto::ImportKindNamed) {
+	if (fix->AutoImportFix->ImportKind == lsp::lsproto::ImportKindNamed) {
 		namedImport = std::make_unique<newImportBinding>();
 		namedImport->kind = lsp::lsproto::ImportKindNamed;
-		namedImport->name = fix->autoImportFix.Name;
-		namedImport->addAsTypeOnly = fix->autoImportFix.AddAsTypeOnly;
+		namedImport->name = fix->AutoImportFix->Name;
+		namedImport->addAsTypeOnly = fix->AutoImportFix->AddAsTypeOnly;
 	}
 	auto result = std::make_unique<addToExistingImportFix>();
 	result->importClauseOrBindingPattern = importClauseOrBindingPattern;
@@ -828,10 +828,11 @@ std::vector<std::unique_ptr<Fix>> View::GetFixes(
 		// For pure types in JS files, use JSDoc import type syntax
 		std::vector<std::unique_ptr<Fix>> out;
 		auto f = std::make_unique<Fix>();
-		f->autoImportFix.Kind = lsp::lsproto::AutoImportFixKindJsdocTypeImport;
-		f->autoImportFix.ModuleSpecifier = moduleSpecifier;
-		f->autoImportFix.Name = e->Name();
-		f->autoImportFix.UsagePosition =
+		f->AutoImportFix = new lsp::lsproto::AutoImportFix{};
+		f->AutoImportFix->Kind = lsp::lsproto::AutoImportFixKindJsdocTypeImport;
+		f->AutoImportFix->ModuleSpecifier = moduleSpecifier;
+		f->AutoImportFix->Name = e->Name();
+		f->AutoImportFix->UsagePosition =
 		    const_cast<lsp::lsproto::Position*>(usagePosition);
 		f->ModuleSpecifierKind = moduleSpecifierKind;
 		f->IsReExport = !(e->Target.ModuleID == e->exportID.ModuleID);
@@ -856,12 +857,13 @@ std::vector<std::unique_ptr<Fix>> View::GetFixes(
 	}
 
 	auto f = std::make_unique<Fix>();
-	f->autoImportFix.Kind = lsp::lsproto::AutoImportFixKindAddNew;
-	f->autoImportFix.ImportKind = importKind;
-	f->autoImportFix.ModuleSpecifier = moduleSpecifier;
-	f->autoImportFix.Name = name;
-	f->autoImportFix.UseRequire = shouldUseRequire();
-	f->autoImportFix.AddAsTypeOnly = addAsTypeOnly;
+	f->AutoImportFix = new lsp::lsproto::AutoImportFix{};
+	f->AutoImportFix->Kind = lsp::lsproto::AutoImportFixKindAddNew;
+	f->AutoImportFix->ImportKind = importKind;
+	f->AutoImportFix->ModuleSpecifier = moduleSpecifier;
+	f->AutoImportFix->Name = name;
+	f->AutoImportFix->UseRequire = shouldUseRequire();
+	f->AutoImportFix->AddAsTypeOnly = addAsTypeOnly;
 	f->ModuleSpecifierKind = moduleSpecifierKind;
 	f->IsReExport = !(e->Target.ModuleID == e->exportID.ModuleID);
 	f->ModuleFileName = e->ModuleFileName;
@@ -911,16 +913,17 @@ std::unique_ptr<Fix> View::tryUseExistingNamespaceImport(
 			continue;
 		}
 		auto f = std::make_unique<Fix>();
-		f->autoImportFix.Kind = lsp::lsproto::AutoImportFixKindUseNamespace;
-		f->autoImportFix.Name = e->Name();
-		f->autoImportFix.ModuleSpecifier = existingImport.moduleSpecifier;
-		f->autoImportFix.ImportKind = lsp::lsproto::ImportKindNamespace;
-		f->autoImportFix.AddAsTypeOnly = lsp::lsproto::AddAsTypeOnlyAllowed;
-		f->autoImportFix.ImportIndex =
+		f->AutoImportFix = new lsp::lsproto::AutoImportFix{};
+		f->AutoImportFix->Kind = lsp::lsproto::AutoImportFixKindUseNamespace;
+		f->AutoImportFix->Name = e->Name();
+		f->AutoImportFix->ModuleSpecifier = existingImport.moduleSpecifier;
+		f->AutoImportFix->ImportKind = lsp::lsproto::ImportKindNamespace;
+		f->AutoImportFix->AddAsTypeOnly = lsp::lsproto::AddAsTypeOnlyAllowed;
+		f->AutoImportFix->ImportIndex =
 		    static_cast<int32_t>(existingImport.index);
-		f->autoImportFix.UsagePosition =
+		f->AutoImportFix->UsagePosition =
 		    const_cast<lsp::lsproto::Position*>(usagePosition);
-		f->autoImportFix.NamespacePrefix = namespacePrefix;
+		f->AutoImportFix->NamespacePrefix = namespacePrefix;
 		return f;
 	}
 
@@ -999,15 +1002,16 @@ std::unique_ptr<Fix> View::tryAddToExistingImport(
 			    existingImport.node->name()->kind ==
 			        Kind::ObjectBindingPattern) {
 				auto fix = std::make_unique<Fix>();
-				fix->autoImportFix.Kind =
+				fix->AutoImportFix = new lsp::lsproto::AutoImportFix{};
+				fix->AutoImportFix->Kind =
 				    lsp::lsproto::AutoImportFixKindAddToExisting;
-				fix->autoImportFix.Name = e->Name();
-				fix->autoImportFix.ImportKind = importKind;
-				fix->autoImportFix.ImportIndex =
+				fix->AutoImportFix->Name = e->Name();
+				fix->AutoImportFix->ImportKind = importKind;
+				fix->AutoImportFix->ImportIndex =
 				    static_cast<int32_t>(existingImport.index);
-				fix->autoImportFix.ModuleSpecifier =
+				fix->AutoImportFix->ModuleSpecifier =
 				    existingImport.moduleSpecifier;
-				fix->autoImportFix.AddAsTypeOnly = addAsTypeOnly;
+				fix->AutoImportFix->AddAsTypeOnly = addAsTypeOnly;
 				// Variable declarations are never type-only.
 				// Give preference to putting types in existing type-only imports and avoiding conversions
 				// of import statements to/from type-only.
@@ -1054,13 +1058,14 @@ std::unique_ptr<Fix> View::tryAddToExistingImport(
 		}
 
 		auto fix = std::make_unique<Fix>();
-		fix->autoImportFix.Kind = lsp::lsproto::AutoImportFixKindAddToExisting;
-		fix->autoImportFix.Name = e->Name();
-		fix->autoImportFix.ImportKind = importKind;
-		fix->autoImportFix.ImportIndex =
+		fix->AutoImportFix = new lsp::lsproto::AutoImportFix{};
+		fix->AutoImportFix->Kind = lsp::lsproto::AutoImportFixKindAddToExisting;
+		fix->AutoImportFix->Name = e->Name();
+		fix->AutoImportFix->ImportKind = importKind;
+		fix->AutoImportFix->ImportIndex =
 		    static_cast<int32_t>(existingImport.index);
-		fix->autoImportFix.ModuleSpecifier = existingImport.moduleSpecifier;
-		fix->autoImportFix.AddAsTypeOnly = addAsTypeOnly;
+		fix->AutoImportFix->ModuleSpecifier = existingImport.moduleSpecifier;
+		fix->AutoImportFix->AddAsTypeOnly = addAsTypeOnly;
 
 		bool isTypeOnly = importClause->isTypeOnly();
 		// Give preference to putting types in existing type-only imports and avoiding conversions
@@ -1333,8 +1338,8 @@ int View::CompareFixesForSorting(Fix* a, Fix* b) {
 // Fixes of equal desirability will be considered equal.
 // View::CompareFixesForRanking — fix.go:1015
 int View::CompareFixesForRanking(Fix* a, Fix* b) {
-	if (int res = compareFixKinds(a->autoImportFix.Kind,
-	                              b->autoImportFix.Kind);
+	if (int res = compareFixKinds(a->AutoImportFix->Kind,
+	                              b->AutoImportFix->Kind);
 	    res != 0) {
 		return res;
 	}
@@ -1356,8 +1361,8 @@ int View::compareModuleSpecifiersForRanking(Fix* a, Fix* b) {
 	if (a->ModuleSpecifierKind == modulespecifiers::ResultKind::Ambient &&
 	    b->ModuleSpecifierKind == modulespecifiers::ResultKind::Ambient) {
 		if (int comparison = compareNodeCoreModuleSpecifiers(
-		        a->autoImportFix.ModuleSpecifier,
-		        b->autoImportFix.ModuleSpecifier, importingFile, program);
+		        a->AutoImportFix->ModuleSpecifier,
+		        b->AutoImportFix->ModuleSpecifier, importingFile, program);
 		    comparison != 0) {
 			return comparison;
 		}
@@ -1374,8 +1379,8 @@ int View::compareModuleSpecifiersForRanking(Fix* a, Fix* b) {
 		}
 	}
 	if (int comparison = tspath::compareNumberOfDirectorySeparators(
-	        a->autoImportFix.ModuleSpecifier,
-	        b->autoImportFix.ModuleSpecifier);
+	        a->AutoImportFix->ModuleSpecifier,
+	        b->AutoImportFix->ModuleSpecifier);
 	    comparison != 0) {
 		return comparison;
 	}
@@ -1388,23 +1393,23 @@ int View::compareModuleSpecifiersForSorting(Fix* a, Fix* b) {
 		return res;
 	}
 	// Sort ./foo before ../foo for equal-length specifiers
-	if (a->autoImportFix.ModuleSpecifier.starts_with("./") &&
-	    !b->autoImportFix.ModuleSpecifier.starts_with("./")) {
+	if (a->AutoImportFix->ModuleSpecifier.starts_with("./") &&
+	    !b->AutoImportFix->ModuleSpecifier.starts_with("./")) {
 		return -1;
 	}
-	if (b->autoImportFix.ModuleSpecifier.starts_with("./") &&
-	    !a->autoImportFix.ModuleSpecifier.starts_with("./")) {
+	if (b->AutoImportFix->ModuleSpecifier.starts_with("./") &&
+	    !a->AutoImportFix->ModuleSpecifier.starts_with("./")) {
 		return 1;
 	}
 	if (int comparison =
-	        a->autoImportFix.ModuleSpecifier.compare(
-	            b->autoImportFix.ModuleSpecifier);
+	        a->AutoImportFix->ModuleSpecifier.compare(
+	            b->AutoImportFix->ModuleSpecifier);
 	    comparison != 0) {
 		return comparison;
 	}
 	if (int comparison =
-	        static_cast<int>(a->autoImportFix.ImportKind) -
-	        static_cast<int>(b->autoImportFix.ImportKind);
+	        static_cast<int>(a->AutoImportFix->ImportKind) -
+	        static_cast<int>(b->AutoImportFix->ImportKind);
 	    comparison != 0) {
 		return comparison;
 	}

@@ -37,6 +37,7 @@
 #include "internal/ipc/ipc.h"
 #include "internal/json/json.h"
 #include "internal/module/resolver.h"
+#include "internal/lsp/lsproto/lsproto.h"
 #include "internal/module/staticresolver.h"
 #include "internal/module/types.h"
 #include "internal/pprof/pprof.h"
@@ -50,7 +51,6 @@ namespace ls { struct LanguageService; }
 namespace lsconv { struct LSPLineMap; }
 namespace printer { struct Printer; }
 namespace lsproto { struct TextEdit; struct Position; }
-namespace lsp::lsproto { struct TextEdit; struct Position; }
 } // namespace tsc
 
 namespace tsc::api {

@@ -1,27 +1,18 @@
-// === dep decls — owned by ls ===
-// Stubs for ls free functions; see ls.h.
+// === dep decls — owned by the ls-coreB slice (findallreferences.go) ===
+// Called by the api slice; stubbed until ls-coreB lands.
 #include "internal/ls/ls.h"
 
 namespace tsc::ls {
 
-// ErrNeedsAutoImports (completions.go:35).
-const gostd::Error ErrNeedsAutoImports =
-	gostd::newError("completion list needs auto imports");
-
-LanguageService* NewLanguageService(const std::string& /*projectID*/,
-                                    compiler::SimpleProgram* /*program*/,
-                                    Host* /*host*/,
-                                    const std::string& /*activeFile*/) {
-	TSC_UNREACHABLE("ls::NewLanguageService — owned by ls slice");
+std::vector<SignatureUsage> LanguageService::GetSignatureUsages(
+    const ContextPtr& /*ctx*/, Node* /*signatureDecl*/) {
+	TSC_UNREACHABLE("ls::GetSignatureUsages — owned by ls-coreB slice");
 }
 
-std::string GetSymbolDocumentationComment(checker::Checker* /*c*/,
-                                          Symbol* /*symbol*/) {
-	TSC_UNREACHABLE("ls::GetSymbolDocumentationComment — owned by ls slice");
-}
-
-std::vector<JSDocTagInfo> GetSymbolJSDocTags(Symbol* /*symbol*/) {
-	TSC_UNREACHABLE("ls::GetSymbolJSDocTags — owned by ls slice");
+std::vector<SymbolAndEntries*> LanguageService::GetReferencedSymbolsForNode(
+    const ContextPtr& /*ctx*/, int /*position*/, Node* /*node*/,
+    const std::vector<SourceFile*>& /*sourceFiles*/) {
+	TSC_UNREACHABLE("ls::GetReferencedSymbolsForNode — owned by ls-coreB slice");
 }
 
 } // namespace tsc::ls
