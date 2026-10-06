@@ -113,15 +113,6 @@ missingMemberFixer* newMissingMemberFixer(
 	    "newMissingMemberFixer — ls/codeactions_missingmemberfixer slice");
 }
 
-std::tuple<std::string, std::string, std::string,
-           std::vector<lsproto::VSClassifiedTextRun*>>
-LanguageService::getQuickInfoAndDocumentationForSymbol(
-    checker::Checker* c, Symbol* symbol, Node* node,
-    lsproto::MarkupKind contentFormat, checker::VerbosityContext* vc,
-    bool vsCapability) {
-	TSC_UNREACHABLE(
-	    "getQuickInfoAndDocumentationForSymbol — ls/hover slice");
-}
 
 } // namespace tsc::ls
 

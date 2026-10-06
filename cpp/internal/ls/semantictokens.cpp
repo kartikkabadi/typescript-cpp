@@ -358,10 +358,10 @@ std::vector<uint32_t> encodeSemanticTokens(gostd::Context ctx,
 	uint32_t clientIdx = 0;
 	for (size_t i = 0; i < tokenTypes.size(); i++) {
 		const auto& serverType = tokenTypes[i];
-		if (std::find(clientCapabilities->TokenTypes.begin(),
-					  clientCapabilities->TokenTypes.end(),
+		if (std::find(clientCapabilities->TokenTypes->begin(),
+					  clientCapabilities->TokenTypes->end(),
 					  std::string(serverType)) !=
-			clientCapabilities->TokenTypes.end()) {
+			clientCapabilities->TokenTypes->end()) {
 			typeMapping[tokenType(i)] = clientIdx;
 			clientIdx++;
 		}
@@ -370,10 +370,10 @@ std::vector<uint32_t> encodeSemanticTokens(gostd::Context ctx,
 	// Map server token modifiers to client-supported bit positions
 	uint32_t clientBit = 0;
 	for (auto& serverModifier : tokenModifiers) {
-		if (std::find(clientCapabilities->TokenModifiers.begin(),
-					  clientCapabilities->TokenModifiers.end(),
+		if (std::find(clientCapabilities->TokenModifiers->begin(),
+					  clientCapabilities->TokenModifiers->end(),
 					  std::string(serverModifier)) !=
-			clientCapabilities->TokenModifiers.end()) {
+			clientCapabilities->TokenModifiers->end()) {
 			modifierMapping[serverModifier] = clientBit;
 			clientBit++;
 		}
@@ -643,7 +643,7 @@ lsp::lsproto::SemanticTokensResponse LanguageService::ProvideSemanticTokens(
 	// Convert to LSP format (relative encoding)
 	std::vector<uint32_t> encoded = encodeSemanticTokens(ctx, tokens, converters);
 
-	auto* semanticTokens = new lsp::lsproto::SemanticTokens;
+	auto semanticTokens = std::make_shared<lsp::lsproto::SemanticTokens>();
 	semanticTokens->Data = std::move(encoded);
 	out.SemanticTokens = semanticTokens;
 	return out;
@@ -681,7 +681,7 @@ lsp::lsproto::SemanticTokensRangeResponse LanguageService::ProvideSemanticTokens
 
 	std::vector<uint32_t> encoded = encodeSemanticTokens(ctx, tokens, converters);
 
-	auto* semanticTokens = new lsp::lsproto::SemanticTokens;
+	auto semanticTokens = std::make_shared<lsp::lsproto::SemanticTokens>();
 	semanticTokens->Data = std::move(encoded);
 	out.SemanticTokens = semanticTokens;
 	return out;
@@ -696,19 +696,19 @@ lsp::lsproto::SemanticTokensLegend* SemanticTokensLegend(
 	std::vector<std::string> types;
 	types.reserve(tokenTypes.size());
 	for (auto& t : tokenTypes) {
-		if (std::find(clientCapabilities.TokenTypes.begin(),
-					  clientCapabilities.TokenTypes.end(), std::string(t)) !=
-			clientCapabilities.TokenTypes.end()) {
+		if (std::find(clientCapabilities.TokenTypes->begin(),
+					  clientCapabilities.TokenTypes->end(), std::string(t)) !=
+			clientCapabilities.TokenTypes->end()) {
 			types.push_back(std::string(t));
 		}
 	}
 	std::vector<std::string> modifiers;
 	modifiers.reserve(tokenModifiers.size());
 	for (auto& m : tokenModifiers) {
-		if (std::find(clientCapabilities.TokenModifiers.begin(),
-					  clientCapabilities.TokenModifiers.end(),
+		if (std::find(clientCapabilities.TokenModifiers->begin(),
+					  clientCapabilities.TokenModifiers->end(),
 					  std::string(m)) !=
-			clientCapabilities.TokenModifiers.end()) {
+			clientCapabilities.TokenModifiers->end()) {
 			modifiers.push_back(std::string(m));
 		}
 	}

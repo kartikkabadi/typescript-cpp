@@ -173,6 +173,8 @@ std::vector<checker::Signature*> getSignaturesAtLocation(
 	return signatures;
 }
 
+} // namespace
+
 // hover.go:426 — getQuickInfoAndDeclarationAtLocation. Builds classified
 // display parts using displayPartsWriter when vsCapability is true. When
 // vsCapability is false, it still builds the plain text string but skips
@@ -1517,8 +1519,6 @@ std::string getDocumentationForSymbol(
 	return c->GetSymbolAtLocation(node);
 }
 
-} // namespace
-
 // ============================================================================
 // hover.go:207 — documentationLocationMapper
 // ============================================================================
@@ -1771,7 +1771,8 @@ lsp::lsproto::HoverResponse LanguageService::ProvideHover(
 		combined->VSRawContent = rawContents[0].ContainerElement;
 		break;
 	default: {
-		auto* container = new lsp::lsproto::VSContainerElement;
+		auto container =
+			std::make_shared<lsp::lsproto::VSContainerElement>();
 		container->Style =
 			lsp::lsproto::VSContainerElementStyleStacked;
 		container->Elements = rawContents;

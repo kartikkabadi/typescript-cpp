@@ -904,11 +904,17 @@ struct CrossProjectOrchestrator {
 // combineLocationArray — crossproject.go:298.
 template <typename T>
 std::vector<T> combineLocationArray(
-    std::vector<T> combined, std::vector<T>* locations,
+    std::vector<T> combined,
+    const std::shared_ptr<lsproto::Slice<T>>& locations,
     collections::Set<lsproto::Location>* seen) {
-	for (auto& loc : *locations) {
+	if (locations == nullptr || !locations->has_value()) {
+		return combined;
+	}
+	for (auto& loc : **locations) {
 		lsproto::Location key;
 		if constexpr (std::is_pointer_v<T>) {
+			key = loc->GetLocation();
+		} else if constexpr (requires(const T& t) { t->GetLocation(); }) {
 			key = loc->GetLocation();
 		} else {
 			key = loc.GetLocation();
@@ -922,14 +928,15 @@ std::vector<T> combineLocationArray(
 }
 
 template <lsproto::HasLocations T>
-std::vector<lsproto::Location>* combineResponseLocations(
+std::shared_ptr<lsproto::Slice<lsproto::Location>> combineResponseLocations(
     const std::function<void(const std::function<bool(T&)>&)>& resultsSeq) {
-	auto* combined = new std::vector<lsproto::Location>();
+	auto combined = std::make_shared<lsproto::Slice<lsproto::Location>>(
+	    std::vector<lsproto::Location>{});
 	collections::Set<lsproto::Location> seenLocations;
 	resultsSeq([&](T& resp) -> bool {
-		if (auto* locations = resp.GetLocations(); locations != nullptr) {
-			*combined = combineLocationArray(*combined, locations,
-			                                 &seenLocations);
+		if (auto locations = resp.GetLocations(); locations != nullptr) {
+			**combined = combineLocationArray(std::move(**combined),
+			                                  locations, &seenLocations);
 		}
 		return true;
 	});
@@ -978,7 +985,7 @@ struct signatureInformation {
 	std::string* Documentation = nullptr;
 	std::vector<struct signatureHelpParameter> Parameters;
 	bool IsVariadic = false;
-	std::vector<lsproto::VSClassifiedTextRun*> ColorizedRuns;
+	lsproto::Slice<std::shared_ptr<lsproto::VSClassifiedTextRun>> ColorizedRuns;
 };
 
 struct signatureHelpParameter {
@@ -1481,6 +1488,9 @@ public:
 	autoimport::ProjectID* projectID() { return projectID_; }
 	lsconv::Converters* Converters() { return converters; }
 
+	std::pair<lsp::lsproto::Range, spanmap::Fidelity> createFoldingRangeFromBounds(
+		int start, int end, SourceFile* sourceFile);
+
 private:
 	friend struct sourceDefResolver;
 	autoimport::ProjectID* projectID_;
@@ -1539,24 +1549,24 @@ private:
 	std::pair<lsproto::SignatureHelpOrNull, gostd::Error> ProvideSignatureHelp(
 	    const gostd::Context& ctx, lsproto::DocumentUri documentURI,
 	    lsproto::Position position, lsproto::SignatureHelpContext* context);
-	lsproto::SignatureHelp* GetSignatureHelpItems(
+	std::shared_ptr<lsproto::SignatureHelp> GetSignatureHelpItems(
 	    const gostd::Context& ctx, int position,
 	    compiler::SimpleProgram* program, SourceFile* sourceFile,
 	    lsproto::SignatureHelpContext* context);
-	lsproto::SignatureHelp* createJSSignatureHelpItems(
+	std::shared_ptr<lsproto::SignatureHelp> createJSSignatureHelpItems(
 	    const gostd::Context& ctx, argumentListInfo* argumentInfo,
 	    compiler::SimpleProgram* program, checker::Checker* c);
-	lsproto::SignatureHelp* findSignatureHelpFromNamedDeclarations(
+	std::shared_ptr<lsproto::SignatureHelp> findSignatureHelpFromNamedDeclarations(
 	    const gostd::Context& ctx, SourceFile* sourceFile,
 	    const std::string& name, argumentListInfo* argumentInfo,
 	    checker::Checker* c);
-	lsproto::SignatureHelp* createSignatureHelpItems(
+	std::shared_ptr<lsproto::SignatureHelp> createSignatureHelpItems(
 	    const gostd::Context& ctx,
 	    const std::vector<checker::Signature*>& candidates,
 	    checker::Signature* resolvedSignature,
 	    argumentListInfo* argumentInfo, SourceFile* sourceFile,
 	    checker::Checker* c, bool useFullPrefix);
-	lsproto::UintegerOrNull* computeActiveParameter(
+	std::shared_ptr<lsproto::UintegerOrNull> computeActiveParameter(
 	    signatureInformation sig, int argumentIndex, bool supportsNull);
 	std::vector<signatureInformation> getSignatureHelpItem(
 	    checker::Signature* candidate, bool isTypeParameterList,
@@ -1836,14 +1846,12 @@ private:
 	// === slice: ls-coreC — folding.go ===
 	lsp::lsproto::FoldingRangeResponse ProvideFoldingRange(gostd::Context ctx,
 														 lsp::lsproto::DocumentUri documentURI);
-	std::vector<lsp::lsproto::FoldingRange*> adjustFoldingEnd(
-		std::vector<lsp::lsproto::FoldingRange*> ranges, SourceFile* sourceFile);
-	std::vector<lsp::lsproto::FoldingRange*> addNodeOutliningSpans(gostd::Context ctx,
+	std::vector<std::shared_ptr<lsp::lsproto::FoldingRange>> adjustFoldingEnd(
+		std::vector<std::shared_ptr<lsp::lsproto::FoldingRange>> ranges, SourceFile* sourceFile);
+	std::vector<std::shared_ptr<lsp::lsproto::FoldingRange>> addNodeOutliningSpans(gostd::Context ctx,
 																 SourceFile* sourceFile);
-	std::vector<lsp::lsproto::FoldingRange*> addRegionOutliningSpans(gostd::Context ctx,
+	std::vector<std::shared_ptr<lsp::lsproto::FoldingRange>> addRegionOutliningSpans(gostd::Context ctx,
 																   SourceFile* sourceFile);
-	std::pair<lsp::lsproto::Range, spanmap::Fidelity> createFoldingRangeFromBounds(int start, int end,
-																				 SourceFile* sourceFile);
 
 	// === slice: ls-coreC — sourcedefinition.go ===
 	lsp::lsproto::DefinitionResponse ProvideSourceDefinition(gostd::Context ctx,
@@ -1863,6 +1871,7 @@ private:
 													 compiler::SimpleProgram* program);
 	std::vector<semanticToken> collectSemanticTokensInRange(gostd::Context ctx, checker::Checker* c,
 															SourceFile* file,
+															compiler::SimpleProgram* program,
 															int spanStart, int spanEnd);
 
 	// === slice: ls-coreC — symbols.go ===
@@ -1892,23 +1901,27 @@ private:
 									std::vector<lsp::lsproto::DocumentUri> filesToSearch);
 	lsp::lsproto::MultiDocumentHighlightsOrNull provideDocumentHighlightsAtPosition(
 		gostd::Context ctx, lsp::lsproto::DocumentUri documentUri, int position,
+		compiler::SimpleProgram* program, SourceFile* sourceFile,
 		std::vector<lsp::lsproto::DocumentUri> filesToSearch);
-	std::vector<lsp::lsproto::MultiDocumentHighlight*> getSemanticDocumentHighlights(
+	std::vector<std::shared_ptr<lsp::lsproto::MultiDocumentHighlight>>
+	getSemanticDocumentHighlights(
 		gostd::Context ctx, int position, ::tsc::Node* node, compiler::SimpleProgram* program,
 		std::vector<SourceFile*> sourceFiles);
-	std::pair<std::string, lsp::lsproto::DocumentHighlight*> toDocumentHighlight(ReferenceEntry* entry);
-	std::vector<lsp::lsproto::DocumentHighlight*> getSyntacticDocumentHighlights(::tsc::Node* node,
-																			   SourceFile* sourceFile);
-	std::vector<lsp::lsproto::DocumentHighlight*> useParent(
+	std::pair<std::string, std::shared_ptr<lsp::lsproto::DocumentHighlight>>
+	toDocumentHighlight(ReferenceEntry* entry);
+	std::vector<std::shared_ptr<lsp::lsproto::DocumentHighlight>>
+	getSyntacticDocumentHighlights(::tsc::Node* node,
+								   SourceFile* sourceFile);
+	std::vector<std::shared_ptr<lsp::lsproto::DocumentHighlight>> useParent(
 		::tsc::Node* node, std::function<bool(::tsc::Node*)> nodeTest,
 		std::function<std::vector<::tsc::Node*>(::tsc::Node*, SourceFile*)> getNodes,
 		SourceFile* sourceFile);
-	std::vector<lsp::lsproto::DocumentHighlight*> highlightSpans(std::vector<::tsc::Node*> nodes,
+	std::vector<std::shared_ptr<lsp::lsproto::DocumentHighlight>> highlightSpans(std::vector<::tsc::Node*> nodes,
 															   SourceFile* sourceFile);
-	std::vector<lsp::lsproto::DocumentHighlight*> getFromAllDeclarations(
+	std::vector<std::shared_ptr<lsp::lsproto::DocumentHighlight>> getFromAllDeclarations(
 		std::function<bool(::tsc::Node*)> nodeTest, std::vector<Kind> keywords, ::tsc::Node* node,
 		SourceFile* sourceFile);
-	std::vector<lsp::lsproto::DocumentHighlight*> getIfElseOccurrences(IfStatement* ifStatement,
+	std::vector<std::shared_ptr<lsp::lsproto::DocumentHighlight>> getIfElseOccurrences(IfStatement* ifStatement,
 																	 SourceFile* sourceFile);
 
 	// === slice: ls-coreC — inlay_hints.go ===
@@ -1916,11 +1929,13 @@ private:
 												   lsp::lsproto::InlayHintParams* params);
 
 	// === slice: ls-coreC — callhierarchy.go ===
-	lsp::lsproto::CallHierarchyItem* createCallHierarchyItem(compiler::SimpleProgram* program,
-														   ::tsc::Node* node);
-	lsp::lsproto::CallHierarchyIncomingCall* convertCallSiteGroupToIncomingCall(
+	std::shared_ptr<lsp::lsproto::CallHierarchyItem> createCallHierarchyItem(
+		compiler::SimpleProgram* program, ::tsc::Node* node);
+	std::shared_ptr<lsp::lsproto::CallHierarchyIncomingCall>
+	convertCallSiteGroupToIncomingCall(
 		compiler::SimpleProgram* program, std::vector<callSite*> entries);
-	lsp::lsproto::CallHierarchyOutgoingCall* convertCallSiteGroupToOutgoingCall(
+	std::shared_ptr<lsp::lsproto::CallHierarchyOutgoingCall>
+	convertCallSiteGroupToOutgoingCall(
 		compiler::SimpleProgram* program, std::vector<callSite*> entries);
 	std::pair<lsp::lsproto::CallHierarchyIncomingCallsResponse, gostd::Error> getIncomingCalls(
 		gostd::Context ctx, compiler::SimpleProgram* program, ::tsc::Node* declaration,
@@ -1928,7 +1943,8 @@ private:
 	std::pair<lsp::lsproto::CallHierarchyIncomingCallsResponse, gostd::Error>
 	symbolAndEntriesToIncomingCalls(gostd::Context ctx, incomingEntry* params,
 									SymbolAndEntriesData data, symbolEntryTransformOptions options);
-	std::vector<lsp::lsproto::CallHierarchyOutgoingCall*> getOutgoingCalls(
+	std::vector<std::shared_ptr<lsp::lsproto::CallHierarchyOutgoingCall>>
+	getOutgoingCalls(
 		compiler::SimpleProgram* program, ::tsc::Node* declaration);
 	lsp::lsproto::CallHierarchyPrepareResponse ProvidePrepareCallHierarchy(
 		gostd::Context ctx, lsp::lsproto::DocumentUri documentURI,
@@ -1940,6 +1956,7 @@ private:
 		gostd::Context ctx, lsp::lsproto::CallHierarchyItem* item);
 	std::vector<::tsc::Node*> callHierarchyDeclarations(SourceFile* file,
 														lsp::lsproto::Position position,
+														compiler::SimpleProgram* program,
 														bool allowSourceFile);
 
 	// === slice: ls-coreC — hover.go ===

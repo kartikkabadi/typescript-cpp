@@ -72,24 +72,6 @@ int findIndex(const std::vector<T>& slice, F f) {
 	return -1;
 }
 
-// getDeclarationName — ast.go:3087.
-std::string getDeclarationName(Node* declaration) {
-	Node* name = getNonAssignedNameOfDeclaration(declaration);
-	if (name != nullptr) {
-		if (isComputedPropertyName(name)) {
-			if (isStringOrNumericLiteralLike(name->expression())) {
-				return name->expression()->text();
-			}
-			if (isPropertyAccessExpression(name->expression())) {
-				return name->expression()->name()->text();
-			}
-		} else if (isPropertyName(name)) {
-			return name->text();
-		}
-	}
-	return "";
-}
-
 // getInvokedExpression — utilities.go:3764.
 Node* getInvokedExpression(Node* node) {
 	switch (node->kind) {
@@ -241,7 +223,7 @@ CandidateOrTypeInfo* getCandidateOrTypeInfo(argumentListInfo* info,
                                           Node* startingToken,
                                           bool onlyUseSyntacticOwners);
 Symbol* chooseBetterSymbol(Symbol* s);
-lsproto::SignatureHelp* createTypeHelpItems(
+std::shared_ptr<lsproto::SignatureHelp> createTypeHelpItems(
     const gostd::Context& ctx, Symbol* symbol, argumentListInfo* argumentInfo,
     SourceFile* sourceFile, checker::Checker* c);
 signatureInformation getTypeHelpItem(
@@ -283,7 +265,7 @@ LanguageService::ProvideSignatureHelp(
 		if (!projection.Fidelity.IsSingleSegment()) {
 			continue;
 		}
-		lsproto::SignatureHelp* items = GetSignatureHelpItems(
+		auto items = GetSignatureHelpItems(
 		    ctx, projection.Position, program, projection.Script, context);
 		if (items != nullptr) {
 			return {lsproto::SignatureHelpOrNull{items}, nullptr};
@@ -293,7 +275,8 @@ LanguageService::ProvideSignatureHelp(
 }
 
 // === GetSignatureHelpItems — signaturehelp.go:75 ===
-lsproto::SignatureHelp* LanguageService::GetSignatureHelpItems(
+std::shared_ptr<lsproto::SignatureHelp>
+LanguageService::GetSignatureHelpItems(
     const gostd::Context& ctx, int position,
     compiler::SimpleProgram* program, SourceFile* sourceFile,
     lsproto::SignatureHelpContext* context) {
@@ -312,7 +295,7 @@ lsproto::SignatureHelp* LanguageService::GetSignatureHelpItems(
 	if (context != nullptr) {
 		switch (context->TriggerKind) {
 		case lsproto::SignatureHelpTriggerKindTriggerCharacter:
-			if (context->TriggerCharacter != nullptr) {
+			if (context->TriggerCharacter.has_value()) {
 				if (context->IsRetrigger) {
 					triggerReasonKind = signatureHelpTriggerReasonKindRetriggered;
 				} else {
@@ -393,7 +376,7 @@ lsproto::SignatureHelp* LanguageService::GetSignatureHelpItems(
 }
 
 // === createTypeHelpItems — signaturehelp.go:169 ===
-lsproto::SignatureHelp* createTypeHelpItems(
+std::shared_ptr<lsproto::SignatureHelp> createTypeHelpItems(
     const gostd::Context& ctx, Symbol* symbol, argumentListInfo* argumentInfo,
     SourceFile* sourceFile, checker::Checker* c) {
 	std::vector<checker::Type*> typeParameters =
@@ -406,44 +389,56 @@ lsproto::SignatureHelp* createTypeHelpItems(
 	// brackets for an empty list either way).
 	signatureInformation item = getTypeHelpItem(
 	    symbol, typeParameters,
-	    getEnclosingDeclarationFromInvocation(argumentInfo->invocation),
+	    getEnclosingDeclarationFromInvocation(argumentInfo->invocation_),
 	    sourceFile, c);
 
 	// Check client capabilities for activeParameter handling
-	auto* caps = lsproto::getClientCapabilities(ctx);
+	auto caps = lsproto::getClientCapabilities(ctx);
 	auto& sigInfoCaps = caps->TextDocument.SignatureHelp.SignatureInformation;
 	bool supportsPerSignatureActiveParam = sigInfoCaps.ActiveParameterSupport;
 
 	// Converting signatureHelpParameter to *lsproto.ParameterInformation
-	std::vector<lsproto::ParameterInformation*> parameters;
+	std::vector<std::shared_ptr<lsproto::ParameterInformation>> parameters;
 	parameters.reserve(item.Parameters.size());
 	for (auto& param : item.Parameters) {
-		parameters.push_back(param.parameterInfo);
+		parameters.push_back(
+		    std::shared_ptr<lsproto::ParameterInformation>(param.parameterInfo));
 	}
 
-	auto* sigInfo = new lsproto::SignatureInformation{
-	    /*Label*/ item.Label,
-	    /*Documentation*/ nullptr,
-	    /*Parameters*/ &parameters,
-	};
+	auto sigInfo = std::shared_ptr<lsproto::SignatureInformation>(
+	    new lsproto::SignatureInformation{
+	        /*Label*/ item.Label,
+	        /*Documentation*/ nullptr,
+	        /*Parameters*/ std::make_shared<lsproto::Slice<
+	            std::shared_ptr<lsproto::ParameterInformation>>>(
+	            std::move(parameters))});
+
 
 	// If client supports per-signature activeParameter, set it on
 	// SignatureInformation
 	if (supportsPerSignatureActiveParam && !item.Parameters.empty()) {
-		sigInfo->ActiveParameter = new lsproto::UintegerOrNull{
-		    new uint32_t(argumentInfo->argumentIndex)};
+		sigInfo->ActiveParameter =
+		    std::shared_ptr<lsproto::UintegerOrNull>(
+		        new lsproto::UintegerOrNull{
+		            std::make_shared<uint32_t>(argumentInfo->argumentIndex)});
 	}
 
-	auto* help = new lsproto::SignatureHelp{
-	    /*Signatures*/ {sigInfo},
-	    /*ActiveSignature*/ new uint32_t(0),
-	};
+	auto help = std::shared_ptr<lsproto::SignatureHelp>(
+	    new lsproto::SignatureHelp{
+	        /*Signatures*/ lsproto::Slice<
+	            std::shared_ptr<lsproto::SignatureInformation>>(
+	            std::vector<std::shared_ptr<lsproto::SignatureInformation>>{
+	                sigInfo}),
+	        /*ActiveSignature*/ 0u});
+
 
 	// If client doesn't support per-signature activeParameter, set it on the
 	// top-level SignatureHelp
 	if (!supportsPerSignatureActiveParam && !item.Parameters.empty()) {
-		help->ActiveParameter = new lsproto::UintegerOrNull{
-		    new uint32_t(argumentInfo->argumentIndex)};
+		help->ActiveParameter =
+		    std::shared_ptr<lsproto::UintegerOrNull>(
+		        new lsproto::UintegerOrNull{
+		            std::make_shared<uint32_t>(argumentInfo->argumentIndex)});
 	}
 
 	return help;
@@ -487,10 +482,11 @@ signatureInformation getTypeHelpItem(
 }
 
 // === createJSSignatureHelpItems — signaturehelp.go:244 ===
-lsproto::SignatureHelp* LanguageService::createJSSignatureHelpItems(
+std::shared_ptr<lsproto::SignatureHelp>
+LanguageService::createJSSignatureHelpItems(
     const gostd::Context& ctx, argumentListInfo* argumentInfo,
     compiler::SimpleProgram* program, checker::Checker* c) {
-	if (argumentInfo->invocation->contextualInvocation != nullptr) {
+	if (argumentInfo->invocation_->contextualInvocation != nullptr) {
 		return nullptr;
 	}
 	// See if we can find some symbol with the call expression name that has
@@ -506,7 +502,7 @@ lsproto::SignatureHelp* LanguageService::createJSSignatureHelpItems(
 	}
 
 	for (auto* sf : program->GetSourceFiles()) {
-		lsproto::SignatureHelp* result =
+		auto result =
 		    findSignatureHelpFromNamedDeclarations(ctx, sf, name,
 		                                           argumentInfo, c);
 		if (result != nullptr) {
@@ -517,12 +513,12 @@ lsproto::SignatureHelp* LanguageService::createJSSignatureHelpItems(
 }
 
 // === findSignatureHelpFromNamedDeclarations — signaturehelp.go:267 ===
-lsproto::SignatureHelp*
+std::shared_ptr<lsproto::SignatureHelp>
 LanguageService::findSignatureHelpFromNamedDeclarations(
     const gostd::Context& ctx, SourceFile* sourceFile,
     const std::string& name, argumentListInfo* argumentInfo,
     checker::Checker* c) {
-	lsproto::SignatureHelp* result = nullptr;
+	std::shared_ptr<lsproto::SignatureHelp> result;
 	std::function<bool(Node*)> visit;
 	visit = [&](Node* node) -> bool {
 		if (result != nullptr) {
@@ -555,26 +551,27 @@ LanguageService::findSignatureHelpFromNamedDeclarations(
 }
 
 // === createSignatureHelpItems — signaturehelp.go:295 ===
-lsproto::SignatureHelp* LanguageService::createSignatureHelpItems(
+std::shared_ptr<lsproto::SignatureHelp>
+LanguageService::createSignatureHelpItems(
     const gostd::Context& ctx,
     const std::vector<checker::Signature*>& candidates,
     checker::Signature* resolvedSignature, argumentListInfo* argumentInfo,
     SourceFile* sourceFile, checker::Checker* c, bool useFullPrefix) {
-	auto* caps = lsproto::getClientCapabilities(ctx);
+	auto caps = lsproto::getClientCapabilities(ctx);
 	lsproto::MarkupKind docFormat = lsproto::PreferredMarkupKind(
-	    &caps->TextDocument.SignatureHelp.SignatureInformation
-	         .DocumentationFormat);
+	    caps->TextDocument.SignatureHelp.SignatureInformation
+	        .DocumentationFormat);
 	bool vsCapability = caps->VSSupportsVisualStudioExtensions;
 
 	Node* enclosingDeclaration =
-	    getEnclosingDeclarationFromInvocation(argumentInfo->invocation);
+	    getEnclosingDeclarationFromInvocation(argumentInfo->invocation_);
 	if (enclosingDeclaration == nullptr) {
 		return nullptr;
 	}
 	Symbol* callTargetSymbol = nullptr;
-	if (argumentInfo->invocation->contextualInvocation != nullptr) {
+	if (argumentInfo->invocation_->contextualInvocation != nullptr) {
 		callTargetSymbol =
-		    argumentInfo->invocation->contextualInvocation->symbol;
+		    argumentInfo->invocation_->contextualInvocation->symbol;
 	} else {
 		callTargetSymbol =
 		    c->GetSymbolAtLocation(getExpressionFromInvocation(argumentInfo));
@@ -631,7 +628,7 @@ lsproto::SignatureHelp* LanguageService::createSignatureHelpItems(
 		itemSeen += static_cast<int>(item.size());
 	}
 
-	TSC_ASSERT(selectedItemIndex != -1, "");
+	debug::assert(selectedItemIndex != -1);
 	std::vector<signatureInformation> flattenedSignatures;
 	for (auto& item : items) {
 		flattenedSignatures.insert(flattenedSignatures.end(), item.begin(),
@@ -647,33 +644,40 @@ lsproto::SignatureHelp* LanguageService::createSignatureHelpItems(
 	bool supportsNullActiveParam = sigInfoCaps.NoActiveParameterSupport;
 
 	// Converting []signatureInformation to []*lsproto.SignatureInformation
-	std::vector<lsproto::SignatureInformation*> signatureInformation;
+	std::vector<std::shared_ptr<lsproto::SignatureInformation>>
+	    signatureInformation;
 	signatureInformation.reserve(flattenedSignatures.size());
 	for (auto& item : flattenedSignatures) {
-		std::vector<lsproto::ParameterInformation*> parameters;
+		std::vector<std::shared_ptr<lsproto::ParameterInformation>> parameters;
 		parameters.reserve(item.Parameters.size());
 		for (auto& param : item.Parameters) {
-			parameters.push_back(param.parameterInfo);
+			parameters.push_back(std::shared_ptr<lsproto::ParameterInformation>(
+			    param.parameterInfo));
 		}
-		lsproto::StringOrMarkupContent* documentation = nullptr;
+		std::shared_ptr<lsproto::StringOrMarkupContent> documentation;
 		if (item.Documentation != nullptr) {
-			documentation = new lsproto::StringOrMarkupContent{};
-			documentation->MarkupContent = new lsproto::MarkupContent{
-			    /*Kind*/ docFormat,
-			    /*Value*/ *item.Documentation,
-			};
+			documentation = std::make_shared<lsproto::StringOrMarkupContent>();
+			documentation->MarkupContent =
+			    std::shared_ptr<lsproto::MarkupContent>(
+			        new lsproto::MarkupContent{
+			            /*Kind*/ docFormat,
+			            /*Value*/ *item.Documentation});
 		}
-		auto* sigInfo = new lsproto::SignatureInformation{
-		    /*Label*/ item.Label,
-		    /*Documentation*/ documentation,
-		    /*Parameters*/ &parameters,
-		};
+		auto sigInfo = std::shared_ptr<lsproto::SignatureInformation>(
+		    new lsproto::SignatureInformation{
+		        /*Label*/ item.Label,
+		        /*Documentation*/ documentation,
+		        /*Parameters*/ std::make_shared<lsproto::Slice<
+		            std::shared_ptr<lsproto::ParameterInformation>>>(
+		            std::move(parameters))});
+
 
 		// Set VS-specific colorized label if we have classified runs
-		if (!item.ColorizedRuns.empty()) {
-			sigInfo->VSColorizedLabel = new lsproto::VSClassifiedTextElement{
-			    /*Runs*/ item.ColorizedRuns,
-			};
+		if (item.ColorizedRuns && !item.ColorizedRuns->empty()) {
+			sigInfo->VSColorizedLabel =
+			    std::shared_ptr<lsproto::VSClassifiedTextElement>(
+			        new lsproto::VSClassifiedTextElement{
+			            /*Runs*/ item.ColorizedRuns});
 		}
 
 		// If client supports per-signature activeParameter, set it on each
@@ -686,10 +690,13 @@ lsproto::SignatureHelp* LanguageService::createSignatureHelpItems(
 		signatureInformation.push_back(sigInfo);
 	}
 
-	auto* help = new lsproto::SignatureHelp{
-	    /*Signatures*/ signatureInformation,
-	    /*ActiveSignature*/ new uint32_t(selectedItemIndex),
-	};
+	auto help = std::shared_ptr<lsproto::SignatureHelp>(
+	    new lsproto::SignatureHelp{
+	        /*Signatures*/ lsproto::Slice<
+	            std::shared_ptr<lsproto::SignatureInformation>>(
+	            std::move(signatureInformation)),
+	        /*ActiveSignature*/ static_cast<uint32_t>(selectedItemIndex)});
+
 
 	// If client doesn't support per-signature activeParameter, set it on the
 	// top-level SignatureHelp
@@ -707,7 +714,8 @@ lsproto::SignatureHelp* LanguageService::createSignatureHelpItems(
 // === computeActiveParameter — signaturehelp.go:419 ===
 // Calculates the active parameter index for a signature, handling variadic
 // signatures and null support appropriately.
-lsproto::UintegerOrNull* LanguageService::computeActiveParameter(
+std::shared_ptr<lsproto::UintegerOrNull>
+LanguageService::computeActiveParameter(
     signatureInformation sig, int argumentIndex, bool supportsNull) {
 	int paramCount = static_cast<int>(sig.Parameters.size());
 	if (paramCount == 0) {
@@ -725,11 +733,13 @@ lsproto::UintegerOrNull* LanguageService::computeActiveParameter(
 			// Middle rest parameter - we can't accurately highlight, so
 			// indicate "no active parameter"
 			if (supportsNull) {
-				return new lsproto::UintegerOrNull{}; // null means "no parameter is active"
+				return std::make_shared<lsproto::UintegerOrNull>(); // null means "no parameter is active"
 			}
 			// Client doesn't support null, use out-of-range index (defaults to
 			// 0 per LSP spec)
-			return new lsproto::UintegerOrNull{new uint32_t(paramCount)};
+			return std::shared_ptr<lsproto::UintegerOrNull>(
+			    new lsproto::UintegerOrNull{
+			        std::make_shared<uint32_t>(paramCount)});
 		}
 		// Clamp to last parameter for trailing rest parameters
 		if (activeParam > static_cast<uint32_t>(paramCount - 1)) {
@@ -737,7 +747,9 @@ lsproto::UintegerOrNull* LanguageService::computeActiveParameter(
 		}
 	}
 
-	return new lsproto::UintegerOrNull{new uint32_t(activeParam)};
+	return std::shared_ptr<lsproto::UintegerOrNull>(
+	    new lsproto::UintegerOrNull{
+	        std::make_shared<uint32_t>(activeParam)});
 }
 
 // === getSignatureHelpItem — signaturehelp.go:449 ===
@@ -1044,24 +1056,25 @@ signatureHelpParameter LanguageService::createSignatureHelpParameterFromLabel(
 	bool isOptional =
 	    (parameter->checkFlags & CheckFlagsOptionalParameter) != 0;
 	bool isRest = (parameter->checkFlags & CheckFlagsRestParameter) != 0;
-	lsproto::StringOrMarkupContent* documentation = nullptr;
+	std::shared_ptr<lsproto::StringOrMarkupContent> documentation;
 	if (parameter->valueDeclaration != nullptr) {
 		std::string doc = getDocumentationFromDeclaration(
 		    documentationLocationMapper(spanmap::FeatureSignatureHelp), c,
 		    nullptr, parameter->valueDeclaration, nullptr, docFormat,
 		    true /*commentOnly*/);
 		if (!doc.empty()) {
-			documentation = new lsproto::StringOrMarkupContent{};
-			documentation->MarkupContent = new lsproto::MarkupContent{
-			    /*Kind*/ docFormat,
-			    /*Value*/ doc,
-			};
+			documentation = std::make_shared<lsproto::StringOrMarkupContent>();
+			documentation->MarkupContent =
+			    std::shared_ptr<lsproto::MarkupContent>(
+			        new lsproto::MarkupContent{
+			            /*Kind*/ docFormat,
+			            /*Value*/ doc});
 		}
 	}
 	return signatureHelpParameter{
 	    /*parameterInfo*/ new lsproto::ParameterInformation{
 	        /*Label*/ lsproto::StringOrTuple{
-	            new std::string(label), nullptr},
+	            std::make_shared<std::string>(label), nullptr},
 	        /*Documentation*/ documentation,
 	    },
 	    /*isRest*/ isRest,
@@ -1098,7 +1111,8 @@ signatureHelpParameter createSignatureHelpParameterForTypeParameter(
 	    sourceFile);
 	return signatureHelpParameter{
 	    /*parameterInfo*/ new lsproto::ParameterInformation{
-	        /*Label*/ lsproto::StringOrTuple{new std::string(display), nullptr},
+	        /*Label*/ lsproto::StringOrTuple{
+	            std::make_shared<std::string>(display), nullptr},
 	    },
 	    /*isRest*/ false,
 	    /*isOptional*/ false,
@@ -1118,28 +1132,28 @@ Node* getEnclosingDeclarationFromInvocation(invocation* invocation_) {
 
 // === getExpressionFromInvocation — signaturehelp.go:750 ===
 Node* getExpressionFromInvocation(argumentListInfo* argumentInfo) {
-	if (argumentInfo->invocation->callInvocation != nullptr) {
+	if (argumentInfo->invocation_->callInvocation != nullptr) {
 		return getInvokedExpression(
-		    argumentInfo->invocation->callInvocation->node);
+		    argumentInfo->invocation_->callInvocation->node);
 	}
-	return argumentInfo->invocation->typeArgsInvocation->called;
+	return argumentInfo->invocation_->typeArgsInvocation->called;
 }
 
 // === getCandidateOrTypeInfo — signaturehelp.go:767 ===
 CandidateOrTypeInfo* getCandidateOrTypeInfo(
     argumentListInfo* info, checker::Checker* c, SourceFile* sourceFile,
     Node* startingToken, bool onlyUseSyntacticOwners) {
-	if (info->invocation->callInvocation != nullptr) {
+	if (info->invocation_->callInvocation != nullptr) {
 		if (onlyUseSyntacticOwners &&
 		    !isSyntacticOwner(startingToken,
-		                      info->invocation->callInvocation->node,
+		                      info->invocation_->callInvocation->node,
 		                      sourceFile)) {
 			return nullptr;
 		}
 
 		auto [resolvedSignature, candidates] =
 		    checker::GetResolvedSignatureForSignatureHelp(
-		        info->invocation->callInvocation->node, info->argumentCount,
+		        info->invocation_->callInvocation->node, info->argumentCount,
 		        c);
 		if (candidates.empty()) {
 			return nullptr;
@@ -1152,8 +1166,8 @@ CandidateOrTypeInfo* getCandidateOrTypeInfo(
 		};
 		return ci;
 	}
-	if (info->invocation->typeArgsInvocation != nullptr) {
-		Node* called = info->invocation->typeArgsInvocation->called;
+	if (info->invocation_->typeArgsInvocation != nullptr) {
+		Node* called = info->invocation_->typeArgsInvocation->called;
 		Node* container = called;
 		if (isIdentifier(called)) {
 			container = called->parent;
@@ -1186,16 +1200,16 @@ CandidateOrTypeInfo* getCandidateOrTypeInfo(
 		return nullptr;
 	}
 
-	if (info->invocation->contextualInvocation != nullptr) {
+	if (info->invocation_->contextualInvocation != nullptr) {
 		auto* ci = new CandidateOrTypeInfo{};
 		ci->candidateInfo = new candidateInfo{
-		    /*candidates*/ {info->invocation->contextualInvocation->signature},
-		    /*resolvedSignature*/ info->invocation->contextualInvocation
+		    /*candidates*/ {info->invocation_->contextualInvocation->signature},
+		    /*resolvedSignature*/ info->invocation_->contextualInvocation
 		        ->signature,
 		};
 		return ci;
 	}
-	debug::assertNever(info->invocation);
+	debug::assertNever(info->invocation_);
 	return nullptr;
 }
 
@@ -1245,7 +1259,7 @@ bool containsPrecedingToken(Node* startingToken, SourceFile* sourceFile,
 }
 
 // === getContainingArgumentInfo — signaturehelp.go:861 ===
-lsproto::SignatureHelp* createTypeHelpItems(
+std::shared_ptr<lsproto::SignatureHelp> createTypeHelpItems(
     const gostd::Context& ctx, Symbol* symbol, argumentListInfo* argumentInfo,
     SourceFile* sourceFile, checker::Checker* c);
 signatureInformation getTypeHelpItem(
@@ -1262,10 +1276,8 @@ argumentListInfo* getContainingArgumentInfo(
 	     n = n->parent) {
 		// If the node is not a subspan of its parent, this is a big problem.
 		// There have been crashes that might be caused by this violation.
-		TSC_ASSERT(
-		    n->loc.containedBy(n->parent->loc),
-		    "Not a subspan. Child: " + std::string(kindToString(n->kind)) +
-		        ", parent: " + std::string(kindToString(n->parent->kind)));
+		debug::assert(
+		    n->loc.containedBy(n->parent->loc));
 		argumentListInfo* argumentInfo =
 		    getImmediatelyContainingArgumentOrContextualParameterInfo(
 		        n, position, sourceFile, checker_);
@@ -1275,7 +1287,7 @@ argumentListInfo* getContainingArgumentInfo(
 			// position. This ensures that when inside a callback's parameter
 			// list, we show the callback's signature, not the outer call's
 			// signature.
-			if (argumentInfo->invocation->contextualInvocation != nullptr) {
+			if (argumentInfo->invocation_->contextualInvocation != nullptr) {
 				return argumentInfo;
 			}
 
@@ -1445,7 +1457,7 @@ argumentListInfo* getImmediatelyContainingArgumentInfo(
 		if (typeArgInfo != nullptr) {
 			Node* called = typeArgInfo->called;
 			int nTypeArguments = typeArgInfo->nTypeArguments;
-			auto* invoc = new typeArgsInvocation{called};
+			auto* invoc = new typeArgsInvocation{called->as<Identifier>()};
 			TextRange argumentRange = {called->loc.pos(), node->end()};
 			return new argumentListInfo{
 			    /*isTypeParameterList*/ true,
@@ -1481,8 +1493,7 @@ int getArgumentIndexForTemplatePiece(int spanIndex, Node* node, int position,
 	// Example: f  `# abcd $#{#  1 + 1#  }# efghi ${ #"#hello"#  }  #  `
 	//              ^       ^ ^       ^   ^          ^ ^      ^     ^
 	// Case:        1       1 3       2   1          3 2      2     1
-	TSC_ASSERT(position >= node->loc.pos(),
-	           "Assumed 'position' could not occur before node.");
+	debug::assert(position >= node->loc.pos());
 	if (isTemplateLiteralToken(node)) {
 		if (isInsideTemplateLiteral(node, position, sourceFile)) {
 			return 0;
@@ -1921,7 +1932,7 @@ argumentListInfo* getArgumentListInfoForTemplate(Node* tagExpression,
 		    1;
 	}
 	if (argumentIndex != 0) {
-		TSC_ASSERT(argumentIndex < argumentCount, "");
+		debug::assert(argumentIndex < argumentCount);
 	}
 	return new argumentListInfo{
 	    /*isTypeParameterList*/ false,

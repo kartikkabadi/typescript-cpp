@@ -1248,7 +1248,10 @@ LanguageService::symbolAndEntriesToReferences(
 		    symbol, params->Context->IncludeDeclaration,
 		    spanmap::FeatureReferences);
 		locations = combineLocationArray<lsproto::Location>(
-		    std::move(locations), &symbolLocations, &seenLocations);
+		    std::move(locations),
+		    std::make_shared<lsproto::Slice<lsproto::Location>>(
+		        std::move(symbolLocations)),
+		    &seenLocations);
 	}
 	return {lsproto::LocationsOrNull{
 	            std::make_shared<lsproto::Slice<lsproto::Location>>(
