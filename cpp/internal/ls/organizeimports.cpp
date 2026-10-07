@@ -1083,11 +1083,11 @@ void organizeExportsWorker(
 			}
 
 			change::NodeOptions options{
+			    .Suffix = "\n",
 			    .leadingTrivia =
 			        change::LeadingTriviaOptionExclude,
 			    .trailingTrivia =
 			        change::TrailingTriviaOptionInclude,
-			    .Suffix = "\n",
 			};
 
 			std::vector<Node*> newNodes;
