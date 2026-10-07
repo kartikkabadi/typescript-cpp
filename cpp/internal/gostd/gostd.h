@@ -713,7 +713,14 @@ public:
 		}
 		s->cv.notify_all();
 		if (s->worker.joinable()) {
-			s->worker.join();
+			if (s->worker.get_id() == std::this_thread::get_id()) {
+				// Go's Stop never waits on a running fn — a self-join
+				// throws std::system_error. Detach instead; run()'s
+				// shared_ptr<State> keeps the state alive.
+				s->worker.detach();
+			} else {
+				s->worker.join();
+			}
 		}
 		return ret;
 	}
@@ -725,13 +732,29 @@ public:
 		{
 			std::lock_guard<std::mutex> lock(s->mu);
 			ret = !s->fired;
+			bool workerExited = s->fired || s->stopped;
 			s->deadline = std::chrono::steady_clock::now() + d;
 			s->fired = false;
 			s->stopped = false;
 			if (!s->worker.joinable()) {
-				// Worker already exited after firing; respawn it.
+				// Worker already exited and was reaped; respawn it.
+				s->worker = std::thread(&Timer::run, s);
+			} else if (workerExited) {
+				// Worker fired (or was stopped) — its std::thread is
+				// still joinable even after the OS thread returns, so
+				// without respawning the timer could never fire again
+				// (and assigning over a joinable thread is
+				// std::terminate). Detach rather than join: joining
+				// under the lock deadlocks when fn() is still running
+				// and itself calls Stop/Reset (it would wait on this
+				// mutex); Go's Reset never waits on a running fn.
+				// Detached threads reap themselves; run()'s
+				// shared_ptr<State> keeps state alive.
+				s->worker.detach();
 				s->worker = std::thread(&Timer::run, s);
 			}
+			// Sleeping worker: leave it — notify below makes it
+			// re-wait on the new deadline.
 		}
 		s->cv.notify_all();
 		return ret;
