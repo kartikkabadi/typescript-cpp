@@ -708,8 +708,10 @@ Type* Checker::getIndexTypeForGenericType(Type* t, IndexFlags indexFlags) {
 		(indexFlags & IndexFlagsStringsOnly) ? CachedTypeKind::StringIndexType
 											 : CachedTypeKind::IndexType,
 		t->id};
-	if (Type* indexType = cachedTypes[key]; indexType != nullptr) {
-		return indexType;
+	Type* indexTypeCached = nullptr;
+	if (auto it = cachedTypes.find(key); it != cachedTypes.end()) { indexTypeCached = it->second; }
+	if (indexTypeCached != nullptr) {
+		return indexTypeCached;
 	}
 	Type* indexType = newIndexType(t, indexFlags & IndexFlagsStringsOnly);
 	cachedTypes[key] = indexType;
@@ -832,7 +834,8 @@ Type* Checker::getIndexedAccessTypeOrUndefined(Type* objectType, Type* indexType
 		// Defer the operation by creating an indexed access type.
 		AccessFlags persistentAccessFlags = accessFlags & AccessFlagsPersistent;
 		CacheKey key = getIndexedAccessKey(objectType, indexType, accessFlags, alias);
-		Type* t = indexedAccessTypes[key];
+		Type* t = nullptr;
+		if (auto it = indexedAccessTypes.find(key); it != indexedAccessTypes.end()) { t = it->second; }
 		if (t == nullptr) {
 			t = newIndexedAccessType(objectType, indexType, persistentAccessFlags);
 			t->alias = alias;
@@ -2049,8 +2052,10 @@ Type* Checker::getSimplifiedIndexedAccessType(Type* t, bool writing) {
 	CachedTypeKey key{writing ? CachedTypeKind::IndexedAccessForWriting
 							  : CachedTypeKind::IndexedAccessForReading,
 					  t->id};
-	if (Type* cached = cachedTypes[key]; cached != nullptr) {
-		return cached == circularConstraintType ? t : cached;
+	Type* cachedIx = nullptr;
+	if (auto it = cachedTypes.find(key); it != cachedTypes.end()) { cachedIx = it->second; }
+	if (cachedIx != nullptr) {
+		return cachedIx == circularConstraintType ? t : cachedIx;
 	}
 	cachedTypes[key] = t;
 	Type* result = getSimplifiedIndexedAccessTypeWorker(t, writing);
@@ -2270,7 +2275,8 @@ Type* Checker::getSingleBaseForNonAugmentingSubtype(Type* t) {
 	}
 	CachedTypeKey key{CachedTypeKind::EquivalentBaseType, t->id};
 	if (t->objectFlags & ObjectFlagsIdenticalBaseTypeCalculated) {
-		return cachedTypes[key];
+		if (auto it = cachedTypes.find(key); it != cachedTypes.end()) { return it->second; }
+		return nullptr;
 	}
 	t->objectFlags |= ObjectFlagsIdenticalBaseTypeCalculated;
 	Type* target = t->Target();
@@ -2355,8 +2361,10 @@ Type* Checker::getRegularTypeOfObjectLiteral(Type* t) {
 		return t;
 	}
 	CachedTypeKey key{CachedTypeKind::RegularObjectLiteral, t->id};
-	if (Type* cached = cachedTypes[key]; cached != nullptr) {
-		return cached;
+	Type* cachedRO = nullptr;
+	if (auto it = cachedTypes.find(key); it != cachedTypes.end()) { cachedRO = it->second; }
+	if (cachedRO != nullptr) {
+		return cachedRO;
 	}
 	StructuredType* resolved = resolveStructuredTypeMembers(t);
 	SymbolTable members = transformTypeOfMembers(

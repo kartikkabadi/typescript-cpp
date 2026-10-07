@@ -305,3 +305,82 @@ head -300 ~/conformance/corpus.txt | grep tests/cases > /tmp/smoke.txt
 bash cpp/tools/conformance_check.sh /tmp/smoke.txt 12
 ./cpp/build/tsctestrunner            # 99 scenarios (flaky SIGSEGV = race above)
 ```
+
+## Phase 4 — unordered_map churn + phantom inserts (branch devin/cpp-perf-hotpaths)
+
+Post-phase-3 callgrind (`--noEmit`, perfproj): `Node::text()` is nearly dead
+(99,763 calls / 0.34%, dominated by `getDeclarationName` whose callers need real
+strings) — the broad text() conversion was NOT the remaining sink. The actual
+top sink was **SymbolTable (`unordered_map<string,Symbol*>`) by-value copy
+churn**: `getMembersOfSymbol`/`getExportsOfSymbol`/`getExportsOfModule`/
+`getResolvedMembersOrExportsOfSymbol` returned the whole map by value — Go
+returns the map *reference* (mutation sites already replicate `maps.Clone`
+explicitly). ~1M node allocs/run attributed.
+
+### Fixed
+
+- **const-ref SymbolTable accessors**: the four functions above now return
+  `const SymbolTable&`; 23 read call sites bound to `const&` instead of copying.
+  Two sites keep copies — `members = varsOnly` and `addInheritedMembers`
+  (checker_members.cpp) — which are the `maps.Clone` equivalents. `getSymbol`
+  param widened to `const SymbolTable&` (verified read-only).
+- **Phantom-insert `operator[]` reads → `find()` (12 sites)**: C++
+  `unordered_map::operator[]` inserts a default entry on miss; Go `m[k]`
+  returns zero *without* inserting. Every `Type* t = m[key]; if (t == nullptr)
+  { m[key] = t; }` pattern inserted a phantom `nullptr` per miss — alloc churn
+  plus a real divergence wherever the map is iterated. Converted:
+  `cachedTypes` (5 sites across checker_contextual/typenodes/expressions_a/
+  typeops), `discriminatedContextualTypes`, `flowTypeCache`,
+  `contextFreeTypes`, `stringLiteralTypes`, `numberLiteralTypes`,
+  `bigintLiteralTypes`, `enumLiteralTypes`, `enumNaNLiteralTypes`,
+  `enumRelation`, `unionTypes`/`intersectionTypes`/`templateLiteralTypes`,
+  `indexedAccessTypes`, `instantiations` (2). All these maps were audited —
+  none is range-iterated on check paths, so `find()` is byte-identity-safe.
+- **`putRelater` field-reset**: `*r = Relater{}` + container moves per recycle
+  → Go's actual `[:0]` semantics: reset scalars, `clear()` containers keeping
+  their bucket buffers. (Bug found here: resetting fields must cover
+  `errorChain` + `expandingFlags` — a partial reset leaks error state and
+  produced +55 phantom TS2322s on the deep file. Fixed and re-verified.)
+- **Remaining `text()` top callers converted**: `isEvalOrArgumentsIdentifier`,
+  `moduleExportNameIsDefault` → `textView` compares;
+  `lookupSymbolForPrivateIdentifierDeclaration` → `string_view` param;
+  `checkPropertyAccessExpressionOrQualifiedName` — `propNode->text()` hoisted
+  (3-4 copies per call → 1).
+
+### Skipped (deliberately)
+
+- `getDeclarationName` (83K calls, the dominant remaining text() caller):
+  results feed `declareSymbol`/`newSymbol` — the name is stored, a real string
+  is required. Converting means re-plumbing symbol-name storage.
+- SymbolTable internals (hash function, open addressing): **order-locked** —
+  bucket order leaks into diagnostic suggestion ordering.
+- `instantiateSymbol` `result->declarations = symbol->declarations` (133K
+  vector copies): mirrors Go slice-assign which shares the backing array;
+  sharing in C++ needs shared_ptr/Slice-typed declarations — invasive.
+- `cloneSymbol`/`cloneTypeAsModuleType` member copies: Go-shares-vs-C++-value
+  semantics edge — can't prove byte-identity-safe.
+
+### Results (RUNS=9 medians, perfproj, vs /tmp/tsgo)
+
+| mode   | phase-3 | phase-4 |
+|--------|---------|---------|
+| emit   | 1.19x   | 1.22x   |
+| noEmit | 1.25x   | 1.21x   |
+| decl   | 1.11x   | 1.10x   |
+
+Total instructions 1.725G → 1.674G (-3%); `_M_allocate_node<string,Symbol*>`
+map-copy allocs ~1M → ~200K. Wall-clock deltas are within bench noise on this
+100-file corpus — the win is elimination of a quadratic-cost copy path (map
+size x call frequency) plus the phantom-insert correctness fix.
+
+### Remaining sinks (post-phase-4 callgrind, share of 1.674G Ir)
+
+- Scanner cluster ~9.5% (scan 3.44, scanIdentifier 2.90, ScannerState copy
+  1.63, rewind 0.81) — faithful work vs Go scanner.
+- alloc/copy residue ~12% (memcpy 3.10, new[] 2.98, free 2.03, _M_assign 1.46,
+  memset 1.23, _M_replace 1.13) — remaining vector/string copies, mostly
+  contract-bound.
+- hashtable ~5% (_Hash_bytes 3.04, operator[] writes 1.01, _M_allocate_node
+  0.88) — order-locked, cannot change bucket order.
+- compareNodes/getSourceFileOfNode/compareSymbolsWorker ~6.3% — mirrors Go.
+- _dl_relocate_object 0.87% — cold-start PLT resolution.

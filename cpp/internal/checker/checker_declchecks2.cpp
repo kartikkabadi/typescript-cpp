@@ -1329,7 +1329,7 @@ void Checker::checkExternalModuleExports(Node* node) {
 			}
 		}
 		// Checks for export * conflicts
-		SymbolTable exports = getExportsOfModule(moduleSymbol);
+		const SymbolTable& exports = getExportsOfModule(moduleSymbol);
 		for (auto& entry : exports) {
 			const std::string& id = entry.first;
 			Symbol* symbol = entry.second;

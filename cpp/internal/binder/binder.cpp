@@ -1790,7 +1790,8 @@ void Binder::checkStrictModeLabeledStatement(Node* node) {
 
 static bool isEvalOrArgumentsIdentifier(Node* node) {
 	if (isIdentifier(node)) {
-		const std::string& text = node->text();
+		std::string scratch;
+		std::string_view text = node->textView(scratch);
 		return text == "eval" || text == "arguments";
 	}
 	return false;

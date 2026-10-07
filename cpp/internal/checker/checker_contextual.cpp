@@ -419,7 +419,9 @@ Type* Checker::getPromisedTypeOfPromiseEx(Type* t, Node* errorNode,
 		return nullptr;
 	}
 	CachedTypeKey key{CachedTypeKind::PromisedTypeOfPromise, t->id};
-	if (Type* cached = cachedTypes[key]; cached != nullptr) {
+	Type* cached = nullptr;
+	if (auto it = cachedTypes.find(key); it != cachedTypes.end()) { cached = it->second; }
+	if (cached != nullptr) {
 		return cached;
 	}
 	if (isReferenceToType(t, getGlobalPromiseType())) {
@@ -688,7 +690,8 @@ Node* Checker::getConstraintDeclaration(Type* t) {
 // checker.go:29788 — getStringMappingTypeForGenericType
 Type* Checker::getStringMappingTypeForGenericType(Symbol* symbol, Type* t) {
 	StringMappingKey key{symbol, t};
-	Type* result = stringMappingTypes[key];
+	Type* result = nullptr;
+	if (auto it = stringMappingTypes.find(key); it != stringMappingTypes.end()) { result = it->second; }
 	if (result == nullptr) {
 		result = newStringMappingType(symbol, t);
 		stringMappingTypes[key] = result;
@@ -2205,8 +2208,9 @@ Type* Checker::getClassMemberDecoratorContextOverrideType(Type* nameType,
 				  : (isStatic ? CachedTypeKind::DecoratorContextStatic
 							  : CachedTypeKind::DecoratorContext);
 	CachedTypeKey key{kind, nameType->id};
-	if (Type* overrideType = cachedTypes[key]; overrideType != nullptr) {
-		return overrideType;
+	if (auto it = cachedTypes.find(key);
+		it != cachedTypes.end() && it->second != nullptr) {
+		return it->second;
 	}
 	SymbolTable members;
 	members["name"] = newProperty("name", nameType);
@@ -2621,9 +2625,13 @@ bool ObjectLiteralDiscriminator::matches(int index, Type* t) {
 Type* Checker::discriminateContextualTypeByObjectMembers(Node* node,
 														 Type* contextualType) {
 	DiscriminatedContextualTypeKey key{getNodeId(node), contextualType->id};
-	if (Type* discriminated = discriminatedContextualTypes[key];
-		discriminated != nullptr) {
-		return discriminated;
+	Type* discriminatedCached = nullptr;
+	if (auto it = discriminatedContextualTypes.find(key);
+	    it != discriminatedContextualTypes.end()) {
+		discriminatedCached = it->second;
+	}
+	if (discriminatedCached != nullptr) {
+		return discriminatedCached;
 	}
 	Type* discriminated =
 		getMatchingUnionConstituentForObjectLiteral(contextualType, node);
@@ -3299,7 +3307,9 @@ Type* Checker::getAwaitedTypeNoAliasEx(
 	}
 	// If we've already cached an awaited type, return a possible `Awaited<T>` for it.
 	CachedTypeKey key{CachedTypeKind::AwaitedType, t->id};
-	if (Type* awaitedType = cachedTypes[key]; awaitedType != nullptr) {
+	Type* awaitedType = nullptr;
+	if (auto it = cachedTypes.find(key); it != cachedTypes.end()) { awaitedType = it->second; }
+	if (awaitedType != nullptr) {
 		return awaitedType;
 	}
 	// For a union, get a union of the awaited types of each constituent.

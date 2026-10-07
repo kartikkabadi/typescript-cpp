@@ -584,7 +584,7 @@ Symbol* Checker::combineValueAndTypeSymbols(Symbol* valueSymbol, Symbol* typeSym
 Symbol* Checker::getExportOfModule(Symbol* symbol, const std::string& nameText,
 								   Node* specifier, bool dontResolveAlias) {
 	if (symbol->flags & SymbolFlagsModule) {
-		SymbolTable exports = getExportsOfSymbol(symbol);
+		const SymbolTable& exports = getExportsOfSymbol(symbol);
 		Symbol* exportSymbol = nullptr;
 		auto it = exports.find(nameText);
 		if (it != exports.end()) {

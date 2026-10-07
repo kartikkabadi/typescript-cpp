@@ -1487,7 +1487,7 @@ Node* NodeBuilderImpl::createAccessFromSymbolChain(
 	} else {
 		// lookup a ref to symbol within parent to handle export aliases
 		if (parent != nullptr) {
-			SymbolTable exports = ch->getExportsOfSymbol(parent);
+			const SymbolTable& exports = ch->getExportsOfSymbol(parent);
 			if (!exports.empty()) {
 				// avoid exhaustive iteration in the common case
 				auto it = exports.find(symbol->name);
@@ -1555,7 +1555,7 @@ Node* NodeBuilderImpl::createAccessFromSymbolChain(
 	if ((ctx->flags &
 	     nodebuilder::FlagsForbidIndexedAccessSymbolReferences) == 0 &&
 	    parent != nullptr) {
-		SymbolTable members = ch->getMembersOfSymbol(parent);
+		const SymbolTable& members = ch->getMembersOfSymbol(parent);
 		auto mit = members.find(symbol->name);
 		if (mit != members.end() && mit->second != nullptr &&
 		    ch->getSymbolIfSameReference(mit->second, symbol) != nullptr) {
@@ -7325,7 +7325,7 @@ Node* NodeBuilderImpl::serializeNamespaceMember(Symbol* resolved,
 
 // expandModuleDecl produces a ModuleDeclaration with exported members.
 Node* NodeBuilderImpl::expandModuleDecl(Symbol* symbol) {
-	SymbolTable exports = ch->getExportsOfSymbol(symbol);
+	const SymbolTable& exports = ch->getExportsOfSymbol(symbol);
 	std::vector<Symbol*> members;
 	for (auto& [symName, sym] : exports) {
 		(void)symName;

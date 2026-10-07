@@ -660,7 +660,9 @@ Type* Checker::createArrayLiteralType(Type* t) {
 		return t;
 	}
 	CachedTypeKey key{CachedTypeKind::ArrayLiteralType, t->id};
-	if (Type* cached = cachedTypes[key]; cached != nullptr) {
+	Type* cached = nullptr;
+	if (auto it = cachedTypes.find(key); it != cachedTypes.end()) { cached = it->second; }
+	if (cached != nullptr) {
 		return cached;
 	}
 	Type* literalType = cloneTypeReference(t);

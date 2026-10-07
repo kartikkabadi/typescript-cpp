@@ -586,7 +586,7 @@ Symbol* Checker::getAliasForSymbolInContainer(Symbol* container, Symbol* symbol)
 	    getSymbolIfSameReference(it->second, symbol) != nullptr) {
 		return container;
 	}
-	SymbolTable exports = getExportsOfSymbol(container);
+	const SymbolTable& exports = getExportsOfSymbol(container);
 	if (auto it = exports.find(symbol->name);
 	    it != exports.end() && it->second != nullptr &&
 	    getSymbolIfSameReference(it->second, symbol) != nullptr) {
@@ -820,7 +820,7 @@ std::vector<Symbol*> Checker::getCandidateListForSymbol(
 
 	// Look in the exported members, if we can find accessibleSymbolChain, symbol is accessible using this chain
 	// but only if the symbolFromSymbolTable can be qualified
-	SymbolTable candidateTable = getExportsOfSymbol(resolvedImportedSymbol);
+	const SymbolTable& candidateTable = getExportsOfSymbol(resolvedImportedSymbol);
 	if (candidateTable.empty()) {
 		return {};
 	}

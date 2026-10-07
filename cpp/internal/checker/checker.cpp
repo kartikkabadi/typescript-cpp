@@ -885,7 +885,8 @@ Type* Checker::getUnionTypeEx(std::vector<Type*> types, UnionReduction unionRedu
 			std::swap(id1, id2);
 		}
 		UnionOfUnionKey key{id1, id2, unionReduction, getAliasKey(alias)};
-		Type* t = unionOfUnionTypes[key];
+		Type* t = nullptr;
+		if (auto it = unionOfUnionTypes.find(key); it != unionOfUnionTypes.end()) { t = it->second; }
 		if (t == nullptr) {
 			t = getUnionTypeWorker(types, unionReduction, alias, nullptr);
 			unionOfUnionTypes[key] = t;
@@ -1001,7 +1002,8 @@ Type* Checker::getUnionTypeFromSortedList(std::vector<Type*> types, ObjectFlags 
 		return types[0];
 	}
 	CacheKey key = getUnionKey(types, origin, alias);
-	Type* t = unionTypes[key];
+	Type* t = nullptr;
+	if (auto it = unionTypes.find(key); it != unionTypes.end()) { t = it->second; }
 	if (t == nullptr) {
 		t = newUnionType(objectFlags | getPropagatingFlagsOfTypes(types, TypeFlagsNullable), types);
 		t->AsUnionType()->origin = origin;
@@ -1445,7 +1447,8 @@ Type* Checker::getIntersectionTypeEx(std::vector<Type*> types, IntersectionFlags
 		}
 	}
 	CacheKey key = getIntersectionKey(typeSet, flags, alias);
-	Type* result = intersectionTypes[key];
+	Type* result = nullptr;
+	if (auto it = intersectionTypes.find(key); it != intersectionTypes.end()) { result = it->second; }
 	if (result == nullptr) {
 		if (includes & TypeFlagsUnion) {
 			bool reduced;
@@ -1967,7 +1970,8 @@ Type* Checker::getTemplateLiteralType(const std::vector<std::string>& texts,
 		}
 	}
 	CacheKey key = getTemplateTypeKey(newTexts, newTypes);
-	Type* t = templateLiteralTypes[key];
+	Type* t = nullptr;
+	if (auto it = templateLiteralTypes.find(key); it != templateLiteralTypes.end()) { t = it->second; }
 	if (t == nullptr) {
 		t = newTemplateLiteralType(newTexts, newTypes);
 		templateLiteralTypes[key] = t;
@@ -2521,7 +2525,10 @@ static std::string getPropertyNameFromType(Type* t) {
 	TSC_UNREACHABLE("Unhandled case in getPropertyNameFromType");
 }
 
-SymbolTable Checker::getExportsOfSymbol(Symbol* symbol) {
+// SymbolTable returns here are const-ref views (Go maps are reference types —
+// these accessors return the table itself, not a clone; mutation sites copy
+// explicitly, mirroring maps.Clone).
+const SymbolTable& Checker::getExportsOfSymbol(Symbol* symbol) {
 	if (symbol->flags & SymbolFlagsLateBindingContainer) {
 		return getResolvedMembersOrExportsOfSymbol(symbol, MembersOrExportsResolutionKindResolvedExports);
 	}
@@ -2531,7 +2538,7 @@ SymbolTable Checker::getExportsOfSymbol(Symbol* symbol) {
 	return symbol->exports;
 }
 
-SymbolTable Checker::getResolvedMembersOrExportsOfSymbol(Symbol* symbol,
+const SymbolTable& Checker::getResolvedMembersOrExportsOfSymbol(Symbol* symbol,
 														 MembersOrExportsResolutionKind resolutionKind) {
 	auto* links = membersAndExportsLinks.Get(symbol);
 	if (links->at(resolutionKind).empty()) {
@@ -2717,14 +2724,14 @@ void Checker::addDeclarationToLateBoundSymbol(Symbol* symbol, Node* member, Symb
 }
 
 // Gets a SymbolTable containing both the early- and late-bound members of a symbol.
-SymbolTable Checker::getMembersOfSymbol(Symbol* symbol) {
+const SymbolTable& Checker::getMembersOfSymbol(Symbol* symbol) {
 	if (symbol->flags & SymbolFlagsLateBindingContainer) {
 		return getResolvedMembersOrExportsOfSymbol(symbol, MembersOrExportsResolutionKindResolvedMembers);
 	}
 	return symbol->members;
 }
 
-SymbolTable Checker::getExportsOfModule(Symbol* moduleSymbol) {
+const SymbolTable& Checker::getExportsOfModule(Symbol* moduleSymbol) {
 	auto* links = moduleSymbolLinks.Get(moduleSymbol);
 	if (links->resolvedExports.empty()) {
 		auto [exports, typeOnlyExportStarMap] = getExportsOfModuleWorker(moduleSymbol);
@@ -5852,7 +5859,7 @@ void Checker::checkResolvedBlockScopedVariable(Symbol* result,
 	}
 }
 
-Symbol* Checker::getSymbol(SymbolTable& symbols, std::string_view name,
+Symbol* Checker::getSymbol(const SymbolTable& symbols, std::string_view name,
                            SymbolFlags meaning) {
 	if (meaning & SymbolFlagsAll) {
 		Symbol* symbol = getMergedSymbol(getSymbolFromTableView(symbols, name));
@@ -7536,7 +7543,7 @@ Symbol* Checker::resolveQualifiedName(Node* name, Node* left, Node* right,
 		}
 	}
 	std::string text{right->text()};
-	SymbolTable exportsOfNamespace = getExportsOfSymbol(namespace_);
+	const SymbolTable& exportsOfNamespace = getExportsOfSymbol(namespace_);
 	Symbol* symbol = getMergedSymbol(
 	    getSymbol(exportsOfNamespace, text, meaning));
 	if (symbol == nullptr && namespace_->flags & SymbolFlagsAlias) {
@@ -7633,7 +7640,7 @@ Symbol* Checker::tryGetQualifiedNameAsValue(Node* node) {
 Symbol* Checker::getSuggestedSymbolForNonexistentModule(
     Node* name, Symbol* targetModule) {
 	std::vector<Symbol*> values;
-	SymbolTable exports = getExportsOfModule(targetModule);
+	const SymbolTable& exports = getExportsOfModule(targetModule);
 	for (auto& [k, v] : exports) {
 		values.push_back(v);
 	}

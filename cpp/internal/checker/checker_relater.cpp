@@ -768,7 +768,12 @@ bool Checker::isEnumTypeRelatedTo(Symbol* source, Symbol* target,
 		return false;
 	}
 	EnumRelationKey key{getSymbolId(sourceSymbol), getSymbolId(targetSymbol)};
-	RelationComparisonResult entry = enumRelation[key];
+	// Go `enumRelation[key]` returns zero on miss without inserting; find()
+	// matches that (operator[] would insert a phantom None entry per miss).
+	RelationComparisonResult entry = RelationComparisonResult::None;
+	if (auto eit = enumRelation.find(key); eit != enumRelation.end()) {
+		entry = eit->second;
+	}
 	if (entry != RelationComparisonResult::None &&
 		!((entry & RelationComparisonResult::Failed) != RelationComparisonResult::None &&
 		  errorReporter)) {
@@ -3906,24 +3911,24 @@ Relater* Checker::getRelater() {
 
 // relater.go:2608
 void Checker::putRelater(Relater* r) {
-	r->maybeKeysSet.clear();
 	// Go: *r = Relater{c, maybeKeys[:0], maybeKeysSet, sourceStack[:0],
-	// targetStack[:0], freeRelater} — reset all fields but reuse the backing
-	// storage of the stack buffers and the (now-cleared) set.
-	std::vector<CacheKey> maybeKeys = std::move(r->maybeKeys);
-	maybeKeys.clear();
-	std::unordered_set<CacheKey, CacheKeyHash> maybeKeysSet =
-		std::move(r->maybeKeysSet);
-	std::vector<Type*> sourceStack = std::move(r->sourceStack);
-	std::vector<Type*> targetStack = std::move(r->targetStack);
-	Relater* next = freeRelater;
-	*r = Relater{};
-	r->c = this;
-	r->maybeKeys = std::move(maybeKeys);
-	r->maybeKeysSet = std::move(maybeKeysSet);
-	r->sourceStack = std::move(sourceStack);
-	r->targetStack = std::move(targetStack);
-	r->next = next;
+	// targetStack[:0], freeRelater} — reset scalars and clear containers while
+	// reusing their backing buffers (unordered_set::clear keeps buckets).
+	r->relation = nullptr;
+	r->errorNode = nullptr;
+	r->errorChain = nullptr;
+	r->relatedInfo.clear();
+	r->maybeKeys.clear();
+	r->maybeKeysSet.clear();
+	r->sourceStack.clear();
+	r->targetStack.clear();
+	r->maybeCount = 0;
+	r->sourceDepth = 0;
+	r->targetDepth = 0;
+	r->expandingFlags = ExpandingFlagsNone;
+	r->overflow = false;
+	r->relationCount = 0;
+	r->next = freeRelater;
 	freeRelater = r;
 }
 

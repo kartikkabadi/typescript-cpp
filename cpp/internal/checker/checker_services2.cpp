@@ -493,7 +493,7 @@ std::vector<Symbol*> Checker::GetExportsOfModule(Symbol* symbol) {
 void Checker::ForEachExportAndPropertyOfModule(
 	Symbol* moduleSymbol,
 	const std::function<void(Symbol*, const std::string&)>& cb) {
-	SymbolTable exports = getExportsOfModule(moduleSymbol);
+	const SymbolTable& exports = getExportsOfModule(moduleSymbol);
 	for (const auto& [key, exportedSymbol] : exports) {
 		if (!isReservedMemberName(key)) {
 			cb(exportedSymbol, key);
@@ -700,7 +700,7 @@ Symbol* Checker::TryGetMemberInModuleExportsAndProperties(
 
 Symbol* Checker::TryGetMemberInModuleExports(const std::string& memberName,
 											 Symbol* moduleSymbol) {
-	SymbolTable symbolTable = getExportsOfModule(moduleSymbol);
+	const SymbolTable& symbolTable = getExportsOfModule(moduleSymbol);
 	auto it = symbolTable.find(memberName);
 	return it != symbolTable.end() ? it->second : nullptr;
 }
@@ -932,7 +932,7 @@ Checker::GetSymbolsOfParameterPropertyDeclaration(
 								  : emptyLocals;
 	Symbol* parameterSymbol =
 		getSymbol(ctorLocals, parameterName, SymbolFlagsValue);
-	SymbolTable memberSymbols = getMembersOfSymbol(classDeclaration->symbol());
+	const SymbolTable& memberSymbols = getMembersOfSymbol(classDeclaration->symbol());
 	Symbol* propertySymbol =
 		getSymbol(memberSymbols, parameterName, SymbolFlagsValue);
 
