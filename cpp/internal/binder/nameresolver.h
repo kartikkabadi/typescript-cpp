@@ -20,7 +20,7 @@ struct NameResolver {
 	SymbolTable* globals = nullptr;
 	Symbol* argumentsSymbol = nullptr;
 	Symbol* requireSymbol = nullptr;
-	std::function<Symbol*(SymbolTable*, const std::string&, SymbolFlags)> lookup;
+	std::function<Symbol*(SymbolTable*, std::string_view, SymbolFlags)> lookup;
 	std::function<void(Symbol*, SymbolFlags)> symbolReferenced;
 	std::function<void(Node*, Tristate)> setRequiresScopeChangeCache;
 	std::function<Tristate(Node*)> getRequiresScopeChangeCache;
@@ -28,7 +28,7 @@ struct NameResolver {
 	std::function<void(Node*, const std::string&, SymbolFlags, const DiagnosticMessage*)> onFailedToResolveSymbol;
 	std::function<void(Node*, Symbol*, SymbolFlags, Node*, Node*, bool)> onSuccessfullyResolvedSymbol;
 
-	Symbol* resolve(Node* location, const std::string& name, SymbolFlags meaning,
+	Symbol* resolve(Node* location, std::string_view name, SymbolFlags meaning,
 		const DiagnosticMessage* nameNotFoundMessage, bool isUse, bool excludeGlobals);
 	bool useOuterVariableScopeInParameter(Symbol* result, Node* location, Node* lastLocation);
 	bool requiresScopeChange(Node* node);
@@ -36,7 +36,7 @@ struct NameResolver {
 	Diagnostic* reportError(Node* location, const DiagnosticMessage* message,
 		const std::vector<std::string>& args = {});
 	Symbol* getSymbolOfDeclarationOrDefault(Node* node);
-	Symbol* lookupOrDefault(SymbolTable* symbols, const std::string& name, SymbolFlags meaning);
+	Symbol* lookupOrDefault(SymbolTable* symbols, std::string_view name, SymbolFlags meaning);
 	Symbol* getArgumentsSymbol();
 };
 

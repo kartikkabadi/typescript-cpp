@@ -137,8 +137,8 @@ static bool signatureHasRestParameter(Signature* sig) {
 }
 
 // core.ElementOrNil
-template <class T>
-static T* elementOrNil(const std::vector<T*>& v, size_t i) {
+template <class R>
+static auto elementOrNil(R&& v, size_t i) -> std::decay_t<decltype(v[0])> {
 	return i < v.size() ? v[i] : nullptr;
 }
 
@@ -276,9 +276,10 @@ void Checker::checkParameter(Node* node) {
 	checkGrammarModifiers(node);
 	checkVariableLikeDeclaration(node);
 	Node* fn = getContainingFunction(node);
-	std::string paramName;
+	std::string paramScratch;
+	std::string_view paramName;
 	if (node->name() != nullptr && isIdentifier(node->name())) {
-		paramName = node->name()->text();
+		paramName = node->name()->textView(paramScratch);
 	}
 	if (hasSyntacticModifier(node, ModifierFlagsParameterPropertyModifier)) {
 		if (shouldCheckErasableSyntax(node)) {
@@ -299,7 +300,7 @@ void Checker::checkParameter(Node* node) {
 		auto params = fn->parameters();
 		auto it = std::find(params.begin(), params.end(), node);
 		if (it == params.end() || std::distance(params.begin(), it) != 0) {
-			error(node, A_0_parameter_must_be_the_first_parameter, {paramName});
+			error(node, A_0_parameter_must_be_the_first_parameter, {std::string(paramName)});
 		}
 		if (isConstructorDeclaration(fn) || isConstructSignatureDeclaration(fn) ||
 		    isConstructorTypeNode(fn)) {
@@ -979,7 +980,7 @@ void Checker::checkArrayType(Node* node) {
 void Checker::checkTupleType(Node* node) {
 	bool seenOptionalElement = false;
 	bool seenRestElement = false;
-	std::vector<Node*> elements = node->elements();
+	auto elements = node->elements();
 	for (Node* e : elements) {
 		ElementFlags flags = getTupleElementFlags(e);
 		if ((flags & ElementFlagsVariadic) != 0) {

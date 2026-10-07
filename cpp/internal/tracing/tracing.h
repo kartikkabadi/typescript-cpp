@@ -122,6 +122,18 @@ public:
 	    : pop_(tr != nullptr
 	               ? tr->Push(phase, name, args, separateBeginAndEnd)
 	               : std::function<void()>()) {}
+	// Lazy-args overload: the factory runs only when the pusher is non-null,
+	// so the TraceArgs map is never built in non-tracing runs. The factory may
+	// return TraceArgs or shared_ptr<TraceArgs> (live-map mutation sites).
+	template <class Pusher, class MakeArgs>
+	    requires std::invocable<MakeArgs>
+	TraceScope(Pusher* tr, Phase phase, const std::string& name,
+	           MakeArgs&& makeArgs, bool separateBeginAndEnd)
+	    : pop_(tr != nullptr
+	               ? tr->Push(phase, name,
+	                          std::forward<MakeArgs>(makeArgs)(),
+	                          separateBeginAndEnd)
+	               : std::function<void()>()) {}
 	// For callers whose Push already returns the pop closure (e.g.
 	// checker::Tracer::Push).
 	explicit TraceScope(std::function<void()> pop)

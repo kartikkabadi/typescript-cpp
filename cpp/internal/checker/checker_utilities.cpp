@@ -44,8 +44,8 @@ static PseudoBigInt getBigIntLiteralValue(Type* t) {
 }
 
 // core.FindIndex — index of first element satisfying pred, or -1.
-template <class T, class F>
-static int findIndexReplica(const std::vector<T>& v, F f) {
+template <class R, class F>
+static int findIndexReplica(R&& v, F f) {
 	auto it = std::find_if(v.begin(), v.end(), f);
 	return it != v.end() ? static_cast<int>(it - v.begin()) : -1;
 }

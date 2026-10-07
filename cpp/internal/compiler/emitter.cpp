@@ -99,7 +99,9 @@ void emitter::emit() {
 	// emitter.go:48 — `defer e.tr.Push(..., "emit", {"path"}, true)()`.
 	tracing::TraceScope traceEmit(
 	    tr, tracing::PhaseEmit, "emit",
-	    tracing::TraceArgs{{"path", std::string(sourceFile->Path())}},
+	    [&] {
+	        return tracing::TraceArgs{{"path", std::string(sourceFile->Path())}};
+	    },
 	    true);
 	emitJSFile(sourceFile, paths->JsFilePath(), paths->SourceMapFilePath());
 	emitDeclarationFile(sourceFile, paths->DeclarationFilePath(),
@@ -131,7 +133,9 @@ SourceFile* emitter::runScriptTransformers(printer::EmitContext* emitContext,
 	// emitter.go:70 — `defer e.tr.Push(..., "transformNodes", {"path"}, false)()`.
 	tracing::TraceScope traceTransform(
 	    tr, tracing::PhaseEmit, "transformNodes",
-	    tracing::TraceArgs{{"path", std::string(sourceFile->Path())}},
+	    [&] {
+	        return tracing::TraceArgs{{"path", std::string(sourceFile->Path())}};
+	    },
 	    false);
 	for (auto* transformer :
 	     getScriptTransformers(emitContext, host, sourceFile)) {
@@ -149,7 +153,9 @@ emitter::runDeclarationTransformers(printer::EmitContext* emitContext,
 	// emitter.go:80 — `defer e.tr.Push(..., "transformNodes", {"path"}, false)()`.
 	tracing::TraceScope traceTransform(
 	    tr, tracing::PhaseEmit, "transformNodes",
-	    tracing::TraceArgs{{"path", std::string(sourceFile->Path())}},
+	    [&] {
+	        return tracing::TraceArgs{{"path", std::string(sourceFile->Path())}};
+	    },
 	    false);
 	std::vector<Diagnostic*> diags;
 	for (auto* transformer :
@@ -303,7 +309,8 @@ void emitter::emitJSFile(SourceFile* sourceFile, const std::string& jsFilePath,
 	// {"jsFilePath"}, true)()`.
 	tracing::TraceScope traceEmitJs(
 	    tr, tracing::PhaseEmit, "emitJsFileOrBundle",
-	    tracing::TraceArgs{{"jsFilePath", jsFilePath}}, true);
+	    [&] { return tracing::TraceArgs{{"jsFilePath", jsFilePath}}; },
+	    true);
 
 	auto [emitContext, putEmitContext] = printer::GetEmitContext();
 
@@ -350,7 +357,10 @@ void emitter::emitDeclarationFile(SourceFile* sourceFile,
 	// {"declarationFilePath"}, true)()`.
 	tracing::TraceScope traceEmitDecl(
 	    tr, tracing::PhaseEmit, "emitDeclarationFileOrBundle",
-	    tracing::TraceArgs{{"declarationFilePath", declarationFilePath}},
+	    [&] {
+	        return tracing::TraceArgs{{"declarationFilePath",
+		                           declarationFilePath}};
+	    },
 	    true);
 
 	auto [emitContext, putEmitContext] = printer::GetEmitContext();

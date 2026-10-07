@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -44,6 +45,24 @@ using SymbolTable = std::unordered_map<std::string, Symbol*>;
 inline Symbol* getSymbolFromTable(const SymbolTable& t, const std::string& k) {
 	auto it = t.find(k);
 	return it != t.end() ? it->second : nullptr;
+}
+
+// String-view variant: libstdc++ derives std::hash<std::string_view> from the
+// same _Hash_bytes digest as std::hash<std::string>, and bucket index is
+// hash % bucket_count() (mod-range hashing) — so walking the computed bucket
+// yields exactly the entry find(k) would return. Read-only; table order and
+// contents are untouched.
+inline Symbol* getSymbolFromTableView(const SymbolTable& t, std::string_view k) {
+	if (t.empty()) {
+		return nullptr;
+	}
+	size_t bucket = std::hash<std::string_view>{}(k) % t.bucket_count();
+	for (auto it = t.begin(bucket), end = t.end(bucket); it != end; ++it) {
+		if (it->first == k) {
+			return it->second;
+		}
+	}
+	return nullptr;
 }
 
 inline constexpr char kInternalSymbolNamePrefix = '\xFE';

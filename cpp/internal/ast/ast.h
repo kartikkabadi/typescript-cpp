@@ -12,6 +12,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <mutex>
+#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -50,6 +51,29 @@ inline bool tscEmitdumpPanicExit = false;
 }
 #define TSC_UNREACHABLE(msg) ::tsc::tscUnreachable(msg)
 #define TSC_ASSERT(cond, msg) assert(((void)(msg), (cond)))
+
+
+// NodeSlice — view over a NodeList::nodes vector; the C++ analogue of Go's
+// returned slice header (shared backing, no copy). Read-only element access;
+// converts implicitly to std::vector<Node*> for legacy call boundaries, which
+// materializes the same copy the old by-value accessors produced.
+class NodeSlice {
+	std::span<Node* const> s_;
+public:
+	NodeSlice() = default;
+	NodeSlice(const std::vector<Node*>& v) : s_(v) {}
+	NodeSlice(std::span<Node* const> s) : s_(s) {}
+	operator std::span<Node* const>() const { return s_; }
+	operator std::vector<Node*>() const { return {s_.begin(), s_.end()}; }
+	Node* const* begin() const { return s_.data(); }
+	Node* const* end() const { return s_.data() + s_.size(); }
+	size_t size() const { return s_.size(); }
+	bool empty() const { return s_.empty(); }
+	Node* front() const { return s_.front(); }
+	Node* back() const { return s_.back(); }
+	Node* operator[](size_t i) const { return s_[i]; }
+	Node* const* data() const { return s_.data(); }
+};
 
 struct Node;
 struct NodeList;
@@ -166,7 +190,7 @@ struct Node {
 	std::vector<Node*> eagerJSDoc(SourceFile* file = nullptr);
 
 	ModifierFlags modifierFlags() const;
-	std::vector<Node*> modifierNodes() const;
+	NodeSlice modifierNodes() const;
 	std::vector<Node*> decorators() const;
 	Symbol* symbol() const;
 	Symbol* localSymbol() const;
@@ -195,24 +219,24 @@ struct Node {
 	Node* typeExpression() const;
 	Node* className() const;
 	NodeList* argumentList() const;
-	std::vector<Node*> arguments() const;
+	NodeSlice arguments() const;
 	NodeList* typeArgumentList() const;
-	std::vector<Node*> typeArguments() const;
+	NodeSlice typeArguments() const;
 	NodeList* typeParameterList() const;
-	std::vector<Node*> typeParameters() const;
+	NodeSlice typeParameters() const;
 	NodeList* memberList() const;
-	std::vector<Node*> members() const;
+	NodeSlice members() const;
 	NodeList* statementList() const;
-	std::vector<Node*> statements() const;
+	NodeSlice statements() const;
 	bool canHaveStatements() const;
 	NodeList* elementList() const;
-	std::vector<Node*> elements() const;
+	NodeSlice elements() const;
 	NodeList* propertyList() const;
-	std::vector<Node*> properties() const;
+	NodeSlice properties() const;
 	NodeList* commentList() const;
-	std::vector<Node*> comments() const;
+	NodeSlice comments() const;
 	NodeList* parameterList() const;
-	std::vector<Node*> parameters() const;
+	NodeSlice parameters() const;
 	NodeList* children() const;
 	bool isTypeOnly() const;
 
@@ -839,7 +863,7 @@ Node* tryGetPropertyNameOfBindingOrAssignmentElement(
 Node* getAssignedName(Node* node);
 
 // utilities.go:3866,3879,3891,4046
-std::vector<Node*> getElementsOfBindingOrAssignmentPattern(Node* pattern);
+NodeSlice getElementsOfBindingOrAssignmentPattern(Node* pattern);
 bool isLiteralExpression(Node* node);
 bool isSuperProperty(Node* node);
 bool isSuperCall(Node* node);
@@ -1569,9 +1593,9 @@ struct AllAccessorDeclarations {
 	Node* getAccessor{};
 };
 AllAccessorDeclarations getAllAccessorDeclarationsForDeclaration(
-	Node* accessor, const std::vector<Node*>& declarationsOfSymbol);
+	Node* accessor, std::span<Node* const> declarationsOfSymbol);
 AllAccessorDeclarations getAllAccessorDeclarations(
-	const std::vector<Node*>& parentDeclarations, Node* accessor);
+	std::span<Node* const> parentDeclarations, Node* accessor);
 std::string getPropertyNameForPropertyNameNode(Node* name);
 bool hasAbstractModifier(Node* node);
 bool hasAmbientModifier(Node* node);

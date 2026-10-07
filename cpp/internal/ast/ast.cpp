@@ -103,7 +103,7 @@ ModifierFlags Node::modifierFlags() const {
 	return ModifierFlagsNone;
 }
 
-std::vector<Node*> Node::modifierNodes() const {
+NodeSlice Node::modifierNodes() const {
 	if (ModifierList* m = modifiers())
 		return m->nodes;
 	return {};
@@ -655,7 +655,7 @@ NodeList* Node::argumentList() const {
 	TSC_UNREACHABLE("Unhandled case in Node::argumentList");
 }
 
-std::vector<Node*> Node::arguments() const {
+NodeSlice Node::arguments() const {
 	if (NodeList* l = argumentList())
 		return l->nodes;
 	return {};
@@ -685,7 +685,7 @@ NodeList* Node::typeArgumentList() const {
 	TSC_UNREACHABLE("Unhandled case in Node::typeArgumentList");
 }
 
-std::vector<Node*> Node::typeArguments() const {
+NodeSlice Node::typeArguments() const {
 	if (NodeList* l = typeArgumentList())
 		return l->nodes;
 	return {};
@@ -713,7 +713,7 @@ NodeList* Node::typeParameterList() const {
 	TSC_UNREACHABLE("Unhandled case in Node::typeParameterList");
 }
 
-std::vector<Node*> Node::typeParameters() const {
+NodeSlice Node::typeParameters() const {
 	if (NodeList* l = typeParameterList())
 		return l->nodes;
 	return {};
@@ -747,7 +747,7 @@ NodeList* Node::children() const {
 	TSC_UNREACHABLE("Unhandled case in Node::children");
 }
 
-std::vector<Node*> Node::members() const {
+NodeSlice Node::members() const {
 	if (NodeList* l = memberList())
 		return l->nodes;
 	return {};
@@ -768,7 +768,7 @@ NodeList* Node::statementList() const {
 	TSC_UNREACHABLE("Unhandled case in Node::statementList");
 }
 
-std::vector<Node*> Node::statements() const {
+NodeSlice Node::statements() const {
 	if (NodeList* l = statementList())
 		return l->nodes;
 	return {};
@@ -804,7 +804,7 @@ NodeList* Node::elementList() const {
 	TSC_UNREACHABLE("Unhandled case in Node::elementList");
 }
 
-std::vector<Node*> Node::elements() const {
+NodeSlice Node::elements() const {
 	if (NodeList* l = elementList())
 		return l->nodes;
 	return {};
@@ -820,7 +820,7 @@ NodeList* Node::propertyList() const {
 	TSC_UNREACHABLE("Unhandled case in Node::propertyList");
 }
 
-std::vector<Node*> Node::properties() const {
+NodeSlice Node::properties() const {
 	if (NodeList* l = propertyList())
 		return l->nodes;
 	return {};
@@ -877,7 +877,7 @@ NodeList* Node::commentList() const {
 	TSC_UNREACHABLE("Unhandled case in Node::commentList");
 }
 
-std::vector<Node*> Node::comments() const {
+NodeSlice Node::comments() const {
 	if (NodeList* l = commentList())
 		return l->nodes;
 	return {};
@@ -888,7 +888,7 @@ NodeList* Node::parameterList() const {
 	return d.parameters ? *d.parameters : nullptr;
 }
 
-std::vector<Node*> Node::parameters() const {
+NodeSlice Node::parameters() const {
 	if (NodeList* l = parameterList())
 		return l->nodes;
 	return {};
@@ -912,7 +912,8 @@ ModifierFlags NodeFactory::modifiersToFlags(const std::vector<Node*>& modifiers)
 // ---------------------------------------------------------------------------
 
 bool isThisIdentifier(const Node* node) {
-	return isIdentifier(node) && node->text() == "this";
+	std::string scratch;
+	return isIdentifier(node) && node->textView(scratch) == "this";
 }
 
 bool isAssignmentPattern(const Node* node) {
@@ -927,7 +928,7 @@ bool isAssignmentPattern(const Node* node) {
 Node* getTargetOfBindingOrAssignmentElement(Node* element);
 
 // GetElementsOfBindingOrAssignmentPattern — utilities.go:3866
-std::vector<Node*> getElementsOfBindingOrAssignmentPattern(Node* pattern) {
+NodeSlice getElementsOfBindingOrAssignmentPattern(Node* pattern) {
 	switch (pattern->kind) {
 	case Kind::ObjectBindingPattern:
 	case Kind::ArrayBindingPattern:
@@ -948,7 +949,7 @@ bool containsObjectRestOrSpread(const Node* node) {
 		return false;
 	}
 	// check for nested spread assignments — '{ x: { a, ...b } = foo } = c'
-	std::vector<Node*> elems;
+	std::span<Node* const> elems;
 	switch (node->kind) {
 	case Kind::ObjectBindingPattern:
 	case Kind::ArrayBindingPattern:
@@ -1338,11 +1339,13 @@ bool isInJSFile(Node* node) {
 }
 
 bool isExportsIdentifier(Node* node) {
-	return isIdentifier(node) && node->text() == "exports";
+	std::string scratch;
+	return isIdentifier(node) && node->textView(scratch) == "exports";
 }
 
 bool isModuleIdentifier(Node* node) {
-	return isIdentifier(node) && node->text() == "module";
+	std::string scratch;
+	return isIdentifier(node) && node->textView(scratch) == "module";
 }
 
 Node* getElementOrPropertyAccessName(Node* node) {
@@ -1364,8 +1367,10 @@ Node* getElementOrPropertyAccessName(Node* node) {
 bool isModuleExportsAccessExpression(Node* node) {
 	if (isAccessExpression(node) && isModuleIdentifier(node->expression())) {
 		if (Node* name = getElementOrPropertyAccessName(node);
-		    name != nullptr)
-			return name->text() == "exports";
+		    name != nullptr) {
+			std::string scratch;
+			return name->textView(scratch) == "exports";
+		}
 	}
 	return false;
 }

@@ -1009,7 +1009,7 @@ struct inlayHintState {
 			}
 		};
 
-		visitDisplayPartList = [&](const std::vector<::tsc::Node*>& nodes,
+		visitDisplayPartList = [&](std::span<::tsc::Node* const> nodes,
 								   std::string_view separator) {
 			for (size_t i = 0; i < nodes.size(); i++) {
 				if (i > 0) {

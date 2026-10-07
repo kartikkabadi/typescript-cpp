@@ -47,9 +47,9 @@ T orElse(T v, T fallback) {
 	return v != nullptr ? v : fallback;
 }
 
-template <class T, class F>
-bool someOf(const std::vector<T>& v, F f) {
-	for (const T& x : v) {
+template <class R, class F>
+bool someOf(R&& v, F f) {
+	for (auto& x : v) {
 		if (f(x)) {
 			return true;
 		}
@@ -124,8 +124,9 @@ int findIndexOf(const std::vector<T>& v, F f) {
 	return -1;
 }
 
-template <class T>
-T firstOrNil(const std::vector<T>& v) {
+template <class R>
+auto firstOrNil(R&& v) -> std::decay_t<std::ranges::range_value_t<R>> {
+	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	return v.empty() ? T{} : v.front();
 }
 
@@ -135,8 +136,9 @@ T lastOrNil(const std::vector<T>& v) {
 }
 
 // core.ElementOrNil
-template <class T>
-T elementOrNil(const std::vector<T>& v, int i) {
+template <class R>
+auto elementOrNil(R&& v, int i) -> std::decay_t<std::ranges::range_value_t<R>> {
+	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	return i >= 0 && i < static_cast<int>(v.size()) ? v[i] : T{};
 }
 

@@ -54,19 +54,20 @@ static bool isPrototypeProperty(Symbol* symbol) {
 }
 
 // core.ElementOrNil / core.Find
-template <class T>
-static T* elementOrNil(const std::vector<T*>& v, size_t i) {
+template <class R>
+static auto elementOrNil(R&& v, size_t i) -> std::decay_t<decltype(v[0])> {
 	return i < v.size() ? v[i] : nullptr;
 }
 
-template <class T, class Pred>
-static T* findFirstOrNil(const std::vector<T*>& v, Pred pred) {
-	for (T* x : v) {
+template <typename R, typename Pred>
+static auto findFirstOrNil(R&& v, Pred pred)
+    -> std::decay_t<std::ranges::range_value_t<R>> {
+	for (auto x : v) {
 		if (pred(x)) {
 			return x;
 		}
 	}
-	return nullptr;
+	return std::decay_t<std::ranges::range_value_t<R>>{};
 }
 
 // ast/utilities.go:2994
@@ -992,12 +993,12 @@ std::vector<Node*> Checker::getClassOrInterfaceDeclarationsOfSymbol(Symbol* symb
 // checker.go:4501
 bool Checker::areTypeParametersIdentical(
     const std::vector<Node*>& declarations, const std::vector<Type*>& targetParameters,
-    const std::function<std::vector<Node*>(Node*)>& getTypeParameterDeclarations) {
+    const std::function<NodeSlice(Node*)>& getTypeParameterDeclarations) {
 	size_t maxTypeArgumentCount = targetParameters.size();
 	size_t minTypeArgumentCount = static_cast<size_t>(getMinTypeArgumentCount(targetParameters));
 	for (Node* declaration : declarations) {
 		// If this declaration has too few or too many type parameters, we report an error
-		std::vector<Node*> sourceParameters = getTypeParameterDeclarations(declaration);
+		auto sourceParameters = getTypeParameterDeclarations(declaration);
 		if (sourceParameters.size() < minTypeArgumentCount ||
 		    sourceParameters.size() > maxTypeArgumentCount) {
 			return false;

@@ -28,26 +28,29 @@ namespace checker {
 // ---------------------------------------------------------------------------
 
 // core.Find: first element matching pred, or nullptr.
-template <typename T, typename Pred>
-static T* findInSlice(const std::vector<T*>& slice, Pred pred) {
+template <typename R, typename Pred>
+static auto findInSlice(R&& slice, Pred pred)
+	-> std::decay_t<std::ranges::range_value_t<R>> {
 	auto it = std::find_if(slice.begin(), slice.end(), pred);
-	return it == slice.end() ? nullptr : *it;
+	using T = std::decay_t<std::ranges::range_value_t<R>>;
+	return it == slice.end() ? T{} : static_cast<T>(*it);
 }
 
 // core.LastOrNil: last element, or nullptr for an empty slice.
-template <typename T>
-static T* lastOrNil(const std::vector<T*>& slice) {
-	return slice.empty() ? nullptr : slice.back();
+template <typename R>
+static auto lastOrNil(R&& slice) -> std::decay_t<decltype(slice.back())> {
+	using T = std::decay_t<std::ranges::range_value_t<R>>;
+	return slice.empty() ? T{} : static_cast<T>(slice.back());
 }
 
 // core.Some / core.Every on slices.
-template <typename T, typename Pred>
-static bool someInSlice(const std::vector<T*>& slice, Pred pred) {
+template <typename R, typename Pred>
+static bool someInSlice(R&& slice, Pred pred) {
 	return std::any_of(slice.begin(), slice.end(), pred);
 }
 
-template <typename T, typename Pred>
-static bool everyInSlice(const std::vector<T*>& slice, Pred pred) {
+template <typename R, typename Pred>
+static bool everyInSlice(R&& slice, Pred pred) {
 	return std::all_of(slice.begin(), slice.end(), pred);
 }
 
@@ -399,7 +402,7 @@ bool Checker::checkGrammarModifiers(Node* node /*Union[HasModifiers, HasDecorato
 	// [...leadingDecorators, ...leadingModifiers, ...trailingDecorators, ...trailingModifiers]. It is an error to
 	// have both leading and trailing decorators.
 	bool hasLeadingDecorators = false;
-	std::vector<Node*> modifiers = node->modifierNodes();
+	auto modifiers = node->modifierNodes();
 	for (Node* modifier : modifiers) {
 		if (isDecorator(modifier)) {
 			if (!nodeCanBeDecorated(legacyDecorators, node, node->parent, node->parent->parent)) {
@@ -1244,7 +1247,7 @@ bool Checker::checkGrammarObjectLiteralExpression(ObjectLiteralExpression* node,
 		}
 
 		// Modifiers are never allowed on properties except for 'async' on a method declaration
-		if (std::vector<Node*> modifiers = prop->modifierNodes(); !modifiers.empty()) {
+		if (auto modifiers = prop->modifierNodes(); !modifiers.empty()) {
 			if (canHaveModifiers(prop)) {
 				for (Node* mod : modifiers) {
 					if (isModifier(mod) && (mod->kind != Kind::AsyncKeyword || prop->kind != Kind::MethodDeclaration)) {
@@ -1849,7 +1852,8 @@ bool Checker::checkGrammarVariableDeclaration(VariableDeclaration* node) {
 
 bool Checker::checkGrammarForEsModuleMarkerInBindingName(Node* name) {
 	if (isIdentifier(name)) {
-		if (name->text() == "__esModule") {
+		std::string scratch;
+		if (name->textView(scratch) == "__esModule") {
 			return grammarErrorOnNodeSkippedOnNoEmit(name, Identifier_expected_esModule_is_reserved_as_an_exported_marker_when_transforming_ECMAScript_modules);
 		}
 	} else {
@@ -1864,7 +1868,8 @@ bool Checker::checkGrammarForEsModuleMarkerInBindingName(Node* name) {
 
 bool Checker::checkGrammarNameInLetOrConstDeclarations(Node* name /*Union[Identifier, BindingPattern]*/) {
 	if (name->kind == Kind::Identifier) {
-		if (name->text() == "let") {
+		std::string scratch;
+		if (name->textView(scratch) == "let") {
 			return grammarErrorOnNode(name, X_let_is_not_allowed_to_be_used_as_a_name_in_let_or_const_declarations);
 		}
 	} else {

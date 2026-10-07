@@ -2173,9 +2173,10 @@ bool isEvolvingArrayTypeList(const std::vector<Type*>& types) {
 bool Checker::isEvolvingArrayOperationTarget(Node* node) {
 	Node* root = getReferenceRoot(node);
 	Node* parent = root->parent;
+	std::string scratch;
 	bool isLengthPushOrUnshift =
 		isPropertyAccessExpression(parent) &&
-		(parent->name()->text() == "length" ||
+		(parent->name()->textView(scratch) == "length" ||
 		 (isCallExpression(parent->parent) && isIdentifier(parent->name()) &&
 		  isPushOrUnshiftIdentifier(parent->name())));
 	bool isElementAssignment =

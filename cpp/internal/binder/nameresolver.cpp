@@ -11,8 +11,9 @@ static bool isTypeParameterSymbolDeclaredInContainer(Symbol* symbol, Node* conta
 static bool isSelfReferenceLocation(Node* node, Node* lastLocation);
 static bool getIsDeferredContext(Node* location, Node* lastLocation);
 
-Symbol* NameResolver::resolve(Node* location, const std::string& name, SymbolFlags meaning,
+Symbol* NameResolver::resolve(Node* location, std::string_view name, SymbolFlags meaning,
 	const DiagnosticMessage* nameNotFoundMessage, bool isUse, bool excludeGlobals) {
+	std::string scratch;
 	Symbol* result = nullptr;
 	Node* lastLocation = nullptr;
 	Node* lastSelfReferenceLocation = nullptr;
@@ -120,8 +121,7 @@ Symbol* NameResolver::resolve(Node* location, const std::string& name, SymbolFla
 				}
 				// Because of module/namespace merging, a module's exports are in scope,
 				// yet we never want to treat an export specifier as putting a member in scope.
-				auto it2 = moduleExports.find(name);
-				Symbol* moduleExport = it2 != moduleExports.end() ? it2->second : nullptr;
+				Symbol* moduleExport = getSymbolFromTableView(moduleExports, name);
 				if (moduleExport != nullptr && moduleExport->flags == SymbolFlagsAlias &&
 					(getDeclarationOfKind(moduleExport, Kind::ExportSpecifier) != nullptr ||
 						getDeclarationOfKind(moduleExport, Kind::NamespaceExport) != nullptr)) {
@@ -157,7 +157,8 @@ Symbol* NameResolver::resolve(Node* location, const std::string& name, SymbolFla
 						? "verbatimModuleSyntax" : "isolatedModules";
 					reportError(originalLocation,
 						Cannot_access_0_from_another_file_without_qualification_when_1_is_enabled_Use_2_instead,
-						{name, isolatedModulesLikeFlagName, enumSymbol->name + "." + name});
+						{std::string(name), isolatedModulesLikeFlagName,
+						 enumSymbol->name + "." + std::string(name)});
 				}
 				done = true;
 				break;
@@ -202,7 +203,7 @@ Symbol* NameResolver::resolve(Node* location, const std::string& name, SymbolFla
 			}
 			if (isClassExpression(location) && (meaning & SymbolFlagsClass) != 0) {
 				Node* className = location->name();
-				if (className != nullptr && name == className->text()) {
+				if (className != nullptr && name == className->textView(scratch)) {
 					result = location->symbol();
 					done = true;
 					break;
@@ -264,7 +265,7 @@ Symbol* NameResolver::resolve(Node* location, const std::string& name, SymbolFla
 			}
 			if ((meaning & SymbolFlagsFunction) != 0) {
 				Node* functionName = location->name();
-				if (functionName != nullptr && name == functionName->text()) {
+				if (functionName != nullptr && name == functionName->textView(scratch)) {
 					result = location->symbol();
 					done = true;
 					break;
@@ -309,7 +310,7 @@ Symbol* NameResolver::resolve(Node* location, const std::string& name, SymbolFla
 		case Kind::InferType:
 			if ((meaning & SymbolFlagsTypeParameter) != 0) {
 				Node* parameterName = location->as<InferTypeNode>()->TypeParameter->name();
-				if (parameterName != nullptr && name == parameterName->text()) {
+				if (parameterName != nullptr && name == parameterName->textView(scratch)) {
 					result = location->as<InferTypeNode>()->TypeParameter->symbol();
 					done = true;
 				}
@@ -356,12 +357,14 @@ Symbol* NameResolver::resolve(Node* location, const std::string& name, SymbolFla
 	}
 	if (nameNotFoundMessage != nullptr) {
 		if (propertyWithInvalidInitializer != nullptr && onPropertyWithInvalidInitializer &&
-			onPropertyWithInvalidInitializer(originalLocation, name, propertyWithInvalidInitializer, result)) {
+			onPropertyWithInvalidInitializer(originalLocation, std::string(name),
+				propertyWithInvalidInitializer, result)) {
 			return nullptr;
 		}
 		if (result == nullptr) {
 			if (onFailedToResolveSymbol) {
-				onFailedToResolveSymbol(originalLocation, name, meaning, nameNotFoundMessage);
+				onFailedToResolveSymbol(originalLocation, std::string(name), meaning,
+					nameNotFoundMessage);
 			}
 		} else {
 			if (onSuccessfullyResolvedSymbol) {
@@ -463,14 +466,13 @@ Symbol* NameResolver::getSymbolOfDeclarationOrDefault(Node* node) {
 	return node->symbol();
 }
 
-Symbol* NameResolver::lookupOrDefault(SymbolTable* symbols, const std::string& name, SymbolFlags meaning) {
+Symbol* NameResolver::lookupOrDefault(SymbolTable* symbols, std::string_view name, SymbolFlags meaning) {
 	if (lookup) {
 		return lookup(symbols, name, meaning);
 	}
 	// Default implementation does not support following aliases or merged symbols
 	if (meaning != 0) {
-		auto it = symbols->find(name);
-		Symbol* symbol = it != symbols->end() ? it->second : nullptr;
+		Symbol* symbol = getSymbolFromTableView(*symbols, name);
 		if (symbol != nullptr && (symbol->flags & meaning) != 0) {
 			return symbol;
 		}

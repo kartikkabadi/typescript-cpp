@@ -12,16 +12,17 @@ namespace tsc::ls {
 namespace {
 
 // core.Some
-template <class T, class F>
-bool someRange(const std::vector<T>& v, F f) {
+template <class R, class F>
+bool someRange(R&& v, F f) {
 	return std::any_of(v.begin(), v.end(), f);
 }
 
 // core.Find — first element satisfying pred, or nullptr.
-template <class T, class F>
-T findRange(const std::vector<T>& v, F f) {
+template <class R, class F>
+auto findRange(R&& v, F f) -> std::decay_t<std::ranges::range_value_t<R>> {
+	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	auto it = std::find_if(v.begin(), v.end(), f);
-	return it != v.end() ? *it : T{};
+	return it != v.end() ? static_cast<T>(*it) : T{};
 }
 
 // core.FirstOrNil

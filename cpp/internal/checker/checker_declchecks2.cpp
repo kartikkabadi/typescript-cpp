@@ -38,9 +38,9 @@ T orElse(T a, T b) {
 }
 
 // core.Find
-template <class T, class Pred>
-T* find(const std::vector<T*>& v, Pred pred) {
-	for (T* e : v) {
+template <class R, class Pred>
+auto find(R&& v, Pred pred) -> std::decay_t<std::ranges::range_value_t<R>> {
+	for (auto e : v) {
 		if (pred(e)) {
 			return e;
 		}
@@ -49,9 +49,9 @@ T* find(const std::vector<T*>& v, Pred pred) {
 }
 
 // core.Some
-template <class T, class Pred>
-bool some(const std::vector<T*>& v, Pred pred) {
-	for (T* e : v) {
+template <class R, class Pred>
+bool some(R&& v, Pred pred) {
+	for (auto e : v) {
 		if (pred(e)) {
 			return true;
 		}
@@ -60,9 +60,9 @@ bool some(const std::vector<T*>& v, Pred pred) {
 }
 
 // core.Every
-template <class T, class Pred>
-bool every(const std::vector<T*>& v, Pred pred) {
-	for (T* e : v) {
+template <class R, class Pred>
+bool every(R&& v, Pred pred) {
+	for (auto e : v) {
 		if (!pred(e)) {
 			return false;
 		}
@@ -126,9 +126,9 @@ bool same(const std::vector<T>& a, const std::vector<T>& b) {
 }
 
 // core.LastOrNil
-template <class T>
-T* lastOrNil(const std::vector<T*>& v) {
-	return v.empty() ? nullptr : v.back();
+template <class R>
+auto lastOrNil(R&& v) -> std::decay_t<decltype(v.back())> {
+	return v.empty() ? nullptr : static_cast<Node*>(v.back());
 }
 
 // ---------------------------------------------------------------------------
@@ -596,7 +596,7 @@ void Checker::checkEnumDeclaration(Node* node) {
 			if (declaration->kind != Kind::EnumDeclaration) {
 				continue;
 			}
-			std::vector<Node*> members = declaration->members();
+			auto members = declaration->members();
 			if (members.empty()) {
 				continue;
 			}
@@ -1419,11 +1419,13 @@ void Checker::checkVariableDeclaration(Node* node) {
 	// "checkVariableDeclaration", {"kind","pos","end","path"}, false)()`.
 	tracing::TraceScope traceCheckVariableDeclaration(
 	    tracer, tracing::PhaseCheck, "checkVariableDeclaration",
-	    tracing::TraceArgs{
-	        {"kind", node->kind},
-	        {"pos", node->pos()},
-	        {"end", node->end()},
-	        {"path", getSourceFileOfNode(node)->FileName()}},
+	    [&] {
+	        return tracing::TraceArgs{
+	            {"kind", node->kind},
+	            {"pos", node->pos()},
+	            {"end", node->end()},
+	            {"path", getSourceFileOfNode(node)->FileName()}};
+	    },
 	    false);
 	checkGrammarVariableDeclaration(node->as<VariableDeclaration>());
 	checkVariableLikeDeclaration(node);
@@ -2668,7 +2670,7 @@ void Checker::checkTypeAliasDeclaration(Node* node) {
 	checkExportsOnMergedDeclarations(node);
 
 	Node* typeNode = node->type();
-	std::vector<Node*> typeParameters = node->typeParameters();
+	auto typeParameters = node->typeParameters();
 	checkTypeParameters(typeParameters);
 	if (typeNode != nullptr && typeNode->kind == Kind::IntrinsicKeyword) {
 		if (!((typeParameters.empty() && node->name()->text() == "BuiltinIteratorReturn") ||
@@ -2818,7 +2820,7 @@ DeclarationSpaces Checker::getDeclarationSpaces(Node* node) {
 }
 
 // checker.go:7174 — checkTypeParameters
-void Checker::checkTypeParameters(const std::vector<Node*>& typeParameterDeclarations) {
+void Checker::checkTypeParameters(std::span<Node* const> typeParameterDeclarations) {
 	bool seenDefault = false;
 	for (size_t i = 0; i < typeParameterDeclarations.size(); i++) {
 		Node* node = typeParameterDeclarations[i];
@@ -2842,7 +2844,7 @@ void Checker::checkTypeParameters(const std::vector<Node*>& typeParameterDeclara
 // Check that type parameter defaults only reference previously declared type parameters */
 // checker.go:7194 — checkTypeParametersNotReferenced
 void Checker::checkTypeParametersNotReferenced(Node* root,
-                                               const std::vector<Node*>& typeParameters,
+                                               std::span<Node* const> typeParameters,
                                                size_t index) {
 	std::function<bool(Node*)> visit = [&](Node* node) -> bool {
 		if (isTypeReferenceNode(node)) {
@@ -3084,7 +3086,7 @@ void Checker::reportUnusedParameters(Node* node) {
 
 // checker.go:7373 — reportUnusedBindingElements
 void Checker::reportUnusedBindingElements(Node* node) {
-	std::vector<Node*> declarations = node->elements();
+	auto declarations = node->elements();
 	if (declarations.size() > 1 &&
 		every(declarations, [this](Node* d) { return isUnreferencedVariableDeclaration(d); })) {
 		reportUnusedVariable(node,

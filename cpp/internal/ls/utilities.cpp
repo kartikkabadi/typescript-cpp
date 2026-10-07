@@ -119,18 +119,18 @@ std::string stripQuotes(const std::string& name) {
 
 // core/core.go — generic slice helpers (per-file convention).
 
-template <class T, class F>
-T* findRange(const std::vector<T*>& v, F f) {
+template <class R, class F>
+auto findRange(R&& v, F f) {
 	for (auto& x : v) {
 		if (f(x)) {
 			return x;
 		}
 	}
-	return nullptr;
+	return std::decay_t<std::ranges::range_value_t<R>>{};
 }
 
-template <class T>
-bool containsRange(const std::vector<T>& v, const T& x) {
+template <class R, class T>
+bool containsRange(R&& v, const T& x) {
 	return std::find(v.begin(), v.end(), x) != v.end();
 }
 

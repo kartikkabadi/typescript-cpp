@@ -84,9 +84,9 @@ std::vector<T> filterVec(const std::vector<T>& v, F&& f) {
 	return result;
 }
 
-template <class T, class F>
-bool someList(const std::vector<T>& v, F&& f) {
-	for (const T& x : v) {
+template <class R, class F>
+bool someList(R&& v, F&& f) {
+	for (auto& x : v) {
 		if (f(x)) {
 			return true;
 		}
@@ -122,8 +122,8 @@ T orElse(T a, T b) {
 }
 
 // slices.Index — index of the first occurrence of value, or -1.
-template <class T>
-int indexOf(const std::vector<T>& values, const T& v) {
+template <class R>
+int indexOf(R&& values, const auto& v) {
 	for (size_t i = 0; i < values.size(); i++) {
 		if (values[i] == v) {
 			return static_cast<int>(i);
@@ -2272,7 +2272,8 @@ Symbol* Checker::getResolvedSymbol(Node* node) {
 		links->resolvedSymbolCheckFile = checkFileTag();
 		Symbol* symbol = nullptr;
 		if (!nodeIsMissing(node)) {
-			symbol = resolveName(node, node->text(), SymbolFlagsValue | SymbolFlagsExportValue,
+			std::string scratch;
+			symbol = resolveName(node, node->textView(scratch), SymbolFlagsValue | SymbolFlagsExportValue,
 				getCannotFindNameDiagnosticForName(node), !isWriteOnlyAccess(node), false /*excludeGlobals*/);
 		}
 		links->resolvedSymbol = orElse(symbol, unknownSymbol);

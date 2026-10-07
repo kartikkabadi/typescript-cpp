@@ -267,7 +267,7 @@ struct Binder {
 	void declareCommonJSVariable(const std::string& name);
 	void bindChildren(Node* node);
 	void bindEachChild(Node* node);
-	void bindEach(const std::vector<Node*>& nodes);
+	void bindEach(std::span<Node* const> nodes);
 	void bindNodeList(NodeList* nodeList);
 	void bindModifiers(ModifierList* modifiers);
 	void bindEachStatementFunctionsFirst(NodeList* statements);
@@ -1181,7 +1181,7 @@ void Binder::setExportContextFlag(Node* node) {
 }
 
 bool Binder::hasExportDeclarations(Node* node) {
-	std::vector<Node*> statements;
+	std::span<Node* const> statements;
 	switch (node->kind) {
 	case Kind::SourceFile:
 		statements = node->statements();
@@ -1656,7 +1656,8 @@ void Binder::checkContextualIdentifier(Node* node) {
 	    !(node->flags & NodeFlagsAmbient) &&
 	    !(node->flags & NodeFlagsJSDoc) &&
 	    !isIdentifierName(node)) {
-		Kind originalKeywordKind = getIdentifierToken(node->text());
+		std::string scratch;
+		Kind originalKeywordKind = getIdentifierToken(node->textView(scratch));
 		if (originalKeywordKind == Kind::Identifier) return;
 		if (originalKeywordKind >= KindFirstFutureReservedWord &&
 		    originalKeywordKind <= KindLastFutureReservedWord) {
@@ -1685,7 +1686,8 @@ void Binder::checkContextualIdentifier(Node* node) {
 }
 
 void Binder::checkPrivateIdentifier(Node* node) {
-	if (node->text() == "#constructor" && file->diagnostics.empty()) {
+	std::string scratch;
+	if (node->textView(scratch) == "#constructor" && file->diagnostics.empty()) {
 		errorOnNode(node, X_constructor_is_a_reserved_word,
 		            {declarationNameToString(node)});
 	}
@@ -1708,7 +1710,7 @@ static bool isUseStrictPrologueDirective(SourceFile* sourceFile, Node* node) {
 }
 
 Node* findUseStrictPrologue(SourceFile* sourceFile,
-                            const std::vector<Node*>& statements) {
+                            std::span<Node* const> statements) {
 	for (Node* statement : statements) {
 		if (isPrologueDirective(statement)) {
 			if (isUseStrictPrologueDirective(sourceFile, statement))
@@ -2094,7 +2096,7 @@ void Binder::bindEachChild(Node* node) {
 	node->forEachChild([this](Node* n) -> bool { return bind(n); });
 }
 
-void Binder::bindEach(const std::vector<Node*>& nodes) {
+void Binder::bindEach(std::span<Node* const> nodes) {
 	for (Node* node : nodes) bind(node);
 }
 
