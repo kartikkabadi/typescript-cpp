@@ -10,24 +10,44 @@ TSCPP=${TSCPP:-"$REPO_ROOT/cpp/build/tscpp"}
 
 run_one() {
   F="$1"
-  ID=$(printf '%s' "$F" | md5 | cut -c1-12)
+  ID=$(printf '%s' "$F" | md5sum | cut -c1-12)
   "$BINDUMP" "$F" > "/tmp/bind_go_$ID.txt" 2>/dev/null
+  go_rc=$?
   "$TSCPP" bind "$F" > "/tmp/bind_cpp_$ID.txt" 2>/dev/null
-  if cmp -s "/tmp/bind_go_$ID.txt" "/tmp/bind_cpp_$ID.txt"; then
+  cpp_rc=$?
+  # Fail closed: rc >= 126 means the tool never ran (not found / crashed) —
+  # never compare two empty dumps and call it a match. Legit nonzero exits
+  # on error files still get compared on output.
+  if [ "$cpp_rc" -lt 126 ] && [ "$go_rc" -lt 126 ] && cmp -s "/tmp/bind_go_$ID.txt" "/tmp/bind_cpp_$ID.txt"; then
     echo "PASS $F"
   else
     echo "FAIL $F"
+    return 1
   fi
 }
 
-if [ $# -eq 1 ] && [ -f "$1" ]; then
+# Fail closed: a missing fixture or compiler must print FAIL, never exit 0
+# silently (conformance_corpus.sh feeds list mode via stdin, not this branch).
+if [ $# -eq 1 ]; then
   cd "$REPO_ROOT"
-  run_one "$REPO_ROOT/$1"
+  case "$1" in /*) run_one "$1" ;; *) run_one "$REPO_ROOT/$1" ;; esac
 elif [ $# -eq 2 ]; then
+  if [ ! -s "$1" ] || ! [ "$2" -gt 0 ] 2>/dev/null; then
+    echo "a non-empty file list and a positive job count are required" >&2
+    exit 2
+  fi
+  list="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")" || exit 2
+  if grep -q '^$' "$list"; then
+    echo "empty file list entry" >&2
+    exit 2
+  fi
   cd "$REPO_ROOT"
   export -f run_one 2>/dev/null || true
-  while IFS= read -r F; do printf '%s\0' "$F"; done < "$1" \
-    | xargs -0 -P "$2" -I{} bash -c 'run_one "$@"' _ {}
+  export BINDUMP TSCPP
+  # `|| [ -n "$F" ]` keeps the final line when the list lacks a trailing
+  # newline.
+  while IFS= read -r F || [ -n "$F" ]; do printf '%s\0' "$F"; done < "$list" \
+    | xargs -0 -r -P "$2" -I{} bash -c 'run_one "$@"' _ {}
 else
   echo "usage: $0 <file> | <listfile> <jobs>" >&2
   exit 2

@@ -44,6 +44,9 @@ def main():
                     files.append(os.path.join(base, n))
     files.sort()
     print(f"{len(files)} files", file=sys.stderr)
+    if not files:
+        print("empty corpus — refusing to report success over nothing", file=sys.stderr)
+        sys.exit(2)
     bad = 0
     shown = 0
     with concurrent.futures.ThreadPoolExecutor(16) as ex:
@@ -57,6 +60,7 @@ def main():
                         print(detail)
                     shown += 1
     print(f"\n{bad}/{len(files)} mismatched", file=sys.stderr)
+    sys.exit(1 if bad else 0)
 
 
 if __name__ == "__main__":
