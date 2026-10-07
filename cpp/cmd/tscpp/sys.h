@@ -18,7 +18,7 @@ tsc::execute::tsc::System* newSystem();
 // Used by osSys::Spawn and by --lsp's ServerOptions.Spawn (lsp.go:64).
 std::pair<std::shared_ptr<tsc::gostd::io::ReadWriteCloser>, tsc::gostd::Error>
 spawnProcess(const std::vector<std::string>& command, const std::string& dir,
-             tsc::gostd::io::Writer* stderr);
+             tsc::gostd::io::Writer* stderr_);
 
 // runLSP — lsp.go:20 (lsp.cpp). `tsc --lsp` subcommand.
 int runLSP(const std::vector<std::string>& args);

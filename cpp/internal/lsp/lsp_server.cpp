@@ -165,7 +165,7 @@ Server::Server(const ServerOptions& opts) {
 	}
 	r = opts.In;
 	w = opts.Out;
-	stderr = opts.Err;
+	stderr_ = opts.Err;
 	cwd = opts.Cwd;
 	fs = opts.FS;
 	defaultLibraryPath = opts.DefaultLibraryPath;

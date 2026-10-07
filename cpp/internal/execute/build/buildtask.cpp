@@ -5,6 +5,7 @@
 #include "internal/execute/build/build.h"
 #include "internal/compiler/program.h"
 #include "internal/tsoptions/tsoptions.h"
+#include "internal/fileclock/fileclock.h"
 
 namespace tsc::execute::build {
 
@@ -1026,7 +1027,7 @@ void BuildTask::updateTimeStamps(
 	}
 	bool verboseMessageReported = false;
 	auto buildInfoName = resolved->GetBuildInfoFileName();
-	auto now = std::chrono::file_clock::from_sys(orchestrator->opts.Sys->Now());
+	auto now = fileClockFromSys(orchestrator->opts.Sys->Now());
 	auto updateTimeStamp = [&](const std::string& file) {
 		if (emitted.Has(file)) {
 			return;
@@ -1164,7 +1165,7 @@ void BuildTask::onBuildInfoEmit(Orchestrator* orchestrator,
 	std::lock_guard<std::mutex> lock(buildInfoEntryMu);
 	std::optional<fileTime> dtsTime;
 	auto mTime =
-	    std::chrono::file_clock::from_sys(orchestrator->opts.Sys->Now());
+	    fileClockFromSys(orchestrator->opts.Sys->Now());
 	if (hasChangedDtsFile) {
 		dtsTime = mTime;
 	} else if (buildInfoEntry_ != nullptr) {
@@ -1221,7 +1222,7 @@ BuildTask::writeFile(Orchestrator* orchestrator, const std::string& fileName,
 		// Store time stamps
 		orchestrator->host_->storeMTime(
 		    fileName,
-		    std::chrono::file_clock::from_sys(orchestrator->opts.Sys->Now()));
+		    fileClockFromSys(orchestrator->opts.Sys->Now()));
 	}
 	return std::nullopt;
 }

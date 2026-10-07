@@ -664,7 +664,7 @@ struct ServerOptions {
 	std::function<std::pair<std::shared_ptr<gostd::io::ReadWriteCloser>,
 	                        gostd::Error>(
 		const std::vector<std::string>& command, const std::string& dir,
-		gostd::io::Writer* stderr)>
+		gostd::io::Writer* stderr_)>
 		Spawn;
 	gostd::Duration ProgressDelay{}; // delay before showing progress UI
 	std::function<void(int)> SetParentProcessID;
@@ -724,7 +724,7 @@ public:
 	std::shared_ptr<Writer> w;   // server.go:173
 	gostd::Context backgroundCtx; // server.go:174
 
-	gostd::io::Writer* stderr = nullptr; // server.go:176
+	gostd::io::Writer* stderr_ = nullptr; // server.go:176 (stderr_: CRT macro dodge)
 
 	std::shared_ptr<lsp::logger> logger;       // server.go:178
 	std::atomic<bool> initStarted{false};      // server.go:179

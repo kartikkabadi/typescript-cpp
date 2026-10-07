@@ -10,12 +10,16 @@
 #include <cstring>
 #include <memory>
 #include <string>
+#include <thread>
+#include <vector>
+#ifdef _WIN32
+#include "internal/win32/w32compat.h"
+#else
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <thread>
 #include <unistd.h>
-#include <vector>
+#endif
 
 #include "internal/bundled/bundled.h"
 #include "internal/core/types.h"
@@ -149,14 +153,39 @@ std::pair<std::vector<uint8_t>, gostd::Error>
 npmInstall(const std::string& cwd, const std::vector<std::string>& args) {
 	int outPipe[2];
 	if (::pipe(outPipe) != 0) {
+#ifdef _WIN32
+		return {{}, gostd::newError(w32::errnoText(errno))};
+#else
 		return {{}, gostd::newError(std::strerror(errno))};
+#endif
 	}
+#ifdef _WIN32
+	// exec.Command("npm", args...) + cmd.Output: Go's LookPath resolves npm
+	// via PATHEXT (npm.cmd on Windows). spawnvp mirrors LookPath; a resolved
+	// .cmd can't be run by CreateProcess, so this fails like Go's post-1.21
+	// refusal to exec batch files directly — documented in WINDOWS_PARITY.md.
+	w32::SpawnStdio io;
+	io.stdoutFd = outPipe[1];
+	io.stderrFd = -2;
+	io.stdinFd = -2;
+	std::vector<std::string> argv{"npm"};
+	argv.insert(argv.end(), args.begin(), args.end());
+	pid_t pid = w32::spawnvp(argv, io, cwd);
+#else
 	pid_t pid = ::fork();
+#endif
 	if (pid < 0) {
 		::close(outPipe[0]);
 		::close(outPipe[1]);
-		return {{}, gostd::newError(std::strerror(errno))};
+		return {{}, gostd::newError(
+#ifdef _WIN32
+		                 w32::errnoText(errno)
+#else
+		                 std::strerror(errno)
+#endif
+		             )};
 	}
+#ifndef _WIN32
 	if (pid == 0) {
 		::chdir(cwd.c_str());
 		::dup2(outPipe[1], STDOUT_FILENO);
@@ -171,6 +200,7 @@ npmInstall(const std::string& cwd, const std::vector<std::string>& args) {
 		::execvp("npm", argv.data());
 		_exit(127);
 	}
+#endif
 	::close(outPipe[1]);
 	std::vector<uint8_t> out;
 	char buf[8192];
@@ -205,7 +235,7 @@ npmInstall(const std::string& cwd, const std::vector<std::string>& args) {
 bool isProcessAlive(int pid) {
 	if (::kill(pid, 0) == 0) return true;
 	return errno == EPERM;
-}
+}  // kill(pid, 0) is presence-probe on both platforms (w32::isProcessAlive)
 
 // ---------------------------------------------------------------------------
 // startParentProcessWatchdog — lsp.go:95. Polls the parent every 5s; when it
@@ -303,8 +333,14 @@ int runLSP(const std::vector<std::string>& args) {
 	{
 		char buf[4096];
 		if (::getcwd(buf, sizeof(buf)) == nullptr) {
-			std::fprintf(stderr, "Error getting current directory: %s\n",
-			             std::strerror(errno));
+			std::fprintf(
+			    stderr, "Error getting current directory: %s\n",
+#ifdef _WIN32
+			    w32::errnoText(errno).c_str()
+#else
+			    std::strerror(errno)
+#endif
+			);
 			return 1;
 		}
 		opts.Cwd = tspath::normalizePath(buf);

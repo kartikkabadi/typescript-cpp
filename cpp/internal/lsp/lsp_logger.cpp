@@ -38,8 +38,8 @@ void logger::sendLogMessage(lsproto::MessageType msgType,
                             const std::string& message) {
 	if (!server->initStarted.load()) {
 		// fmt.Fprintln(l.server.stderr, message)
-		if (server->stderr != nullptr) {
-			server->stderr->write(message + "\n");
+		if (server->stderr_ != nullptr) {
+			server->stderr_->write(message + "\n");
 		}
 		return;
 	}
@@ -65,8 +65,8 @@ void logger::sendLogMessage(lsproto::MessageType msgType,
 	                                         notification->toMessage());
 	    err != nullptr) {
 		if (gostd::ctxErr(server->backgroundCtx) != nullptr) {
-			if (server->stderr != nullptr) {
-				server->stderr->write(message + "\n");
+			if (server->stderr_ != nullptr) {
+				server->stderr_->write(message + "\n");
 			}
 		}
 	}

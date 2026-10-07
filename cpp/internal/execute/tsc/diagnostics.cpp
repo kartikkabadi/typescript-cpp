@@ -13,7 +13,11 @@ namespace {
 std::string formatGoTime(vfs::TimePoint t) {
 	std::time_t tt = std::chrono::system_clock::to_time_t(t);
 	std::tm tm{};
+#ifdef _WIN32
+	localtime_s(&tm, &tt);
+#else
 	localtime_r(&tt, &tm);
+#endif
 	char buf[16];
 	std::strftime(buf, sizeof buf, "%I:%M:%S %p", &tm);
 	return buf;

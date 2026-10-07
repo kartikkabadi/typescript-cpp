@@ -2057,9 +2057,9 @@ struct spawner : cm::Spawner {
 
 	std::pair<std::shared_ptr<gostd::io::ReadWriteCloser>, gostd::Error>
 	Spawn(const std::vector<std::string>& command, const std::string& dir,
-	      gostd::io::Writer* stderr) override {
+	      gostd::io::Writer* stderr_) override {
 		(void)dir;
-		(void)stderr;
+		(void)stderr_;
 		auto handlerErr = handlerForMapper(command, lifecycle);
 		auto handler = handlerErr.first;
 		auto err = handlerErr.second;

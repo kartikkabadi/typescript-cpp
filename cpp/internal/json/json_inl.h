@@ -7,6 +7,7 @@
 // marshalJSONTo(Encoder&)/unmarshalJSONFrom(Decoder&) members (or ADL
 // functions), then built-in kinds, containers, optionals, pointers, variants.
 
+#include <algorithm>
 #include <charconv>
 #include <cstring>
 #include <map>

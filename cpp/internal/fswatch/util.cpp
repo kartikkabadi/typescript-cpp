@@ -11,12 +11,16 @@
 #include "internal/stringutil/stringutil.h"
 #include "internal/vfs/vfs.h"
 
+#ifdef _WIN32
+#include "internal/win32/w32compat.h"
+#else
 #include <dirent.h>
 #include <fcntl.h>
-#include <string.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <unistd.h>
+#endif
+#include <string.h>
 
 #include <algorithm>
 #include <cstring>
@@ -25,9 +29,11 @@ namespace tsc::fswatch {
 
 // --- syscall.Errno.Error() — linux errstr table -----------------------------
 
+#ifndef _WIN32
 // Go's errno text table (go/src/syscall/zerrors_linux_amd64.go) is lowercase;
 // glibc strerror capitalizes. Cover every errno this package can surface, and
-// fall back to strerror for anything else.
+// fall back to strerror for anything else. On Windows Go's Errno.Error() is
+// FormatMessage/raw-code driven — w32::errnoText reproduces it.
 static const char* errnoErrstr(int e) {
 	switch (e) {
 	case EPERM:
@@ -102,8 +108,15 @@ static const char* errnoErrstr(int e) {
 		return ::strerror(e);
 	}
 }
+#endif // !_WIN32
 
-std::string errnoErrorObj::Error() const { return errnoErrstr(e); }
+std::string errnoErrorObj::Error() const {
+#ifdef _WIN32
+	return w32::errnoText(e);
+#else
+	return errnoErrstr(e);
+#endif
+}
 
 gostd::Error errnoError(int e) {
 	return std::make_shared<errnoErrorObj>(e);
@@ -188,7 +201,8 @@ std::pair<osFileInfo, gostd::Error> osLstat(const std::string& path) {
 // Go os.ReadDir: Open(O_RDONLY|O_CLOEXEC) + File.ReadDir(-1) + sort by name.
 // Entries whose d_type is DT_UNKNOWN (or otherwise unrecognized, ^FileMode(0)
 // in Go) are resolved with an lstat — IsNotExist entries are skipped — matching
-// newUnixDirent in os/file_unix.go.
+// newUnixDirent in os/file_unix.go. On Windows, os.File.readdir is
+// FindFirstFile/FindNextFile via the compat DIR* — same result shape.
 
 std::pair<std::vector<osDirEntry>, gostd::Error>
 osReadDir(const std::string& path) {
@@ -201,6 +215,60 @@ osReadDir(const std::string& path) {
 		~fdGuard() { ::close(fd); }
 	} guard{fd};
 
+#ifdef _WIN32
+	DIR* dirp = ::fdopendir(fd);
+	if (dirp == nullptr) {
+		return {{}, osPathError("readdirent", path, errno)};
+	}
+	guard.fd = -1; // closedir owns the fd now (POSIX fdopendir rule).
+	struct dirGuard {
+		DIR* p;
+		~dirGuard() { ::closedir(p); }
+	} dguard{dirp};
+
+	std::vector<osDirEntry> entries;
+	for (;;) {
+		errno = 0;
+		struct dirent* d = ::readdir(dirp);
+		if (d == nullptr) {
+			if (errno != 0) {
+				return {{}, osPathError("readdirent", path, errno)};
+			}
+			break;
+		}
+		std::string_view nameBytes(d->d_name);
+		if (nameBytes == "." || nameBytes == "..") {
+			continue;
+		}
+		std::string name(nameBytes);
+		bool isDir;
+		if (d->d_type == DT_DIR) {
+			isDir = true;
+		} else if (d->d_type == DT_UNKNOWN ||
+		           (d->d_type != DT_REG && d->d_type != DT_LNK &&
+		            d->d_type != DT_FIFO && d->d_type != DT_SOCK &&
+		            d->d_type != DT_CHR && d->d_type != DT_BLK)) {
+			// ^FileMode(0) → lstat to resolve the type.
+			auto [info, lerr] = osLstat(path + "/" + name);
+			if (lerr != nullptr) {
+				if (errIsFsNotExist(lerr)) {
+					// Disappeared between readdir and stat.
+					continue;
+				}
+				return {{}, lerr};
+			}
+			isDir = info.isDir;
+		} else {
+			isDir = false;
+		}
+		entries.push_back(osDirEntry{std::move(name), isDir});
+	}
+	std::sort(entries.begin(), entries.end(),
+	          [](const osDirEntry& a, const osDirEntry& b) {
+		          return a.name < b.name;
+	          });
+	return {entries, nullptr};
+#else
 	std::vector<char> buf(8192);
 	std::vector<osDirEntry> entries;
 	for (;;) {
@@ -263,6 +331,7 @@ osReadDir(const std::string& path) {
 		          return a.name < b.name;
 	          });
 	return {entries, nullptr};
+#endif
 }
 
 // --- utf8.ValidString ---------------------------------------------------------

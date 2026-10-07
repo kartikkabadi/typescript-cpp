@@ -20,24 +20,24 @@ NewPipeTransport(std::string_view path) {
 // stdioConn — transport.go:80. An io.ReadWriteCloser wrapping stdin/stdout.
 class stdioConn : public gostd::io::ReadWriteCloser {
 public:
-	stdioConn(std::shared_ptr<gostd::io::ReadCloser> stdin_,
-	          std::shared_ptr<gostd::io::WriteCloser> stdout_)
-	    : stdin(std::move(stdin_)), stdout(std::move(stdout_)) {}
+	stdioConn(std::shared_ptr<gostd::io::ReadCloser> in_,
+	          std::shared_ptr<gostd::io::WriteCloser> out_)
+	    : stdin_(std::move(in_)), stdout_(std::move(out_)) {}
 
 	std::pair<int, gostd::Error> read(std::span<char> b) override {
-		return stdin->read(b);
+		return stdin_->read(b);
 	}
 	std::pair<int, gostd::Error> write(std::string_view b) override {
-		return stdout->write(b);
+		return stdout_->write(b);
 	}
 	gostd::Error close() override {
 		// os.Stdin.Close(); os.Stdout.Close() — nil receivers are valid.
 		gostd::Error inErr, outErr;
-		if (stdin != nullptr) {
-			inErr = stdin->close();
+		if (stdin_ != nullptr) {
+			inErr = stdin_->close();
 		}
-		if (stdout != nullptr) {
-			outErr = stdout->close();
+		if (stdout_ != nullptr) {
+			outErr = stdout_->close();
 		}
 		if (inErr != nullptr) {
 			return inErr;
@@ -46,16 +46,17 @@ public:
 	}
 
 private:
-	std::shared_ptr<gostd::io::ReadCloser> stdin;
-	std::shared_ptr<gostd::io::WriteCloser> stdout;
+	// underscore suffix: stdin/stdout are macros under MSVC's CRT.
+	std::shared_ptr<gostd::io::ReadCloser> stdin_;
+	std::shared_ptr<gostd::io::WriteCloser> stdout_;
 };
 
 // NewStdioTransport — transport.go:55.
 std::shared_ptr<StdioTransport> NewStdioTransport(
-    std::shared_ptr<gostd::io::ReadCloser> stdin,
-    std::shared_ptr<gostd::io::WriteCloser> stdout) {
-	return std::make_shared<StdioTransport>(std::move(stdin),
-	                                        std::move(stdout));
+    std::shared_ptr<gostd::io::ReadCloser> stdin_,
+    std::shared_ptr<gostd::io::WriteCloser> stdout_) {
+	return std::make_shared<StdioTransport>(std::move(stdin_),
+	                                        std::move(stdout_));
 }
 
 // StdioTransport::Accept — transport.go:64. Accept returns the
@@ -67,7 +68,7 @@ StdioTransport::Accept() {
 		        gostd::io::errEOF}; // Only one connection allowed
 	}
 	used = true;
-	return {std::make_shared<stdioConn>(stdin, stdout), nullptr};
+	return {std::make_shared<stdioConn>(stdin_, stdout_), nullptr};
 }
 
 // StdioTransport::Close — transport.go:74.

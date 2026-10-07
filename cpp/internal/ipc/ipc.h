@@ -433,24 +433,25 @@ NewPipeTransport(std::string_view path);
 // connection transport; only accepts one connection.
 class StdioTransport : public Transport {
 public:
-	StdioTransport(std::shared_ptr<gostd::io::ReadCloser> stdin,
-	               std::shared_ptr<gostd::io::WriteCloser> stdout)
-	    : stdin(std::move(stdin)), stdout(std::move(stdout)) {}
+	// Names stdin_/stdout_ dodge the MSVC CRT macros stdin/stdout.
+	StdioTransport(std::shared_ptr<gostd::io::ReadCloser> stdin_,
+	               std::shared_ptr<gostd::io::WriteCloser> stdout_)
+	    : stdin_(std::move(stdin_)), stdout_(std::move(stdout_)) {}
 
 	std::pair<std::shared_ptr<gostd::io::ReadWriteCloser>, gostd::Error>
 	Accept() override;
 	gostd::Error Close() override;
 
 private:
-	std::shared_ptr<gostd::io::ReadCloser> stdin;
-	std::shared_ptr<gostd::io::WriteCloser> stdout;
+	std::shared_ptr<gostd::io::ReadCloser> stdin_;
+	std::shared_ptr<gostd::io::WriteCloser> stdout_;
 	bool used = false;
 };
 
 // NewStdioTransport — transport.go:55.
 std::shared_ptr<StdioTransport> NewStdioTransport(
-    std::shared_ptr<gostd::io::ReadCloser> stdin,
-    std::shared_ptr<gostd::io::WriteCloser> stdout);
+    std::shared_ptr<gostd::io::ReadCloser> stdin_,
+    std::shared_ptr<gostd::io::WriteCloser> stdout_);
 
 // GeneratePipePath — transport_unix.go:23. A platform-appropriate pipe path
 // for the given name (os.TempDir() + name).

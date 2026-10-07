@@ -867,19 +867,19 @@ std::shared_ptr<Host> NewHostWithOptions(gostd::Context ctx, Spawner* spawner,
 		auto mapperTiming = timingPtr->mapper(mapper->Identity());
 		std::string diagnosticName = mapper->DiagnosticName();
 		gostd::Time spawnStart = gostd::now();
-		gostd::io::Writer* stderr = gostd::io::discard();
+		gostd::io::Writer* stderr_ = gostd::io::discard();
 		std::shared_ptr<stderrLogger> stderrLog;
 		if (logger != nullptr) {
 			stderrLog = std::make_shared<stderrLogger>();
 			stderrLog->mapperName = diagnosticName;
 			stderrLog->logger = logger;
-			stderr = stderrLog.get();
+			stderr_ = stderrLog.get();
 		}
 		auto [rwc, spawnErr] =
 		    spawner->Spawn(mapper->Manifest.Exec, mapper->Definition.Options.empty()
 		                       ? mapper->PackageDirectory
 		                       : mapper->PackageDirectory,
-		                   stderr);
+		                   stderr_);
 		mapperTiming->spawn.record(spawnStart);
 		if (spawnErr != nullptr) {
 			auto* ie = new InitializeError;

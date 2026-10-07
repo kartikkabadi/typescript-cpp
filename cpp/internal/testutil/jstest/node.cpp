@@ -4,11 +4,15 @@
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
+#ifdef _WIN32
+#include "internal/win32/w32compat.h"
+#else
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #include <fcntl.h>
+#endif
 #include <fstream>
 #include <sstream>
 #include <vector>
@@ -17,10 +21,24 @@ namespace tsc::testutil::jstest {
 
 namespace {
 
+// strerror on POSIX; on Windows our errno text matching Go's zerrors table.
+std::string w32ErrText(int e) {
+#ifdef _WIN32
+	return w32::errnoText(e);
+#else
+	return std::strerror(e);
+#endif
+}
+
 // getNodeExeOnce — node.go:19 (sync.OnceValue).
 std::string getNodeExeOnce() {
 	static const std::string exe = [] {
 		const char* exeName = "node";
+#ifdef _WIN32
+		// Go's exec.LookPath on windows: PATHEXT walk + ';' PATH split.
+		auto [found, err] = w32::lookPath(exeName, {});
+		return err ? std::string() : found;
+#else
 		// exec.LookPath: if the name contains a slash, try it
 		// directly; otherwise search PATH.
 		auto findExecutable = [](const std::string& file) -> std::string {
@@ -53,6 +71,7 @@ std::string getNodeExeOnce() {
 			start = colon + 1;
 		}
 		return std::string();
+#endif
 	}();
 	return exe;
 }
@@ -87,14 +106,28 @@ std::pair<std::string, gostd::Error> combinedOutput(
 	int fds[2];
 	if (pipe(fds) != 0) {
 		return {"", gostd::errorf("pipe: %s",
-		                          {std::strerror(errno)})};
+		                          {w32ErrText(errno)})};
 	}
+#ifdef _WIN32
+	// fork+execvp doesn't exist on Windows: spawn the same image directly.
+	w32::SpawnStdio io;
+	io.stdoutFd = fds[1];
+	io.mergeStderrToStdout = true;
+	std::vector<std::string> argv{exe};
+	argv.insert(argv.end(), args.begin(), args.end());
+	pid_t pid = w32::spawnvp(argv, io, dir);
+	close(fds[1]);
+	if (pid < 0) {
+		close(fds[0]);
+		return {"", gostd::errorf("spawn: %s", {w32ErrText(errno)})};
+	}
+#else
 	pid_t pid = fork();
 	if (pid < 0) {
 		close(fds[0]);
 		close(fds[1]);
 		return {"", gostd::errorf("fork: %s",
-		                          {std::strerror(errno)})};
+		                          {w32ErrText(errno)})};
 	}
 	if (pid == 0) {
 		// Child: stdout+stderr both go to the pipe.
@@ -117,6 +150,7 @@ std::pair<std::string, gostd::Error> combinedOutput(
 		_exit(127);
 	}
 	close(fds[1]);
+#endif
 	std::string output;
 	char buf[4096];
 	for (;;) {

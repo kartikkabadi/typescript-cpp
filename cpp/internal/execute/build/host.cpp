@@ -1,6 +1,7 @@
 // host.cpp — port of tsc/internal/execute/build/host.go.
 #include "internal/execute/build/build.h"
 #include "internal/tsoptions/tsoptions.h"
+#include "internal/fileclock/fileclock.h"
 
 namespace tsc::execute::build {
 
@@ -97,7 +98,7 @@ std::optional<std::string>
 host::SetMTime(const std::string& file, std::filesystem::file_time_type mTime) {
 	if (auto err = host_->fs->Chtimes(
 	        file, vfs::TimePoint{std::chrono::seconds{-62135596800}},
-	        std::chrono::file_clock::to_sys(mTime))) {
+	        fileClockToSys(mTime))) {
 		return err.str();
 	}
 	return std::nullopt;

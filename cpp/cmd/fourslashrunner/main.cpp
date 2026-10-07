@@ -16,10 +16,14 @@
 #include <string>
 #include <vector>
 
+#ifdef _WIN32
+#include "internal/win32/w32compat.h"
+#else
 #include <signal.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#endif
 
 #include "internal/fourslash/tests/registry.h"
 #include "internal/gostd/testing.h"
@@ -38,8 +42,70 @@ void onTestAlarm(int) {
 	_exit(1);
 }
 
+// Runs the test body and returns 0 pass / 1 fail / 2 skip — shared by the
+// forked child (POSIX) and the --test-child respawn (Windows).
+int runTestBody(const tsc::fourslash::tests::FourslashTestCase& tc) {
+	signal(SIGALRM, onTestAlarm);
+	alarm(kTestTimeoutSeconds);
+	tsc::gostd::testing::T t;
+	int code = 0;
+	try {
+		// Run as a named subtest, like go test does: t->Name() feeds
+		// getBaseFileNameFromTest for baseline file naming.
+		t.Run(tc.name, tc.fn);
+	} catch (const std::exception& e) {
+		t.Errorf("uncaught exception: %s", {e.what()});
+	} catch (...) {
+		t.Errorf("uncaught non-std::exception", {});
+	}
+	if (t.Skipped()) code = 2;
+	else if (t.Failed()) code = 1;
+	fflush(stdout);
+	fflush(stderr);
+	return code;
+}
+
 // Runs one test in a child process; returns 0 pass, 1 fail, and the
 // child's captured stdout+stderr in `output`.
+#ifdef _WIN32
+int runOne(const tsc::fourslash::tests::FourslashTestCase& tc, std::string& output) {
+	// Windows has no fork: respawn this image with --test-child <name> and
+	// capture its stdout+stderr through a pipe (the parent's already-flushed
+	// FILE buffers don't leak — the child is a fresh process).
+	int pipefd[2];
+	if (pipe(pipefd) != 0) {
+		fprintf(stderr, "pipe failed\n");
+		return 1;
+	}
+	w32::SpawnStdio io;
+	io.stdoutFd = pipefd[1];
+	io.mergeStderrToStdout = true;
+	std::string self = w32::selfExePath();
+	std::vector<std::string> argv{self, "--test-child", tc.name};
+	pid_t pid = w32::spawnvp(argv, io);
+	close(pipefd[1]);
+	if (pid < 0) {
+		fprintf(stderr, "spawn failed\n");
+		close(pipefd[0]);
+		return 1;
+	}
+	char buf[4096];
+	ssize_t n;
+	while ((n = read(pipefd[0], buf, sizeof(buf))) > 0) {
+		output.append(buf, static_cast<size_t>(n));
+	}
+	close(pipefd[0]);
+	int status = 0;
+	waitpid(pid, &status, 0);
+	if (WIFEXITED(status)) {
+		return WEXITSTATUS(status);
+	}
+	if (WIFSIGNALED(status)) {
+		output += "[killed by signal " + std::to_string(WTERMSIG(status)) + "]\n";
+	}
+	return 1;
+}
+#else
 int runOne(const tsc::fourslash::tests::FourslashTestCase& tc, std::string& output) {
 	int pipefd[2];
 	if (pipe(pipefd) != 0) {
@@ -63,25 +129,8 @@ int runOne(const tsc::fourslash::tests::FourslashTestCase& tc, std::string& outp
 		dup2(pipefd[1], STDOUT_FILENO);
 		dup2(pipefd[1], STDERR_FILENO);
 		close(pipefd[1]);
-		signal(SIGALRM, onTestAlarm);
-		alarm(kTestTimeoutSeconds);
-		tsc::gostd::testing::T t;
-		int code = 0;
-		try {
-			// Run as a named subtest, like go test does: t->Name() feeds
-			// getBaseFileNameFromTest for baseline file naming.
-			t.Run(tc.name, tc.fn);
-		} catch (const std::exception& e) {
-			t.Errorf("uncaught exception: %s", {e.what()});
-		} catch (...) {
-			t.Errorf("uncaught non-std::exception", {});
-		}
-		if (t.Skipped()) code = 2;
-		else if (t.Failed()) code = 1;
-		fflush(stdout);
-		fflush(stderr);
 		// Avoid running atexit/IPC teardown twice.
-		_exit(code);
+		_exit(runTestBody(tc));
 	}
 	close(pipefd[1]);
 	char buf[4096];
@@ -100,10 +149,26 @@ int runOne(const tsc::fourslash::tests::FourslashTestCase& tc, std::string& outp
 	}
 	return 1;
 }
+#endif
 
 }  // namespace
 
 int main(int argc, char** argv) {
+#ifdef _WIN32
+	// Child side of runOne's respawn: run the named test, print its result
+	// stream to stdout, exit with its code.
+	if (argc >= 3 && std::string(argv[1]) == "--test-child") {
+		w32::setBinaryStdio();
+		const std::string target = argv[2];
+		for (auto& tc : tsc::fourslash::tests::fourslashTestRegistry()) {
+			if (tc.name == target) {
+				return runTestBody(tc);
+			}
+		}
+		fprintf(stderr, "unknown test %s\n", target.c_str());
+		return 1;
+	}
+#endif
 	std::string runFilter;
 	for (int i = 1; i < argc; ++i) {
 		std::string arg = argv[i];

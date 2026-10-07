@@ -6,6 +6,7 @@
 // failed Remove is surfaced as an errors.New-style message; syscall errors
 // carry the POSIX errno text like Go's os.PathError wrapping.
 
+#ifndef _WIN32
 #include "internal/ipc/ipc.h"
 
 #include <cerrno>
@@ -211,3 +212,5 @@ std::string GeneratePipePath(std::string_view name) {
 }
 
 } // namespace tsc::ipc
+
+#endif // !_WIN32

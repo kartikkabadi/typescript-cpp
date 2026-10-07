@@ -95,6 +95,7 @@
 //   Write a byte to pipe[1] → poll sees POLLIN on pipe[0] → loop exits →
 //   deferred closeFDs closes fanotify fd, pipe fds, and signals endedSignal.
 
+#ifndef _WIN32
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE // pipe2, name_to_handle_at
 #endif
@@ -987,3 +988,5 @@ watcher& fanotifyWatcher() {
 }
 
 } // namespace tsc::fswatch
+
+#endif // !_WIN32
