@@ -3491,9 +3491,9 @@ std::string LanguageService::printObjectLiteralMethodLabelDetail(
 	printer::Printer* signaturePrinter = printer::NewPrinter(
 	    printer::PrinterOptions{
 	        .RemoveComments = true,
-	        .OmitTrailingSemicolon = true,
 	        .NewLine =
 	            getNewLineKind(FormatOptions().NewLineCharacter),
+	        .OmitTrailingSemicolon = true,
 	        .Target = GetProgram()->Options()->GetEmitScriptTarget(),
 	    },
 	    printer::PrintHandlers{}, /*emitContext*/ nullptr);
@@ -6594,9 +6594,9 @@ lsproto::CompletionItem* LanguageService::createLSPCompletionItem(
 		    lsproto::TextEditOrInsertReplaceEdit{
 		        .TextEdit = std::make_shared<lsproto::TextEdit>(
 		            lsproto::TextEdit{
+		                .Range = *replacementSpan,
 		                .NewText =
 		                    insertText.empty() ? name : insertText,
-		                .Range = *replacementSpan,
 		            }),
 		    });
 	}
@@ -6668,12 +6668,12 @@ lsproto::CompletionItem* LanguageService::createLSPCompletionItem(
 	        : std::nullopt,
 	    .InsertTextFormat = insertTextFormat,
 	    .TextEdit = textEdit,
-	    .CommitCharacters = commitCharacters != nullptr
-	        ? std::make_shared<lsproto::Slice<std::string>>(*commitCharacters)
-	        : nullptr,
 	    .AdditionalTextEdits = additionalTextEdits != nullptr
 	        ? std::make_shared<lsproto::Slice<std::shared_ptr<lsproto::TextEdit>>>(
 	            *additionalTextEdits)
+	        : nullptr,
+	    .CommitCharacters = commitCharacters != nullptr
+	        ? std::make_shared<lsproto::Slice<std::string>>(*commitCharacters)
 	        : nullptr,
 	    .Data = data,
 	};
@@ -8396,12 +8396,12 @@ LanguageService::getExhaustiveCaseSnippets(
 		            .InsertText = !insertText.empty()
 		                ? std::optional<std::string>(insertText)
 		                : std::nullopt,
-		            .AdditionalTextEdits = additionalTextEdits,
 		            .InsertTextFormat =
 		                clientSupportsItemSnippet(ctx)
 		                    ? std::make_shared<lsproto::InsertTextFormat>(
 		                          lsproto::InsertTextFormatSnippet)
 		                    : nullptr,
+		            .AdditionalTextEdits = additionalTextEdits,
 		            .Data = std::make_shared<lsproto::CompletionItemData>(
 		                lsproto::CompletionItemData{
 		                    .FileName = file->OriginalFileName(),
