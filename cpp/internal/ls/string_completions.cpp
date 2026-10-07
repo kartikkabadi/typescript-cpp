@@ -994,7 +994,11 @@ LanguageService::getCompletionEntriesForNonRelativeModules(
 			if (!fragmentDirectory.empty() && resolvePackageJsonExports) {
 				auto nodeModulesDirectoryOrImportsLookup =
 				    ancestorLookup;
-				ancestorLookup = [&](std::string_view ancestor)
+				// Capture the lookup by value: it's a block-local
+				// std::function and ancestorLookup is invoked after
+				// this scope ends (Go's closure heap-escapes it).
+				ancestorLookup = [&, nodeModulesDirectoryOrImportsLookup](
+				    std::string_view ancestor)
 				    -> std::pair<std::monostate, bool> {
 					std::vector<std::string> components =
 					    tspath::getPathComponents(fragment, "");
