@@ -41,10 +41,10 @@ const a = <div {...{}} /*1*/></div>;)TS";
 		.Items = std::make_shared<fourslash::CompletionsExpectedItems>(fourslash::CompletionsExpectedItems{
 			.Exact = std::vector<fourslash::CompletionsExpectedItem>{
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =      "aria-whatever?",
-					.InsertText = "aria-whatever",
+					.Label = "aria-whatever?",
+					.SortText = std::string(ls::SortTextOptionalMember),
 					.FilterText = "aria-whatever",
-					.SortText =   std::string(ls::SortTextOptionalMember)})}})}));
+					.InsertText = "aria-whatever",})}})}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestJsxAriaLikeCompletions, TestJsxAriaLikeCompletions);
@@ -86,50 +86,50 @@ declare namespace JSX {
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
 					.Label = "prop_a"}),
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "prop_b",
-					.TextEdit =         tsu::InsertReplaceTextEdit("prop_b=\"$1\"", f->Ranges()[0]->LSRange),
-					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet)}),
+					.Label = "prop_b",
+					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
+					.TextEdit = tsu::InsertReplaceTextEdit("prop_b=\"$1\"", f->Ranges()[0]->LSRange),}),
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "prop_c",
-					.TextEdit =         tsu::InsertReplaceTextEdit("prop_c={$1}", f->Ranges()[0]->LSRange),
-					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet)}),
+					.Label = "prop_c",
+					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
+					.TextEdit = tsu::InsertReplaceTextEdit("prop_c={$1}", f->Ranges()[0]->LSRange),}),
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "prop_d",
-					.TextEdit =         tsu::InsertReplaceTextEdit("prop_d={$1}", f->Ranges()[0]->LSRange),
-					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet)}),
+					.Label = "prop_d",
+					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
+					.TextEdit = tsu::InsertReplaceTextEdit("prop_d={$1}", f->Ranges()[0]->LSRange),}),
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "prop_e",
-					.TextEdit =         tsu::InsertReplaceTextEdit("prop_e=\"$1\"", f->Ranges()[0]->LSRange),
-					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet)}),
+					.Label = "prop_e",
+					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
+					.TextEdit = tsu::InsertReplaceTextEdit("prop_e=\"$1\"", f->Ranges()[0]->LSRange),}),
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
 					.Label = "prop_f"}),
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "prop_g",
-					.TextEdit =         tsu::InsertReplaceTextEdit("prop_g={$1}", f->Ranges()[0]->LSRange),
-					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet)}),
-				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "prop_h?",
-					.TextEdit =         tsu::InsertReplaceTextEdit("prop_h=\"$1\"", f->Ranges()[0]->LSRange),
-					.FilterText =       "prop_h",
+					.Label = "prop_g",
 					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
-					.SortText =         std::string(ls::SortTextOptionalMember)}),
+					.TextEdit = tsu::InsertReplaceTextEdit("prop_g={$1}", f->Ranges()[0]->LSRange),}),
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =      "prop_i?",
-					.TextEdit =   tsu::InsertReplaceTextEdit("prop_i", f->Ranges()[0]->LSRange),
+					.Label = "prop_h?",
+					.SortText = std::string(ls::SortTextOptionalMember),
+					.FilterText = "prop_h",
+					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
+					.TextEdit = tsu::InsertReplaceTextEdit("prop_h=\"$1\"", f->Ranges()[0]->LSRange),}),
+				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
+					.Label = "prop_i?",
+					.SortText = std::string(ls::SortTextOptionalMember),
 					.FilterText = "prop_i",
-					.SortText =   std::string(ls::SortTextOptionalMember)}),
+					.TextEdit = tsu::InsertReplaceTextEdit("prop_i", f->Ranges()[0]->LSRange),}),
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "prop_j?",
-					.TextEdit =         tsu::InsertReplaceTextEdit("prop_j={$1}", f->Ranges()[0]->LSRange),
-					.FilterText =       "prop_j",
+					.Label = "prop_j?",
+					.SortText = std::string(ls::SortTextOptionalMember),
+					.FilterText = "prop_j",
 					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
-					.SortText =         std::string(ls::SortTextOptionalMember)}),
+					.TextEdit = tsu::InsertReplaceTextEdit("prop_j={$1}", f->Ranges()[0]->LSRange),}),
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "prop_string_literal_union?",
-					.TextEdit =         tsu::InsertReplaceTextEdit("prop_string_literal_union=\"$1\"", f->Ranges()[0]->LSRange),
-					.FilterText =       "prop_string_literal_union",
+					.Label = "prop_string_literal_union?",
+					.SortText = std::string(ls::SortTextOptionalMember),
+					.FilterText = "prop_string_literal_union",
 					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
-					.SortText =         std::string(ls::SortTextOptionalMember)})}}),
+					.TextEdit = tsu::InsertReplaceTextEdit("prop_string_literal_union=\"$1\"", f->Ranges()[0]->LSRange),})}}),
 		.UserPreferences = std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.JsxAttributeCompletionStyle = lsutil::JsxAttributeCompletionStyleAuto})}));
 	});
 }
@@ -169,51 +169,51 @@ declare namespace JSX {
 		.Items = std::make_shared<fourslash::CompletionsExpectedItems>(fourslash::CompletionsExpectedItems{
 			.Exact = std::vector<fourslash::CompletionsExpectedItem>{
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "prop_a",
-					.TextEdit =         tsu::InsertReplaceTextEdit("prop_a={$1}", f->Ranges()[0]->LSRange),
-					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet)}),
-				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "prop_b",
-					.TextEdit =         tsu::InsertReplaceTextEdit("prop_b={$1}", f->Ranges()[0]->LSRange),
-					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet)}),
-				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "prop_c",
-					.TextEdit =         tsu::InsertReplaceTextEdit("prop_c={$1}", f->Ranges()[0]->LSRange),
-					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet)}),
-				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "prop_d",
-					.TextEdit =         tsu::InsertReplaceTextEdit("prop_d={$1}", f->Ranges()[0]->LSRange),
-					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet)}),
-				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "prop_e",
-					.TextEdit =         tsu::InsertReplaceTextEdit("prop_e={$1}", f->Ranges()[0]->LSRange),
-					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet)}),
-				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "prop_f",
-					.TextEdit =         tsu::InsertReplaceTextEdit("prop_f={$1}", f->Ranges()[0]->LSRange),
-					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet)}),
-				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "prop_g",
-					.TextEdit =         tsu::InsertReplaceTextEdit("prop_g={$1}", f->Ranges()[0]->LSRange),
-					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet)}),
-				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "prop_h?",
-					.TextEdit =         tsu::InsertReplaceTextEdit("prop_h={$1}", f->Ranges()[0]->LSRange),
-					.FilterText =       "prop_h",
+					.Label = "prop_a",
 					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
-					.SortText =         std::string(ls::SortTextOptionalMember)}),
+					.TextEdit = tsu::InsertReplaceTextEdit("prop_a={$1}", f->Ranges()[0]->LSRange),}),
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "prop_i?",
-					.TextEdit =         tsu::InsertReplaceTextEdit("prop_i={$1}", f->Ranges()[0]->LSRange),
-					.FilterText =       "prop_i",
+					.Label = "prop_b",
 					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
-					.SortText =         std::string(ls::SortTextOptionalMember)}),
+					.TextEdit = tsu::InsertReplaceTextEdit("prop_b={$1}", f->Ranges()[0]->LSRange),}),
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "prop_j?",
-					.TextEdit =         tsu::InsertReplaceTextEdit("prop_j={$1}", f->Ranges()[0]->LSRange),
-					.FilterText =       "prop_j",
+					.Label = "prop_c",
 					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
-					.SortText =         std::string(ls::SortTextOptionalMember)})}}),
+					.TextEdit = tsu::InsertReplaceTextEdit("prop_c={$1}", f->Ranges()[0]->LSRange),}),
+				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
+					.Label = "prop_d",
+					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
+					.TextEdit = tsu::InsertReplaceTextEdit("prop_d={$1}", f->Ranges()[0]->LSRange),}),
+				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
+					.Label = "prop_e",
+					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
+					.TextEdit = tsu::InsertReplaceTextEdit("prop_e={$1}", f->Ranges()[0]->LSRange),}),
+				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
+					.Label = "prop_f",
+					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
+					.TextEdit = tsu::InsertReplaceTextEdit("prop_f={$1}", f->Ranges()[0]->LSRange),}),
+				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
+					.Label = "prop_g",
+					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
+					.TextEdit = tsu::InsertReplaceTextEdit("prop_g={$1}", f->Ranges()[0]->LSRange),}),
+				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
+					.Label = "prop_h?",
+					.SortText = std::string(ls::SortTextOptionalMember),
+					.FilterText = "prop_h",
+					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
+					.TextEdit = tsu::InsertReplaceTextEdit("prop_h={$1}", f->Ranges()[0]->LSRange),}),
+				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
+					.Label = "prop_i?",
+					.SortText = std::string(ls::SortTextOptionalMember),
+					.FilterText = "prop_i",
+					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
+					.TextEdit = tsu::InsertReplaceTextEdit("prop_i={$1}", f->Ranges()[0]->LSRange),}),
+				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
+					.Label = "prop_j?",
+					.SortText = std::string(ls::SortTextOptionalMember),
+					.FilterText = "prop_j",
+					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
+					.TextEdit = tsu::InsertReplaceTextEdit("prop_j={$1}", f->Ranges()[0]->LSRange),})}}),
 		.UserPreferences = std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.JsxAttributeCompletionStyle = lsutil::JsxAttributeCompletionStyleBraces})}));
 	});
 }
@@ -267,20 +267,20 @@ declare namespace JSX {
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
 					.Label = "prop_g"}),
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =      "prop_h?",
-					.TextEdit =   tsu::InsertReplaceTextEdit("prop_h", f->Ranges()[0]->LSRange),
+					.Label = "prop_h?",
+					.SortText = std::string(ls::SortTextOptionalMember),
 					.FilterText = "prop_h",
-					.SortText =   std::string(ls::SortTextOptionalMember)}),
+					.TextEdit = tsu::InsertReplaceTextEdit("prop_h", f->Ranges()[0]->LSRange),}),
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =      "prop_i?",
-					.TextEdit =   tsu::InsertReplaceTextEdit("prop_i", f->Ranges()[0]->LSRange),
+					.Label = "prop_i?",
+					.SortText = std::string(ls::SortTextOptionalMember),
 					.FilterText = "prop_i",
-					.SortText =   std::string(ls::SortTextOptionalMember)}),
+					.TextEdit = tsu::InsertReplaceTextEdit("prop_i", f->Ranges()[0]->LSRange),}),
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =      "prop_j?",
-					.TextEdit =   tsu::InsertReplaceTextEdit("prop_j", f->Ranges()[0]->LSRange),
+					.Label = "prop_j?",
+					.SortText = std::string(ls::SortTextOptionalMember),
 					.FilterText = "prop_j",
-					.SortText =   std::string(ls::SortTextOptionalMember)})}})}));
+					.TextEdit = tsu::InsertReplaceTextEdit("prop_j", f->Ranges()[0]->LSRange),})}})}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestJsxAttributeCompletionStyleDefault, TestJsxAttributeCompletionStyleDefault);
@@ -331,20 +331,20 @@ declare namespace JSX {
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
 					.Label = "prop_g"}),
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =      "prop_h?",
-					.TextEdit =   tsu::InsertReplaceTextEdit("prop_h", f->Ranges()[0]->LSRange),
+					.Label = "prop_h?",
+					.SortText = std::string(ls::SortTextOptionalMember),
 					.FilterText = "prop_h",
-					.SortText =   std::string(ls::SortTextOptionalMember)}),
+					.TextEdit = tsu::InsertReplaceTextEdit("prop_h", f->Ranges()[0]->LSRange),}),
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =      "prop_i?",
-					.TextEdit =   tsu::InsertReplaceTextEdit("prop_i", f->Ranges()[0]->LSRange),
+					.Label = "prop_i?",
+					.SortText = std::string(ls::SortTextOptionalMember),
 					.FilterText = "prop_i",
-					.SortText =   std::string(ls::SortTextOptionalMember)}),
+					.TextEdit = tsu::InsertReplaceTextEdit("prop_i", f->Ranges()[0]->LSRange),}),
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =      "prop_j?",
-					.TextEdit =   tsu::InsertReplaceTextEdit("prop_j", f->Ranges()[0]->LSRange),
+					.Label = "prop_j?",
+					.SortText = std::string(ls::SortTextOptionalMember),
 					.FilterText = "prop_j",
-					.SortText =   std::string(ls::SortTextOptionalMember)})}}),
+					.TextEdit = tsu::InsertReplaceTextEdit("prop_j", f->Ranges()[0]->LSRange),})}}),
 		.UserPreferences = std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.JsxAttributeCompletionStyle = lsutil::JsxAttributeCompletionStyleAuto})}));
 	});
 }
@@ -398,20 +398,20 @@ declare namespace JSX {
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
 					.Label = "prop_g"}),
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =      "prop_h?",
-					.TextEdit =   tsu::InsertReplaceTextEdit("prop_h", f->Ranges()[0]->LSRange),
+					.Label = "prop_h?",
+					.SortText = std::string(ls::SortTextOptionalMember),
 					.FilterText = "prop_h",
-					.SortText =   std::string(ls::SortTextOptionalMember)}),
+					.TextEdit = tsu::InsertReplaceTextEdit("prop_h", f->Ranges()[0]->LSRange),}),
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =      "prop_i?",
-					.TextEdit =   tsu::InsertReplaceTextEdit("prop_i", f->Ranges()[0]->LSRange),
+					.Label = "prop_i?",
+					.SortText = std::string(ls::SortTextOptionalMember),
 					.FilterText = "prop_i",
-					.SortText =   std::string(ls::SortTextOptionalMember)}),
+					.TextEdit = tsu::InsertReplaceTextEdit("prop_i", f->Ranges()[0]->LSRange),}),
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =      "prop_j?",
-					.TextEdit =   tsu::InsertReplaceTextEdit("prop_j", f->Ranges()[0]->LSRange),
+					.Label = "prop_j?",
+					.SortText = std::string(ls::SortTextOptionalMember),
 					.FilterText = "prop_j",
-					.SortText =   std::string(ls::SortTextOptionalMember)})}}),
+					.TextEdit = tsu::InsertReplaceTextEdit("prop_j", f->Ranges()[0]->LSRange),})}}),
 		.UserPreferences = std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.JsxAttributeCompletionStyle = lsutil::JsxAttributeCompletionStyleNone})}));
 	});
 }
@@ -467,12 +467,12 @@ function fn4() {
 		.Items = std::make_shared<fourslash::CompletionsExpectedItems>(fourslash::CompletionsExpectedItems{
 			.Includes = std::vector<fourslash::CompletionsExpectedItem>{
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "xyz?",
-					.InsertText =       "xyz={$1}",
-					.FilterText =       "xyz",
-					.Detail =           "(property) xyz?: number",
-					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
-					.SortText =         std::string(ls::SortTextOptionalMember)})}}),
+					.Label = "xyz?",
+					.Detail = "(property) xyz?: number",
+					.SortText = std::string(ls::SortTextOptionalMember),
+					.FilterText = "xyz",
+					.InsertText = "xyz={$1}",
+					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),})}}),
 		.UserPreferences = std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.JsxAttributeCompletionStyle = lsutil::JsxAttributeCompletionStyleBraces})}));
 	});
 }
@@ -561,12 +561,12 @@ function fn16() {
 		.Items = std::make_shared<fourslash::CompletionsExpectedItems>(fourslash::CompletionsExpectedItems{
 			.Includes = std::vector<fourslash::CompletionsExpectedItem>{
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "className?",
-					.InsertText =       "className={$1}",
-					.FilterText =       "className",
-					.Detail =           "(property) className?: string",
-					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
-					.SortText =         std::string(ls::SortTextOptionalMember)})}}),
+					.Label = "className?",
+					.Detail = "(property) className?: string",
+					.SortText = std::string(ls::SortTextOptionalMember),
+					.FilterText = "className",
+					.InsertText = "className={$1}",
+					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),})}}),
 		.UserPreferences = std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.JsxAttributeCompletionStyle = lsutil::JsxAttributeCompletionStyleBraces})}));
 		f->VerifyCompletions(t, "2", tsu::ptr(fourslash::CompletionsExpectedList{
 		.IsIncomplete = false,
@@ -576,12 +576,12 @@ function fn16() {
 		.Items = std::make_shared<fourslash::CompletionsExpectedItems>(fourslash::CompletionsExpectedItems{
 			.Includes = std::vector<fourslash::CompletionsExpectedItem>{
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "className?",
-					.InsertText =       "className={$1}",
-					.FilterText =       "className",
-					.Detail =           "(property) className?: string",
-					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
-					.SortText =         std::string(ls::SortTextOptionalMember)})}}),
+					.Label = "className?",
+					.Detail = "(property) className?: string",
+					.SortText = std::string(ls::SortTextOptionalMember),
+					.FilterText = "className",
+					.InsertText = "className={$1}",
+					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),})}}),
 		.UserPreferences = std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.JsxAttributeCompletionStyle = lsutil::JsxAttributeCompletionStyleBraces})}));
 		f->VerifyCompletions(t, "3", tsu::ptr(fourslash::CompletionsExpectedList{
 		.IsIncomplete = false,
@@ -591,12 +591,12 @@ function fn16() {
 		.Items = std::make_shared<fourslash::CompletionsExpectedItems>(fourslash::CompletionsExpectedItems{
 			.Includes = std::vector<fourslash::CompletionsExpectedItem>{
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "className?",
-					.TextEdit =         tsu::InsertReplaceTextEdit("className={$1}", f->Ranges()[0]->LSRange),
-					.FilterText =       "className",
-					.Detail =           "(property) className?: string",
+					.Label = "className?",
+					.Detail = "(property) className?: string",
+					.SortText = std::string(ls::SortTextOptionalMember),
+					.FilterText = "className",
 					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
-					.SortText =         std::string(ls::SortTextOptionalMember)})}}),
+					.TextEdit = tsu::InsertReplaceTextEdit("className={$1}", f->Ranges()[0]->LSRange),})}}),
 		.UserPreferences = std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.JsxAttributeCompletionStyle = lsutil::JsxAttributeCompletionStyleBraces})}));
 		f->VerifyCompletions(t, "4", tsu::ptr(fourslash::CompletionsExpectedList{
 		.IsIncomplete = false,
@@ -606,12 +606,12 @@ function fn16() {
 		.Items = std::make_shared<fourslash::CompletionsExpectedItems>(fourslash::CompletionsExpectedItems{
 			.Includes = std::vector<fourslash::CompletionsExpectedItem>{
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "className?",
-					.TextEdit =         tsu::InsertReplaceTextEdit("className={$1}", f->Ranges()[1]->LSRange),
-					.FilterText =       "className",
-					.Detail =           "(property) className?: string",
+					.Label = "className?",
+					.Detail = "(property) className?: string",
+					.SortText = std::string(ls::SortTextOptionalMember),
+					.FilterText = "className",
 					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
-					.SortText =         std::string(ls::SortTextOptionalMember)})}}),
+					.TextEdit = tsu::InsertReplaceTextEdit("className={$1}", f->Ranges()[1]->LSRange),})}}),
 		.UserPreferences = std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.JsxAttributeCompletionStyle = lsutil::JsxAttributeCompletionStyleBraces})}));
 		f->VerifyCompletions(t, "5", tsu::ptr(fourslash::CompletionsExpectedList{
 		.IsIncomplete = false,
@@ -621,12 +621,12 @@ function fn16() {
 		.Items = std::make_shared<fourslash::CompletionsExpectedItems>(fourslash::CompletionsExpectedItems{
 			.Includes = std::vector<fourslash::CompletionsExpectedItem>{
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "className?",
-					.InsertText =       "className={$1}",
-					.FilterText =       "className",
-					.Detail =           "(property) className?: string",
-					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
-					.SortText =         std::string(ls::SortTextOptionalMember)})}}),
+					.Label = "className?",
+					.Detail = "(property) className?: string",
+					.SortText = std::string(ls::SortTextOptionalMember),
+					.FilterText = "className",
+					.InsertText = "className={$1}",
+					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),})}}),
 		.UserPreferences = std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.JsxAttributeCompletionStyle = lsutil::JsxAttributeCompletionStyleBraces})}));
 		f->VerifyCompletions(t, "6", tsu::ptr(fourslash::CompletionsExpectedList{
 		.IsIncomplete = false,
@@ -636,12 +636,12 @@ function fn16() {
 		.Items = std::make_shared<fourslash::CompletionsExpectedItems>(fourslash::CompletionsExpectedItems{
 			.Includes = std::vector<fourslash::CompletionsExpectedItem>{
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "className?",
-					.TextEdit =         tsu::InsertReplaceTextEdit("className={$1}", f->Ranges()[2]->LSRange),
-					.FilterText =       "className",
-					.Detail =           "(property) className?: string",
+					.Label = "className?",
+					.Detail = "(property) className?: string",
+					.SortText = std::string(ls::SortTextOptionalMember),
+					.FilterText = "className",
 					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
-					.SortText =         std::string(ls::SortTextOptionalMember)})}}),
+					.TextEdit = tsu::InsertReplaceTextEdit("className={$1}", f->Ranges()[2]->LSRange),})}}),
 		.UserPreferences = std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.JsxAttributeCompletionStyle = lsutil::JsxAttributeCompletionStyleBraces})}));
 		f->VerifyCompletions(t, "7", tsu::ptr(fourslash::CompletionsExpectedList{
 		.IsIncomplete = false,
@@ -651,12 +651,12 @@ function fn16() {
 		.Items = std::make_shared<fourslash::CompletionsExpectedItems>(fourslash::CompletionsExpectedItems{
 			.Includes = std::vector<fourslash::CompletionsExpectedItem>{
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "className?",
-					.InsertText =       "className={$1}",
-					.FilterText =       "className",
-					.Detail =           "(property) className?: string",
-					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
-					.SortText =         std::string(ls::SortTextOptionalMember)})}}),
+					.Label = "className?",
+					.Detail = "(property) className?: string",
+					.SortText = std::string(ls::SortTextOptionalMember),
+					.FilterText = "className",
+					.InsertText = "className={$1}",
+					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),})}}),
 		.UserPreferences = std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.JsxAttributeCompletionStyle = lsutil::JsxAttributeCompletionStyleBraces})}));
 		f->VerifyCompletions(t, "8", tsu::ptr(fourslash::CompletionsExpectedList{
 		.IsIncomplete = false,
@@ -666,12 +666,12 @@ function fn16() {
 		.Items = std::make_shared<fourslash::CompletionsExpectedItems>(fourslash::CompletionsExpectedItems{
 			.Includes = std::vector<fourslash::CompletionsExpectedItem>{
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "className?",
-					.TextEdit =         tsu::InsertReplaceTextEdit("className={$1}", f->Ranges()[3]->LSRange),
-					.FilterText =       "className",
-					.Detail =           "(property) className?: string",
+					.Label = "className?",
+					.Detail = "(property) className?: string",
+					.SortText = std::string(ls::SortTextOptionalMember),
+					.FilterText = "className",
 					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
-					.SortText =         std::string(ls::SortTextOptionalMember)})}}),
+					.TextEdit = tsu::InsertReplaceTextEdit("className={$1}", f->Ranges()[3]->LSRange),})}}),
 		.UserPreferences = std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.JsxAttributeCompletionStyle = lsutil::JsxAttributeCompletionStyleBraces})}));
 		f->VerifyCompletions(t, "9", tsu::ptr(fourslash::CompletionsExpectedList{
 		.IsIncomplete = false,
@@ -681,12 +681,12 @@ function fn16() {
 		.Items = std::make_shared<fourslash::CompletionsExpectedItems>(fourslash::CompletionsExpectedItems{
 			.Includes = std::vector<fourslash::CompletionsExpectedItem>{
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "className?",
-					.TextEdit =         tsu::InsertReplaceTextEdit("className={$1}", f->Ranges()[4]->LSRange),
-					.FilterText =       "className",
-					.Detail =           "(property) className?: string",
+					.Label = "className?",
+					.Detail = "(property) className?: string",
+					.SortText = std::string(ls::SortTextOptionalMember),
+					.FilterText = "className",
 					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
-					.SortText =         std::string(ls::SortTextOptionalMember)})}}),
+					.TextEdit = tsu::InsertReplaceTextEdit("className={$1}", f->Ranges()[4]->LSRange),})}}),
 		.UserPreferences = std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.JsxAttributeCompletionStyle = lsutil::JsxAttributeCompletionStyleBraces})}));
 		f->VerifyCompletions(t, "10", tsu::ptr(fourslash::CompletionsExpectedList{
 		.IsIncomplete = false,
@@ -696,12 +696,12 @@ function fn16() {
 		.Items = std::make_shared<fourslash::CompletionsExpectedItems>(fourslash::CompletionsExpectedItems{
 			.Includes = std::vector<fourslash::CompletionsExpectedItem>{
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "className?",
-					.InsertText =       "className={$1}",
-					.FilterText =       "className",
-					.Detail =           "(property) className?: string",
-					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
-					.SortText =         std::string(ls::SortTextOptionalMember)})}}),
+					.Label = "className?",
+					.Detail = "(property) className?: string",
+					.SortText = std::string(ls::SortTextOptionalMember),
+					.FilterText = "className",
+					.InsertText = "className={$1}",
+					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),})}}),
 		.UserPreferences = std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.JsxAttributeCompletionStyle = lsutil::JsxAttributeCompletionStyleBraces})}));
 		f->VerifyCompletions(t, "11", tsu::ptr(fourslash::CompletionsExpectedList{
 		.IsIncomplete = false,
@@ -711,12 +711,12 @@ function fn16() {
 		.Items = std::make_shared<fourslash::CompletionsExpectedItems>(fourslash::CompletionsExpectedItems{
 			.Includes = std::vector<fourslash::CompletionsExpectedItem>{
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "className?",
-					.TextEdit =         tsu::InsertReplaceTextEdit("className={$1}", f->Ranges()[5]->LSRange),
-					.FilterText =       "className",
-					.Detail =           "(property) className?: string",
+					.Label = "className?",
+					.Detail = "(property) className?: string",
+					.SortText = std::string(ls::SortTextOptionalMember),
+					.FilterText = "className",
 					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
-					.SortText =         std::string(ls::SortTextOptionalMember)})}}),
+					.TextEdit = tsu::InsertReplaceTextEdit("className={$1}", f->Ranges()[5]->LSRange),})}}),
 		.UserPreferences = std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.JsxAttributeCompletionStyle = lsutil::JsxAttributeCompletionStyleBraces})}));
 		f->VerifyCompletions(t, "12", tsu::ptr(fourslash::CompletionsExpectedList{
 		.IsIncomplete = false,
@@ -726,12 +726,12 @@ function fn16() {
 		.Items = std::make_shared<fourslash::CompletionsExpectedItems>(fourslash::CompletionsExpectedItems{
 			.Includes = std::vector<fourslash::CompletionsExpectedItem>{
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "className?",
-					.TextEdit =         tsu::InsertReplaceTextEdit("className={$1}", f->Ranges()[6]->LSRange),
-					.FilterText =       "className",
-					.Detail =           "(property) className?: string",
+					.Label = "className?",
+					.Detail = "(property) className?: string",
+					.SortText = std::string(ls::SortTextOptionalMember),
+					.FilterText = "className",
 					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
-					.SortText =         std::string(ls::SortTextOptionalMember)})}}),
+					.TextEdit = tsu::InsertReplaceTextEdit("className={$1}", f->Ranges()[6]->LSRange),})}}),
 		.UserPreferences = std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.JsxAttributeCompletionStyle = lsutil::JsxAttributeCompletionStyleBraces})}));
 		f->VerifyCompletions(t, "13", tsu::ptr(fourslash::CompletionsExpectedList{
 		.IsIncomplete = false,
@@ -741,12 +741,12 @@ function fn16() {
 		.Items = std::make_shared<fourslash::CompletionsExpectedItems>(fourslash::CompletionsExpectedItems{
 			.Includes = std::vector<fourslash::CompletionsExpectedItem>{
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "className?",
-					.InsertText =       "className={$1}",
-					.FilterText =       "className",
-					.Detail =           "(property) className?: string",
-					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
-					.SortText =         std::string(ls::SortTextOptionalMember)})}}),
+					.Label = "className?",
+					.Detail = "(property) className?: string",
+					.SortText = std::string(ls::SortTextOptionalMember),
+					.FilterText = "className",
+					.InsertText = "className={$1}",
+					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),})}}),
 		.UserPreferences = std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.JsxAttributeCompletionStyle = lsutil::JsxAttributeCompletionStyleBraces})}));
 		f->VerifyCompletions(t, "14", tsu::ptr(fourslash::CompletionsExpectedList{
 		.IsIncomplete = false,
@@ -756,12 +756,12 @@ function fn16() {
 		.Items = std::make_shared<fourslash::CompletionsExpectedItems>(fourslash::CompletionsExpectedItems{
 			.Includes = std::vector<fourslash::CompletionsExpectedItem>{
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "className?",
-					.TextEdit =         tsu::InsertReplaceTextEdit("className={$1}", f->Ranges()[7]->LSRange),
-					.FilterText =       "className",
-					.Detail =           "(property) className?: string",
+					.Label = "className?",
+					.Detail = "(property) className?: string",
+					.SortText = std::string(ls::SortTextOptionalMember),
+					.FilterText = "className",
 					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
-					.SortText =         std::string(ls::SortTextOptionalMember)})}}),
+					.TextEdit = tsu::InsertReplaceTextEdit("className={$1}", f->Ranges()[7]->LSRange),})}}),
 		.UserPreferences = std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.JsxAttributeCompletionStyle = lsutil::JsxAttributeCompletionStyleBraces})}));
 		f->VerifyCompletions(t, "15", tsu::ptr(fourslash::CompletionsExpectedList{
 		.IsIncomplete = false,
@@ -771,11 +771,11 @@ function fn16() {
 		.Items = std::make_shared<fourslash::CompletionsExpectedItems>(fourslash::CompletionsExpectedItems{
 			.Includes = std::vector<fourslash::CompletionsExpectedItem>{
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =      "onClick?",
-					.TextEdit =   tsu::InsertReplaceTextEdit("onClick", f->Ranges()[8]->LSRange),
+					.Label = "onClick?",
+					.Detail = "(property) onClick?: () => void",
+					.SortText = std::string(ls::SortTextOptionalMember),
 					.FilterText = "onClick",
-					.Detail =     "(property) onClick?: () => void",
-					.SortText =   std::string(ls::SortTextOptionalMember)})}}),
+					.TextEdit = tsu::InsertReplaceTextEdit("onClick", f->Ranges()[8]->LSRange),})}}),
 		.UserPreferences = std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.JsxAttributeCompletionStyle = lsutil::JsxAttributeCompletionStyleBraces})}));
 		f->VerifyCompletions(t, "16", tsu::ptr(fourslash::CompletionsExpectedList{
 		.IsIncomplete = false,
@@ -785,11 +785,11 @@ function fn16() {
 		.Items = std::make_shared<fourslash::CompletionsExpectedItems>(fourslash::CompletionsExpectedItems{
 			.Includes = std::vector<fourslash::CompletionsExpectedItem>{
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =      "onClick?",
-					.TextEdit =   tsu::InsertReplaceTextEdit("onClick", f->Ranges()[9]->LSRange),
+					.Label = "onClick?",
+					.Detail = "(property) onClick?: () => void",
+					.SortText = std::string(ls::SortTextOptionalMember),
 					.FilterText = "onClick",
-					.Detail =     "(property) onClick?: () => void",
-					.SortText =   std::string(ls::SortTextOptionalMember)})}}),
+					.TextEdit = tsu::InsertReplaceTextEdit("onClick", f->Ranges()[9]->LSRange),})}}),
 		.UserPreferences = std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.JsxAttributeCompletionStyle = lsutil::JsxAttributeCompletionStyleBraces})}));
 	});
 }
@@ -863,12 +863,12 @@ function fn11() {
 		.Items = std::make_shared<fourslash::CompletionsExpectedItems>(fourslash::CompletionsExpectedItems{
 			.Includes = std::vector<fourslash::CompletionsExpectedItem>{
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "className?",
-					.InsertText =       "className={$1}",
-					.FilterText =       "className",
-					.Detail =           "(property) className?: string",
-					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
-					.SortText =         std::string(ls::SortTextOptionalMember)})}}),
+					.Label = "className?",
+					.Detail = "(property) className?: string",
+					.SortText = std::string(ls::SortTextOptionalMember),
+					.FilterText = "className",
+					.InsertText = "className={$1}",
+					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),})}}),
 		.UserPreferences = std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.JsxAttributeCompletionStyle = lsutil::JsxAttributeCompletionStyleBraces})}));
 		f->VerifyCompletions(t, "2", tsu::ptr(fourslash::CompletionsExpectedList{
 		.IsIncomplete = false,
@@ -878,12 +878,12 @@ function fn11() {
 		.Items = std::make_shared<fourslash::CompletionsExpectedItems>(fourslash::CompletionsExpectedItems{
 			.Includes = std::vector<fourslash::CompletionsExpectedItem>{
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "className?",
-					.InsertText =       "className={$1}",
-					.FilterText =       "className",
-					.Detail =           "(property) className?: string",
-					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
-					.SortText =         std::string(ls::SortTextOptionalMember)})}}),
+					.Label = "className?",
+					.Detail = "(property) className?: string",
+					.SortText = std::string(ls::SortTextOptionalMember),
+					.FilterText = "className",
+					.InsertText = "className={$1}",
+					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),})}}),
 		.UserPreferences = std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.JsxAttributeCompletionStyle = lsutil::JsxAttributeCompletionStyleBraces})}));
 		f->VerifyCompletions(t, "3", tsu::ptr(fourslash::CompletionsExpectedList{
 		.IsIncomplete = false,
@@ -893,12 +893,12 @@ function fn11() {
 		.Items = std::make_shared<fourslash::CompletionsExpectedItems>(fourslash::CompletionsExpectedItems{
 			.Includes = std::vector<fourslash::CompletionsExpectedItem>{
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "className?",
-					.TextEdit =         tsu::InsertReplaceTextEdit("className={$1}", f->Ranges()[0]->LSRange),
-					.FilterText =       "className",
-					.Detail =           "(property) className?: string",
+					.Label = "className?",
+					.Detail = "(property) className?: string",
+					.SortText = std::string(ls::SortTextOptionalMember),
+					.FilterText = "className",
 					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
-					.SortText =         std::string(ls::SortTextOptionalMember)})}}),
+					.TextEdit = tsu::InsertReplaceTextEdit("className={$1}", f->Ranges()[0]->LSRange),})}}),
 		.UserPreferences = std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.JsxAttributeCompletionStyle = lsutil::JsxAttributeCompletionStyleBraces})}));
 		f->VerifyCompletions(t, "4", tsu::ptr(fourslash::CompletionsExpectedList{
 		.IsIncomplete = false,
@@ -908,12 +908,12 @@ function fn11() {
 		.Items = std::make_shared<fourslash::CompletionsExpectedItems>(fourslash::CompletionsExpectedItems{
 			.Includes = std::vector<fourslash::CompletionsExpectedItem>{
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "className?",
-					.TextEdit =         tsu::InsertReplaceTextEdit("className={$1}", f->Ranges()[1]->LSRange),
-					.FilterText =       "className",
-					.Detail =           "(property) className?: string",
+					.Label = "className?",
+					.Detail = "(property) className?: string",
+					.SortText = std::string(ls::SortTextOptionalMember),
+					.FilterText = "className",
 					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
-					.SortText =         std::string(ls::SortTextOptionalMember)})}}),
+					.TextEdit = tsu::InsertReplaceTextEdit("className={$1}", f->Ranges()[1]->LSRange),})}}),
 		.UserPreferences = std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.JsxAttributeCompletionStyle = lsutil::JsxAttributeCompletionStyleBraces})}));
 		f->VerifyCompletions(t, "5", tsu::ptr(fourslash::CompletionsExpectedList{
 		.IsIncomplete = false,
@@ -923,12 +923,12 @@ function fn11() {
 		.Items = std::make_shared<fourslash::CompletionsExpectedItems>(fourslash::CompletionsExpectedItems{
 			.Includes = std::vector<fourslash::CompletionsExpectedItem>{
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "className?",
-					.InsertText =       "className={$1}",
-					.FilterText =       "className",
-					.Detail =           "(property) className?: string",
-					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
-					.SortText =         std::string(ls::SortTextOptionalMember)})}}),
+					.Label = "className?",
+					.Detail = "(property) className?: string",
+					.SortText = std::string(ls::SortTextOptionalMember),
+					.FilterText = "className",
+					.InsertText = "className={$1}",
+					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),})}}),
 		.UserPreferences = std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.JsxAttributeCompletionStyle = lsutil::JsxAttributeCompletionStyleBraces})}));
 		f->VerifyCompletions(t, "6", tsu::ptr(fourslash::CompletionsExpectedList{
 		.IsIncomplete = false,
@@ -938,12 +938,12 @@ function fn11() {
 		.Items = std::make_shared<fourslash::CompletionsExpectedItems>(fourslash::CompletionsExpectedItems{
 			.Includes = std::vector<fourslash::CompletionsExpectedItem>{
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "className?",
-					.TextEdit =         tsu::InsertReplaceTextEdit("className={$1}", f->Ranges()[2]->LSRange),
-					.FilterText =       "className",
-					.Detail =           "(property) className?: string",
+					.Label = "className?",
+					.Detail = "(property) className?: string",
+					.SortText = std::string(ls::SortTextOptionalMember),
+					.FilterText = "className",
 					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
-					.SortText =         std::string(ls::SortTextOptionalMember)})}}),
+					.TextEdit = tsu::InsertReplaceTextEdit("className={$1}", f->Ranges()[2]->LSRange),})}}),
 		.UserPreferences = std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.JsxAttributeCompletionStyle = lsutil::JsxAttributeCompletionStyleBraces})}));
 		f->VerifyCompletions(t, "7", tsu::ptr(fourslash::CompletionsExpectedList{
 		.IsIncomplete = false,
@@ -953,12 +953,12 @@ function fn11() {
 		.Items = std::make_shared<fourslash::CompletionsExpectedItems>(fourslash::CompletionsExpectedItems{
 			.Includes = std::vector<fourslash::CompletionsExpectedItem>{
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "className?",
-					.InsertText =       "className={$1}",
-					.FilterText =       "className",
-					.Detail =           "(property) className?: string",
-					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
-					.SortText =         std::string(ls::SortTextOptionalMember)})}}),
+					.Label = "className?",
+					.Detail = "(property) className?: string",
+					.SortText = std::string(ls::SortTextOptionalMember),
+					.FilterText = "className",
+					.InsertText = "className={$1}",
+					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),})}}),
 		.UserPreferences = std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.JsxAttributeCompletionStyle = lsutil::JsxAttributeCompletionStyleBraces})}));
 		f->VerifyCompletions(t, "8", tsu::ptr(fourslash::CompletionsExpectedList{
 		.IsIncomplete = false,
@@ -968,12 +968,12 @@ function fn11() {
 		.Items = std::make_shared<fourslash::CompletionsExpectedItems>(fourslash::CompletionsExpectedItems{
 			.Includes = std::vector<fourslash::CompletionsExpectedItem>{
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "className?",
-					.TextEdit =         tsu::InsertReplaceTextEdit("className={$1}", f->Ranges()[3]->LSRange),
-					.FilterText =       "className",
-					.Detail =           "(property) className?: string",
+					.Label = "className?",
+					.Detail = "(property) className?: string",
+					.SortText = std::string(ls::SortTextOptionalMember),
+					.FilterText = "className",
 					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
-					.SortText =         std::string(ls::SortTextOptionalMember)})}}),
+					.TextEdit = tsu::InsertReplaceTextEdit("className={$1}", f->Ranges()[3]->LSRange),})}}),
 		.UserPreferences = std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.JsxAttributeCompletionStyle = lsutil::JsxAttributeCompletionStyleBraces})}));
 		f->VerifyCompletions(t, "9", tsu::ptr(fourslash::CompletionsExpectedList{
 		.IsIncomplete = false,
@@ -983,12 +983,12 @@ function fn11() {
 		.Items = std::make_shared<fourslash::CompletionsExpectedItems>(fourslash::CompletionsExpectedItems{
 			.Includes = std::vector<fourslash::CompletionsExpectedItem>{
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "className?",
-					.TextEdit =         tsu::InsertReplaceTextEdit("className={$1}", f->Ranges()[4]->LSRange),
-					.FilterText =       "className",
-					.Detail =           "(property) className?: string",
+					.Label = "className?",
+					.Detail = "(property) className?: string",
+					.SortText = std::string(ls::SortTextOptionalMember),
+					.FilterText = "className",
 					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
-					.SortText =         std::string(ls::SortTextOptionalMember)})}}),
+					.TextEdit = tsu::InsertReplaceTextEdit("className={$1}", f->Ranges()[4]->LSRange),})}}),
 		.UserPreferences = std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.JsxAttributeCompletionStyle = lsutil::JsxAttributeCompletionStyleBraces})}));
 		f->VerifyCompletions(t, "10", tsu::ptr(fourslash::CompletionsExpectedList{
 		.IsIncomplete = false,
@@ -998,12 +998,12 @@ function fn11() {
 		.Items = std::make_shared<fourslash::CompletionsExpectedItems>(fourslash::CompletionsExpectedItems{
 			.Includes = std::vector<fourslash::CompletionsExpectedItem>{
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "className?",
-					.InsertText =       "className={$1}",
-					.FilterText =       "className",
-					.Detail =           "(property) className?: string",
-					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
-					.SortText =         std::string(ls::SortTextOptionalMember)})}}),
+					.Label = "className?",
+					.Detail = "(property) className?: string",
+					.SortText = std::string(ls::SortTextOptionalMember),
+					.FilterText = "className",
+					.InsertText = "className={$1}",
+					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),})}}),
 		.UserPreferences = std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.JsxAttributeCompletionStyle = lsutil::JsxAttributeCompletionStyleBraces})}));
 		f->VerifyCompletions(t, "11", tsu::ptr(fourslash::CompletionsExpectedList{
 		.IsIncomplete = false,
@@ -1013,12 +1013,12 @@ function fn11() {
 		.Items = std::make_shared<fourslash::CompletionsExpectedItems>(fourslash::CompletionsExpectedItems{
 			.Includes = std::vector<fourslash::CompletionsExpectedItem>{
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =            "className?",
-					.TextEdit =         tsu::InsertReplaceTextEdit("className={$1}", f->Ranges()[5]->LSRange),
-					.FilterText =       "className",
-					.Detail =           "(property) className?: string",
+					.Label = "className?",
+					.Detail = "(property) className?: string",
+					.SortText = std::string(ls::SortTextOptionalMember),
+					.FilterText = "className",
 					.InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet),
-					.SortText =         std::string(ls::SortTextOptionalMember)})}}),
+					.TextEdit = tsu::InsertReplaceTextEdit("className={$1}", f->Ranges()[5]->LSRange),})}}),
 		.UserPreferences = std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.JsxAttributeCompletionStyle = lsutil::JsxAttributeCompletionStyleBraces})}));
 	});
 }

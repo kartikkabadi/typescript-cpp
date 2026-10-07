@@ -100,11 +100,11 @@ let opt4 = <Opt wrong /*5*/ />;)TS";
 				"propString",
 				"propx",
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =      "optional?",
-					.InsertText = "optional",
+					.Label = "optional?",
+					.Kind = std::make_shared<lsproto::CompletionItemKind>(lsproto::CompletionItemKindField),
+					.SortText = std::string(ls::SortTextOptionalMember),
 					.FilterText = "optional",
-					.Kind =       std::make_shared<lsproto::CompletionItemKind>(lsproto::CompletionItemKindField),
-					.SortText =   std::string(ls::SortTextOptionalMember)})}})}));
+					.InsertText = "optional",})}})}));
 		f->VerifyCompletions(t, "2", tsu::ptr(fourslash::CompletionsExpectedList{
 		.IsIncomplete = false,
 		.ItemDefaults = std::make_shared<fourslash::CompletionsExpectedItemDefaults>(fourslash::CompletionsExpectedItemDefaults{
@@ -115,15 +115,15 @@ let opt4 = <Opt wrong /*5*/ />;)TS";
 				"propString",
 				"propx",
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =      "optional?",
+					.Label = "optional?",
+					.Kind = std::make_shared<lsproto::CompletionItemKind>(lsproto::CompletionItemKindField),
+					.SortText = std::string(ls::SortTextOptionalMember),
 					.FilterText = "optional",
-					.Kind =       std::make_shared<lsproto::CompletionItemKind>(lsproto::CompletionItemKindField),
-					.SortText =   std::string(ls::SortTextOptionalMember),
 					.TextEdit = std::make_shared<lsproto::TextEditOrInsertReplaceEdit>(lsproto::TextEditOrInsertReplaceEdit{
 						.InsertReplaceEdit = std::make_shared<lsproto::InsertReplaceEdit>(lsproto::InsertReplaceEdit{
 							.NewText = "optional",
 							.Insert =  f->Ranges()[0]->LSRange,
-							.Replace = f->Ranges()[0]->LSRange})})})}})}));
+							.Replace = f->Ranges()[0]->LSRange})}),})}})}));
 		f->VerifyCompletions(t, "3", tsu::ptr(fourslash::CompletionsExpectedList{
 		.IsIncomplete = false,
 		.ItemDefaults = std::make_shared<fourslash::CompletionsExpectedItemDefaults>(fourslash::CompletionsExpectedItemDefaults{
@@ -133,11 +133,11 @@ let opt4 = <Opt wrong /*5*/ />;)TS";
 			.Exact = std::vector<fourslash::CompletionsExpectedItem>{
 				"propString",
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =      "optional?",
-					.InsertText = "optional",
+					.Label = "optional?",
+					.Kind = std::make_shared<lsproto::CompletionItemKind>(lsproto::CompletionItemKindField),
+					.SortText = std::string(ls::SortTextOptionalMember),
 					.FilterText = "optional",
-					.Kind =       std::make_shared<lsproto::CompletionItemKind>(lsproto::CompletionItemKindField),
-					.SortText =   std::string(ls::SortTextOptionalMember)})}})}));
+					.InsertText = "optional",})}})}));
 		f->VerifyCompletions(t, "4", tsu::ptr(fourslash::CompletionsExpectedList{
 		.IsIncomplete = false,
 		.ItemDefaults = std::make_shared<fourslash::CompletionsExpectedItemDefaults>(fourslash::CompletionsExpectedItemDefaults{
@@ -192,17 +192,17 @@ let opt = <MainButton wrong /*6*/ />;)TS";
 				"goTo",
 				"onClick",
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =      "children?",
-					.InsertText = "children",
+					.Label = "children?",
+					.Kind = std::make_shared<lsproto::CompletionItemKind>(lsproto::CompletionItemKindField),
+					.SortText = std::string(ls::SortTextOptionalMember),
 					.FilterText = "children",
-					.Kind =       std::make_shared<lsproto::CompletionItemKind>(lsproto::CompletionItemKindField),
-					.SortText =   std::string(ls::SortTextOptionalMember)}),
+					.InsertText = "children",}),
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =      "className?",
-					.InsertText = "className",
+					.Label = "className?",
+					.Kind = std::make_shared<lsproto::CompletionItemKind>(lsproto::CompletionItemKindField),
+					.SortText = std::string(ls::SortTextOptionalMember),
 					.FilterText = "className",
-					.Kind =       std::make_shared<lsproto::CompletionItemKind>(lsproto::CompletionItemKindField),
-					.SortText =   std::string(ls::SortTextOptionalMember)})}})}));
+					.InsertText = "className",})}})}));
 		f->VerifyCompletions(t, "2", tsu::ptr(fourslash::CompletionsExpectedList{
 		.IsIncomplete = false,
 		.ItemDefaults = std::make_shared<fourslash::CompletionsExpectedItemDefaults>(fourslash::CompletionsExpectedItemDefaults{
@@ -213,11 +213,11 @@ let opt = <MainButton wrong /*6*/ />;)TS";
 				"goTo",
 				"onClick",
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =      "className?",
-					.InsertText = "className",
+					.Label = "className?",
+					.Kind = std::make_shared<lsproto::CompletionItemKind>(lsproto::CompletionItemKindField),
+					.SortText = std::string(ls::SortTextOptionalMember),
 					.FilterText = "className",
-					.Kind =       std::make_shared<lsproto::CompletionItemKind>(lsproto::CompletionItemKindField),
-					.SortText =   std::string(ls::SortTextOptionalMember)})}})}));
+					.InsertText = "className",})}})}));
 		f->VerifyCompletions(t, std::vector<std::string>{"3", "4", "5"}, tsu::ptr(fourslash::CompletionsExpectedList{
 		.IsIncomplete = false,
 		.ItemDefaults = std::make_shared<fourslash::CompletionsExpectedItemDefaults>(fourslash::CompletionsExpectedItemDefaults{
@@ -226,17 +226,17 @@ let opt = <MainButton wrong /*6*/ />;)TS";
 		.Items = std::make_shared<fourslash::CompletionsExpectedItems>(fourslash::CompletionsExpectedItems{
 			.Exact = std::vector<fourslash::CompletionsExpectedItem>{
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =      "children?",
-					.InsertText = "children",
+					.Label = "children?",
+					.Kind = std::make_shared<lsproto::CompletionItemKind>(lsproto::CompletionItemKindField),
+					.SortText = std::string(ls::SortTextOptionalMember),
 					.FilterText = "children",
-					.Kind =       std::make_shared<lsproto::CompletionItemKind>(lsproto::CompletionItemKindField),
-					.SortText =   std::string(ls::SortTextOptionalMember)}),
+					.InsertText = "children",}),
 				std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{
-					.Label =      "className?",
-					.InsertText = "className",
+					.Label = "className?",
+					.Kind = std::make_shared<lsproto::CompletionItemKind>(lsproto::CompletionItemKindField),
+					.SortText = std::string(ls::SortTextOptionalMember),
 					.FilterText = "className",
-					.Kind =       std::make_shared<lsproto::CompletionItemKind>(lsproto::CompletionItemKindField),
-					.SortText =   std::string(ls::SortTextOptionalMember)})}})}));
+					.InsertText = "className",})}})}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestTsxCompletion13, TestTsxCompletion13);

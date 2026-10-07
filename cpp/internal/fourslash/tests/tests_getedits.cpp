@@ -460,7 +460,9 @@ import {} from 'dir/a';
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
 		f->VerifyWillRenameFilesEdits(t, "/dir/a.ts", "/dir/a1.ts", std::unordered_map<std::string, std::string>{{
 		"/dir/b.ts", R"TS(import {} from "dir/a1";
-import {} from 'dir/a1';)TS"}}, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.ImportModuleSpecifierPreference = "non-relative", .QuotePreference = lsutil::QuotePreference("single")}));
+import {} from 'dir/a1';)TS"}}, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{
+	.QuotePreference = lsutil::QuotePreference("single"),
+	.ImportModuleSpecifierPreference = "non-relative",}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestGetEditsForFileRename_preferences, TestGetEditsForFileRename_preferences);

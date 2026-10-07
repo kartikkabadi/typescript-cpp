@@ -6576,19 +6576,19 @@ function f([|p|]) {
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
 		f->VerifySuggestionDiagnostics(t, std::vector<std::shared_ptr<lsproto::Diagnostic>>{
 		std::make_shared<lsproto::Diagnostic>(lsproto::Diagnostic{
-			.Message = lsproto::StringOrMarkupContent{.String =std::make_shared<std::string>("Parameter 'p' implicitly has an 'any' type, but a better type may be inferred from usage.")},
-			.Range =   f->Ranges()[0]->LSRange,
-			.Code =    std::make_shared<lsproto::IntegerOrString>(lsproto::IntegerOrString{.Integer =std::make_shared<int32_t>(int32_t(7044))})}),
+			.Range = f->Ranges()[0]->LSRange,
+			.Code = std::make_shared<lsproto::IntegerOrString>(lsproto::IntegerOrString{.Integer =std::make_shared<int32_t>(int32_t(7044))}),
+			.Message = lsproto::StringOrMarkupContent{.String =std::make_shared<std::string>("Parameter 'p' implicitly has an 'any' type, but a better type may be inferred from usage.")},}),
 		std::make_shared<lsproto::Diagnostic>(lsproto::Diagnostic{
+			.Range = f->Ranges()[0]->LSRange,
+			.Code = std::make_shared<lsproto::IntegerOrString>(lsproto::IntegerOrString{.Integer =std::make_shared<int32_t>(int32_t(6133))}),
 			.Message = lsproto::StringOrMarkupContent{.String =std::make_shared<std::string>("'p' is declared but its value is never read.")},
-			.Range =   f->Ranges()[0]->LSRange,
-			.Code =    std::make_shared<lsproto::IntegerOrString>(lsproto::IntegerOrString{.Integer =std::make_shared<int32_t>(int32_t(6133))}),
-			.Tags =    std::make_shared<lsproto::Slice<lsproto::DiagnosticTag>>(std::vector<lsproto::DiagnosticTag>{lsproto::DiagnosticTagUnnecessary})}),
+			.Tags = std::make_shared<lsproto::Slice<lsproto::DiagnosticTag>>(std::vector<lsproto::DiagnosticTag>{lsproto::DiagnosticTagUnnecessary}),}),
 		std::make_shared<lsproto::Diagnostic>(lsproto::Diagnostic{
+			.Range = f->Ranges()[1]->LSRange,
+			.Code = std::make_shared<lsproto::IntegerOrString>(lsproto::IntegerOrString{.Integer =std::make_shared<int32_t>(int32_t(6133))}),
 			.Message = lsproto::StringOrMarkupContent{.String =std::make_shared<std::string>("'x' is declared but its value is never read.")},
-			.Range =   f->Ranges()[1]->LSRange,
-			.Code =    std::make_shared<lsproto::IntegerOrString>(lsproto::IntegerOrString{.Integer =std::make_shared<int32_t>(int32_t(6133))}),
-			.Tags =    std::make_shared<lsproto::Slice<lsproto::DiagnosticTag>>(std::vector<lsproto::DiagnosticTag>{lsproto::DiagnosticTagUnnecessary})})});
+			.Tags = std::make_shared<lsproto::Slice<lsproto::DiagnosticTag>>(std::vector<lsproto::DiagnosticTag>{lsproto::DiagnosticTagUnnecessary}),})});
 		f->VerifyCodeFixAvailable(t, std::nullopt);
 	});
 }
