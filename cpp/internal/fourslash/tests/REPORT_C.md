@@ -92,12 +92,16 @@ returns `0/0` — the match is case-sensitive; run as
    source file, so cross-project references/implementations enumerate 1
    location instead of 2–3). Those residuals are not crashes and belong to
    the other clusters.
-3. **Declaration-map state baseline hangs** (~25 timeouts). `tests_c_statemaps` +
-   `TestDeclarationMaps*`: `// @stateBaseline: true` tests on
-   project-reference declaration maps time out in the child (SIGALRM kill).
-   These do not touch the `// @tsc:` → `tsctests::getFileMapWithBuild` path
-   (that stub is `TSC_UNREACHABLE`, instant panic — not the hang); the hang is
-   downstream in baseline state machinery. Left FAILING/timed-out.
+3. ~~**Declaration-map state baseline hangs** (~25 timeouts).~~ **FIXED** —
+   see "Divergences found and fixed" below (ODR-duplicate `FSDiffer`).
+   `tests_c_statemaps` + `TestDeclarationMaps*`: `// @stateBaseline: true`
+   tests on project-reference declaration maps time out in the child
+   (SIGALRM kill). These do not touch the `// @tsc:` →
+   `tsctests::getFileMapWithBuild` path (that stub is `TSC_UNREACHABLE`,
+   instant panic — not the hang); the hang was the ODR-duplicate differ
+   deadlocking inside baseline state machinery. tests_c_statemaps now
+   **30/30** (8 legit `tsctests.GetFileMapWithBuild` skips — owned by the
+   execute/tsc cluster).
 4. **Completion-item field diffs** (~30 fails in autoimport2/quickinfo2/
    references). Expected items carry fields actual items lack:
    `filterText`/`insertText` (ClassMemberSnippet source), `labelDetails`,
@@ -389,6 +393,44 @@ family). `TestQuickInfo|TestFindAll|TestRename|TestImportFix|TestMissing|
 TestSourceUpdate|TestUnused|TestSuggestion|TestReferences` 561/577 → 562/577
 (remaining: 11 multi-project signal-11 = #3, 3 baseline diffs = #7, 1 semantic
 diff = #8). Zero regressions on both sweeps.
+
+### Cluster 3 — declaration-map state baseline hangs (`devin/cpp-fsc-statemaps`)
+
+One divergence fixed; the whole `// @stateBaseline:` family un-hung.
+
+1. **ODR-duplicate `FSDiffer` deadlock**
+   (`cpp/internal/testutil/fsbaselineutil/differ.{h,cpp}` — deleted;
+   `fourslash.h`, `statebaseline.cpp`, `CMakeLists.txt`).
+   `fsbaselineutil` shipped two conflicting definitions of
+   `testutil::fsbaselineutil::FSDiffer`: the canonical one in
+   `fsbaselineutil.h` (`std::shared_ptr<iovfs::FsWithSys> FS`;
+   `collections::SyncSet<std::string>* WrittenFiles`) and a stale copy in
+   `differ.h` (`vfs::iovfs::FsWithSys* FS`;
+   `std::shared_ptr<collections::SyncSet<std::string>> WrittenFiles`).
+   TUs compiled against `differ.h` (via `fourslash.h`'s include) laid out
+   the object differently than TUs compiled against `fsbaselineutil.h`,
+   so the differ's `SyncSet` mutex landed at a different offset in each —
+   `BaselineFSwithDiff`/`ChangedPaths` blocked on a garbage-initialized
+   mutex forever, and every `// @stateBaseline:` test burned its full
+   180s alarm. Deleting `differ.{h,cpp}` and repointing `fourslash.h` at
+   `fsbaselineutil.h` restores the single Go-faithful definition;
+   `statebaseline.cpp` now assigns the `shared_ptr` FS directly and
+   allocates the borrowed `WrittenFiles` set on the heap like Go's
+   `&collections.SyncSet[string]{}`.
+
+Verification (merged `devin/cpp-port` HEAD + this fix):
+- tests_c_statemaps sweep (`TestCallHierarchyAcrossProject`,
+  `TestCodeLens*`, `TestDeclarationMaps*`, `TestFindAllRefs*`,
+  `TestImplementationsAcrossProjects`, `TestRename*`,
+  `TestGoToSourceDeclarationMap*`): **30 PASS / 0 FAIL / 8 SKIP** — all
+  skips are `tsctests.GetFileMapWithBuild` (`// @tsc:` path), owned by
+  the execute/tsc cluster.
+- `-run 'TestWorkspaceSymbolMultiProject|TestAutoImportPackageJsonFilterExistingImport'`:
+  **3/3** — `TestWorkspaceSymbolMultiProjectNonExistentRef` (was signal 11)
+  and `TestAutoImportPackageJsonFilterExistingImport2` (was timeout) both
+  pass; cluster 9 confirmed shared-root and healed.
+- `-run 'TestCodeLens|TestCallHierarchy|TestWorkspaceSymbol|TestContentMapper.*CodeLens'`:
+  **54/54**, zero regressions.
 
 ## Unported remainder (for the next wave)
 
