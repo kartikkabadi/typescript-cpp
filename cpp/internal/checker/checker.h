@@ -1740,7 +1740,7 @@ public:
 	Type* newLiteralType(TypeFlags flags, const LiteralValue& value, Type* regularType);
 	Type* newUniqueESSymbolType(Symbol* symbol, const std::string& name);
 	Type* newObjectType(ObjectFlags objectFlags, Symbol* symbol);
-	Type* newAnonymousType(Symbol* symbol, const SymbolTable& members,
+	Type* newAnonymousType(Symbol* symbol, SymbolTable members,
 						 const std::vector<Signature*>& callSignatures,
 						 const std::vector<Signature*>& constructSignatures,
 						 const std::vector<IndexInfo*>& indexInfos);
@@ -1750,7 +1750,7 @@ public:
 							  ObjectFlags objectFlags);
 	Type* createDeferredTypeReference(Type* target, Node* node, TypeMapper* mapper, TypeAlias* alias);
 	Type* cloneTypeReference(Type* source);
-	void setStructuredTypeMembers(Type* t, const SymbolTable& members,
+	void setStructuredTypeMembers(Type* t, SymbolTable members,
 								  const std::vector<Signature*>& callSignatures,
 								  const std::vector<Signature*>& constructSignatures,
 								  const std::vector<IndexInfo*>& indexInfos);
@@ -2111,9 +2111,9 @@ public:
 	const SymbolTable& getExportsOfSymbol(Symbol* symbol);
 	const SymbolTable& getResolvedMembersOrExportsOfSymbol(Symbol* symbol,
 														   MembersOrExportsResolutionKind resolutionKind);
-	Symbol* lateBindMember(Symbol* parent, SymbolTable& earlySymbols, SymbolTable& lateSymbols,
+	Symbol* lateBindMember(Symbol* parent, const SymbolTable& earlySymbols, SymbolTable& lateSymbols,
 						   Node* decl);
-	void lateBindIndexSignature(Symbol* parent, SymbolTable& earlySymbols, SymbolTable& lateSymbols,
+	void lateBindIndexSignature(Symbol* parent, const SymbolTable& earlySymbols, SymbolTable& lateSymbols,
 								Node* decl);
 	void addDeclarationToLateBoundSymbol(Symbol* symbol, Node* member, SymbolFlags symbolFlags);
 	const SymbolTable& getExportsOfModule(Symbol* moduleSymbol);

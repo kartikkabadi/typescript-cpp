@@ -384,3 +384,58 @@ size x call frequency) plus the phantom-insert correctness fix.
   0.88) — order-locked, cannot change bucket order.
 - compareNodes/getSourceFileOfNode/compareSymbolsWorker ~6.3% — mirrors Go.
 - _dl_relocate_object 0.87% — cold-start PLT resolution.
+
+## Phase 5 — SymbolTable copy storm eliminated (branch devin/cpp-perf-hotpaths)
+
+Phase-4 removed by-value *returns*; the remaining mass was by-value *installs*
+and redundant clones along the same paths — `_M_assign_elements` (unordered_map
+copy-assign) sat at 34.7M Ir (~2%) dominated by `setStructuredTypeMembers`
+(25.7M).
+
+### Fixed
+
+- **`setStructuredTypeMembers`/`newAnonymousType` take `SymbolTable` by
+  value** and `data->members = std::move(members)`. Go installs the map header
+  (O(1) alias); moving recreates the same zero-copy effect for local maps.
+  Callers passing shared maps (`resolved->members`, `symbol->members`) still
+  pay exactly one copy — the Go-alias edge we cannot share safely.
+  - Bug caught + fixed: `getNamedMembers(members)` must run BEFORE the move
+    (use-after-move emptied member tables → +3 TS2322 on deep file).
+- **Call-site `std::move` on locals**: resolveStructuredTypeMembers,
+  resolveAnonymousTypeMembers (instantiation + class-handler paths),
+  inference.cpp getTypeOfReverseMappedSymbol-ish path, contextual.cpp
+  decorator-context override, declchecks2.cpp import-attributes type.
+- **Deleted two redundant self-clones** (`members = SymbolTable(members)`):
+  both sites' own comments admitted "in C++ the assignment already produced a
+  copy" — the Go `maps.Clone` exists only because Go's assignment was an
+  alias; in C++ value semantics the copy already happened upstream.
+- **`addInheritedMembers(std::move(members), ...)`**: param is by-value —
+  moving in + moving the return out drops one full map copy per base type.
+- **`resolveDeclaredMembers` phantom-insert**: `d->declaredMembers[
+  InternalSymbolNameCall/New]` inserted `__call`/`__new` keys into the member
+  table on every resolved type — `find()` now (Go map-read semantics).
+- **`getResolvedMembersOrExportsOfSymbol`**: `earlySymbols` bound as
+  `const SymbolTable&` (it is only read — `lateBindMember`/`lateBindIndexSignature`
+  params widened to `const&`, verified read-only); kills one deep copy per
+  resolution. `links->resolvedExports`/`typeOnlyExportStarMap` now moved out
+  of the worker pair.
+
+### Results (callgrind, --noEmit perfproj)
+
+| metric | phase-4 | phase-5 |
+|--------|---------|---------|
+| total Ir | 1.674G | 1.627G (-2.8%) |
+| `_M_assign_elements` (map copy) | 34.7M | **0.98M (-97%)** |
+| `_M_allocate_node<string,Symbol*>` | 14.8M | 4.49M (-70%) |
+
+### Remaining (honest floor)
+
+- `Node::text()` callers left are all **contract-bound** — every hot site
+  stores or returns the string (getDeclarationName 5.17M Ir, literal-type
+  caches, diagnostic args, module-name returns). No more textView conversions
+  available without re-plumbing symbol-name storage.
+- `getNamedMembers` (14.2M Ir flat) — iterates member tables building the
+  properties vector; mirrors Go.
+- Residual `_M_allocate_node` — legitimate map writes (Go inserts too).
+- `visit` lambda in getExportsOfModuleWorker copies `symbol->exports` per
+  visited module — mutation target (Go maps.Clone equivalent), kept.

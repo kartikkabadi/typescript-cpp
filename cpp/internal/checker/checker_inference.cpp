@@ -1802,7 +1802,7 @@ void Checker::resolveReverseMappedTypeMembers(Type* t) {
 		}
 		members[prop->name] = inferredProp;
 	}
-	setStructuredTypeMembers(t, members, {}, {}, indexInfos);
+	setStructuredTypeMembers(t, std::move(members), {}, {}, indexInfos);
 }
 
 // getTypeOfReverseMappedSymbol — inference.go:1145
