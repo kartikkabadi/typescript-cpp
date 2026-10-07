@@ -23,28 +23,27 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 # operator new/delete. Static link puts our symbols ahead of libc's.
 option(TSCPP_MIMALLOC "Route all heap allocation through mimalloc" ON)
 if(TSCPP_MIMALLOC)
-	add_library(tsc_mimalloc STATIC
-		third_party/mimalloc/src/static.c
-		cmd/malloc_override.cpp)
+	# OBJECT library, not STATIC: an interposition library must be linked
+	# unconditionally. As an archive, GNU ld's single-pass scan under the
+	# ThinLTO plugin drops members (malloc_override.cpp.o -> static.c.o
+	# intra-archive chain unresolved) and direct malloc() calls inside
+	# libtsc.a silently bind to glibc — and even --start-group doesn't fix
+	# it under clang-18's plugin (lld rescans, which is why it only fails
+	# under GNU ld). Object files are always linked, on every linker.
+	add_library(tsc_mimalloc OBJECT third_party/mimalloc/src/static.c)
+	if(MSVC)
+		# On MSVC the C TU's __MSC_VER branch emits no new/delete overrides;
+		# they must come from a C++ TU. On GNUC/clang the C TU already emits
+		# them under their Itanium-mangled names — compiling the .cpp too is
+		# a duplicate-symbol error once the objects are force-linked.
+		target_sources(tsc_mimalloc PRIVATE cmd/malloc_override.cpp)
+	endif()
 	target_include_directories(tsc_mimalloc PUBLIC third_party/mimalloc/include)
 	target_compile_definitions(tsc_mimalloc PRIVATE MI_MALLOC_OVERRIDE)
 	set_target_properties(tsc_mimalloc PROPERTIES C_STANDARD 11)
-	set(tsc_alloc_lib tsc_mimalloc)
+	set(tsc_alloc_objects $<TARGET_OBJECTS:tsc_mimalloc>)
 else()
-	set(tsc_alloc_lib "")
-endif()
-
-# Archive order cannot express the malloc-interposition dependencies:
-# libtsc.a creates undefined malloc/operator-new refs, tsc_mimalloc.a resolves
-# them and adds its own intra-archive mi_* refs (malloc_override.cpp.o ->
-# static.c.o). GNU ld's single-pass archive scan under the ThinLTO plugin can
-# leave these unresolved or silently bind malloc to glibc (lld rescans, which
-# is why it only fails under GNU ld). A rescan group fixes it; ELF linkers
-# only (ld64/lld-link don't take GNU flags).
-if(TSCPP_MIMALLOC AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
-	set(tsc_link_libs -Wl,--start-group ${tsc_alloc_lib} tsc -Wl,--end-group)
-else()
-	set(tsc_link_libs ${tsc_alloc_lib} tsc)
+	set(tsc_alloc_objects "")
 endif()
 
 add_library(tsc STATIC
@@ -457,8 +456,9 @@ add_library(tsc STATIC
 
 target_link_libraries(tsc PUBLIC z) # zlib — pprof profile writer
 
-add_executable(tscpp cmd/tscpp/main.cpp cmd/tscpp/sys.cpp cmd/tscpp/lsp.cpp cmd/tscpp/api.cpp)
-target_link_libraries(tscpp PRIVATE ${tsc_link_libs})
+add_executable(tscpp cmd/tscpp/main.cpp cmd/tscpp/sys.cpp cmd/tscpp/lsp.cpp cmd/tscpp/api.cpp
+	${tsc_alloc_objects})
+target_link_libraries(tscpp PRIVATE tsc)
 
 # tsctestrunner — scenario-runner binary for the ported tscInput tests.
 # Scenarios self-register via REGISTER_TSCTEST; enumerate them with glob
@@ -466,16 +466,17 @@ target_link_libraries(tscpp PRIVATE ${tsc_link_libs})
 file(GLOB tsctestrunner_tests CONFIGURE_DEPENDS
 	internal/execute/tsctests/tests/*.cpp)
 add_executable(tsctestrunner cmd/tsctestrunner/main.cpp
-	${tsctestrunner_tests})
-target_link_libraries(tsctestrunner PRIVATE ${tsc_link_libs})
+	${tsctestrunner_tests} ${tsc_alloc_objects})
+target_link_libraries(tsctestrunner PRIVATE tsc)
 
 # fourslash test runner — ported Go fourslash tests register statically
 # (internal/fourslash/tests/registry.h) and run one test per forked child.
 file(GLOB FOURSLASH_TEST_SOURCES CONFIGURE_DEPENDS
 	internal/fourslash/tests/tests_*.cpp)
 add_executable(fourslashrunner cmd/fourslashrunner/main.cpp
-	internal/fourslash/tests/registry.cpp ${FOURSLASH_TEST_SOURCES})
-target_link_libraries(fourslashrunner PRIVATE ${tsc_link_libs})
+	internal/fourslash/tests/registry.cpp ${FOURSLASH_TEST_SOURCES}
+	${tsc_alloc_objects})
+target_link_libraries(fourslashrunner PRIVATE tsc)
 
 # unittest runner — ported Go *_test.go unit tests register statically
 # (internal/testutil/unittests/registry.h, REGISTER_UNIT_TEST) and run one
@@ -487,5 +488,6 @@ file(GLOB UNIT_TEST_SOURCES CONFIGURE_DEPENDS
 # fourslash tests link into fourslashrunner, not here.
 list(FILTER UNIT_TEST_SOURCES EXCLUDE REGEX "internal/fourslash/")
 add_executable(unittestrunner cmd/unittestrunner/main.cpp
-	internal/testutil/unittests/registry.cpp ${UNIT_TEST_SOURCES})
-target_link_libraries(unittestrunner PRIVATE ${tsc_link_libs})
+	internal/testutil/unittests/registry.cpp ${UNIT_TEST_SOURCES}
+	${tsc_alloc_objects})
+target_link_libraries(unittestrunner PRIVATE tsc)
