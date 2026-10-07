@@ -1221,11 +1221,11 @@ void FourslashTest::openFile(gostd::testing::T* t,
 	    std::make_shared<lsproto::DidOpenTextDocumentParams>(
 	        [&] {
 		        lsproto::DidOpenTextDocumentParams p;
+		        // Value-initialize: `TextDocumentItem i;` would leave
+		        // int32_t Version indeterminate (garbage stack value,
+		        // serialized as "version": 1); Go zero-value is 0.
 		        p.TextDocument =
-		            std::make_shared<lsproto::TextDocumentItem>([] {
-			            lsproto::TextDocumentItem i;
-			            return i;
-		            }());
+		            std::make_shared<lsproto::TextDocumentItem>();
 		        p.TextDocument->Uri =
 		            lsconv::FileNameToDocumentURI(filename);
 		        p.TextDocument->LanguageId = getLanguageKind(filename);
