@@ -40,7 +40,7 @@
 #include "internal/stringutil/stringutil.h"
 #include "internal/testutil/baseline/baseline.h"
 #include "internal/testutil/tsbaseline/tsbaseline.h"
-#include "internal/testutil/fsbaselineutil/differ.h"
+#include "internal/testutil/fsbaselineutil/fsbaselineutil.h"
 #include "internal/testutil/harnessutil/harnessutil.h"
 #include "internal/testutil/lsptestutil/lspclient.h"
 #include "internal/tspath/tspath.h"

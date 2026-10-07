@@ -440,7 +440,6 @@ add_library(tsc STATIC
 	internal/fourslash/statebaseline.cpp
 	internal/fourslash/semantictokens.cpp
 	internal/fourslash/tests/util/util.cpp
-	internal/testutil/fsbaselineutil/differ.cpp
 )
 
 target_link_libraries(tsc PUBLIC z) # zlib — pprof profile writer

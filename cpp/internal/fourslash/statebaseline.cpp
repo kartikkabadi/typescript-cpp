@@ -17,9 +17,11 @@ std::shared_ptr<stateBaseline> newStateBaseline(
 	auto sb = std::make_shared<stateBaseline>();
 	sb->fsDiffer =
 	    std::make_shared<testutil::fsbaselineutil::FSDiffer>();
-	sb->fsDiffer->FS = fsFromMap.get();
+	sb->fsDiffer->FS = fsFromMap;
+	// Go `WrittenFiles: &collections.SyncSet[string]{}` — heap set the
+	// differ borrows (non-owning); lives for the test's duration.
 	sb->fsDiffer->WrittenFiles =
-	    std::make_shared<collections::SyncSet<std::string>>();
+	    new collections::SyncSet<std::string>();
 	// fmt.Fprintf(&stateBaseline.baseline, "UseCaseSensitiveFileNames: %v\n", ...)
 	sb->baseline.WriteString(gostd::sprintf(
 	    "UseCaseSensitiveFileNames: %v\n",
