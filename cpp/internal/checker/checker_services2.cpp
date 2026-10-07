@@ -112,8 +112,8 @@ T* firstOrNil(const std::vector<T*>& v) {
 }
 
 // slices.Index
-template <class T>
-int indexOf(const std::vector<T>& v, T elem) {
+template <class R>
+int indexOf(R&& v, const auto& elem) {
 	auto it = std::find(v.begin(), v.end(), elem);
 	return it == v.end() ? -1 : static_cast<int>(it - v.begin());
 }

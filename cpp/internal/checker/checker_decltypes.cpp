@@ -36,8 +36,10 @@ T orElse(const T& a, const T& b) {
 }
 
 // core.SameMap — returns the input unchanged when f is the identity on every element.
-template <typename T, typename F>
-std::vector<T> sameMap(const std::vector<T>& values, F f) {
+template <class R, typename F>
+auto sameMap(R&& values, F f)
+	-> std::vector<std::decay_t<std::ranges::range_value_t<R>>> {
+	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	std::vector<T> result;
 	result.reserve(values.size());
 	bool same = true;
@@ -51,8 +53,9 @@ std::vector<T> sameMap(const std::vector<T>& values, F f) {
 	return same ? values : result;
 }
 
-template <typename T, typename F>
-auto mapVec(const std::vector<T>& values, F f) -> std::vector<decltype(f(std::declval<T>()))> {
+template <class R, typename F>
+auto mapVec(R&& values, F f) -> std::vector<decltype(f(std::declval<std::decay_t<std::ranges::range_value_t<R>>>()))> {
+	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	std::vector<decltype(f(std::declval<T>()))> result;
 	result.reserve(values.size());
 	for (const T& v : values) {
@@ -61,11 +64,12 @@ auto mapVec(const std::vector<T>& values, F f) -> std::vector<decltype(f(std::de
 	return result;
 }
 
-template <typename T, typename F>
-auto mapIndex(const std::vector<T>& values, F f)
-	-> std::vector<decltype(f(std::declval<T>(), 0))> {
-	using R = decltype(f(std::declval<T>(), 0));
-	std::vector<R> result;
+template <class R, typename F>
+auto mapIndex(R&& values, F f)
+	-> std::vector<decltype(f(std::declval<std::decay_t<std::ranges::range_value_t<R>>>(), 0))> {
+	using T = std::decay_t<std::ranges::range_value_t<R>>;
+	using U = decltype(f(std::declval<T>(), 0));
+	std::vector<U> result;
 	result.reserve(values.size());
 	for (size_t i = 0; i < values.size(); i++) {
 		result.push_back(f(values[i], static_cast<int>(i)));
@@ -96,23 +100,27 @@ int findLastIndex(const std::vector<Node*>& values, F f) {
 	return -1;
 }
 
-template <typename T, typename F>
-bool someOf(const std::vector<T>& values, F f) {
+template <class R, typename F>
+bool someOf(R&& values, F f) {
+	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	return std::any_of(values.begin(), values.end(), f);
 }
 
-template <typename T, typename F>
-bool everyOf(const std::vector<T>& values, F f) {
+template <class R, typename F>
+bool everyOf(R&& values, F f) {
+	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	return std::all_of(values.begin(), values.end(), f);
 }
 
-template <typename T>
-bool containsElem(const std::vector<T>& values, const T& v) {
+template <class R>
+bool containsElem(R&& values, const auto& v) {
+	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	return std::find(values.begin(), values.end(), v) != values.end();
 }
 
-template <typename T>
-int indexOf(const std::vector<T>& values, const T& v) {
+template <class R>
+int indexOf(R&& values, const auto& v) {
+	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	auto it = std::find(values.begin(), values.end(), v);
 	return it == values.end() ? -1 : static_cast<int>(it - values.begin());
 }

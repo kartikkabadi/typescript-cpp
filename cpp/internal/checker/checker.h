@@ -1901,7 +1901,7 @@ public:
 	std::vector<Type*> appendLocalTypeParametersOfClassOrInterfaceOrTypeAlias(
 		std::vector<Type*> types, Symbol* symbol);
 	std::vector<Type*> appendTypeParameters(
-		std::vector<Type*> typeParameters, const std::vector<Node*>& declarations);
+		std::vector<Type*> typeParameters, std::span<Node* const> declarations);
 	Type* getDeclaredTypeOfTypeParameter(Symbol* symbol);
 	Type* getDeclaredTypeOfTypeAlias(Symbol* symbol);
 	Type* getDeclaredTypeOfEnum(Symbol* symbol);
@@ -1967,7 +1967,7 @@ public:
 	Type* createArrayTypeEx(Type* elementType, bool readonly);
 	// Name resolution wiring (checker.go createNameResolver +
 	// nameresolver hooks)
-	Symbol* getSymbol(SymbolTable& symbols, const std::string& name,
+	Symbol* getSymbol(SymbolTable& symbols, std::string_view name,
 	                SymbolFlags meaning);
 	// aligned to Go signature getAwaitedTypeEx(t, errorNode, diagnosticMessage, args ...any)
 	Type* getAwaitedTypeEx(Type* type, Node* errorNode,
@@ -1982,7 +1982,7 @@ public:
 	bool allTypesAssignableToKindEx(Type* source, TypeFlags kind, bool strict);
 	Symbol* getImmediateAliasedSymbol(Symbol* symbol);
 	Symbol* getSuggestionForSymbolNameLookup(SymbolTable& symbols,
-	                                       const std::string& name,
+	                                       std::string_view name,
 	                                       SymbolFlags meaning);
 	Symbol* getSpellingSuggestionForName(const std::string& name,
 	                                     const std::vector<Symbol*>& symbols,
@@ -2227,7 +2227,7 @@ public:
 
 	// checkSourceFile entry points
 	void checkSourceFile(SourceFile* sourceFile, bool checkUnused);
-	void checkSourceElements(const std::vector<Node*>& nodes);
+	void checkSourceElements(std::span<Node* const> nodes);
 	bool checkSourceElement(Node* node);
 	void checkSourceElementWorker(Node* node);
 	bool checkSourceElementUnreachable(Node* node);
@@ -2559,7 +2559,7 @@ public:
 	void checkVariableLikeDeclaration(Node* node);
 	void checkDecorators(Node* node);
 	void checkTypeNameIsReserved(Node* name, const DiagnosticMessage* message);
-	void checkTypeParameters(const std::vector<Node*>& typeParameterDeclarations);
+	void checkTypeParameters(std::span<Node* const> typeParameterDeclarations);
 	bool isReferenceToType(Type* t, Type* target);
 	Type* getConstraintOfTypeParameter(Type* typeParameter);
 	std::vector<Type*> getTypeParametersForTypeReferenceOrImport(Node* node);
@@ -2632,7 +2632,7 @@ public:
 	std::vector<Node*> getClassOrInterfaceDeclarationsOfSymbol(Symbol* symbol);
 	bool areTypeParametersIdentical(
 	    const std::vector<Node*>& declarations, const std::vector<Type*>& targetParameters,
-	    const std::function<std::vector<Node*>(Node*)>& getTypeParameterDeclarations);
+	    const std::function<NodeSlice(Node*)>& getTypeParameterDeclarations);
 	void checkBaseTypeAccessibility(Type* t, Node* node);
 	void issueMemberSpecificError(Node* node, Type* typeWithThis, Type* baseWithThis,
 	                              const DiagnosticMessage* broadDiag);
@@ -2685,9 +2685,9 @@ public:
 	std::vector<Symbol*> getPropertiesOfObjectType(Type* t);
 	Symbol* getPropertyOfObjectType(Type* t, const std::string& name);
 	std::vector<Signature*> getConstructorsForTypeArguments(
-	    Type* t, const std::vector<Node*>& typeArgumentNodes, Node* location);
+	    Type* t, std::span<Node* const> typeArgumentNodes, Node* location);
 	std::vector<Signature*> getInstantiatedConstructorsForTypeArguments(
-	    Type* t, const std::vector<Node*>& typeArgumentNodes, Node* location);
+	    Type* t, std::span<Node* const> typeArgumentNodes, Node* location);
 	bool isValidBaseType(Type* t);
 	Type* getIndexTypeOfType(Type* t, Type* keyType);
 	IndexInfo* getIndexInfoOfType(Type* t, Type* keyType);
@@ -3081,9 +3081,11 @@ public:
 	Type* instantiateReverseMappedType(Type* t, TypeMapper* m);
 	std::vector<Symbol*> instantiateSymbols(const std::vector<Symbol*>& symbols,
 											TypeMapper* m);
-	template <typename T>
-	std::vector<T> instantiateList(const std::vector<T>& values, TypeMapper* m,
-								   T (Checker::*instantiator)(T, TypeMapper*));
+	template <typename R>
+	auto instantiateList(R&& values, TypeMapper* m,
+						 std::decay_t<std::ranges::range_value_t<R>> (Checker::*instantiator)(
+							 std::decay_t<std::ranges::range_value_t<R>>, TypeMapper*))
+		-> std::vector<std::decay_t<std::ranges::range_value_t<R>>>;
 
 	// Dep stubs — declared here, defined at the bottom of checker_instantiate.cpp.
 	Type* createNormalizedTypeReference(Type* target,
@@ -3971,7 +3973,7 @@ public:
 	void checkCollisionWithRequireExportsInGeneratedCode(Node* node, Node* name);
 	void checkCollisionWithGlobalObjectInGeneratedCode(Node* node, Node* name);
 	bool needCollisionCheckForIdentifier(Node* node, Node* identifier,
-	                                     const std::string& name);
+	                                     std::string_view name);
 	void recordPotentialCollisionWithWeakMapSetInGeneratedCode(Node* node,
 	                                                           Node* name);
 	void checkWeakMapSetCollision(Node* node);
@@ -4116,7 +4118,7 @@ public:
 	bool areDeclarationFlagsIdentical(Node* left, Node* right);
 	DeclarationSpaces getDeclarationSpaces(Node* node);
 	void checkTypeParametersNotReferenced(Node* root,
-	                                      const std::vector<Node*>& typeParameters,
+	                                      std::span<Node* const> typeParameters,
 	                                      size_t index);
 	bool isReferenced(Symbol* symbol);
 	void reportUnusedVariable(Node* location, Diagnostic* diagnostic);

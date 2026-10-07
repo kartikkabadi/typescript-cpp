@@ -177,9 +177,10 @@ std::vector<T> concatenate(std::vector<T> a, std::initializer_list<T> b) {
 	return a;
 }
 
-template <class T, class F>
-auto mapVec(const std::vector<T>& v, F&& f)
-	-> std::vector<decltype(f(std::declval<T>()))> {
+template <class R, class F>
+auto mapVec(R&& v, F&& f)
+	-> std::vector<decltype(f(std::declval<std::decay_t<std::ranges::range_value_t<R>>>()))> {
+	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	std::vector<decltype(f(std::declval<T>()))> result;
 	result.reserve(v.size());
 	for (const T& x : v) {
@@ -189,8 +190,10 @@ auto mapVec(const std::vector<T>& v, F&& f)
 }
 
 // core.SameMap — returns the input unchanged when every element maps to itself.
-template <class T, class F>
-std::vector<T> sameMap(const std::vector<T>& v, F&& f) {
+template <class R, class F>
+auto sameMap(R&& v, F&& f)
+	-> std::vector<std::decay_t<std::ranges::range_value_t<R>>> {
+	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	std::vector<T> result;
 	result.reserve(v.size());
 	bool same = true;
@@ -204,8 +207,10 @@ std::vector<T> sameMap(const std::vector<T>& v, F&& f) {
 	return same ? v : result;
 }
 
-template <class T, class F>
-std::vector<T> filterVec(const std::vector<T>& v, F&& f) {
+template <class R, class F>
+auto filterVec(R&& v, F&& f)
+	-> std::vector<std::decay_t<std::ranges::range_value_t<R>>> {
+	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	std::vector<T> result;
 	for (const T& x : v) {
 		if (f(x)) {
@@ -215,8 +220,9 @@ std::vector<T> filterVec(const std::vector<T>& v, F&& f) {
 	return result;
 }
 
-template <class T, class F>
-bool someList(const std::vector<T>& v, F&& f) {
+template <class R, class F>
+bool someList(R&& v, F&& f) {
+	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	for (const T& x : v) {
 		if (f(x)) {
 			return true;
@@ -225,8 +231,9 @@ bool someList(const std::vector<T>& v, F&& f) {
 	return false;
 }
 
-template <class T, class F>
-bool everyList(const std::vector<T>& v, F&& f) {
+template <class R, class F>
+bool everyList(R&& v, F&& f) {
+	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	for (const T& x : v) {
 		if (!f(x)) {
 			return false;
@@ -247,9 +254,10 @@ T orElse(T a, T b) {
 }
 
 // core.FirstNonNil — first non-null mapped value.
-template <class T, class F>
-auto firstNonNil(const std::vector<T>& v, F&& f)
-	-> decltype(f(std::declval<T>())) {
+template <class R, class F>
+auto firstNonNil(R&& v, F&& f)
+	-> decltype(f(std::declval<std::decay_t<std::ranges::range_value_t<R>>>())) {
+	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	for (const T& x : v) {
 		auto r = f(x);
 		if (r != nullptr) {
@@ -260,9 +268,10 @@ auto firstNonNil(const std::vector<T>& v, F&& f)
 }
 
 // core.MapNonNil — map dropping null results.
-template <class T, class F>
-auto mapNonNil(const std::vector<T>& v, F&& f)
-	-> std::vector<decltype(f(std::declval<T>()))> {
+template <class R, class F>
+auto mapNonNil(R&& v, F&& f)
+	-> std::vector<decltype(f(std::declval<std::decay_t<std::ranges::range_value_t<R>>>()))> {
+	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	std::vector<decltype(f(std::declval<T>()))> result;
 	for (const T& x : v) {
 		auto r = f(x);
@@ -903,7 +912,7 @@ void Checker::resolveBaseTypesOfClass(Type* t) {
 }
 
 std::vector<Signature*> Checker::getInstantiatedConstructorsForTypeArguments(
-	Type* t, const std::vector<Node*>& typeArgumentNodes, Node* location) {
+	Type* t, std::span<Node* const> typeArgumentNodes, Node* location) {
 	std::vector<Signature*> signatures =
 		getConstructorsForTypeArguments(t, typeArgumentNodes, location);
 	std::vector<Type*> typeArguments = mapVec(typeArgumentNodes,
@@ -917,7 +926,7 @@ std::vector<Signature*> Checker::getInstantiatedConstructorsForTypeArguments(
 }
 
 std::vector<Signature*> Checker::getConstructorsForTypeArguments(
-	Type* t, const std::vector<Node*>& typeArgumentNodes, Node* location) {
+	Type* t, std::span<Node* const> typeArgumentNodes, Node* location) {
 	int typeArgCount = static_cast<int>(typeArgumentNodes.size());
 	return filterVec(getSignaturesOfType(t, SignatureKind::Construct), [&](Signature* sig) {
 		return typeArgCount >= getMinTypeArgumentCount(sig->typeParameters) &&

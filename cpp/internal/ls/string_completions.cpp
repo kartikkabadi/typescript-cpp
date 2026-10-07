@@ -30,12 +30,12 @@ namespace {
 // ---------------------------------------------------------------------------
 
 // core.Map.
-template <class T, class F>
-auto mapList(const std::vector<T>& list, F f)
-    -> std::vector<std::invoke_result_t<F, const T&>> {
-	std::vector<std::invoke_result_t<F, const T&>> out;
+template <class R, class F>
+auto mapList(R&& list, F f)
+    -> std::vector<std::invoke_result_t<F, std::decay_t<std::ranges::range_value_t<R>>>> {
+	std::vector<std::invoke_result_t<F, std::decay_t<std::ranges::range_value_t<R>>>> out;
 	out.reserve(list.size());
-	for (const T& v : list) {
+	for (auto& v : list) {
 		out.push_back(f(v));
 	}
 	return out;

@@ -1,6 +1,7 @@
 // Port of tsc/internal/binder — bindSourceFile entry point.
 #pragma once
 
+#include <span>
 #include <vector>
 #include "internal/ast/symbol.h"
 
@@ -14,7 +15,7 @@ void setValueDeclaration(Symbol* symbol, Node* node);
 bool isAssignmentDeclaration(Node* decl);
 bool isEffectiveModuleDeclaration(Node* node);
 Node* findUseStrictPrologue(SourceFile* sourceFile,
-                            const std::vector<Node*>& statements);
+                            std::span<Node* const> statements);
 
 // binder.go: ContainerFlags
 using ContainerFlags = int32_t;

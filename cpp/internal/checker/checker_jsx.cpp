@@ -753,7 +753,7 @@ Signature* Checker::resolveJsxOpeningLikeElement(Node* node,
 					getEffectiveFirstArgumentForJsxSignature(fakeSignature, node),
 					nullptr /*inferenceContext*/, CheckModeNormal),
 				result, node->tagName(), node->attributes(), nullptr, nullptr);
-			std::vector<Node*> typeArguments = node->typeArguments();
+			auto typeArguments = node->typeArguments();
 			if (!typeArguments.empty()) {
 				checkSourceElements(typeArguments);
 				SourceFile* sourceFile = getSourceFileOfNode(node);

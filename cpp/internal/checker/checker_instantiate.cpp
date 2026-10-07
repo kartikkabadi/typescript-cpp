@@ -158,18 +158,21 @@ const std::vector<Type*>& aliasTypeArguments(TypeAlias* alias) {
 // core.Some / Every / Map / Filter replicas.
 // ---------------------------------------------------------------------------
 
-template <typename T, typename F>
-bool anyOf(const std::vector<T>& v, F&& f) {
+template <class R, typename F>
+bool anyOf(R&& v, F&& f) {
+	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	return std::any_of(v.begin(), v.end(), std::forward<F>(f));
 }
 
-template <typename T, typename F>
-bool allOf(const std::vector<T>& v, F&& f) {
+template <class R, typename F>
+bool allOf(R&& v, F&& f) {
+	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	return std::all_of(v.begin(), v.end(), std::forward<F>(f));
 }
 
-template <typename T, typename F>
-auto mapVec(const std::vector<T>& v, F&& f) -> std::vector<decltype(f(v.front()))> {
+template <class R, typename F>
+auto mapVec(R&& v, F&& f) -> std::vector<decltype(f(v.front()))> {
+	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	std::vector<decltype(f(v.front()))> out;
 	out.reserve(v.size());
 	for (const T& e : v) {
@@ -178,8 +181,10 @@ auto mapVec(const std::vector<T>& v, F&& f) -> std::vector<decltype(f(v.front())
 	return out;
 }
 
-template <typename T, typename F>
-std::vector<T> filterVec(const std::vector<T>& v, F&& f) {
+template <class R, typename F>
+auto filterVec(R&& v, F&& f)
+	-> std::vector<std::decay_t<std::ranges::range_value_t<R>>> {
+	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	std::vector<T> out;
 	for (const T& e : v) {
 		if (f(e)) {
@@ -1289,9 +1294,11 @@ std::vector<IndexInfo*> Checker::instantiateIndexInfos(
 // instantiateList — checker.go:23204-23219
 // (Go generic — member template; only instantiated within this TU.)
 
-template <typename T>
-std::vector<T> Checker::instantiateList(const std::vector<T>& values, TypeMapper* m,
-										T (Checker::*instantiator)(T, TypeMapper*)) {
+template <class R>
+auto Checker::instantiateList(R&& values, TypeMapper* m,
+										std::decay_t<std::ranges::range_value_t<R>> (Checker::*instantiator)(std::decay_t<std::ranges::range_value_t<R>>, TypeMapper*))
+	-> std::vector<std::decay_t<std::ranges::range_value_t<R>>> {
+	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	for (size_t i = 0; i < values.size(); i++) {
 		T mapped = (this->*instantiator)(values[i], m);
 		if (mapped != values[i]) {

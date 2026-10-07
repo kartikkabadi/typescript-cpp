@@ -2392,7 +2392,7 @@ Symbol* Checker::getSymbolOfNode(Node* node) {
 static bool isTypeUsableAsPropertyName(Type* t);
 static bool isLateBindableAST(Node* node);
 static std::string getPropertyNameFromType(Type* t);
-static std::vector<Node*> getMembersOfDeclaration(Node* node);
+static std::span<Node* const> getMembersOfDeclaration(Node* node);
 struct ExportCollision {
 	std::string specifierText;
 	std::vector<Node*> exportsWithDuplicate;
@@ -2490,7 +2490,7 @@ static bool isLateBindableAST(Node* node) {
 	return expr != nullptr && isEntityNameExpression(expr);
 }
 
-static std::vector<Node*> getMembersOfDeclaration(Node* node) {
+static std::span<Node* const> getMembersOfDeclaration(Node* node) {
 	switch (node->kind) {
 	case Kind::InterfaceDeclaration:
 	case Kind::ClassDeclaration:
@@ -3448,7 +3448,7 @@ std::vector<Type*> Checker::appendLocalTypeParametersOfClassOrInterfaceOrTypeAli
 // Appends the type parameters given by a list of declarations to a set of type
 // parameters and returns the resulting set.
 std::vector<Type*> Checker::appendTypeParameters(
-	std::vector<Type*> typeParameters, const std::vector<Node*>& declarations) {
+	std::vector<Type*> typeParameters, std::span<Node* const> declarations) {
 	for (Node* declaration : declarations) {
 		Type* tp = getDeclaredTypeOfTypeParameter(getSymbolOfDeclaration(declaration));
 		if (std::find(typeParameters.begin(), typeParameters.end(), tp) ==
@@ -4844,12 +4844,12 @@ static binder::NameResolver* newNameResolverImpl(
 	nr->argumentsSymbol = c->argumentsSymbol;
 	nr->requireSymbol = c->requireSymbol;
 	if (forSuggestion) {
-		nr->lookup = [c](SymbolTable* symbols, const std::string& name,
+		nr->lookup = [c](SymbolTable* symbols, std::string_view name,
 		               SymbolFlags meaning) {
 			return c->getSuggestionForSymbolNameLookup(*symbols, name, meaning);
 		};
 	} else {
-		nr->lookup = [c](SymbolTable* symbols, const std::string& name,
+		nr->lookup = [c](SymbolTable* symbols, std::string_view name,
 		               SymbolFlags meaning) {
 			return c->getSymbol(*symbols, name, meaning);
 		};
@@ -5528,7 +5528,7 @@ static std::vector<Symbol*> getPrimitiveTypeAliasSuggestions(
 }
 
 Symbol* Checker::getSuggestionForSymbolNameLookup(SymbolTable& symbols,
-                                                const std::string& name,
+                                                std::string_view name,
                                                 SymbolFlags meaning) {
 	Symbol* symbol = getSymbol(symbols, name, meaning);
 	if (symbol != nullptr) {
@@ -5545,7 +5545,7 @@ Symbol* Checker::getSuggestionForSymbolNameLookup(SymbolTable& symbols,
 			candidates.push_back(s);
 		}
 	}
-	return getSpellingSuggestionForName(name, candidates, meaning);
+	return getSpellingSuggestionForName(std::string(name), candidates, meaning);
 }
 
 bool Checker::isUncheckedJSSuggestion(Node* node, Symbol* suggestion,
@@ -5850,12 +5850,10 @@ void Checker::checkResolvedBlockScopedVariable(Symbol* result,
 	}
 }
 
-Symbol* Checker::getSymbol(SymbolTable& symbols, const std::string& name,
+Symbol* Checker::getSymbol(SymbolTable& symbols, std::string_view name,
                            SymbolFlags meaning) {
 	if (meaning & SymbolFlagsAll) {
-		auto it = symbols.find(name);
-		Symbol* symbol =
-			it != symbols.end() ? getMergedSymbol(it->second) : nullptr;
+		Symbol* symbol = getMergedSymbol(getSymbolFromTableView(symbols, name));
 		if (symbol != nullptr) {
 			if (symbol->flags & meaning) {
 				return symbol;
@@ -6183,7 +6181,7 @@ void Checker::init(Program* p) {
 	                   SymbolFlags meaning,
 	                   const DiagnosticMessage* nameNotFoundMessage, bool isUse,
 	                   bool excludeGlobals) {
-		return nr->resolve(location, std::string(name), meaning,
+		return nr->resolve(location, name, meaning,
 		                   nameNotFoundMessage, isUse, excludeGlobals);
 	};
 	binder::NameResolver* nrs = newNameResolverImpl(this, true);
@@ -6191,7 +6189,7 @@ void Checker::init(Program* p) {
 		[nrs](Node* location, std::string_view name, SymbolFlags meaning,
 		      const DiagnosticMessage* nameNotFoundMessage, bool isUse,
 		      bool excludeGlobals) {
-			return nrs->resolve(location, std::string(name), meaning,
+			return nrs->resolve(location, name, meaning,
 			                    nameNotFoundMessage, isUse, excludeGlobals);
 		};
 	anyType = newIntrinsicType(TypeFlagsAny, "any");
@@ -7438,13 +7436,14 @@ Symbol* Checker::resolveEntityName(Node* name, SymbolFlags meaning,
 			}
 		}
 		Node* resolveLocation = location != nullptr ? location : name;
+		std::string nameScratch;
 		if (meaning == SymbolFlagsNamespace) {
 			symbol = getMergedSymbol(resolveName(
-			    resolveLocation, name->text(), meaning, nullptr,
+			    resolveLocation, name->textView(nameScratch), meaning, nullptr,
 			    true /*isUse*/, false /*excludeGlobals*/));
 			if (symbol == nullptr) {
 				Symbol* alias = getMergedSymbol(resolveName(
-				    resolveLocation, name->text(),
+				    resolveLocation, name->textView(nameScratch),
 				    SymbolFlagsAlias, nullptr, true /*isUse*/,
 				    false /*excludeGlobals*/));
 				if (alias != nullptr &&
@@ -7455,13 +7454,13 @@ Symbol* Checker::resolveEntityName(Node* name, SymbolFlags meaning,
 				}
 			}
 			if (symbol == nullptr && message != nullptr) {
-				resolveName(resolveLocation, name->text(), meaning,
+				resolveName(resolveLocation, name->textView(nameScratch), meaning,
 				            message, true /*isUse*/,
 				            false /*excludeGlobals*/);
 			}
 		} else {
 			symbol = getMergedSymbol(resolveName(
-			    resolveLocation, name->text(), meaning, message,
+			    resolveLocation, name->textView(nameScratch), meaning, message,
 			    true /*isUse*/, false /*excludeGlobals*/));
 		}
 		break;

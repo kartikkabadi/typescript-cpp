@@ -308,13 +308,13 @@ auto mapVecIndex(const std::vector<T>& values, F f)
 	return result;
 }
 
-template <typename T, typename F>
-bool someOf(const std::vector<T>& values, F f) {
+template <typename R, typename F>
+bool someOf(R&& values, F f) {
 	return std::any_of(values.begin(), values.end(), f);
 }
 
-template <typename T, typename F>
-bool allOf(const std::vector<T>& values, F f) {
+template <typename R, typename F>
+bool allOf(R&& values, F f) {
 	return std::all_of(values.begin(), values.end(), f);
 }
 

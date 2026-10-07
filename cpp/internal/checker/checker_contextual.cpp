@@ -40,20 +40,23 @@ T orElse(T a, T b) {
 }
 
 // core.Some
-template <class T, class F>
-bool someRange(const std::vector<T>& v, F f) {
+template <class R, class F>
+bool someRange(R&& v, F f) {
+	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	return std::any_of(v.begin(), v.end(), f);
 }
 
 // core.Every
-template <class T, class F>
-bool everyRange(const std::vector<T>& v, F f) {
+template <class R, class F>
+bool everyRange(R&& v, F f) {
+	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	return std::all_of(v.begin(), v.end(), f);
 }
 
 // core.Map
-template <class T, class F>
-auto mapRange(const std::vector<T>& v, F f) -> std::vector<std::invoke_result_t<F, T>> {
+template <class R, class F>
+auto mapRange(R&& v, F f) -> std::vector<std::invoke_result_t<F, std::decay_t<std::ranges::range_value_t<R>>>> {
+	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	std::vector<std::invoke_result_t<F, T>> out;
 	out.reserve(v.size());
 	for (const T& x : v) {
@@ -63,8 +66,10 @@ auto mapRange(const std::vector<T>& v, F f) -> std::vector<std::invoke_result_t<
 }
 
 // core.Filter
-template <class T, class F>
-std::vector<T> filterRange(const std::vector<T>& v, F f) {
+template <class R, class F>
+auto filterRange(R&& v, F f)
+	-> std::vector<std::decay_t<std::ranges::range_value_t<R>>> {
+	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	std::vector<T> out;
 	for (const T& x : v) {
 		if (f(x)) {
@@ -75,47 +80,58 @@ std::vector<T> filterRange(const std::vector<T>& v, F f) {
 }
 
 // core.Find — first element satisfying pred, or nullptr.
-template <class T, class F>
-T findRange(const std::vector<T>& v, F f) {
+template <class R, class F>
+auto findRange(R&& v, F f)
+	-> std::decay_t<std::ranges::range_value_t<R>> {
+	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	auto it = std::find_if(v.begin(), v.end(), f);
 	return it != v.end() ? *it : T{};
 }
 
 // core.FindIndex — index of first element satisfying pred, or -1.
-template <class T, class F>
-int findIndexRange(const std::vector<T>& v, F f) {
+template <class R, class F>
+int findIndexRange(R&& v, F f) {
+	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	auto it = std::find_if(v.begin(), v.end(), f);
 	return it != v.end() ? static_cast<int>(it - v.begin()) : -1;
 }
 
 // slices.Index — index of the first occurrence of value, or -1.
-template <class T>
-int indexOfRange(const std::vector<T>& v, const T& value) {
+template <class R>
+int indexOfRange(R&& v, const auto& value) {
+	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	auto it = std::find(v.begin(), v.end(), value);
 	return it != v.end() ? static_cast<int>(it - v.begin()) : -1;
 }
 
 // core.FirstOrNil
-template <class T>
-T firstOrNil(const std::vector<T>& v) {
+template <class R>
+auto firstOrNil(R&& v)
+	-> std::decay_t<std::ranges::range_value_t<R>> {
+	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	return v.empty() ? T{} : v.front();
 }
 
 // core.LastOrNil
-template <class T>
-T lastOrNil(const std::vector<T>& v) {
+template <class R>
+auto lastOrNil(R&& v)
+	-> std::decay_t<std::ranges::range_value_t<R>> {
+	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	return v.empty() ? T{} : v.back();
 }
 
 // slices.Contains
-template <class T>
-bool containsElement(const std::vector<T>& v, const T& value) {
+template <class R>
+bool containsElement(R&& v, const auto& value) {
+	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	return std::find(v.begin(), v.end(), value) != v.end();
 }
 
 // core.ReplaceElement
-template <class T>
-std::vector<T> replaceElement(const std::vector<T>& v, size_t index, T element) {
+template <class R>
+auto replaceElement(R&& v, size_t index, std::decay_t<std::ranges::range_value_t<R>> element)
+	-> std::vector<std::decay_t<std::ranges::range_value_t<R>>> {
+	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	std::vector<T> out = v;
 	out[index] = element;
 	return out;

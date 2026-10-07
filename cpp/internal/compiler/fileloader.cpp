@@ -1031,7 +1031,8 @@ void filesLoader::resolveAutomaticTypeDirectives(parseTask* t) {
 	// "processTypeReferences", nil, false)()` (wraps the
 	// loadAutomaticTypeDirectives equivalent).
 	tracing::TraceScope traceProcessTypeRefs(
-	    tracing, tracing::PhaseProgram, "processTypeReferences", {}, false);
+	    tracing, tracing::PhaseProgram, "processTypeReferences",
+	    [&] { return tracing::TraceArgs{}; }, false);
 	std::vector<std::string> automaticTypeDirectiveNames =
 	    module::GetAutomaticTypeDirectiveNames(*compilerOptions, host);
 	if (!automaticTypeDirectiveNames.empty()) {
@@ -1619,7 +1620,7 @@ void projectReferenceParseTask::parse(projectReferenceParser* parser) {
 	tracing::TraceScope traceParseConfig(
 	    loader->tracing, tracing::PhaseParse,
 	    "parseJsonSourceFileConfigFileContent",
-	    tracing::TraceArgs{{"path", configName}}, false);
+	    [&] { return tracing::TraceArgs{{"path", configName}}; }, false);
 	resolved = loader->host->GetResolvedProjectReference(
 	    configName, loader->toPath(configName));
 	if (resolved == nullptr) {
@@ -1827,7 +1828,8 @@ void filesParser::load(parseTask* t) {
 	// "findSourceFile", {"fileName"}, false)()`.
 	tracing::TraceScope traceFindSourceFile(
 	    loader->tracing, tracing::PhaseProgram, "findSourceFile",
-	    tracing::TraceArgs{{"fileName", t->normalizedFilePath}}, false);
+	    [&] { return tracing::TraceArgs{{"fileName", t->normalizedFilePath}}; },
+	    false);
 
 	// filesparser.go:73-77 — Try to find the project redirect
 	if (std::string redirect =
@@ -2420,7 +2422,8 @@ void filesLoader::processAllProgramFiles(
 	// "processRootFiles", {"count"}, false)()`.
 	tracing::TraceScope traceProcessRootFiles(
 	    tracing, tracing::PhaseProgram, "processRootFiles",
-	    tracing::TraceArgs{{"count", (int)rootFileNames.size()}}, false);
+	    [&] { return tracing::TraceArgs{{"count", (int)rootFileNames.size()}}; },
+	    false);
 	for (size_t index = 0; index < rootFileNames.size(); index++) {
 		addRootFileTask(
 		    rootFileNames[index], nullptr,

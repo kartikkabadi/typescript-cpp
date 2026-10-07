@@ -176,23 +176,23 @@ CacheKey getTupleKey(const std::vector<TupleElementInfo>& elementInfos,
 // List helpers — per-file equivalents of core.Map/Filter/Some/Every/Find etc.
 // ---------------------------------------------------------------------------
 
-template <class T, class F>
-auto mapList(const std::vector<T>& v, F&& f)
+template <class R, class F>
+auto mapList(R&& v, F&& f)
 	-> std::vector<decltype(f(v.front()))> {
-	using R = decltype(f(v.front()));
-	std::vector<R> result;
+	using U = decltype(f(v.front()));
+	std::vector<U> result;
 	result.reserve(v.size());
-	for (const T& t : v) {
+	for (auto& t : v) {
 		result.push_back(f(t));
 	}
 	return result;
 }
 
-template <class T, class F>
-auto mapIndexList(const std::vector<T>& v, F&& f)
+template <class R, class F>
+auto mapIndexList(R&& v, F&& f)
 	-> std::vector<decltype(f(v.front(), 0))> {
-	using R = decltype(f(v.front(), 0));
-	std::vector<R> result;
+	using U = decltype(f(v.front(), 0));
+	std::vector<U> result;
 	result.reserve(v.size());
 	for (size_t i = 0; i < v.size(); i++) {
 		result.push_back(f(v[i], static_cast<int>(i)));
@@ -200,10 +200,12 @@ auto mapIndexList(const std::vector<T>& v, F&& f)
 	return result;
 }
 
-template <class T, class F>
-std::vector<T> filterList(const std::vector<T>& v, F&& f) {
+template <class R, class F>
+auto filterList(R&& v, F&& f)
+	-> std::vector<std::decay_t<std::ranges::range_value_t<R>>> {
+	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	std::vector<T> result;
-	for (const T& t : v) {
+	for (auto& t : v) {
 		if (f(t)) {
 			result.push_back(t);
 		}
@@ -211,9 +213,9 @@ std::vector<T> filterList(const std::vector<T>& v, F&& f) {
 	return result;
 }
 
-template <class T, class F>
-bool someList(const std::vector<T>& v, F&& f) {
-	for (const T& t : v) {
+template <class R, class F>
+bool someList(R&& v, F&& f) {
+	for (auto& t : v) {
 		if (f(t)) {
 			return true;
 		}
@@ -221,9 +223,9 @@ bool someList(const std::vector<T>& v, F&& f) {
 	return false;
 }
 
-template <class T, class F>
-bool everyList(const std::vector<T>& v, F&& f) {
-	for (const T& t : v) {
+template <class R, class F>
+bool everyList(R&& v, F&& f) {
+	for (auto& t : v) {
 		if (!f(t)) {
 			return false;
 		}
@@ -233,7 +235,7 @@ bool everyList(const std::vector<T>& v, F&& f) {
 
 template <class T, class F>
 T findList(const std::vector<T>& v, F&& f) {
-	for (const T& t : v) {
+	for (auto& t : v) {
 		if (f(t)) {
 			return t;
 		}
@@ -244,7 +246,7 @@ T findList(const std::vector<T>& v, F&& f) {
 template <class T, class F>
 int countWhereList(const std::vector<T>& v, F&& f) {
 	int n = 0;
-	for (const T& t : v) {
+	for (auto& t : v) {
 		if (f(t)) {
 			n++;
 		}

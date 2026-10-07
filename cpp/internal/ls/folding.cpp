@@ -195,7 +195,7 @@ std::shared_ptr<lsp::lsproto::FoldingRange> rangeBetweenTokens(gostd::Context ct
 }
 
 // folding.go:653 — isNodeArrayMultiLine
-bool isNodeArrayMultiLine(std::vector<::tsc::Node*> list, SourceFile* sourceFile) {
+bool isNodeArrayMultiLine(std::span<::tsc::Node* const> list, SourceFile* sourceFile) {
 	if (list.empty()) {
 		return false;
 	}

@@ -86,12 +86,12 @@ bool isBreakOrContinueStatement(Node* node) {
 }
 
 // core.FindIn — first element matching f, or nil.
-template <class T, class F>
-T* findIn(const std::vector<T*>& list, F f) {
-	for (T* v : list) {
+template <class R, class F>
+auto findIn(R&& list, F f) {
+	for (auto v : list) {
 		if (f(v)) return v;
 	}
-	return nullptr;
+	return std::decay_t<std::ranges::range_value_t<R>>{};
 }
 
 // checker/utilities.go:1029 isLateBoundName.
@@ -559,11 +559,11 @@ std::invoke_result_t<F, T> firstNonNil(const std::vector<T>& ts, F&& f) {
 }
 
 // core.MapNonNil — slice→slice variant returning the mapped non-nil values.
-template <class T, class F>
-auto mapNonNil(const std::vector<T>& ts, F&& f)
-    -> std::vector<std::invoke_result_t<F, T>> {
+template <class R, class F>
+auto mapNonNil(R&& ts, F&& f) {
+	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	std::vector<std::invoke_result_t<F, T>> out;
-	for (const T& t : ts) {
+	for (auto& t : ts) {
 		auto v = f(t);
 		if (v != std::invoke_result_t<F, T>{}) {
 			out.push_back(v);

@@ -350,7 +350,7 @@ struct flattener {
 	                                             Node* pattern,
 	                                             Node* value,
 	                                             TextRange location) {
-		std::vector<Node*> elements =
+		auto elements =
 			getElementsOfBindingOrAssignmentPattern(pattern);
 		size_t numElements = elements.size();
 		if (numElements != 1) {
@@ -430,7 +430,7 @@ struct flattener {
 	                                            Node* pattern,
 	                                            Node* value,
 	                                            TextRange location) {
-		std::vector<Node*> elements =
+		auto elements =
 			getElementsOfBindingOrAssignmentPattern(pattern);
 		size_t numElements = elements.size();
 		bool allOmitted = true;

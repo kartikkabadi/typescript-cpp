@@ -21,8 +21,8 @@ namespace {
 // --- local stand-ins for helpers with no C++ equivalent (PORTING.md) ---
 
 // core.Some — true when pred(x) holds for any element.
-template <typename T, typename F>
-bool some(const std::vector<T>& v, F&& pred) {
+template <typename R, typename F>
+bool some(R&& v, F&& pred) {
 	for (auto& x : v) {
 		if (pred(x)) {
 			return true;

@@ -698,8 +698,9 @@ void Checker::checkCollisionWithGlobalObjectInGeneratedCode(Node* node,
 }
 
 bool Checker::needCollisionCheckForIdentifier(Node* node, Node* identifier,
-                                              const std::string& name) {
-	if (identifier != nullptr && identifier->text() != name) {
+                                              std::string_view name) {
+	std::string scratch;
+	if (identifier != nullptr && identifier->textView(scratch) != name) {
 		return false;
 	}
 	switch (node->kind) {

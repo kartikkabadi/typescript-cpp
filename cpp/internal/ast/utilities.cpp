@@ -22,9 +22,9 @@ namespace tsc {
 static std::atomic<NodeId> nextNodeId{0};
 static std::atomic<SymbolId> nextSymbolId{0};
 
-template <class T, class F>
-static bool someList(const std::vector<T>& ts, F&& f) {
-	for (const T& t : ts) {
+template <class F>
+static bool someList(std::span<Node* const> ts, F&& f) {
+	for (Node* t : ts) {
 		if (f(t)) {
 			return true;
 		}
@@ -310,7 +310,8 @@ bool isDottedName(Node* node) {
 }
 
 bool isPushOrUnshiftIdentifier(Node* node) {
-	const std::string& text = node->text();
+	std::string scratch;
+	std::string_view text = node->textView(scratch);
 	return text == "push" || text == "unshift";
 }
 
@@ -1018,9 +1019,12 @@ bool isGlobalSourceFile(Node* node) {
 }
 
 bool isConstTypeReference(Node* node) {
-	return isTypeReferenceNode(node) && node->typeArguments().empty() &&
-		isIdentifier(node->as<TypeReferenceNode>()->TypeName) &&
-		node->as<TypeReferenceNode>()->TypeName->text() == "const";
+	if (!(isTypeReferenceNode(node) && node->typeArguments().empty() &&
+	      isIdentifier(node->as<TypeReferenceNode>()->TypeName))) {
+		return false;
+	}
+	std::string scratch;
+	return node->as<TypeReferenceNode>()->TypeName->textView(scratch) == "const";
 }
 
 bool isConstAssertion(Node* node) {
@@ -1496,7 +1500,7 @@ static bool isPartOfTypeNodeInParent(Node* node) {
 	case Kind::CallExpression:
 	case Kind::NewExpression:
 	case Kind::TaggedTemplateExpression: {
-		std::vector<Node*> typeArgs = parent->typeArguments();
+		auto typeArgs = parent->typeArguments();
 		return std::find(typeArgs.begin(), typeArgs.end(), node) !=
 		       typeArgs.end();
 	}
@@ -1824,7 +1828,7 @@ bool childIsDecorated(bool useLegacyDecorators, Node* node, Node* parent) {
 }
 
 AllAccessorDeclarations getAllAccessorDeclarationsForDeclaration(
-	Node* accessor, const std::vector<Node*>& declarationsOfSymbol) {
+	Node* accessor, std::span<Node* const> declarationsOfSymbol) {
 	Kind otherKind{};
 	if (accessor->kind == Kind::SetAccessor) {
 		otherKind = Kind::GetAccessor;
@@ -1872,12 +1876,12 @@ AllAccessorDeclarations getAllAccessorDeclarationsForDeclaration(
 }
 
 AllAccessorDeclarations getAllAccessorDeclarations(
-	const std::vector<Node*>& parentDeclarations, Node* accessor) {
+	std::span<Node* const> parentDeclarations, Node* accessor) {
 	if (hasDynamicName(accessor)) {
 		// dynamic names can only be match up via checker symbol lookup, just
 		// return an object with just this accessor
 		return getAllAccessorDeclarationsForDeclaration(accessor,
-		                                                {accessor});
+		                                                {&accessor, 1});
 	}
 
 	std::string accessorName = getPropertyNameForPropertyNameNode(accessor->name());
@@ -1929,7 +1933,7 @@ std::string getPropertyNameForPropertyNameNode(Node* name) {
 
 Node* getThisParameter(Node* signature) {
 	// callback tags do not currently support this parameters
-	std::vector<Node*> parameters = signature->parameters();
+	auto parameters = signature->parameters();
 	if (!parameters.empty()) {
 		Node* thisParameter = parameters[0];
 		if (isThisParameter(thisParameter)) {

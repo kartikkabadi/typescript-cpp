@@ -10,9 +10,9 @@ plus the pathological single file `tsc/testdata/tests/cases/compiler/deeplyNeste
 | workload                              | before        | latest        |
 |---------------------------------------|---------------|---------------|
 | `tscpp check deeplyNestedMappedTypes` | ~130 s        | **0.40–0.43 s** (byte-identical to checkdump oracle) |
-| `tsc -p` emit (perfproj, med ratio)   | ~1.95× slower | **~1.16–1.42× slower** (very noisy VM) |
-| `tsc -p` --noEmit                     | ~2.33× slower | **~1.18–1.44×** |
-| `tsc -p` --declaration                | ~2.37× slower | **~1.16–1.25×** |
+| `tsc -p` emit (perfproj, med ratio)   | ~1.95× slower | **~1.16–1.42× slower** (very noisy VM; latest RUNS=9 medians 1.19×) |
+| `tsc -p` --noEmit                     | ~2.33× slower | **~1.17–1.44×** (latest 1.25×) |
+| `tsc -p` --declaration                | ~2.37× slower | **~0.995–1.25×** (latest 1.11×; hit parity on one RUNS=7 set) |
 | `tsc -p` parse phase                  | 0.107 s vs Go 0.035 s | **~0.063–0.066 s** |
 | `mprotect` syscalls per `tsc -p` run  | 21,635        | **22** (mimalloc) |
 | decl-emit peak RSS                    | ~460 MB gate  | **323 MB** |
@@ -198,6 +198,52 @@ glibc malloc ~9% are gone; mimalloc's own cost shows up as `operator new[]`
 5. **`Checker::compareNodes` 2.21% + `getSourceFileOfNode` 1.90%** —
    `compareSymbolsWorker` sorts compare nodes across files; mirrors Go's
    parent-walk (`ast/utilities.go:861`) exactly — faithful, no port gap.
+
+## Phase 3: vector-by-value accessors → NodeSlice views; sv name-resolution path
+
+Post-mimalloc profile showed `new[]`+`memcpy`+`free` ~9.7% — Go returns slice
+headers where we returned `std::vector<Node*>` by value. Converted the hottest
+accessor family (`Node::{modifierNodes,arguments,typeArguments,typeParameters,
+members,statements,elements,properties,comments,parameters}` +
+`getElementsOfBindingOrAssignmentPattern`) to return **`NodeSlice`**: a
+`std::span<Node* const>` wrapper that also implicitly converts to
+`std::vector<Node*>` at legacy mutation/`const vector&` boundaries — read
+sites get zero-copy views, write sites materialize exactly the same copy as
+before. ~50 file-local `const std::vector<T>` helper templates were widened to
+generic `R&&` ranges (~25 files) so views reach leaf code. Result: accessor
+copies eliminated from the profile (`typeArguments` 0.37%→0.24% flat, no
+vector-copy inside); `new[]` 3.71%→3.23%.
+
+Also converted the name-resolution path to `std::string_view` end to end:
+`resolveName`/`NameResolver::resolve`/`lookupOrDefault`/`getSymbol`/
+`getSuggestionForSymbolNameLookup` now take `std::string_view`, with
+`getSymbolFromTableView` (symbol.h) doing heterogeneous bucket-walk finds —
+libstdc++ hashes `string_view` via the same `_Hash_bytes` digest as `string`
+and buckets as `h % bucket_count()`, verified equal to `find()` on 200K keys.
+Previously every `resolveName(loc, x->text(), …)` materialized the temp twice
+(`text()` copy + `std::string(name)` at the resolve boundary). Top compare-only
+`text()` callers converted to `textView`: `checkContextualIdentifier` (90.8K
+calls), `isConstTypeReference` (88.1K), `needCollisionCheckForIdentifier`
+(56K), `resolveEntityName` (44K), `isThisInTypeQuery`/`isThisIdentifier`
+(24.5K+4.7K), `getResolvedSymbol` (12.8K), `isPushOrUnshiftIdentifier`,
+`checkPrivateIdentifier`, grammar checks, `checkParameter`.
+
+Also kept from earlier phase-3 work: lazy `TraceScope` args — `tracing.h`
+gains a `MakeArgs` factory overload so `TraceArgs{...}` only materializes
+when a tracer is attached (call sites in checker_walk/declchecks2/emitter/
+fileloader/program wrap args in `[&]{ return TraceArgs{...}; }`). Previously
+the eager `TraceArgs` (an `unordered_map<string,any>` with `new[]` allocs)
+was built on every traced call including the null-tracer case — the top
+`operator new[]` caller at 299,849 allocations.
+
+Skipped: `Node::text()` itself (1,437 call sites — most store or pass the
+string onward; mass conversion is out of scope), `getDeclarationName`
+(returns `std::string` by contract), scanner `tokenValue` string_view
+(attempted — heap-corruption SIGSEGV from dangling views into moved
+ScannerState; reverted permanently).
+
+Gates re-verified: deep file byte-identical, 300/300 check smoke, emit + decl
+`diff -r` identical to tsgo, decl RSS 326 MB, tsctestrunner 99/99.
 
 ## Known bugs found while profiling (not fixed here)
 

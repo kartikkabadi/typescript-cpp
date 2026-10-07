@@ -175,7 +175,8 @@ void Checker::checkSourceFile(SourceFile* sourceFile, bool checkUnused) {
 	if (!links->typeChecked) {
 		traceCheckSourceFile.emplace(
 		    tracer, tracing::PhaseCheck, "checkSourceFile",
-		    tracing::TraceArgs{{"path", sourceFile->FileName()}}, true);
+		    [&] { return tracing::TraceArgs{{"path", sourceFile->FileName()}}; },
+		    true);
 		checkGrammarSourceFile(sourceFile);
 		renamedBindingElementsInTypes.clear();
 		checkSourceElements(sourceFile->Statements->nodes);
@@ -204,7 +205,7 @@ void Checker::checkSourceFile(SourceFile* sourceFile, bool checkUnused) {
 	activeCheckFile = nullptr;
 }
 
-void Checker::checkSourceElements(const std::vector<Node*>& nodes) {
+void Checker::checkSourceElements(std::span<Node* const> nodes) {
 	for (Node* node : nodes) {
 		if (isCanceled()) {
 			break;
@@ -464,7 +465,7 @@ bool Checker::checkSourceElementUnreachable(Node* node) {
 
 	Node* parent = node->parent;
 	if (parent != nullptr && parent->canHaveStatements()) {
-		std::vector<Node*> statements = parent->statements();
+		auto statements = parent->statements();
 		auto it = std::find(statements.begin(), statements.end(), node);
 		if (it != statements.end()) {
 			size_t offset = static_cast<size_t>(it - statements.begin());
@@ -566,11 +567,13 @@ void Checker::checkDeferredNode(Node* node) {
 	// {"kind","pos","end","path"}, false)()`.
 	tracing::TraceScope traceDeferredNode(
 	    tracer, tracing::PhaseCheck, "checkDeferredNode",
-	    tracing::TraceArgs{
-	        {"kind", node->kind},
-	        {"pos", node->pos()},
-	        {"end", node->end()},
-	        {"path", getSourceFileOfNode(node)->FileName()}},
+	    [&] {
+	        return tracing::TraceArgs{
+	            {"kind", node->kind},
+	            {"pos", node->pos()},
+	            {"end", node->end()},
+	            {"path", getSourceFileOfNode(node)->FileName()}};
+	    },
 	    false);
 	Node* saveCurrentNode = currentNode;
 	currentNode = node;
@@ -830,11 +833,13 @@ Type* Checker::checkExpressionEx(Node* node, CheckMode checkMode) {
 	// {"kind","pos","end","path"}, false)()`.
 	tracing::TraceScope traceCheckExpression(
 	    tracer, tracing::PhaseCheck, "checkExpression",
-	    tracing::TraceArgs{
-	        {"kind", node->kind},
-	        {"pos", node->pos()},
-	        {"end", node->end()},
-	        {"path", getSourceFileOfNode(node)->FileName()}},
+	    [&] {
+	        return tracing::TraceArgs{
+	            {"kind", node->kind},
+	            {"pos", node->pos()},
+	            {"end", node->end()},
+	            {"path", getSourceFileOfNode(node)->FileName()}};
+	    },
 	    false);
 	Node* saveCurrentNode = currentNode;
 	currentNode = node;

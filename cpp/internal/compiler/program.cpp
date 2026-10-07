@@ -435,7 +435,9 @@ void SimpleProgram::BindSourceFiles() {
 				// program.go:578 — `defer tr.Push(..., "bindSourceFile", ...)`.
 				tracing::TraceScope tracePop(
 				    tr_, tracing::PhaseBind, "bindSourceFile",
-				    tracing::TraceArgs{{"path", std::string(file->Path())}},
+				    [&] {
+				        return tracing::TraceArgs{{"path", std::string(file->Path())}};
+				    },
 				    true);
 				bindSourceFile(file);
 			});
@@ -1439,8 +1441,9 @@ bool SimpleProgram::SourceFileMayBeEmitted(SourceFile* sourceFile,
 // emits sequentially (identical observable results).
 EmitResult* SimpleProgram::Emit(EmitOptions* options) {
 	// program.go:1868 — `defer tr.Push(PhaseEmit, "emit", nil, true)()`.
-	tracing::TraceScope emitTraceGuard(tr_, tracing::PhaseEmit, "emit", {},
-	                                   true);
+	tracing::TraceScope emitTraceGuard(
+	    tr_, tracing::PhaseEmit, "emit",
+	    [&] { return tracing::TraceArgs{}; }, true);
 
 	if (!options->ForceEmit &&
 	    options->EmitOnly != EmitOnly::EmitOnlyBuilderSignature) {
