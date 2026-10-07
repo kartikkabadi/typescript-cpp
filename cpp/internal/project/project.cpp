@@ -529,8 +529,8 @@ bool Project::ShouldTriggerATA(uint64_t snapshotID) {
 // Project.ComputeTypingsInfo — project.go:675.
 ata::TypingsInfo Project::ComputeTypingsInfo() {
 	return ata::TypingsInfo{
-	    .CompilerOptions = CommandLine->CompilerOptions(),
 	    .TypeAcquisition = GetTypeAcquisition(),
+	    .CompilerOptions = CommandLine->CompilerOptions(),
 	    .UnresolvedImports = GetUnresolvedImports(),
 	};
 }
