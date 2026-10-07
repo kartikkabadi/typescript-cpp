@@ -339,11 +339,11 @@ void organizeImportsWorker(
 		}
 
 		change::NodeOptions options{
+		    .Suffix = "\n",
 		    .leadingTrivia =
 		        change::LeadingTriviaOptionExclude, // Preserve header comment
 		    .trailingTrivia =
 		        change::TrailingTriviaOptionInclude,
-		    .Suffix = "\n",
 		};
 
 		std::vector<Node*> newNodes;
