@@ -1210,7 +1210,14 @@ Server::handleCodeLensResolve(
 			    ? &*initializationOptions->CodeLensShowLocationsCommandName
 			    : nullptr,
 			orchestrator.get());
-		return {std::shared_ptr<lsproto::CodeLens>(r.first), r.second};
+		// Go returns the same *CodeLens as the request params
+		// (GC-shared). Alias codeLens' ownership so the response doesn't
+		// own a second control block over the request item — a plain
+		// shared_ptr(r.first) would delete it while params still holds
+		// it (writer-thread UAF). Same fix as
+		// handleCompletionItemResolve.
+		return {std::shared_ptr<lsproto::CodeLens>(codeLens, r.first),
+		        r.second};
 	} catch (...) {
 		recover_(reqMsg);
 		return {nullptr, nullptr};

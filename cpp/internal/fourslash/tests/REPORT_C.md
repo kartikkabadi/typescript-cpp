@@ -70,16 +70,21 @@ returns `0/0` — the match is case-sensitive; run as
 
 ## Divergence clusters (new tests, by root-cause hypothesis)
 
-1. **Content-mapper project wiring** (~40 fails). `[-32603] no project found for
+1. ~~**Content-mapper project wiring** (~40 fails).~~ **FIXED** — see
+   "Divergences found and fixed" below. `[-32603] no project found for
    URI file:///...` on mapped `.astro/.vue/.svelte/.ol` documents across codeLens,
    diagnostics, hover, completion, rename, signatureHelp, documentSymbol,
-   foldingRange, formatting, selectionRange, documentHighlights. Faithful port of
-   `contentmappertest::NewSpawner` + `FourslashOptions.ContentMapperSpawner`;
-   the mapped files never get a project attached server-side. Left FAILING —
-   product divergence, owned elsewhere.
-2. **codeLens SEGV/UAF** (~10 fails). `TestCodeLens*` and
+   foldingRange, formatting, selectionRange, documentHighlights.
+   `TestContentMapper*`: 4/55 → **55/55**.
+2. **codeLens SEGV/UAF** (~10 fails → ~5 remaining). `TestCodeLens*` and
    `TestContentMapper*CodeLens` die with signal 11 (one `free(): invalid pointer`
-   abort). Ownership/lifetime bug in the codelens slice — left FAILING.
+   abort). The `TestContentMapper*CodeLens` family is **FIXED** (writer-thread
+   UAF in `handleCodeLensResolve` — see below). Plain `TestCodeLensAcrossProjects`
+   still SEGVs and `TestCodeLensOnFunctionAcrossProjects1` resolves to a
+   baseline diff (1 reference vs expected 2 — the cross-project orchestrator
+   never visits the second project); on the un-fixed tree the latter timed
+   out instead. Both remain — cross-project orchestrator/project-tree
+   divergence, owned by another cluster.
 3. **Declaration-map state baseline hangs** (~25 timeouts). `tests_c_statemaps` +
    `TestDeclarationMaps*`: `// @stateBaseline: true` tests on
    project-reference declaration maps time out in the child (SIGALRM kill).
@@ -111,6 +116,68 @@ returns `0/0` — the match is case-sensitive; run as
    `TestWorkspaceSymbolMultiProjectNonExistentRef` (signal 11) and siblings —
    per-test alarm fired; consistent with #1/#3 (multi-project/project-reference
    machinery).
+
+## Divergences found and fixed
+
+### Cluster 1 — content-mapper project wiring (`TestContentMapper*`, 4/55 → 55/55)
+
+Four independent port bugs hid behind the same `no project found for URI`
+symptom; all fixed faithfully against the Go source.
+
+1. **Loader never learned the mapper extensions** (`cpp/internal/compiler/
+   program.cpp`). `SimpleProgram`'s loader called
+   `tsoptions::getSupportedExtensions(&options, {})` and
+   `SimpleProgram::GetSourceFileFromReference` called
+   `tsoptions::GetSupportedExtensions(&options, {})`. Go passes
+   `opts.Config.ContentMapperExtensions()` at `fileloader.go:158` and
+   `CommandLine().ContentMapperExtensions()` at `program.go:248`. With `{}`,
+   `addRootFileTask`/`parseTask::load` rejected `.vue/.astro/.svelte/.ol` root
+   files as unsupported before `parseContentMappedFile` could run — the file
+   stayed in `commandLine.FileNames` but never entered `Program.SourceFiles`,
+   so `session.GetDefaultProject` found no project containing it
+   (`[-32603] no project found for URI`). Fixed by passing
+   `commandLine_->ContentMapperExtensions()` at both sites (the
+   `string_view` span aliases `loader.contentMapperExtensions`, which
+   outlives loader use).
+
+2. **`codeLens/resolve` double-owner UAF → deadlock** (`cpp/internal/lsp/
+   lsp_handlers.cpp`). `handleCodeLensResolve` wrapped the resolved
+   `*CodeLens` — the same object owned by the request params — in a fresh
+   `shared_ptr`, giving it two independent control blocks. When the params
+   owner died, the object was deleted while the response's `AnyValue` still
+   pointed into it; the writer thread then marshaled freed memory,
+   producing invalid JSON (`data.uri`/`command.command` first-8-byte
+   tcache stamp) that killed the client MessageRouter and deadlocked the
+   test. Fixed with the aliasing shared_ptr (`shared_ptr(codeLens,
+   r.first)`) — the same pattern already used by
+   `handleCompletionItemResolve`. NOTE: touches the shared
+   `lsp_handlers.cpp` codelens path — required by this cluster, minimal
+   edit; plain (non-mapper) `TestCodeLensAcrossProjects` SEGV remains with
+   the cross-project cluster.
+
+3. **`cmp` ignore-paths dropped inside arrays** (`cpp/internal/fourslash/
+   fourslash_deps.h`, shared test-harness helper). `domEqual` recursed
+   into `Array` elements with `{}` instead of `opts`, so
+   `diagnosticsIgnoreOpts` never ignored `.Severity`/`.Source`/
+   `.RelatedInformation` on `Diagnostic[]` elements.
+   `TestContentMapperTransformFailureDiagnostics` fixed; minimal edit to a
+   shared helper.
+
+4. **Three-way comparator passed straight to `std::stable_sort`**
+   (`cpp/internal/testutil/tsbaseline/error_baseline.cpp`, shared
+   tsbaseline helper). `iterateErrorBaseline` gave Go's `func(a,b) int`
+   comparator to `std::stable_sort`, which expects a bool `<` predicate —
+   any nonzero result read as `true`, producing an invalid ordering and
+   unsorted baseline output (`TestContentMapperDiagnostics`). Wrapped as
+   `compareDiagnostics(a,b) < 0`; minimal edit to a shared helper.
+
+Verification: `fourslashrunner -run 'TestContentMapper'` = **55/55 PASS**
+(was 4/55 at branch point). `-run 'TestOrganizeImports|TestCallHierarchy'`
+= 130/131 — the single `TestCallHierarchyAcrossProject` SIGSEGV is
+pre-existing on the un-fixed tree (same for `TestCodeLensAcrossProjects`
+SEGV and `TestCodeLensOnFunctionAcrossProjects1`, which timed out there).
+All `TestContentMapper*` and `*CodeLens`/`Diagnostics` name-filter runs
+clean.
 
 ## Fixed vs left
 

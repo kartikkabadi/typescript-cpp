@@ -91,8 +91,13 @@ std::vector<std::string> iterateErrorBaseline(
 	std::vector<diagnosticwriter::Diagnostic*> diagnostics;
 	diagnostics.reserve(inputDiagnostics.size());
 	for (auto* d : inputDiagnostics) diagnostics.push_back(d);
+	// compareDiagnostics is a Go-style three-way comparator; adapt it
+	// to the strict-weak-ordering predicate std::stable_sort expects.
 	std::stable_sort(diagnostics.begin(), diagnostics.end(),
-	                 compareDiagnostics);
+	                 [&](diagnosticwriter::Diagnostic* a,
+	                     diagnosticwriter::Diagnostic* b) {
+		                 return compareDiagnostics(a, b) < 0;
+	                 });
 
 	std::string outputLines;
 	// Count up all errors that were found in files other than lib.d.ts so

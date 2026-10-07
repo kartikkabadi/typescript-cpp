@@ -363,8 +363,15 @@ SimpleProgram::SimpleProgram(CompilerHost* host_,
 	loader.useCaseSensitiveFileNames = host->FS()->UseCaseSensitiveFileNames();
 	// fileloader.go:178 — extensions the configured content mappers claim.
 	loader.contentMapperExtensions = commandLine_->ContentMapperExtensions();
-	loader.supportedExtensions =
-	    tsoptions::getSupportedExtensions(&options, {});
+	// fileloader.go:158 — extraExtensions =
+	// Config.ContentMapperExtensions(); the views alias
+	// loader.contentMapperExtensions, which outlives their use inside the
+	// loader.
+	loader.supportedExtensions = tsoptions::getSupportedExtensions(
+	    &options,
+	    std::vector<std::string_view>(
+	        loader.contentMapperExtensions.begin(),
+	        loader.contentMapperExtensions.end()));
 	loader.supportedExtensionsWithJsonIfResolveJsonModule =
 	    tsoptions::getSupportedExtensionsWithJsonIfResolveJsonModule(
 	        &options, loader.supportedExtensions);
@@ -1387,7 +1394,7 @@ SourceFile* SimpleProgram::GetSourceFileFromReference(SourceFile* origin,
 	std::string fileName = tspath::resolvePath(
 	    tspath::getDirectoryPath(origin->FileName()), {ref->FileName});
 	auto* supportedExtensionsBase = tsoptions::GetSupportedExtensions(
-	    &options, {}); // CommandLine().ContentMapperExtensions() — none here
+	    &options, commandLine_->ContentMapperExtensions());
 	auto* supportedExtensions =
 	    tsoptions::GetSupportedExtensionsWithJsonIfResolveJsonModule(
 	        &options, supportedExtensionsBase);
