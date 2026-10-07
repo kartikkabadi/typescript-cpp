@@ -2040,6 +2040,7 @@ public:
 	Node* getThisContainer(Node* node, bool includeArrowFunctions,
 	                       bool includeClassComputedPropertyName);
 	void sortSymbols(std::vector<Symbol*>& symbols);
+	void sortSymbols(std::span<Symbol*> symbols);
 	int compareNodes(Node* n1, Node* n2);
 	int compareSymbolsWorker(Symbol* s1, Symbol* s2);
 	int compareSymbolChainsWorker(const std::vector<Symbol*>& a,

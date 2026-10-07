@@ -39,6 +39,11 @@ struct RawSourceMap;
 namespace tsc::tracing {
 class Tracing;
 }
+namespace tsc {
+// core/workgroup.go — forward decl so filesParser can hold one without
+// pulling utilities.h in; destructor lives in fileloader.cpp.
+struct workGroup;
+}
 
 namespace tsc::compiler {
 
@@ -306,6 +311,10 @@ struct processingDiagnostic {
 
 // --- includeprocessor.go ---
 struct includeProcessor {
+	// arenaMu guards the three arenas below — parse workers allocate
+	// reasons/diagnostics concurrently inside their per-path data.mu
+	// critical sections (Go: heap alloc under GC).
+	std::mutex arenaMu;
 	std::unordered_map<tspath::Path,
 	                   std::vector<const FileIncludeReason*>>
 	    fileIncludeReasons;
@@ -326,6 +335,7 @@ struct includeProcessor {
 
 	const FileIncludeReason* newReason(FileIncludeKind kind,
 	                                   FileIncludeReason::DataV data) {
+		std::lock_guard<std::mutex> lock(arenaMu);
 		return reasonArena
 		    ->emplace_back(
 		        std::make_unique<FileIncludeReason>(FileIncludeReason{kind,
@@ -336,6 +346,7 @@ struct includeProcessor {
 	    processingDiagnosticKind k,
 	    std::variant<const FileIncludeReason*, includeExplainingDiagnostic>
 	        d) {
+		std::lock_guard<std::mutex> lock(arenaMu);
 		return processingDiagArena
 		    ->emplace_back(
 		        std::make_unique<processingDiagnostic>(
@@ -397,6 +408,9 @@ struct resolvedRef {
 struct filesLoader;
 struct parseTask;
 struct parseTaskData {
+	// filesparser.go:27 — one mutex per path's data; every read/write of the
+	// fields below happens under it on the parallel parse path (Go: data.mu).
+	std::mutex mu;
 	// map of tasks by file casing
 	std::unordered_map<std::string, parseTask*> tasks;
 	int lowestDepth = INT32_MAX;
@@ -446,19 +460,42 @@ struct parseTask {
 
 struct filesLoader;
 
-// filesParser — DFS file graph walker.
+// filesParser — DFS file graph walker. Runs the file graph in parallel
+// through a work group when the program isn't single-threaded (Go:
+// filesParser.start queues each task on core.WorkGroup).
 struct filesParser {
 	filesLoader* loader{};
 	int maxDepth{};
+	bool singleThreaded{};
+	~filesParser(); // out-of-line: tsc::workGroup is incomplete here
+	// filesparser.go:20 — Go's collections.SyncMap[path]*parseTaskData;
+	// the map itself is only touched under taskDataMapMu (LoadOrStore).
 	std::unordered_map<tspath::Path, std::unique_ptr<parseTaskData>>
 	    taskDataByPath;
+	std::mutex taskDataMapMu;
+	// arenaMu guards both allocation arenas: newTask runs inside per-path
+	// data.mu critical sections that overlap across paths (Go: GC).
+	std::mutex arenaMu;
 	std::vector<std::unique_ptr<parseTask>> taskArena;
-	NodeFactory factory; // synthetic imports only
+	NodeFactory factory; // synthetic imports only (guarded by filesLoader::factoryMu)
 	// arena for empty ResolvedModule sentinels (Go: &module.ResolvedModule{})
 	std::deque<module::ResolvedModule> resolvedModuleArena;
+	// Keep-alive for shared_ptr<ResolvedModule> results stored as raw
+	// pointers in per-file resolutionsInFile maps. The resolver cache
+	// uses LoadOrStore, so a result that loses a concurrent store isn't
+	// owned by the cache (Go: GC keeps every result alive). Moved to
+	// SimpleProgram when loading completes.
+	std::vector<std::shared_ptr<module::ResolvedModule>>
+	    resolvedModuleKeepAlive;
+	// filesparser.go:21 — Go's w.wg; created in getProcessedFiles.
+	std::unique_ptr<tsc::workGroup> wg;
+
+	filesParser() = default;
+	filesParser(const filesParser&) = delete;
 
 	// task arena helpers
 	parseTask* newTask(const std::string& normalizedFilePath) {
+		std::lock_guard<std::mutex> lock(arenaMu);
 		auto* t = taskArena.emplace_back(std::make_unique<parseTask>()).get();
 		t->normalizedFilePath = normalizedFilePath;
 		return t;
@@ -537,9 +574,16 @@ struct filesLoader {
 	// populated like Go.)
 	gostd::Error moduleResolutionError;
 	// fileloader.go:58-59 — counts feeding map/vector capacity hints
-	// (atomics in Go; the C++ parser is single-threaded).
-	int32_t totalFileCount = 0;
-	int32_t libFileCount = 0;
+	// (atomic.Int32 in Go; parse workers increment them in parallel).
+	std::atomic<int32_t> totalFileCount{0};
+	std::atomic<int32_t> libFileCount{0};
+	// factoryMu — fileloader.go:58. Guards parser->factory during synthetic
+	// import creation on parallel parse workers.
+	std::mutex factoryMu;
+	// libMu serializes pathForLibFile's cache fills (Go: the
+	// pathForLibFileCache/pathForLibFileResolutions SyncMaps); only a
+	// handful of lib files, so one lock for both maps.
+	std::mutex libMu;
 
 	std::string defaultLibraryPath;
 	bool useCaseSensitiveFileNames{};
@@ -904,6 +948,13 @@ public:
 	// this the libFiles values dangle after createProgram returns.
 	std::unordered_map<std::string, std::unique_ptr<LibFile>>
 	    pathForLibFileCache;
+	// Unresolved-resolution placeholders created during file loading
+	// (raw ResolvedModule* live in per-file resolutionsInFile maps;
+	// Go: GC keeps them alive). Moved in from filesParser when loading
+	// completes — deque so element addresses are stable across moves.
+	std::deque<module::ResolvedModule> resolvedModuleArena;
+	std::vector<std::shared_ptr<module::ResolvedModule>>
+	    resolvedModuleKeepAlive;
 	std::vector<std::string> missingFiles;
 	std::unordered_map<tspath::Path, std::vector<std::string>>
 	    redirectTargetsMap;

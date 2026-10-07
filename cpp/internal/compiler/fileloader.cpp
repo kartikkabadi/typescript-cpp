@@ -106,6 +106,9 @@ static std::string getLibraryNameFromLibFileName(
 
 // fileloader.go:961 pathForLibFile
 LibFile* filesLoader::pathForLibFile(const std::string& name) {
+	// Serializes the cache fills — called concurrently by parse workers
+	// (Go: pathForLibFileCache / pathForLibFileResolutions are SyncMaps).
+	std::lock_guard<std::mutex> lock(libMu);
 	if (auto it = pathForLibFileCache.find(name);
 	    it != pathForLibFileCache.end())
 		return it->second.get();
@@ -126,6 +129,13 @@ LibFile* filesLoader::pathForLibFile(const std::string& name) {
 		auto [resolutionShared, libTrace] = resolver->ResolveModuleName(
 		    libraryName, resolveFrom, ModuleKind::CommonJS, nullptr);
 		module::ResolvedModule* resolution = resolutionShared.get();
+		if (resolution != nullptr) {
+			// raw ptr outlives resolutionShared — keep the result alive
+			// (cache.LoadOrStore losers aren't owned by the cache).
+			std::lock_guard<std::mutex> arenaLock(parser->arenaMu);
+			parser->resolvedModuleKeepAlive.push_back(
+			    std::move(resolutionShared));
+		}
 		if (resolution != nullptr && resolution->IsResolved()) {
 			path = resolution->ResolvedFileName;
 			replaced = true;
@@ -144,6 +154,9 @@ LibFile* filesLoader::pathForLibFile(const std::string& name) {
 // fileloader.go:951 createSyntheticImport
 Node* filesLoader::createSyntheticImport(const std::string& text,
                                          SourceFile* file) {
+	// fileloader.go:58 — the loader's NodeFactory is shared; Go guards it
+	// with factoryMu because imports can be synthesized on parse workers.
+	std::lock_guard<std::mutex> lock(factoryMu);
 	Node* moduleReference =
 	    parser->factory.newStringLiteral(text, TokenFlagsNone);
 	Node* importDecl = parser->factory.newImportDeclaration(
@@ -924,8 +937,15 @@ void filesLoader::resolveImportsAndModuleAugmentations(parseTask* t) {
 			module::ResolvedModule* resolvedModule =
 			    resolvedShared.get();
 			if (resolvedModule == nullptr) {
+				std::lock_guard<std::mutex> arenaLock(parser->arenaMu);
 				resolvedModule =
 				    &parser->resolvedModuleArena.emplace_back();
+			} else {
+				// Raw pointer kept in resolutionsInFile — anchor the
+				// shared_ptr so LoadOrStore losers stay alive (Go: GC).
+				std::lock_guard<std::mutex> arenaLock(parser->arenaMu);
+				parser->resolvedModuleKeepAlive.push_back(
+				    std::move(resolvedShared));
 			}
 			resolutionsInFile[module::ModeAwareCacheKey{
 			    std::string(moduleName), mode}] = resolvedModule;
@@ -1980,9 +2000,14 @@ void filesParser::load(parseTask* t) {
 }
 
 // filesparser.go:269 filesParser.start (single-threaded DFS)
+// filesparser.go:269 filesParser.start — each task is queued on the work
+// group; the task body runs under its path's parseTaskData mutex (Go:
+// `data.mu`). The taskDataByPath table itself is SyncMap-equivalent via
+// taskDataMapMu.
 void filesParser::start(const std::vector<parseTask*>& tasks, int depth) {
 	for (auto* task : tasks) {
 		task->path = loader->toPath(task->normalizedFilePath);
+		std::unique_lock<std::mutex> mapLock(taskDataMapMu);
 		auto& dataSlot = taskDataByPath[task->path];
 		parseTaskData* data;
 		bool loaded;
@@ -1995,54 +2020,66 @@ void filesParser::start(const std::vector<parseTask*>& tasks, int depth) {
 			data = dataSlot.get();
 			loaded = true;
 		}
+		mapLock.unlock();
 
-		bool startSubtasks = false;
-		if (loaded) {
-			if (auto it = data->tasks.find(task->normalizedFilePath);
-			    it != data->tasks.end()) {
-				task->loadedTask = it->second;
-			} else {
-				data->tasks[task->normalizedFilePath] = task;
-				// new task for file name — load subtasks if there was
-				// loading for any other casing
-				startSubtasks = data->startedSubTasks;
-			}
-		}
+		wg->Queue([this, task, data, loaded, depth] {
+			std::lock_guard<std::mutex> dataLock(data->mu);
 
-		// Propagate PackageId to data if we have one and data doesn't yet
-		if (data->PackageId.Name.empty() && !task->PackageId.Name.empty()) {
-			data->PackageId = task->PackageId;
-		}
-
-		int currentDepth =
-		    task->increaseDepth ? depth + 1 : depth;
-		if (currentDepth < data->lowestDepth) {
-			// reprocess subtasks to ensure they are loaded
-			data->lowestDepth = currentDepth;
-			startSubtasks = true;
-			data->startedSubTasks = true;
-		}
-
-		if (task->elideOnDepth && currentDepth > maxDepth) {
-			continue;
-		}
-
-		for (auto& [name, taskByFileName] : data->tasks) {
-			bool loadSubTasks = startSubtasks;
-			if (!taskByFileName->loaded) {
-				load(taskByFileName);
-				if (taskByFileName->redirectedParseTask != nullptr) {
-					loadSubTasks = true;
-					data->startedSubTasks = true;
+			bool startSubtasks = false;
+			if (loaded) {
+				if (auto it = data->tasks.find(task->normalizedFilePath);
+				    it != data->tasks.end()) {
+					task->loadedTask = it->second;
+				} else {
+					data->tasks[task->normalizedFilePath] = task;
+					// new task for file name — load subtasks if there
+					// was loading for any other casing
+					startSubtasks = data->startedSubTasks;
 				}
 			}
-			if (!taskByFileName->startedSubTasksTask && loadSubTasks) {
-				taskByFileName->startedSubTasksTask = true;
-				start(taskByFileName->subTasks, data->lowestDepth);
+
+			// Propagate PackageId to data if we have one and data
+			// doesn't yet
+			if (data->PackageId.Name.empty() &&
+			    !task->PackageId.Name.empty()) {
+				data->PackageId = task->PackageId;
 			}
-		}
+
+			int currentDepth =
+			    task->increaseDepth ? depth + 1 : depth;
+			if (currentDepth < data->lowestDepth) {
+				// reprocess subtasks to ensure they are loaded
+				data->lowestDepth = currentDepth;
+				startSubtasks = true;
+				data->startedSubTasks = true;
+			}
+
+			if (task->elideOnDepth && currentDepth > maxDepth) {
+				return;
+			}
+
+			for (auto& [name, taskByFileName] : data->tasks) {
+				bool loadSubTasks = startSubtasks;
+				if (!taskByFileName->loaded) {
+					load(taskByFileName);
+					if (taskByFileName->redirectedParseTask !=
+					    nullptr) {
+						loadSubTasks = true;
+						data->startedSubTasks = true;
+					}
+				}
+				if (!taskByFileName->startedSubTasksTask &&
+				    loadSubTasks) {
+					taskByFileName->startedSubTasksTask = true;
+					start(taskByFileName->subTasks,
+					      data->lowestDepth);
+				}
+			}
+		});
 	}
 }
+
+filesParser::~filesParser() = default;
 
 // filesparser.go:330 getProcessedFiles — collectFiles
 // `seen` dedupes by shared parseTaskData (multiple file-name casings for one
@@ -2466,6 +2503,7 @@ void filesLoader::processAllProgramFiles(
 		addAutomaticTypeDirectiveTasks();
 	}
 
+	parser->singleThreaded = singleThreaded;
 	parser->getProcessedFiles(rootTasks);
 }
 
@@ -2473,8 +2511,11 @@ void filesLoader::processAllProgramFiles(
 // lib-sort / allFiles / redirect-index / libResolution tail.
 void filesParser::getProcessedFiles(
     const std::vector<parseTask*>& tasks) {
-	// parse() — single-threaded DFS.
+	// filesparser.go:327-328 — parse() queues every task on the work
+	// group and blocks until it drains (parallel unless singleThreaded).
+	wg.reset(tsc::newWorkGroup(singleThreaded));
 	start(tasks, 0);
+	wg->RunAndWait();
 
 	// fileloader.go:223-224 — the mapper's loader and host links are
 	// severed once parsing ends so reuse can detect a stale loader and a

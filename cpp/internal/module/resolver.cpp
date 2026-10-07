@@ -149,10 +149,9 @@ DefaultResolver* NewResolver(ResolverOptions opts) {
 	return new DefaultResolver(std::move(opts));
 }
 
-tracer* DefaultResolver::newTraceBuilder() {
+std::unique_ptr<tracer> DefaultResolver::newTraceBuilder() {
 	if (compilerOptions->TraceResolution == Tristate::True) {
-		traceBuilderStorage = tracer{};
-		return &traceBuilderStorage;
+		return std::make_unique<tracer>();
 	}
 	return nullptr;
 }
@@ -190,7 +189,7 @@ DefaultResolver::ResolveTypeReferenceDirective(
     const ResolvedProjectReference* redirectedReference) {
 	auto containingDirectory =
 	    tspath::getDirectoryPath(containingFile);
-	tracer* traceBuilder = newTraceBuilder();
+	auto traceBuilder = newTraceBuilder();
 
 	bool fromInferredTypesContainingFile =
 	    containingFile.ends_with(InferredTypesContainingFile);
@@ -228,7 +227,7 @@ DefaultResolver::ResolveTypeReferenceDirective(
 	auto state = newResolutionState(
 	    std::string{typeReferenceDirectiveName}, containingDirectory,
 	    true /*isTypeReferenceDirective*/, resolutionMode, options,
-	    redirectedReference, this, traceBuilder);
+	    redirectedReference, this, traceBuilder.get());
 	auto result = state.resolveTypeReferenceDirective(
 	    typeRoots, fromConfig, fromInferredTypesContainingFile);
 
@@ -269,7 +268,7 @@ DefaultResolver::resolveModuleName(
     const std::string& moduleName, const std::string& containingFile,
     const std::string& containingDirectory, ResolutionMode resolutionMode,
     const ResolvedProjectReference* redirectedReference) {
-	tracer* traceBuilder = newTraceBuilder();
+	auto traceBuilder = newTraceBuilder();
 
 	moduleResolutionCacheKey cacheKey{
 	    containingDirectory, moduleName, resolutionMode,
@@ -315,7 +314,7 @@ DefaultResolver::resolveModuleName(
 		auto state = newResolutionState(
 		    moduleName, containingDirectory,
 		    false /*isTypeReferenceDirective*/, resolutionMode, options,
-		    redirectedReference, this, traceBuilder);
+		    redirectedReference, this, traceBuilder.get());
 		result = state.resolveNodeLike();
 		break;
 	}
@@ -345,7 +344,7 @@ DefaultResolver::resolveModuleName(
 	}
 
 	auto finalResult = tryResolveFromTypingsLocation(
-	    moduleName, containingDirectory, result, traceBuilder);
+	    moduleName, containingDirectory, result, traceBuilder.get());
 	moduleResolutionCache_.Set(cacheKey, finalResult);
 
 	return {finalResult, traceBuilder != nullptr

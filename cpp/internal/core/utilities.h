@@ -52,6 +52,14 @@ struct parallelWorkGroup final : workGroup {
 	std::condition_variable cv;
 	int running = 0;
 
+	~parallelWorkGroup() override {
+		// Detached workers' tails (running-- + cv.notify_all) can still
+		// be in flight when RunAndWait returns. Both run under mu, so a
+		// single lock acquisition here happens-after the last worker's
+		// tail and makes destroying mu/cv safe (Go: no dtor — GC).
+		std::lock_guard<std::mutex> lock(mu);
+	}
+
 	void Queue(std::function<void()> fn) override {
 		if (done.load()) {
 			TSC_UNREACHABLE("Queue called after RunAndWait returned");
@@ -63,10 +71,13 @@ struct parallelWorkGroup final : workGroup {
 		std::thread([this, fn = std::move(fn)]() mutable {
 			fn();
 			{
+				// notify under mu so the destructor's lock
+				// acquisition is a happens-after edge for the
+				// worker's last use of cv/running.
 				std::lock_guard<std::mutex> lock(mu);
 				running--;
+				cv.notify_all();
 			}
-			cv.notify_all();
 		}).detach();
 	}
 

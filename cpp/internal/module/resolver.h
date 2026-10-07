@@ -370,8 +370,10 @@ public:
 	explicit DefaultResolver(ResolverOptions opts);
 
 	// newTraceBuilder — non-null only when TraceResolution is on.
-	tracer* newTraceBuilder();
-	tracer traceBuilderStorage;
+	// Fresh tracer per call (resolver.go:183 — `&tracer{}`); callers
+	// resolve concurrently under parallel parse, so a shared member
+	// would interleave entries and lose args.
+	std::unique_ptr<tracer> newTraceBuilder();
 
 	std::shared_ptr<packagejson::InfoCacheEntry> GetPackageScopeForPath(
 	    const std::string& directory) override;
