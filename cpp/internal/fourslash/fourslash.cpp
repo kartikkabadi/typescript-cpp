@@ -205,9 +205,9 @@ newFourslash(gostd::testing::T* t, const std::string& content,
 
 	// !!! use default compiler options for inferred project as base
 	tsc::CompilerOptions compilerOptions{
+	    .Jsx = JsxEmit::Preserve,
 	    .SkipDefaultLibCheck = Tristate::True,
 	    .Target = ScriptTarget::LatestStandard,
-	    .Jsx = JsxEmit::Preserve,
 	};
 	testutil::harnessutil::HarnessOptions harnessOptions{
 	    .UseCaseSensitiveFileNames = true,
@@ -6055,10 +6055,10 @@ void FourslashTest::BaselineAutoImportsCompletions(
 	        userPreferences.AutoImportSpecifierExcludeRegexes,
 	    .AutoImportFileExcludePatterns =
 	        userPreferences.AutoImportFileExcludePatterns,
-	    .PreferTypeOnlyAutoImports =
-	        userPreferences.PreferTypeOnlyAutoImports,
 	    .AutoImportEntrypointDirectorySearch =
 	        userPreferences.AutoImportEntrypointDirectorySearch,
+	    .PreferTypeOnlyAutoImports =
+	        userPreferences.PreferTypeOnlyAutoImports,
 	});
 	// Go `defer reset()` — runs at function end (after the loop).
 	for (auto& markerName : markerNames) {
