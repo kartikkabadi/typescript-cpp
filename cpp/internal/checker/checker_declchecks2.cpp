@@ -999,7 +999,7 @@ Type* Checker::checkImportAttributesExpression(Node* node) {
 				getRegularTypeOfLiteralType(checkExpressionCached(attribute->as<ImportAttribute>()->Value));
 			members[member->name] = member;
 		}
-		Type* t = newAnonymousType(symbol, members, {}, {}, {});
+		Type* t = newAnonymousType(symbol, std::move(members), {}, {}, {});
 		t->objectFlags |= ObjectFlagsObjectLiteral | ObjectFlagsNonInferrableType;
 		links->resolvedType = t;
 	}

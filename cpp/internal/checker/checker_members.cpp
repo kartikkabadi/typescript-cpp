@@ -765,10 +765,9 @@ void Checker::resolveObjectTypeMembers(Type* t, Type* source,
 	}
 	std::vector<Type*> baseTypes = getBaseTypes(source);
 	if (!baseTypes.empty()) {
-		if (!instantiated) {
-			// maps.Clone — in C++ the SymbolTable assignment above already produced a copy.
-			members = SymbolTable(members);
-		}
+		// Go: members = maps.Clone(members) — needed there because the
+		// non-instantiated branch aliased resolved.declaredMembers. In C++ the
+		// assignment already produced a private copy; no clone needed.
 		Type* thisArgument = lastOrNil(typeArguments);
 		for (Type* baseType : baseTypes) {
 			Type* instantiatedBaseType = baseType;
@@ -776,7 +775,7 @@ void Checker::resolveObjectTypeMembers(Type* t, Type* source,
 				instantiatedBaseType = getTypeWithThisArgument(instantiateType(baseType, mapper),
 					thisArgument, false /*needsApparentType*/);
 			}
-			members = addInheritedMembers(members, getPropertiesOfType(instantiatedBaseType));
+			members = addInheritedMembers(std::move(members), getPropertiesOfType(instantiatedBaseType));
 			callSignatures = concatenate(callSignatures,
 				getSignaturesOfType(instantiatedBaseType, SignatureKind::Call));
 			constructSignatures = concatenate(constructSignatures,
@@ -794,7 +793,7 @@ void Checker::resolveObjectTypeMembers(Type* t, Type* source,
 			indexInfos = concatenate(indexInfos, filtered);
 		}
 	}
-	setStructuredTypeMembers(t, members, callSignatures, constructSignatures, indexInfos);
+	setStructuredTypeMembers(t, std::move(members), callSignatures, constructSignatures, indexInfos);
 }
 
 IndexInfo* Checker::findIndexInfo(const std::vector<IndexInfo*>& indexInfos, Type* keyType) {
@@ -1313,10 +1312,14 @@ InterfaceType* Checker::resolveDeclaredMembers(Type* t) {
 		const SymbolTable& members = getMembersOfSymbol(t->symbol);
 		d->declaredMembersResolved = true;
 		d->declaredMembers = members;
-		d->declaredCallSignatures =
-			getSignaturesOfSymbol(d->declaredMembers[InternalSymbolNameCall]);
-		d->declaredConstructSignatures =
-			getSignaturesOfSymbol(d->declaredMembers[InternalSymbolNameNew]);
+		// Go map reads return nil on miss without inserting — operator[] would
+		// insert phantom __call/__new keys into the member table.
+		auto itCall = d->declaredMembers.find(InternalSymbolNameCall);
+		auto itNew = d->declaredMembers.find(InternalSymbolNameNew);
+		d->declaredCallSignatures = getSignaturesOfSymbol(
+			itCall != d->declaredMembers.end() ? itCall->second : nullptr);
+		d->declaredConstructSignatures = getSignaturesOfSymbol(
+			itNew != d->declaredMembers.end() ? itNew->second : nullptr);
 		d->declaredIndexInfos = getIndexInfosOfSymbol(t->symbol);
 	}
 	return d;
@@ -1555,7 +1558,7 @@ void Checker::resolveAnonymousTypeMembers(Type* t) {
 			getSignaturesOfType(d->target, SignatureKind::Construct), d->mapper);
 		std::vector<IndexInfo*> indexInfos =
 			instantiateIndexInfos(getIndexInfosOfType(d->target), d->mapper);
-		setStructuredTypeMembers(t, members, callSignatures, constructSignatures, indexInfos);
+		setStructuredTypeMembers(t, std::move(members), callSignatures, constructSignatures, indexInfos);
 		return;
 	}
 	Symbol* symbol = getMergedSymbol(t->symbol);
@@ -1592,10 +1595,10 @@ void Checker::resolveAnonymousTypeMembers(Type* t) {
 		Type* baseConstructorType = getBaseConstructorTypeOfClass(classType);
 		if (baseConstructorType->flags &
 			(TypeFlagsObject | TypeFlagsIntersection | TypeFlagsTypeVariable)) {
-			// maps.Clone — C++ SymbolTable is a value type; members is already a copy.
-			members = SymbolTable(members);
-			members = addInheritedMembers(members, getPropertiesOfType(baseConstructorType));
-			setStructuredTypeMembers(t, members, {}, {}, {});
+			// Go: members = maps.Clone(members) — unnecessary in C++ (members
+			// is already a private copy).
+			members = addInheritedMembers(std::move(members), getPropertiesOfType(baseConstructorType));
+			setStructuredTypeMembers(t, std::move(members), {}, {}, {});
 		} else if (baseConstructorType == anyType) {
 			baseConstructorIndexInfo = anyBaseTypeIndexInfo;
 		}

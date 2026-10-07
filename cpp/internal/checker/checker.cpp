@@ -455,12 +455,12 @@ Type* Checker::newObjectType(ObjectFlags objectFlags, Symbol* symbol) {
 	return t;
 }
 
-Type* Checker::newAnonymousType(Symbol* symbol, const SymbolTable& members,
+Type* Checker::newAnonymousType(Symbol* symbol, SymbolTable members,
 	const std::vector<Signature*>& callSignatures,
 	const std::vector<Signature*>& constructSignatures,
 	const std::vector<IndexInfo*>& indexInfos) {
 	Type* t = newObjectType(ObjectFlagsAnonymous, symbol);
-	setStructuredTypeMembers(t, members, callSignatures, constructSignatures, indexInfos);
+	setStructuredTypeMembers(t, std::move(members), callSignatures, constructSignatures, indexInfos);
 	return t;
 }
 
@@ -520,14 +520,17 @@ Type* Checker::cloneTypeReference(Type* source) {
 	return t;
 }
 
-void Checker::setStructuredTypeMembers(Type* t, const SymbolTable& members,
+// members is taken by value and moved in — Go shares the map header
+// (t.members = members is O(1)); local maps at call sites are moved in for the
+// same zero-copy effect, shared maps still pay one copy (Go-alias edge).
+void Checker::setStructuredTypeMembers(Type* t, SymbolTable members,
 	const std::vector<Signature*>& callSignatures,
 	const std::vector<Signature*>& constructSignatures,
 	const std::vector<IndexInfo*>& indexInfos) {
 	t->objectFlags |= ObjectFlagsMembersResolved;
 	StructuredType* data = t->AsStructuredType();
-	data->members = members;
 	data->properties = getNamedMembers(members, t->symbol);
+	data->members = std::move(members);
 	if (!callSignatures.empty()) {
 		if (!constructSignatures.empty()) {
 			data->signatures = callSignatures;
@@ -2543,22 +2546,27 @@ const SymbolTable& Checker::getResolvedMembersOrExportsOfSymbol(Symbol* symbol,
 	auto* links = membersAndExportsLinks.Get(symbol);
 	if (links->at(resolutionKind).empty()) {
 		bool isStatic = resolutionKind == MembersOrExportsResolutionKindResolvedExports;
-		SymbolTable earlySymbols = symbol->exports;
+		// Go: earlySymbols = symbol.exports/members aliases the map; it is only
+		// read (lateBindMember looks up, combineSymbolTables builds a new map)
+		// so a const-ref is equivalent and skips the deep copy.
+		std::pair<SymbolTable, std::unordered_map<std::string, Node*>> moduleWorker;
+		const SymbolTable* earlySymbols = &symbol->exports;
 		if (!isStatic) {
-			earlySymbols = symbol->members;
+			earlySymbols = &symbol->members;
 		} else if (symbol->flags & SymbolFlagsModule) {
-			earlySymbols = std::get<0>(getExportsOfModuleWorker(symbol));
+			moduleWorker = getExportsOfModuleWorker(symbol);
+			earlySymbols = &moduleWorker.first;
 		}
-		(*links)[resolutionKind] = earlySymbols;
+		(*links)[resolutionKind] = *earlySymbols;
 		// fill in any as-yet-unresolved late-bound members.
 		SymbolTable lateSymbols;
 		for (Node* decl : symbol->declarations) {
 			for (Node* member : getMembersOfDeclaration(decl)) {
 				if (isStatic == static_cast<bool>(hasStaticModifier(member))) {
 					if (hasLateBindableName(member)) {
-						lateBindMember(symbol, earlySymbols, lateSymbols, member);
+						lateBindMember(symbol, *earlySymbols, lateSymbols, member);
 					} else if (hasLateBindableIndexSignature(member)) {
-						lateBindIndexSignature(symbol, earlySymbols, lateSymbols, member);
+						lateBindIndexSignature(symbol, *earlySymbols, lateSymbols, member);
 					}
 				}
 			}
@@ -2569,12 +2577,12 @@ const SymbolTable& Checker::getResolvedMembersOrExportsOfSymbol(Symbol* symbol,
 				Symbol* assignmentSymbol = it->second;
 				for (Node* member : assignmentSymbol->declarations) {
 					if (hasLateBindableName(member)) {
-						lateBindMember(symbol, earlySymbols, lateSymbols, member);
+						lateBindMember(symbol, *earlySymbols, lateSymbols, member);
 					}
 				}
 			}
 		}
-		(*links)[resolutionKind] = combineSymbolTables(earlySymbols, lateSymbols);
+		(*links)[resolutionKind] = combineSymbolTables(*earlySymbols, lateSymbols);
 	}
 	return links->at(resolutionKind);
 }
@@ -2582,7 +2590,7 @@ const SymbolTable& Checker::getResolvedMembersOrExportsOfSymbol(Symbol* symbol,
 // Performs late-binding of a dynamic member. This performs the same function for
 // late-bound members that `declareSymbol` in binder.ts performs for early-bound
 // members.
-Symbol* Checker::lateBindMember(Symbol* parent, SymbolTable& earlySymbols, SymbolTable& lateSymbols,
+Symbol* Checker::lateBindMember(Symbol* parent, const SymbolTable& earlySymbols, SymbolTable& lateSymbols,
 								Node* decl) {
 	TSC_ASSERT(decl->symbol() != nullptr, "The member is expected to have a symbol.");
 	auto* links = symbolNodeLinks.Get(decl);
@@ -2658,7 +2666,7 @@ Symbol* Checker::lateBindMember(Symbol* parent, SymbolTable& earlySymbols, Symbo
 	return links->resolvedSymbol;
 }
 
-void Checker::lateBindIndexSignature(Symbol* parent, SymbolTable& earlySymbols,
+void Checker::lateBindIndexSignature(Symbol* parent, const SymbolTable& earlySymbols,
 									 SymbolTable& lateSymbols, Node* decl) {
 	(void)parent;
 	// First, late bind the index symbol itself, if needed
@@ -2735,8 +2743,8 @@ const SymbolTable& Checker::getExportsOfModule(Symbol* moduleSymbol) {
 	auto* links = moduleSymbolLinks.Get(moduleSymbol);
 	if (links->resolvedExports.empty()) {
 		auto [exports, typeOnlyExportStarMap] = getExportsOfModuleWorker(moduleSymbol);
-		links->resolvedExports = exports;
-		links->typeOnlyExportStarMap = typeOnlyExportStarMap;
+		links->resolvedExports = std::move(exports);
+		links->typeOnlyExportStarMap = std::move(typeOnlyExportStarMap);
 	}
 	return links->resolvedExports;
 }

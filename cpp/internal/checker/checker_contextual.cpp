@@ -2218,7 +2218,7 @@ Type* Checker::getClassMemberDecoratorContextOverrideType(Type* nameType,
 		newProperty("private", isPrivate ? trueType : falseType);
 	members["static"] =
 		newProperty("static", isStatic ? trueType : falseType);
-	Type* overrideType = newAnonymousType(nullptr, members, {}, {}, {});
+	Type* overrideType = newAnonymousType(nullptr, std::move(members), {}, {}, {});
 	cachedTypes[key] = overrideType;
 	return overrideType;
 }
