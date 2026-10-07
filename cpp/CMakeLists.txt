@@ -463,3 +463,16 @@ file(GLOB FOURSLASH_TEST_SOURCES CONFIGURE_DEPENDS
 add_executable(fourslashrunner cmd/fourslashrunner/main.cpp
 	internal/fourslash/tests/registry.cpp ${FOURSLASH_TEST_SOURCES})
 target_link_libraries(fourslashrunner PRIVATE ${tsc_alloc_lib} tsc)
+
+# unittest runner — ported Go *_test.go unit tests register statically
+# (internal/testutil/unittests/registry.h, REGISTER_UNIT_TEST) and run one
+# test per forked child. Glob so adding tests_*.cpp files needs no list
+# maintenance; covers internal/<pkg>/tests and internal/<pkg>/<sub>/tests.
+file(GLOB UNIT_TEST_SOURCES CONFIGURE_DEPENDS
+	internal/*/tests/tests_*.cpp
+	internal/*/*/tests/tests_*.cpp)
+# fourslash tests link into fourslashrunner, not here.
+list(FILTER UNIT_TEST_SOURCES EXCLUDE REGEX "internal/fourslash/")
+add_executable(unittestrunner cmd/unittestrunner/main.cpp
+	internal/testutil/unittests/registry.cpp ${UNIT_TEST_SOURCES})
+target_link_libraries(unittestrunner PRIVATE ${tsc_alloc_lib} tsc)
