@@ -1040,9 +1040,9 @@ CompilerOptions* getDefaultCompilerOptions(std::string_view configFileName) {
 	if (!configFileName.empty() && tspath::getBaseFileName(configFileName) == "jsconfig.json") {
 		options = new CompilerOptions{
 		    .AllowJs = Tristate::True,
-		    .MaxNodeModuleJsDepth = new int(2),
-		    .SkipLibCheck = Tristate::True,
 		    .NoEmit = Tristate::True,
+		    .SkipLibCheck = Tristate::True,
+		    .MaxNodeModuleJsDepth = new int(2),
 		};
 	}
 	return options;

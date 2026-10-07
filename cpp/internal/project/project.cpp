@@ -49,16 +49,16 @@ Project* NewInferredProject(
 	if (compilerOptions == nullptr) {
 		compilerOptions = new CompilerOptions{
 		    .AllowJs = Tristate::True,
+		    .AllowImportingTsExtensions = Tristate::True,
+		    .AllowNonTsExtensions = Tristate::True,
+		    .Jsx = JsxEmit::ReactJSX,
 		    .Module = ModuleKind::ESNext,
 		    .ModuleResolution = ModuleResolutionKind::Bundler,
-		    .Target = ScriptTarget::LatestStandard,
-		    .Jsx = JsxEmit::ReactJSX,
-		    .AllowImportingTsExtensions = Tristate::True,
-		    .StrictNullChecks = Tristate::True,
-		    .StrictFunctionTypes = Tristate::True,
-		    .SourceMap = Tristate::True,
-		    .AllowNonTsExtensions = Tristate::True,
 		    .ResolveJsonModule = Tristate::True,
+		    .StrictFunctionTypes = Tristate::True,
+		    .StrictNullChecks = Tristate::True,
+		    .SourceMap = Tristate::True,
+		    .Target = ScriptTarget::LatestStandard,
 		};
 	}
 	p->CommandLine = newInferredProjectCommandLine(
