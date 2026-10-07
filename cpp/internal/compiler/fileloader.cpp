@@ -1348,7 +1348,9 @@ module::ResolutionHost* newProjectReferenceDtsFakingHost(
 	mapper->fakingVfsImpl =
 	    std::make_unique<projectReferenceDtsFakingVfs>();
 	mapper->fakingVfsImpl->mapper = mapper;
-	mapper->fakingVfsImpl->dtsDirectories = &loader->dtsDirectories;
+	// projectreferencedtsfakinghost.go:29 — Go copies the map header:
+	// share the shared_ptr so the Set outlives this stack-local loader.
+	mapper->fakingVfsImpl->dtsDirectories = loader->dtsDirectories;
 	mapper->fakingVfs =
 	    vfs::cachedvfs::From(mapper->fakingVfsImpl.get());
 	mapper->fakingHost =
@@ -1742,7 +1744,7 @@ std::vector<tspath::Path> projectReferenceParser::initMapperWorker(
 					declDir = task->resolved->CompilerOptions()->OutDir;
 				}
 				if (!declDir.empty()) {
-					loader->dtsDirectories.Add(
+					loader->dtsDirectories->Add(
 					    loader->toPath(declDir));
 				}
 			}

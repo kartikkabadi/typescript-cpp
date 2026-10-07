@@ -519,8 +519,14 @@ struct filesLoader {
 	filesParser* parser{};
 	SimpleProgram* program{};
 	// fileloader.go:66 — declaration directories of project references
-	// (filled by projectReferenceParser::initMapperWorker).
-	collections::Set<tspath::Path> dtsDirectories;
+	// (filled by projectReferenceParser::initMapperWorker). Go's
+	// collections.Set is a map — a reference type: the faking vfs at
+	// projectreferencedtsfakinghost.go:29 copies the map header and
+	// keeps the shared map alive past the loader's lifetime. Mirrored
+	// with a shared_ptr so the post-ctor resolution host doesn't
+	// dereference the destroyed stack loader's field.
+	std::shared_ptr<collections::Set<tspath::Path>> dtsDirectories =
+	    std::make_shared<collections::Set<tspath::Path>>();
 	// fileloader.go:67 — the source/dts <-> project-reference mapping;
 	// shared with the produced program. Its loader/host links are
 	// released after parsing (fileloader.go:223).
@@ -718,10 +724,13 @@ struct projectReferenceFileMapper {
 // on. Wrapped in cachedvfs like Go.
 struct projectReferenceDtsFakingVfs : vfs::FS {
 	projectReferenceFileMapper* mapper{};
-	// Go stores the loader's Set by value but shares the map — the
-	// pointer gives the same aliasing here (the set is fully populated
-	// before this vfs is created and never written afterwards).
-	const collections::Set<tspath::Path>* dtsDirectories{};
+	// projectreferencedtsfakinghost.go:29 — Go copies the map header,
+	// sharing the underlying Set and keeping it alive via GC. A raw
+	// pointer into the stack-local loader used to dangle here: post-ctor
+	// resolutions (auto-import specifiers -> DirectoryExists -> Keys())
+	// iterated a dead unordered_set — the paths_stripSrc/paths_toDist
+	// SIGSEGVs. shared_ptr mirrors Go's shared-reference lifetime.
+	std::shared_ptr<collections::Set<tspath::Path>> dtsDirectories;
 	// A fresh KnownSymlinks (Go: `symlinks.KnownSymlinks{}` — empty,
 	// zero-value cwd/case flag).
 	symlinks::KnownSymlinks knownSymlinks{"", false};
@@ -995,7 +1004,10 @@ public:
 	// is borrowed as the program's opts.Config; nullptr synthesizes a bare
 	// ParsedCommandLine from `options`/`rootFileNames`. `tracing` seeds
 	// tr_ BEFORE files load (Go program.go:302 — opts.Tracing is set on
-	// the program before loadFiles runs).
+	// the program before loadFiles runs). `popts`, when non-null, is the
+	// caller's full ProgramOptions and seeds opts_ BEFORE the loader runs
+	// (Go's `p := &Program{opts: opts}` — the loader/mapper read fields
+	// like UseSourceOfProjectReference during processAllProgramFiles).
 	SimpleProgram(CompilerHost* host, const CompilerOptions& options,
 	              std::vector<std::string> rootFileNames,
 	              tsoptions::ParsedCommandLine* config,
