@@ -315,9 +315,13 @@ struct BreadthFirstSearchLevel {
 	bool Has(const K& key) { return jobs.Has(key); }
 	void Delete(const K& key) { jobs.Delete(key); }
 	// Range — ordered_map.go Values() order; fn returning false stops.
+	// Go iterates the LIVE keys slice by index: mid-iteration Delete
+	// shifts later elements into already-visited slots (skipped) and
+	// appended elements get visited. Iterate by index — a stale element
+	// reference across erase() is UB.
 	void Range(const std::function<bool(const N&)>& f) {
-		for (const K& k : jobs.keys) {
-			if (!f(jobs.mp.at(k)->node)) {
+		for (size_t i = 0; i < jobs.keys.size(); i++) {
+			if (!f(jobs.mp.at(jobs.keys[i])->node)) {
 				return;
 			}
 		}
