@@ -5500,7 +5500,11 @@ Symbol* Checker::getSpellingSuggestionForName(
 }
 
 static std::unordered_map<std::string, Symbol*>&
-primitiveTypeAliasSuggestions(Arena& arena) {
+primitiveTypeAliasSuggestions() {
+	// checker.go:1786 — sync.OnceValue: Symbols are plain heap objects that
+	// live for the process lifetime. They MUST NOT be arena-allocated: the
+	// static map outlives any single checker's typeArena, and arena clear /
+	// sweep would leave dangling Symbol* behind.
 	static std::unordered_map<std::string, Symbol*>* result = nullptr;
 	if (result == nullptr) {
 		result = new std::unordered_map<std::string, Symbol*>();
@@ -5508,7 +5512,7 @@ primitiveTypeAliasSuggestions(Arena& arena) {
 		         {"string", "String"}, {"number", "Number"},
 		         {"boolean", "Boolean"}, {"object", "Object"},
 		         {"bigint", "BigInt"}, {"symbol", "Symbol"}}) {
-			Symbol* sym = arena.alloc<Symbol>();
+			Symbol* sym = new Symbol();
 			sym->flags = SymbolFlagsTypeAlias | SymbolFlagsTransient;
 			sym->name = e.first;
 			(*result)[e.second] = sym;
@@ -5518,10 +5522,10 @@ primitiveTypeAliasSuggestions(Arena& arena) {
 }
 
 static std::vector<Symbol*> getPrimitiveTypeAliasSuggestions(
-	SymbolTable& symbols, Arena& arena) {
+	SymbolTable& symbols) {
 	std::vector<Symbol*> out;
 	for (auto& [builtinName, suggestion] :
-	     primitiveTypeAliasSuggestions(arena)) {
+	     primitiveTypeAliasSuggestions()) {
 		if (symbols.find(builtinName) != symbols.end()) {
 			out.push_back(suggestion);
 		}
@@ -5542,8 +5546,7 @@ Symbol* Checker::getSuggestionForSymbolNameLookup(SymbolTable& symbols,
 		candidates.push_back(v);
 	}
 	if (meaning & SymbolFlagsGlobalLookup) {
-		for (Symbol* s :
-		     getPrimitiveTypeAliasSuggestions(symbols, typeArena)) {
+		for (Symbol* s : getPrimitiveTypeAliasSuggestions(symbols)) {
 			candidates.push_back(s);
 		}
 	}

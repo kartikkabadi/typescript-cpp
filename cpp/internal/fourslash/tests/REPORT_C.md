@@ -93,13 +93,20 @@ returns `0/0` — the match is case-sensitive; run as
    `data.source`, `additionalTextEdits`, `moduleSpecifier` ("fs" vs "node:fs"),
    kind mismatches, "No completion item match"/"multiple candidates" noise.
    Looks like autoimport completion synthesis/resolve-fields divergence —
-   marshal/shape issue, not test shape. Left FAILING.
+   marshal/shape issue, not test shape. **FIXED** — see
+   "Divergences found and fixed" below; the residual fails in this family
+   are sibling clusters #5/#7/#9.
 5. **Module-specifier resolution empty** (~8 fails). `Expected N module
    specifiers, got 0` / `No codefixes returned` on cross-project paths
    (`_paths_*`, `baseUrl_toDist`, `PackageJsonImportsConditions`,
    `dist`/`stripSrc`). Path-mapping/project-reference resolver divergence.
 6. **LSP `InternalError` on completions** (~7 fails). `[-32603] InternalError`
    from `textDocument/completion` inside contentmapper + a few misc tests.
+   **FIXED** for the completion path — see "Divergences found and fixed";
+   remaining `InternalError`-surface crashes are `std::system_error:
+   Resource deadlock avoided` in the LSP client/server queue machinery
+   (`responseChan`/`dynamicQueue`/`errgroup::wait`), i.e. multi-project
+   threading consistent with #1/#3/#9, not completion logic.
 7. **Baseline-file diffs** (~6 fails). `vSQuickInfo/*DisplayParts*VS`,
    `vsFindAllRefs*` baseline files differ — batch B documents these as an
    existing family (baseline-accept not ours to run). Left FAILING.
@@ -123,14 +130,74 @@ returns `0/0` — the match is case-sensitive; run as
   `ToAny(f.Ranges())...`, `shared_ptr` vs `.`/`-`>` selector operators, anonymous
   struct literals (`anonStructN`), `util.*`→`tsu::*` alias, `new(int32)` idiom,
   `strings.Index`, `strconv.Quote`, `IfElse`, variadic-extension packing.
-- **Left FAILING:** every divergence above — all look like product-side gaps
-  (content-mapper project attachment, codelens lifetimes, declaration-map
-  baseline machinery, completion field synthesis, module-specifier resolution,
-  baseline-file drift). None were weakened to pass.
+- **Left FAILING:** every remaining divergence above — all look like
+  product-side gaps (content-mapper project attachment, codelens lifetimes,
+  declaration-map baseline machinery, module-specifier resolution,
+  baseline-file drift, multi-project threading). None were weakened to pass.
 - **Production code touched outside `tests_*.cpp`:** none. No new `Verify*`
   helpers were needed — every method the corpus calls is already ported in
   `cpp/internal/fourslash/fourslash.h`. Only new files under
   `cpp/internal/fourslash/tests/` were added (plus this report).
+
+## Divergences found and fixed
+
+Follow-up session on `devin/cpp-fsc-completion` (clusters 4 + 6 above):
+
+1. **`SimpleProgram::comparePathsOptions()`** (`cpp/internal/compiler/program.cpp`)
+   — Go `program.go:94` declares `comparePathsOptions` as a **stored field that
+   is never initialized** on a fresh `Program` (Go zero value
+   `{UseCaseSensitiveFileNames: false, CurrentDirectory: ""}`; the only write is
+   the `UpdateProgram` clone at `program.go:407` copying the same zero value
+   forward). The port computed it from the host instead. The non-empty
+   `CurrentDirectory`/case-sensitivity made `IsGlobalTypingsFile`-adjacent path
+   compares drop `.d.ts` files from auto-import indexing, so completion items
+   were missing entirely or arrived without `data.autoImport`/`detail`/
+   `moduleSpecifier`. Now returns the Go zero value `{}`. Fixed
+   `TestAutoImportTypeOnlyPreferred1` and unblocked `.d.ts`-export indexing
+   everywhere.
+2. **`primitiveTypeAliasSuggestions` arena-dangle** (`cpp/internal/checker/checker.cpp`)
+   — Go `checker.go:1786` wraps the map in `sync.OnceValue`: plain heap
+   `Symbol` objects that live for the process lifetime. The port allocated
+   them in the checker's `typeArena`; `Arena::sweep()`/`clear()` freed them
+   while the static cache still pointed at them, so
+   `getSpellingSuggestionForName` read a garbage `name` →
+   `basic_string::_M_create` with a giant size →
+   `panic handling request textDocument/completion: InternalError`
+   (`TestAutoImportProvider_wildcardExports3`, plus the rest of the #6
+   InternalError family). Now `new Symbol()` on the heap.
+3. **`domEqual` dropped ignore-opts inside arrays**
+   (`cpp/internal/fourslash/fourslash_deps.h`) — Go `fourslash.go:1565`
+   `ignorePaths` is `cmp.FilterPath(p.Last() ∈ paths)`: an ignored leaf name
+   applies at **every** depth, including inside array elements. The port
+   recursed into `K::Array` with `{}`, so `severity`/`source`/`data`/
+   `detail`/`additionalTextEdits`/`labelDetails`/`filterText`/`sortText`/
+   `relatedInformation` inside arrays were diffed where Go ignores them —
+   the mechanical source of most cluster-4 "missing field" reports.
+   Now propagates `opts` (`TestSuggestionNoDuplicates`, plus any list-compare
+   that relies on ignored fields).
+4. **`isClassLikeMemberCompletion` mask** (`cpp/internal/ls/completions.cpp`)
+   — `SymbolFlagsClassMember & ~SymbolFlagsEnumMemberExcludes` zeroed
+   `memberFlags` entirely (`EnumMemberExcludes` is a positive mask
+   `Value|Type` in this port, not a bit to clear). Go is
+   `SymbolFlagsClassMember & SymbolFlagsEnumMemberExcludes`. Class-member
+   snippet completions (the `filterText`/`insertText` ClassMemberSnippet
+   source) were misclassified.
+5. **`getRangeOfEnclosingComment` dangling return** (`cpp/internal/ls/format.cpp`)
+   — Go returns `&commentRange` where the range variable escapes to the heap;
+   the port returned the address of a local vector element that dangled once
+   `commentRanges` was destroyed. Now `new CommentRange(commentRange)`.
+6. **`trimLeftSpace` dangling `string_view`** (`cpp/internal/ls/string_completions.cpp`)
+   — callers do `rest = trimLeftSpace(rest)` with `rest` a `string_view`;
+   returning `std::string` left `rest` dangling into a destroyed temporary.
+   Now returns `std::string_view`.
+
+Verification: `-run 'TestAutoImport|TestCompletionEntry'` 117/131 → 118/131
+(all 13 residual fails are sibling clusters #5/#7/#9 — `project-b/src`
+module-specifier, baseline drift, and the `Resource deadlock avoided`/timeout
+family). `TestQuickInfo|TestFindAll|TestRename|TestImportFix|TestMissing|
+TestSourceUpdate|TestUnused|TestSuggestion|TestReferences` 561/577 → 562/577
+(remaining: 11 multi-project signal-11 = #3, 3 baseline diffs = #7, 1 semantic
+diff = #8). Zero regressions on both sweeps.
 
 ## Unported remainder (for the next wave)
 

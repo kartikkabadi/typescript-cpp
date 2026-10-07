@@ -4089,8 +4089,12 @@ bool isClassLikeMemberCompletion(Symbol* symbol, Node* location,
 	if (isInJSFile(location)) {
 		return false;
 	}
+	// Go: ast.SymbolFlagsClassMember & ast.SymbolFlagsEnumMemberExcludes —
+	// EnumMemberExcludes is a positive mask (Value|Type), so the AND keeps
+	// the class-member bits (they are all Value-namespace flags). A `~`
+	// here would zero memberFlags entirely.
 	SymbolFlags memberFlags = static_cast<SymbolFlags>(
-	    SymbolFlagsClassMember & ~SymbolFlagsEnumMemberExcludes);
+	    SymbolFlagsClassMember & SymbolFlagsEnumMemberExcludes);
 	return (symbol->flags & memberFlags) &&
 	    (isClassLike(location) ||
 	     (location->parent != nullptr &&

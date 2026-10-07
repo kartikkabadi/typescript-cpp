@@ -105,8 +105,10 @@ inline bool domEqual(const json::Dom& a, const json::Dom& b,
 	case K::String: return a.strVal == b.strVal;
 	case K::Array: {
 		if (a.arr.size() != b.arr.size()) return false;
+		// go-cmp FilterPath(p.Last()) semantics: ignored leaf names apply at
+		// every depth, including inside array elements — propagate opts.
 		for (size_t i = 0; i < a.arr.size(); i++) {
-			if (!domEqual(a.arr[i], b.arr[i], {})) return false;
+			if (!domEqual(a.arr[i], b.arr[i], opts)) return false;
 		}
 		return true;
 	}
