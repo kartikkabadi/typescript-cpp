@@ -51,7 +51,7 @@ jobs:
       - name: Lexer conformance (bounded)
         env:
           LEXDUMP: /tmp/lexdump
-        run: python3 cpp/tools/conformance_lex.py tsc/testdata/tests/cases/scanner
+        run: python3 cpp/tools/conformance_lex.py tsc/testdata/tests/cases/conformance/scanner
 
       - name: Parser + binder conformance (bounded)
         env:
