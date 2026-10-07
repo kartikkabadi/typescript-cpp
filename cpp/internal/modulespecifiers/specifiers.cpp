@@ -431,7 +431,7 @@ std::vector<ModulePath> getAllModulePathsWorker(
 			}
 		}
 		if (!pathsInDirectory.empty()) {
-			std::sort(pathsInDirectory.begin(), pathsInDirectory.end(),
+			std::stable_sort(pathsInDirectory.begin(), pathsInDirectory.end(),
 			          [&](const ModulePath& a, const ModulePath& b) {
 				          return comparePaths(a, b) < 0;
 			          });
@@ -450,7 +450,7 @@ std::vector<ModulePath> getAllModulePathsWorker(
 		for (auto& kv : allFileNames) {
 			remainingPaths.push_back(kv.second);
 		}
-		std::sort(remainingPaths.begin(), remainingPaths.end(),
+		std::stable_sort(remainingPaths.begin(), remainingPaths.end(),
 		          [&](const ModulePath& a, const ModulePath& b) {
 			          return comparePaths(a, b) < 0;
 		          });

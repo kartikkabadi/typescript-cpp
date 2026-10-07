@@ -1884,7 +1884,7 @@ normalizeDiagnosticDirectives(
 	for (size_t i = 0; i < result.size(); i++) {
 		sorted[i] = indexedDirective{result[i], (int)i};
 	}
-	std::sort(sorted.begin(), sorted.end(),
+	std::stable_sort(sorted.begin(), sorted.end(),
 	          [](const indexedDirective& a, const indexedDirective& b) {
 		          return a.directive.VirtualRange.pos() <
 		                 b.directive.VirtualRange.pos();

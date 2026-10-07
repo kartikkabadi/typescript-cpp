@@ -374,7 +374,7 @@ std::optional<MappingError> Validate(const SpanMap* m, std::string_view virtualT
 // spanmap.go:222
 SpanMap* New(std::vector<Segment> segments) {
 	std::vector<Segment> sorted = std::move(segments);
-	std::sort(sorted.begin(), sorted.end(), [](const Segment& a, const Segment& b) {
+	std::stable_sort(sorted.begin(), sorted.end(), [](const Segment& a, const Segment& b) {
 		return a.VirtualStart < b.VirtualStart;
 	});
 	auto* m = new SpanMap();
@@ -636,7 +636,7 @@ std::vector<MappedPosition> OriginalToVirtualPositions(SpanMap* m, TextPos pos, 
 			}
 		}
 	}
-	std::sort(results.begin(), results.end(), [](const MappedPosition& a, const MappedPosition& b) {
+	std::stable_sort(results.begin(), results.end(), [](const MappedPosition& a, const MappedPosition& b) {
 		return a.Position < b.Position;
 	});
 	return results;
@@ -696,7 +696,7 @@ std::vector<MappedSpan> OriginalToVirtualSpans(SpanMap* m, TextRange r, Feature 
 		std::vector<MappedSpan> results =
 			originalToVirtualSpansInSegments(containing, start, end, feature);
 		if (!results.empty()) {
-			std::sort(results.begin(), results.end(), [](const MappedSpan& a, const MappedSpan& b) {
+			std::stable_sort(results.begin(), results.end(), [](const MappedSpan& a, const MappedSpan& b) {
 				return a.Span.pos() < b.Span.pos();
 			});
 			return results;
@@ -764,7 +764,7 @@ std::vector<MappedSpan> OriginalToVirtualIntersectingSpans(SpanMap* m, TextRange
 originalIndex* SpanMap::origIndex() {
 	std::call_once(origOnce, [this] {
 		std::vector<Segment> sorted = segments;
-		std::sort(sorted.begin(), sorted.end(), [](const Segment& a, const Segment& b) {
+		std::stable_sort(sorted.begin(), sorted.end(), [](const Segment& a, const Segment& b) {
 			if (a.OriginalStart != b.OriginalStart) {
 				return a.OriginalStart < b.OriginalStart;
 			}
