@@ -394,13 +394,19 @@ struct lspWriter : Writer {
 // messageMarshalError — server.go:123.
 struct messageMarshalError : gostd::ErrObj {
 	gostd::Error err;
-	explicit messageMarshalError(gostd::Error e) : err(std::move(e)) {}
+	// Owned by the ErrObj so an ErrorCodeError* obtained through
+	// errors.As stays valid for the error's lifetime (the Go
+	// value-type equivalent is GC-pinned by the error chain).
+	gostd::Error codeErr;
+	explicit messageMarshalError(gostd::Error e)
+	    : err(std::move(e)),
+	      codeErr(lsproto::errorCodeErr(lsproto::ErrorCodeInternalError)) {}
 	std::string Error() const override {
 		return "failed to marshal message: " +
 		       (err ? err->Error() : "<nil>");
 	}
 	std::vector<gostd::Error> unwrap() const override {
-		return {lsproto::errorCodeErr(lsproto::ErrorCodeInternalError), err};
+		return {codeErr, err};
 	}
 };
 
@@ -415,12 +421,15 @@ std::shared_ptr<Writer> ToWriter(std::shared_ptr<gostd::io::Writer> w);
 // Unwrap reports RequestFailed; the message is shown to the user.
 struct userFacingRequestFailedError : gostd::ErrObj {
 	std::string message;
+	// Owned by the ErrObj: errors.As returns a raw pointer into
+	// the unwrap() chain, so a freshly-created ErrorCodeError
+	// would die with unwrap()'s return vector (Go pins it via GC).
+	gostd::Error codeErr;
 	explicit userFacingRequestFailedError(std::string msg)
-	    : message(std::move(msg)) {}
+	    : message(std::move(msg)),
+	      codeErr(lsproto::errorCodeErr(lsproto::ErrorCodeRequestFailed)) {}
 	std::string Error() const override { return message; }
-	std::vector<gostd::Error> unwrap() const override {
-		return {lsproto::errorCodeErr(lsproto::ErrorCodeRequestFailed)};
-	}
+	std::vector<gostd::Error> unwrap() const override { return {codeErr}; }
 };
 
 // ---------------------------------------------------------------------------
