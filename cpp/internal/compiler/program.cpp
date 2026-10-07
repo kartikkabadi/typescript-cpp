@@ -328,10 +328,14 @@ SimpleProgram::SimpleProgram(CompilerHost* host_,
 	// opts.Config — the program's ParsedCommandLine (program.go NewProgram
 	// receives the caller's). Borrowed when constructed from a config;
 	// otherwise synthesize a bare one from options+fileNames.
+	// Note: commandLine construction gets real host-based options (like
+	// projectcollectionbuilder.go's NewParsedCommandLine call sites), NOT
+	// p.comparePathsOptions — see comparePathsOptions() below.
 	commandLine_ = config;
 	if (commandLine_ == nullptr) {
 		commandLineOwned_.reset(tsoptions::NewParsedCommandLine(
-		    &options, rootFileNames, {}, comparePathsOptions()));
+		    &options, rootFileNames, {},
+		    {host->UseCaseSensitiveFileNames(), host->GetCurrentDirectory()}));
 		commandLine_ = commandLineOwned_.get();
 	}
 	// === end slice: incremental ===
@@ -2424,9 +2428,7 @@ void SimpleProgram::verifyCompilerOptions() {
 			    return false;
 		    },
 		    getSourceFilesToEmit(nullptr, false, false), false);
-		verifyEmitFilePath(
-		    outputpaths::GetBuildInfoFileName(&options,
-		                                      comparePathsOptions()));
+		verifyEmitFilePath(opts_.Config->GetBuildInfoFileName());
 	}
 }
 
@@ -3062,7 +3064,8 @@ std::tuple<SimpleProgram*, SourceFile*, bool> SimpleProgram::ReuseProgram(
 		result->commandLineOwned_.reset(
 		    tsoptions::NewParsedCommandLine(
 		        &result->options, result->fileNameList, {},
-		        result->comparePathsOptions()));
+		        {result->host->UseCaseSensitiveFileNames(),
+		         result->host->GetCurrentDirectory()}));
 		result->commandLine_ = result->commandLineOwned_.get();
 	}
 	result->skipModuleResolution = skipModuleResolution;

@@ -116,6 +116,7 @@ returns `0/0` — the match is case-sensitive; run as
    specifiers, got 0` / `No codefixes returned` on cross-project paths
    (`_paths_*`, `baseUrl_toDist`, `PackageJsonImportsConditions`,
    `dist`/`stripSrc`). Path-mapping/project-reference resolver divergence.
+   **FIXED** — see "Divergences found and fixed" below.
 6. **LSP `InternalError` on completions** (~7 fails). `[-32603] InternalError`
    from `textDocument/completion` inside contentmapper + a few misc tests.
    **FIXED** for the completion path — see "Divergences found and fixed";
@@ -431,6 +432,70 @@ Verification (merged `devin/cpp-port` HEAD + this fix):
   pass; cluster 9 confirmed shared-root and healed.
 - `-run 'TestCodeLens|TestCallHierarchy|TestWorkspaceSymbol|TestContentMapper.*CodeLens'`:
   **54/54**, zero regressions.
+
+||||||| adb5be5715
+## Divergences found and fixed (modspec, `devin/cpp-fsc-modspec`)
+
+Cluster-5 "Expected N module specifiers, got 0" / "No codefixes
+returned" — the cross-project auto-import/codefix family. Two of the
+three root causes were fixed in parallel by siblings and are identical
+on merged HEAD: `SimpleProgram::comparePathsOptions()` → `{}` (Go
+`program.go:94` dead field — with `TypingsLocation=""` a live cwd made
+every `.d.ts` classify as global-typings and `isIgnoredFile` excluded
+them from the auto-import index) and `ProgramOptions` pre-load seeding
+(the project-reference dts-faking host depends on
+`canUseProjectReferenceSource()` during `processAllProgramFiles`; with
+post-ctor seeding referenced-project sources never joined, so
+`../../common/dist/src/X` imports could not resolve). This branch adds
+the remaining fidelity around those sites:
+
+1. **Synthesized `ParsedCommandLine` compare options**
+   (`program.cpp` ctor + `ReuseProgram`). With `comparePathsOptions()`
+   now `{}`, the two `NewParsedCommandLine` synthesis call sites would
+   build a command line with empty cwd / case-insensitive compares.
+   Go builds every real `ParsedCommandLine` with live host options
+   (`project.go:257-266`, `projectcollectionbuilder.go:1311-1314`), so
+   the synthesized one now gets
+   `{host->UseCaseSensitiveFileNames(), host->GetCurrentDirectory()}`
+   inline — matching what every real caller's pcl carries.
+2. **`verifyCompilerOptions` buildinfo path** (`program.cpp`) — Go
+   `program.go:1381` is `verifyEmitFilePath(p.opts.Config.GetBuildInfoFileName())`:
+   it reads the config's buildinfo name, which uses the pcl's own stored
+   compare options. The port called
+   `outputpaths::GetBuildInfoFileName(&options, comparePathsOptions())`
+   — after the dead-field fix that silently meant `{}`. Now calls
+   `opts_.Config->GetBuildInfoFileName()` exactly like Go.
+
+3. **`dtsDirectories` stack-UAF** (`cpp/internal/compiler/program.h:523,733`,
+   `fileloader.cpp:1353,1747`) — the two flaky SIGSEGVs
+   (`TestAutoImportCrossProject_paths_{stripSrc,toDist}`). `filesLoader
+   loader` is a stack local in `SimpleProgram`'s ctor; the
+   project-reference dts faking vfs stored `&loader->dtsDirectories` and
+   outlived it, so post-ctor resolutions (auto-import specifier
+   computation -> `DirectoryExists` -> `Keys()`) iterated a dead
+   `unordered_set`. Go keeps `loader.dtsDirectories` alive via GC:
+   `projectreferencedtsfakinghost.go:29` copies the map header and
+   shares the underlying map. Mirrored with `shared_ptr` on both
+   fields; `mapper->loader`/`->host` were audited — they're nulled
+   post-parse (fileloader.cpp:2479-2480, Go fileloader.go:223-224).
+
+Verified on this branch (pre-merge): the 8 named cluster-5 tests pass
+(`TestAutoImportCrossProject_paths_*`, `baseUrl_toDist`,
+`PackageJsonImportsConditions`, `dist`/`stripSrc` family);
+`-run 'TestAutoImport'` 109/131 → 121/131 (remaining fails are other
+clusters: ClassMemberSnippet diffs, the `Resource deadlock avoided`
+checkerPool timer deadlock — baseline-verified — and one SEGV).
+`-run 'TestImportNameCodeFix'` 135/136 — all six
+`NewImportExportEquals*`/`jsCJSvsESM*` tests healed by the same
+indexing fix; sole fail is the pre-existing deadlock.
+
+Post-rebase verification on merged HEAD (adb5be5715) + this branch's
+remaining hunks: `-run 'TestAutoImportCrossProject|
+TestAutoImportSymlinkedMonorepo|TestAutoImportPackageJsonImportsConditions|
+TestAutoImportProvider_wildcardExports3|
+TestAutoImportRelativePathToMonorepoPackage'` = 17/17;
+`paths_{stripSrc,toDist}` 2/2 x10 repeats after the UAF fix;
+`-run 'TestAutoImport|TestImportNameCodeFix'` = 263/263.
 
 ## Unported remainder (for the next wave)
 
