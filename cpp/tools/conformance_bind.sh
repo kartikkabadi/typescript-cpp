@@ -10,10 +10,11 @@ TSCPP=${TSCPP:-"$REPO_ROOT/cpp/build/tscpp"}
 
 run_one() {
   F="$1"
+  case "$F" in /*) ;; *) F="$REPO_ROOT/$F" ;; esac
   ID=$(printf '%s' "$F" | md5sum | cut -c1-12)
-  "$BINDUMP" "$F" > "/tmp/bind_go_$ID.txt" 2>/dev/null
+  (cd "$REPO_ROOT" && "$BINDUMP" "$F") > "/tmp/bind_go_$ID.txt" 2>/dev/null
   go_rc=$?
-  "$TSCPP" bind "$F" > "/tmp/bind_cpp_$ID.txt" 2>/dev/null
+  (cd "$REPO_ROOT" && "$TSCPP" bind "$F") > "/tmp/bind_cpp_$ID.txt" 2>/dev/null
   cpp_rc=$?
   # Fail closed: rc >= 126 means the tool never ran (not found / crashed) —
   # never compare two empty dumps and call it a match. Legit nonzero exits
@@ -43,7 +44,7 @@ elif [ $# -eq 2 ]; then
   fi
   cd "$REPO_ROOT"
   export -f run_one 2>/dev/null || true
-  export BINDUMP TSCPP
+  export REPO_ROOT BINDUMP TSCPP
   # `|| [ -n "$F" ]` keeps the final line when the list lacks a trailing
   # newline.
   while IFS= read -r F || [ -n "$F" ]; do printf '%s\0' "$F"; done < "$list" \
