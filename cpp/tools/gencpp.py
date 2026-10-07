@@ -971,7 +971,10 @@ def gen_nodes():
             "\tstd::vector<::tsc::Node*> resolveJSDoc(::tsc::Node* n);\n"
             "\tvoid setHasLazyJSDoc(bool lazy) { hasLazyJSDoc = lazy; }\n"
             "\tconst std::string& FileName() const { return fileName; }\n"
-            "\tconst std::string& Path() const { return fileName; }\n"
+            "\t// ast.go:2705 — Path is the in-project path (parseOptions.Path),"
+            " not the\n"
+            "\t// on-disk fileName.\n"
+            "\tconst std::string& Path() const { return parseOptions.Path; }\n"
             "\tconst std::string& Text() const { return text; }\n"
             "\t::tsc::SourceFileParseOptions ParseOptions() const { return parseOptions; }\n"
             "\tconst std::string& OriginalText() const;\n"
@@ -990,6 +993,67 @@ def gen_nodes():
             "\t::tsc::Arena nodeArena;\n"
             "\t::tsc::Arena jsdocArena;\n"
             "\tvoid copyFrom(SourceFile* other);\n"
+        ),
+    }
+
+    # Members emitted after the generated fields (they may reference them).
+    extra_members_tail = {
+        "SourceFile": (
+            "\n"
+            "\t// === slice: api ===\n"
+            "\t// ast.go:2452-2464 — per-key lazily-computed data store (Go: data"
+            " map +\n"
+            "\t// getDataCell under dataMu) plus GetPositionMap/IsBound/"
+            "BindOnce.\n"
+            "\tstd::unordered_map<uint64_t, "
+            "std::shared_ptr<::tsc::SourceFileDataCellBase>> data_;\n"
+            "\n"
+            "\t// GetPositionMap returns the PositionMap for this source file,"
+            " computing it lazily.\n"
+            "\t::tsc::PositionMap* GetPositionMap() {\n"
+            "\t\tpositionMapOnce.run([this] { positionMap = "
+            "::tsc::computePositionMap(text); });\n"
+            "\t\treturn positionMap;\n"
+            "\t}\n"
+            "\n"
+            "\tbool IsBound() const { return isBound.load(); }\n"
+            "\n"
+            "\tvoid BindOnce(const std::function<void()>& bind) {\n"
+            "\t\tbindOnce.run([&] {\n"
+            "\t\t\tbind();\n"
+            "\t\t\tisBound.store(true);\n"
+            "\t\t});\n"
+            "\t}\n"
+            "\n"
+            "\t// GetOrComputeData (ast.go:2404) — returns the cell's computed"
+            " value,\n"
+            "\t// computing it exactly once per key.\n"
+            "\ttemplate <typename T>\n"
+            "\tT* GetOrComputeData(uint64_t key, "
+            "const std::function<T*(SourceFile*)>& compute) {\n"
+            "\t\tif (key == 0) {\n"
+            "\t\t\tTSC_UNREACHABLE(\"invalid SourceFileDataKey; use "
+            "NewSourceFileDataKey\");\n"
+            "\t\t}\n"
+            "\t\tstd::shared_ptr<::tsc::SourceFileDataCellBase> base;\n"
+            "\t\t{\n"
+            "\t\t\tstd::lock_guard<std::mutex> lk(dataMu);\n"
+            "\t\t\tauto it = data_.find(key);\n"
+            "\t\t\tif (it != data_.end()) {\n"
+            "\t\t\t\tbase = it->second;\n"
+            "\t\t\t} else {\n"
+            "\t\t\t\tauto cell = "
+            "std::make_shared<::tsc::SourceFileDataCell<T>>();\n"
+            "\t\t\t\tdata_.emplace(key, cell);\n"
+            "\t\t\t\tbase = std::move(cell);\n"
+            "\t\t\t}\n"
+            "\t\t}\n"
+            "\t\tauto* cell = "
+            "static_cast<::tsc::SourceFileDataCell<T>*>(base.get());\n"
+            "\t\tcell->once.run([&] { cell->value = compute(this); });\n"
+            "\t\treturn cell->value;\n"
+            "\t}\n"
+            "\t// === end slice: api ===\n"
         ),
     }
 
@@ -1022,6 +1086,8 @@ def gen_nodes():
                 out.append(f"\t{cxx} {cf}{{}};\n")
             else:
                 out.append(f"\t{cxx} {cf};\n")
+        if sname in extra_members_tail:
+            out.append(extra_members_tail[sname])
         out.append("};\n\n")
 
     # ---- NodeFactory methods ----
@@ -1874,8 +1940,21 @@ def gen_nodes():
                 args.append(f"std::move({a})")
             else:
                 args.append(visit_arg(a))
-        vout.append(f"\t\t\treturn v.factory->{uname[0].lower() + uname[1:]}"
-                    f"(n, {', '.join(args)});\n\t\t}}\n")
+        # C++ function-argument evaluation order is unspecified; Go's
+        # VisitEachChild must invoke the visit hooks in forEachChild order
+        # (visit order is observable, e.g. findRightmostValidToken).
+        # Bind each argument to a temporary so hooks run left-to-right.
+        if len(args) > 1:
+            for i, a in enumerate(args):
+                vout.append(f"\t\t\tauto _c{i} = {a};\n")
+            vout.append(f"\t\t\treturn v.factory->"
+                        f"{uname[0].lower() + uname[1:]}(n, "
+                        f"{', '.join('_c%d' % i for i in range(len(args)))});"
+                        "\n\t\t}\n")
+        else:
+            vout.append(f"\t\t\treturn v.factory->"
+                        f"{uname[0].lower() + uname[1:]}"
+                        f"(n, {', '.join(args)});\n\t\t}}\n")
     vout.append("\t\tdefault:\n\t\t\treturn this;\n\t}\n}\n\n")
 
     vout.append("\n}  // namespace tsc\n")

@@ -5246,6 +5246,14 @@ inline ModifierList* deepCloneModifierList(NodeFactory& f,
                                            const ModifierList* m,
                                            bool syntheticLocation = true);
 
+inline std::vector<Node*> deepCloneNodeVec(
+    NodeFactory& f, const std::vector<Node*>& l,
+    bool syntheticLocation) {
+	std::vector<Node*> c = l;
+	for (auto& n : c) n = deepCloneNode(f, n, syntheticLocation);
+	return c;
+}
+
 inline NodeList* deepCloneNodeList(NodeFactory& f,
                                    const NodeList* l,
                                    bool syntheticLocation) {
@@ -6247,6 +6255,7 @@ inline Node* deepCloneNode(NodeFactory& f, const Node* node,
 		{
 			auto* n = static_cast<const JSDocTypeLiteral*>(node);
 			auto* c = f.arena().alloc<JSDocTypeLiteral>(*n);
+			c->JSDocPropertyTags = deepCloneNodeVec(f, n->JSDocPropertyTags, syntheticLocation);
 			if (syntheticLocation) c->loc = TextRange{-1, -1};
 			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;
@@ -6931,6 +6940,7 @@ inline Node* deepCloneNode(NodeFactory& f, const Node* node,
 		{
 			auto* n = static_cast<const SyntaxList*>(node);
 			auto* c = f.arena().alloc<SyntaxList>(*n);
+			c->Children = deepCloneNodeVec(f, n->Children, syntheticLocation);
 			if (syntheticLocation) c->loc = TextRange{-1, -1};
 			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
 			return c;

@@ -1175,7 +1175,9 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::ArrayLiteralExpression:
 		{
 			auto* n = static_cast<ArrayLiteralExpression*>(this);
-			return v.factory->updateArrayLiteralExpression(n, v.visitNodesHooked(n->Elements), n->MultiLine);
+			auto _c0 = v.visitNodesHooked(n->Elements);
+			auto _c1 = n->MultiLine;
+			return v.factory->updateArrayLiteralExpression(n, _c0, _c1);
 		}
 		case Kind::ArrayType:
 		{
@@ -1185,12 +1187,21 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::ArrowFunction:
 		{
 			auto* n = static_cast<ArrowFunction*>(this);
-			return v.factory->updateArrowFunction(n, v.visitModifiersHooked(n->modifiers), v.visitNodesHooked(n->TypeParameters), v.visitParametersHooked(n->Parameters), v.visitNodeHooked(n->Type), v.visitNodeHooked(n->FullSignature), v.visitNodeHooked(n->EqualsGreaterThanToken), v.visitFunctionBodyHooked(n->Body));
+			auto _c0 = v.visitModifiersHooked(n->modifiers);
+			auto _c1 = v.visitNodesHooked(n->TypeParameters);
+			auto _c2 = v.visitParametersHooked(n->Parameters);
+			auto _c3 = v.visitNodeHooked(n->Type);
+			auto _c4 = v.visitNodeHooked(n->FullSignature);
+			auto _c5 = v.visitNodeHooked(n->EqualsGreaterThanToken);
+			auto _c6 = v.visitFunctionBodyHooked(n->Body);
+			return v.factory->updateArrowFunction(n, _c0, _c1, _c2, _c3, _c4, _c5, _c6);
 		}
 		case Kind::AsExpression:
 		{
 			auto* n = static_cast<AsExpression*>(this);
-			return v.factory->updateAsExpression(n, v.visitNodeHooked(n->Expression), v.visitNodeHooked(n->Type));
+			auto _c0 = v.visitNodeHooked(n->Expression);
+			auto _c1 = v.visitNodeHooked(n->Type);
+			return v.factory->updateAsExpression(n, _c0, _c1);
 		}
 		case Kind::AwaitExpression:
 		{
@@ -1204,12 +1215,21 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::BinaryExpression:
 		{
 			auto* n = static_cast<BinaryExpression*>(this);
-			return v.factory->updateBinaryExpression(n, v.visitModifiersHooked(n->modifiers), v.visitNodeHooked(n->Left), v.visitNodeHooked(n->Type), v.visitNodeHooked(n->OperatorToken), v.visitNodeHooked(n->Right));
+			auto _c0 = v.visitModifiersHooked(n->modifiers);
+			auto _c1 = v.visitNodeHooked(n->Left);
+			auto _c2 = v.visitNodeHooked(n->Type);
+			auto _c3 = v.visitNodeHooked(n->OperatorToken);
+			auto _c4 = v.visitNodeHooked(n->Right);
+			return v.factory->updateBinaryExpression(n, _c0, _c1, _c2, _c3, _c4);
 		}
 		case Kind::BindingElement:
 		{
 			auto* n = static_cast<BindingElement*>(this);
-			return v.factory->updateBindingElement(n, v.visitNodeHooked(n->DotDotDotToken), v.visitNodeHooked(n->PropertyName), v.visitNodeHooked(n->name), v.visitNodeHooked(n->Initializer));
+			auto _c0 = v.visitNodeHooked(n->DotDotDotToken);
+			auto _c1 = v.visitNodeHooked(n->PropertyName);
+			auto _c2 = v.visitNodeHooked(n->name);
+			auto _c3 = v.visitNodeHooked(n->Initializer);
+			return v.factory->updateBindingElement(n, _c0, _c1, _c2, _c3);
 		}
 		case Kind::ObjectBindingPattern:
 		case Kind::ArrayBindingPattern:
@@ -1220,7 +1240,9 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::Block:
 		{
 			auto* n = static_cast<Block*>(this);
-			return v.factory->updateBlock(n, v.visitNodesHooked(n->Statements), n->MultiLine);
+			auto _c0 = v.visitNodesHooked(n->Statements);
+			auto _c1 = n->MultiLine;
+			return v.factory->updateBlock(n, _c0, _c1);
 		}
 		case Kind::BreakStatement:
 		{
@@ -1230,12 +1252,20 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::CallExpression:
 		{
 			auto* n = static_cast<CallExpression*>(this);
-			return v.factory->updateCallExpression(n, v.visitNodeHooked(n->Expression), v.visitNodeHooked(n->QuestionDotToken), v.visitNodesHooked(n->TypeArguments), v.visitNodesHooked(n->Arguments), n->flags);
+			auto _c0 = v.visitNodeHooked(n->Expression);
+			auto _c1 = v.visitNodeHooked(n->QuestionDotToken);
+			auto _c2 = v.visitNodesHooked(n->TypeArguments);
+			auto _c3 = v.visitNodesHooked(n->Arguments);
+			auto _c4 = n->flags;
+			return v.factory->updateCallExpression(n, _c0, _c1, _c2, _c3, _c4);
 		}
 		case Kind::CallSignature:
 		{
 			auto* n = static_cast<CallSignatureDeclaration*>(this);
-			return v.factory->updateCallSignatureDeclaration(n, v.visitNodesHooked(n->TypeParameters), v.visitNodesHooked(n->Parameters), v.visitNodeHooked(n->Type));
+			auto _c0 = v.visitNodesHooked(n->TypeParameters);
+			auto _c1 = v.visitNodesHooked(n->Parameters);
+			auto _c2 = v.visitNodeHooked(n->Type);
+			return v.factory->updateCallSignatureDeclaration(n, _c0, _c1, _c2);
 		}
 		case Kind::CaseBlock:
 		{
@@ -1246,27 +1276,43 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::DefaultClause:
 		{
 			auto* n = static_cast<CaseOrDefaultClause*>(this);
-			return v.factory->updateCaseOrDefaultClause(n, v.visitNodeHooked(n->Expression), v.visitNodesHooked(n->Statements));
+			auto _c0 = v.visitNodeHooked(n->Expression);
+			auto _c1 = v.visitNodesHooked(n->Statements);
+			return v.factory->updateCaseOrDefaultClause(n, _c0, _c1);
 		}
 		case Kind::CatchClause:
 		{
 			auto* n = static_cast<CatchClause*>(this);
-			return v.factory->updateCatchClause(n, v.visitNodeHooked(n->VariableDeclaration), v.visitNodeHooked(n->Block));
+			auto _c0 = v.visitNodeHooked(n->VariableDeclaration);
+			auto _c1 = v.visitNodeHooked(n->Block);
+			return v.factory->updateCatchClause(n, _c0, _c1);
 		}
 		case Kind::ClassDeclaration:
 		{
 			auto* n = static_cast<ClassDeclaration*>(this);
-			return v.factory->updateClassDeclaration(n, v.visitModifiersHooked(n->modifiers), v.visitNodeHooked(n->name), v.visitNodesHooked(n->TypeParameters), v.visitNodesHooked(n->HeritageClauses), v.visitNodesHooked(n->Members));
+			auto _c0 = v.visitModifiersHooked(n->modifiers);
+			auto _c1 = v.visitNodeHooked(n->name);
+			auto _c2 = v.visitNodesHooked(n->TypeParameters);
+			auto _c3 = v.visitNodesHooked(n->HeritageClauses);
+			auto _c4 = v.visitNodesHooked(n->Members);
+			return v.factory->updateClassDeclaration(n, _c0, _c1, _c2, _c3, _c4);
 		}
 		case Kind::ClassExpression:
 		{
 			auto* n = static_cast<ClassExpression*>(this);
-			return v.factory->updateClassExpression(n, v.visitModifiersHooked(n->modifiers), v.visitNodeHooked(n->name), v.visitNodesHooked(n->TypeParameters), v.visitNodesHooked(n->HeritageClauses), v.visitNodesHooked(n->Members));
+			auto _c0 = v.visitModifiersHooked(n->modifiers);
+			auto _c1 = v.visitNodeHooked(n->name);
+			auto _c2 = v.visitNodesHooked(n->TypeParameters);
+			auto _c3 = v.visitNodesHooked(n->HeritageClauses);
+			auto _c4 = v.visitNodesHooked(n->Members);
+			return v.factory->updateClassExpression(n, _c0, _c1, _c2, _c3, _c4);
 		}
 		case Kind::ClassStaticBlockDeclaration:
 		{
 			auto* n = static_cast<ClassStaticBlockDeclaration*>(this);
-			return v.factory->updateClassStaticBlockDeclaration(n, v.visitModifiersHooked(n->modifiers), v.visitNodeHooked(n->Body));
+			auto _c0 = v.visitModifiersHooked(n->modifiers);
+			auto _c1 = v.visitNodeHooked(n->Body);
+			return v.factory->updateClassStaticBlockDeclaration(n, _c0, _c1);
 		}
 		case Kind::ComputedPropertyName:
 		{
@@ -1276,27 +1322,49 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::ConditionalExpression:
 		{
 			auto* n = static_cast<ConditionalExpression*>(this);
-			return v.factory->updateConditionalExpression(n, v.visitNodeHooked(n->Condition), v.visitNodeHooked(n->QuestionToken), v.visitNodeHooked(n->WhenTrue), v.visitNodeHooked(n->ColonToken), v.visitNodeHooked(n->WhenFalse));
+			auto _c0 = v.visitNodeHooked(n->Condition);
+			auto _c1 = v.visitNodeHooked(n->QuestionToken);
+			auto _c2 = v.visitNodeHooked(n->WhenTrue);
+			auto _c3 = v.visitNodeHooked(n->ColonToken);
+			auto _c4 = v.visitNodeHooked(n->WhenFalse);
+			return v.factory->updateConditionalExpression(n, _c0, _c1, _c2, _c3, _c4);
 		}
 		case Kind::ConditionalType:
 		{
 			auto* n = static_cast<ConditionalTypeNode*>(this);
-			return v.factory->updateConditionalTypeNode(n, v.visitNodeHooked(n->CheckType), v.visitNodeHooked(n->ExtendsType), v.visitNodeHooked(n->TrueType), v.visitNodeHooked(n->FalseType));
+			auto _c0 = v.visitNodeHooked(n->CheckType);
+			auto _c1 = v.visitNodeHooked(n->ExtendsType);
+			auto _c2 = v.visitNodeHooked(n->TrueType);
+			auto _c3 = v.visitNodeHooked(n->FalseType);
+			return v.factory->updateConditionalTypeNode(n, _c0, _c1, _c2, _c3);
 		}
 		case Kind::ConstructSignature:
 		{
 			auto* n = static_cast<ConstructSignatureDeclaration*>(this);
-			return v.factory->updateConstructSignatureDeclaration(n, v.visitNodesHooked(n->TypeParameters), v.visitNodesHooked(n->Parameters), v.visitNodeHooked(n->Type));
+			auto _c0 = v.visitNodesHooked(n->TypeParameters);
+			auto _c1 = v.visitNodesHooked(n->Parameters);
+			auto _c2 = v.visitNodeHooked(n->Type);
+			return v.factory->updateConstructSignatureDeclaration(n, _c0, _c1, _c2);
 		}
 		case Kind::Constructor:
 		{
 			auto* n = static_cast<ConstructorDeclaration*>(this);
-			return v.factory->updateConstructorDeclaration(n, v.visitModifiersHooked(n->modifiers), v.visitNodesHooked(n->TypeParameters), v.visitParametersHooked(n->Parameters), v.visitNodeHooked(n->Type), v.visitNodeHooked(n->FullSignature), v.visitFunctionBodyHooked(n->Body));
+			auto _c0 = v.visitModifiersHooked(n->modifiers);
+			auto _c1 = v.visitNodesHooked(n->TypeParameters);
+			auto _c2 = v.visitParametersHooked(n->Parameters);
+			auto _c3 = v.visitNodeHooked(n->Type);
+			auto _c4 = v.visitNodeHooked(n->FullSignature);
+			auto _c5 = v.visitFunctionBodyHooked(n->Body);
+			return v.factory->updateConstructorDeclaration(n, _c0, _c1, _c2, _c3, _c4, _c5);
 		}
 		case Kind::ConstructorType:
 		{
 			auto* n = static_cast<ConstructorTypeNode*>(this);
-			return v.factory->updateConstructorTypeNode(n, v.visitModifiersHooked(n->modifiers), v.visitNodesHooked(n->TypeParameters), v.visitNodesHooked(n->Parameters), v.visitNodeHooked(n->Type));
+			auto _c0 = v.visitModifiersHooked(n->modifiers);
+			auto _c1 = v.visitNodesHooked(n->TypeParameters);
+			auto _c2 = v.visitNodesHooked(n->Parameters);
+			auto _c3 = v.visitNodeHooked(n->Type);
+			return v.factory->updateConstructorTypeNode(n, _c0, _c1, _c2, _c3);
 		}
 		case Kind::ContinueStatement:
 		{
@@ -1320,12 +1388,18 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::DoStatement:
 		{
 			auto* n = static_cast<DoStatement*>(this);
-			return v.factory->updateDoStatement(n, v.visitIterationBodyHooked(n->Statement), v.visitNodeHooked(n->Expression));
+			auto _c0 = v.visitIterationBodyHooked(n->Statement);
+			auto _c1 = v.visitNodeHooked(n->Expression);
+			return v.factory->updateDoStatement(n, _c0, _c1);
 		}
 		case Kind::ElementAccessExpression:
 		{
 			auto* n = static_cast<ElementAccessExpression*>(this);
-			return v.factory->updateElementAccessExpression(n, v.visitNodeHooked(n->Expression), v.visitNodeHooked(n->QuestionDotToken), v.visitNodeHooked(n->ArgumentExpression), n->flags);
+			auto _c0 = v.visitNodeHooked(n->Expression);
+			auto _c1 = v.visitNodeHooked(n->QuestionDotToken);
+			auto _c2 = v.visitNodeHooked(n->ArgumentExpression);
+			auto _c3 = n->flags;
+			return v.factory->updateElementAccessExpression(n, _c0, _c1, _c2, _c3);
 		}
 		case Kind::EmptyStatement:
 		{
@@ -1334,27 +1408,44 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::EnumDeclaration:
 		{
 			auto* n = static_cast<EnumDeclaration*>(this);
-			return v.factory->updateEnumDeclaration(n, v.visitModifiersHooked(n->modifiers), v.visitNodeHooked(n->name), v.visitNodesHooked(n->Members));
+			auto _c0 = v.visitModifiersHooked(n->modifiers);
+			auto _c1 = v.visitNodeHooked(n->name);
+			auto _c2 = v.visitNodesHooked(n->Members);
+			return v.factory->updateEnumDeclaration(n, _c0, _c1, _c2);
 		}
 		case Kind::EnumMember:
 		{
 			auto* n = static_cast<EnumMember*>(this);
-			return v.factory->updateEnumMember(n, v.visitNodeHooked(n->name), v.visitNodeHooked(n->Initializer));
+			auto _c0 = v.visitNodeHooked(n->name);
+			auto _c1 = v.visitNodeHooked(n->Initializer);
+			return v.factory->updateEnumMember(n, _c0, _c1);
 		}
 		case Kind::ExportAssignment:
 		{
 			auto* n = static_cast<ExportAssignment*>(this);
-			return v.factory->updateExportAssignment(n, v.visitModifiersHooked(n->modifiers), n->IsExportEquals, v.visitNodeHooked(n->Type), v.visitNodeHooked(n->Expression));
+			auto _c0 = v.visitModifiersHooked(n->modifiers);
+			auto _c1 = n->IsExportEquals;
+			auto _c2 = v.visitNodeHooked(n->Type);
+			auto _c3 = v.visitNodeHooked(n->Expression);
+			return v.factory->updateExportAssignment(n, _c0, _c1, _c2, _c3);
 		}
 		case Kind::ExportDeclaration:
 		{
 			auto* n = static_cast<ExportDeclaration*>(this);
-			return v.factory->updateExportDeclaration(n, v.visitModifiersHooked(n->modifiers), n->IsTypeOnly, v.visitNodeHooked(n->ExportClause), v.visitNodeHooked(n->ModuleSpecifier), v.visitNodeHooked(n->Attributes));
+			auto _c0 = v.visitModifiersHooked(n->modifiers);
+			auto _c1 = n->IsTypeOnly;
+			auto _c2 = v.visitNodeHooked(n->ExportClause);
+			auto _c3 = v.visitNodeHooked(n->ModuleSpecifier);
+			auto _c4 = v.visitNodeHooked(n->Attributes);
+			return v.factory->updateExportDeclaration(n, _c0, _c1, _c2, _c3, _c4);
 		}
 		case Kind::ExportSpecifier:
 		{
 			auto* n = static_cast<ExportSpecifier*>(this);
-			return v.factory->updateExportSpecifier(n, n->IsTypeOnly, v.visitNodeHooked(n->PropertyName), v.visitNodeHooked(n->name));
+			auto _c0 = n->IsTypeOnly;
+			auto _c1 = v.visitNodeHooked(n->PropertyName);
+			auto _c2 = v.visitNodeHooked(n->name);
+			return v.factory->updateExportSpecifier(n, _c0, _c1, _c2);
 		}
 		case Kind::ExpressionStatement:
 		{
@@ -1364,7 +1455,9 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::ExpressionWithTypeArguments:
 		{
 			auto* n = static_cast<ExpressionWithTypeArguments*>(this);
-			return v.factory->updateExpressionWithTypeArguments(n, v.visitNodeHooked(n->Expression), v.visitNodesHooked(n->TypeArguments));
+			auto _c0 = v.visitNodeHooked(n->Expression);
+			auto _c1 = v.visitNodesHooked(n->TypeArguments);
+			return v.factory->updateExpressionWithTypeArguments(n, _c0, _c1);
 		}
 		case Kind::ExternalModuleReference:
 		{
@@ -1375,37 +1468,73 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::ForInStatement:
 		{
 			auto* n = static_cast<ForInOrOfStatement*>(this);
-			return v.factory->updateForInOrOfStatement(n, v.visitNodeHooked(n->AwaitModifier), v.visitNodeHooked(n->Initializer), v.visitNodeHooked(n->Expression), v.visitIterationBodyHooked(n->Statement));
+			auto _c0 = v.visitNodeHooked(n->AwaitModifier);
+			auto _c1 = v.visitNodeHooked(n->Initializer);
+			auto _c2 = v.visitNodeHooked(n->Expression);
+			auto _c3 = v.visitIterationBodyHooked(n->Statement);
+			return v.factory->updateForInOrOfStatement(n, _c0, _c1, _c2, _c3);
 		}
 		case Kind::ForStatement:
 		{
 			auto* n = static_cast<ForStatement*>(this);
-			return v.factory->updateForStatement(n, v.visitNodeHooked(n->Initializer), v.visitNodeHooked(n->Condition), v.visitNodeHooked(n->Incrementor), v.visitIterationBodyHooked(n->Statement));
+			auto _c0 = v.visitNodeHooked(n->Initializer);
+			auto _c1 = v.visitNodeHooked(n->Condition);
+			auto _c2 = v.visitNodeHooked(n->Incrementor);
+			auto _c3 = v.visitIterationBodyHooked(n->Statement);
+			return v.factory->updateForStatement(n, _c0, _c1, _c2, _c3);
 		}
 		case Kind::FunctionDeclaration:
 		{
 			auto* n = static_cast<FunctionDeclaration*>(this);
-			return v.factory->updateFunctionDeclaration(n, v.visitModifiersHooked(n->modifiers), v.visitNodeHooked(n->AsteriskToken), v.visitNodeHooked(n->name), v.visitNodesHooked(n->TypeParameters), v.visitParametersHooked(n->Parameters), v.visitNodeHooked(n->Type), v.visitNodeHooked(n->FullSignature), v.visitFunctionBodyHooked(n->Body));
+			auto _c0 = v.visitModifiersHooked(n->modifiers);
+			auto _c1 = v.visitNodeHooked(n->AsteriskToken);
+			auto _c2 = v.visitNodeHooked(n->name);
+			auto _c3 = v.visitNodesHooked(n->TypeParameters);
+			auto _c4 = v.visitParametersHooked(n->Parameters);
+			auto _c5 = v.visitNodeHooked(n->Type);
+			auto _c6 = v.visitNodeHooked(n->FullSignature);
+			auto _c7 = v.visitFunctionBodyHooked(n->Body);
+			return v.factory->updateFunctionDeclaration(n, _c0, _c1, _c2, _c3, _c4, _c5, _c6, _c7);
 		}
 		case Kind::FunctionExpression:
 		{
 			auto* n = static_cast<FunctionExpression*>(this);
-			return v.factory->updateFunctionExpression(n, v.visitModifiersHooked(n->modifiers), v.visitNodeHooked(n->AsteriskToken), v.visitNodeHooked(n->name), v.visitNodesHooked(n->TypeParameters), v.visitParametersHooked(n->Parameters), v.visitNodeHooked(n->Type), v.visitNodeHooked(n->FullSignature), v.visitFunctionBodyHooked(n->Body));
+			auto _c0 = v.visitModifiersHooked(n->modifiers);
+			auto _c1 = v.visitNodeHooked(n->AsteriskToken);
+			auto _c2 = v.visitNodeHooked(n->name);
+			auto _c3 = v.visitNodesHooked(n->TypeParameters);
+			auto _c4 = v.visitParametersHooked(n->Parameters);
+			auto _c5 = v.visitNodeHooked(n->Type);
+			auto _c6 = v.visitNodeHooked(n->FullSignature);
+			auto _c7 = v.visitFunctionBodyHooked(n->Body);
+			return v.factory->updateFunctionExpression(n, _c0, _c1, _c2, _c3, _c4, _c5, _c6, _c7);
 		}
 		case Kind::FunctionType:
 		{
 			auto* n = static_cast<FunctionTypeNode*>(this);
-			return v.factory->updateFunctionTypeNode(n, v.visitNodesHooked(n->TypeParameters), v.visitNodesHooked(n->Parameters), v.visitNodeHooked(n->Type));
+			auto _c0 = v.visitNodesHooked(n->TypeParameters);
+			auto _c1 = v.visitNodesHooked(n->Parameters);
+			auto _c2 = v.visitNodeHooked(n->Type);
+			return v.factory->updateFunctionTypeNode(n, _c0, _c1, _c2);
 		}
 		case Kind::GetAccessor:
 		{
 			auto* n = static_cast<GetAccessorDeclaration*>(this);
-			return v.factory->updateGetAccessorDeclaration(n, v.visitModifiersHooked(n->modifiers), v.visitNodeHooked(n->name), v.visitNodesHooked(n->TypeParameters), v.visitParametersHooked(n->Parameters), v.visitNodeHooked(n->Type), v.visitNodeHooked(n->FullSignature), v.visitFunctionBodyHooked(n->Body));
+			auto _c0 = v.visitModifiersHooked(n->modifiers);
+			auto _c1 = v.visitNodeHooked(n->name);
+			auto _c2 = v.visitNodesHooked(n->TypeParameters);
+			auto _c3 = v.visitParametersHooked(n->Parameters);
+			auto _c4 = v.visitNodeHooked(n->Type);
+			auto _c5 = v.visitNodeHooked(n->FullSignature);
+			auto _c6 = v.visitFunctionBodyHooked(n->Body);
+			return v.factory->updateGetAccessorDeclaration(n, _c0, _c1, _c2, _c3, _c4, _c5, _c6);
 		}
 		case Kind::HeritageClause:
 		{
 			auto* n = static_cast<HeritageClause*>(this);
-			return v.factory->updateHeritageClause(n, n->Token, v.visitNodesHooked(n->Types));
+			auto _c0 = n->Token;
+			auto _c1 = v.visitNodesHooked(n->Types);
+			return v.factory->updateHeritageClause(n, _c0, _c1);
 		}
 		case Kind::Identifier:
 		{
@@ -1414,53 +1543,85 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::IfStatement:
 		{
 			auto* n = static_cast<IfStatement*>(this);
-			return v.factory->updateIfStatement(n, v.visitNodeHooked(n->Expression), v.visitEmbeddedStatementHooked(n->ThenStatement), v.visitEmbeddedStatementHooked(n->ElseStatement));
+			auto _c0 = v.visitNodeHooked(n->Expression);
+			auto _c1 = v.visitEmbeddedStatementHooked(n->ThenStatement);
+			auto _c2 = v.visitEmbeddedStatementHooked(n->ElseStatement);
+			return v.factory->updateIfStatement(n, _c0, _c1, _c2);
 		}
 		case Kind::ImportAttribute:
 		{
 			auto* n = static_cast<ImportAttribute*>(this);
-			return v.factory->updateImportAttribute(n, v.visitNodeHooked(n->name), v.visitNodeHooked(n->Value));
+			auto _c0 = v.visitNodeHooked(n->name);
+			auto _c1 = v.visitNodeHooked(n->Value);
+			return v.factory->updateImportAttribute(n, _c0, _c1);
 		}
 		case Kind::ImportAttributes:
 		{
 			auto* n = static_cast<ImportAttributes*>(this);
-			return v.factory->updateImportAttributes(n, n->Token, v.visitNodesHooked(n->Attributes), n->MultiLine);
+			auto _c0 = n->Token;
+			auto _c1 = v.visitNodesHooked(n->Attributes);
+			auto _c2 = n->MultiLine;
+			return v.factory->updateImportAttributes(n, _c0, _c1, _c2);
 		}
 		case Kind::ImportClause:
 		{
 			auto* n = static_cast<ImportClause*>(this);
-			return v.factory->updateImportClause(n, n->PhaseModifier, v.visitNodeHooked(n->name), v.visitNodeHooked(n->NamedBindings));
+			auto _c0 = n->PhaseModifier;
+			auto _c1 = v.visitNodeHooked(n->name);
+			auto _c2 = v.visitNodeHooked(n->NamedBindings);
+			return v.factory->updateImportClause(n, _c0, _c1, _c2);
 		}
 		case Kind::ImportDeclaration:
 		case Kind::JSImportDeclaration:
 		{
 			auto* n = static_cast<ImportDeclaration*>(this);
-			return v.factory->updateImportDeclaration(n, v.visitModifiersHooked(n->modifiers), v.visitNodeHooked(n->ImportClause), v.visitNodeHooked(n->ModuleSpecifier), v.visitNodeHooked(n->Attributes));
+			auto _c0 = v.visitModifiersHooked(n->modifiers);
+			auto _c1 = v.visitNodeHooked(n->ImportClause);
+			auto _c2 = v.visitNodeHooked(n->ModuleSpecifier);
+			auto _c3 = v.visitNodeHooked(n->Attributes);
+			return v.factory->updateImportDeclaration(n, _c0, _c1, _c2, _c3);
 		}
 		case Kind::ImportEqualsDeclaration:
 		{
 			auto* n = static_cast<ImportEqualsDeclaration*>(this);
-			return v.factory->updateImportEqualsDeclaration(n, v.visitModifiersHooked(n->modifiers), n->IsTypeOnly, v.visitNodeHooked(n->name), v.visitNodeHooked(n->ModuleReference));
+			auto _c0 = v.visitModifiersHooked(n->modifiers);
+			auto _c1 = n->IsTypeOnly;
+			auto _c2 = v.visitNodeHooked(n->name);
+			auto _c3 = v.visitNodeHooked(n->ModuleReference);
+			return v.factory->updateImportEqualsDeclaration(n, _c0, _c1, _c2, _c3);
 		}
 		case Kind::ImportSpecifier:
 		{
 			auto* n = static_cast<ImportSpecifier*>(this);
-			return v.factory->updateImportSpecifier(n, n->IsTypeOnly, v.visitNodeHooked(n->PropertyName), v.visitNodeHooked(n->name));
+			auto _c0 = n->IsTypeOnly;
+			auto _c1 = v.visitNodeHooked(n->PropertyName);
+			auto _c2 = v.visitNodeHooked(n->name);
+			return v.factory->updateImportSpecifier(n, _c0, _c1, _c2);
 		}
 		case Kind::ImportType:
 		{
 			auto* n = static_cast<ImportTypeNode*>(this);
-			return v.factory->updateImportTypeNode(n, n->IsTypeOf, v.visitNodeHooked(n->Argument), v.visitNodeHooked(n->Attributes), v.visitNodeHooked(n->Qualifier), v.visitNodesHooked(n->TypeArguments));
+			auto _c0 = n->IsTypeOf;
+			auto _c1 = v.visitNodeHooked(n->Argument);
+			auto _c2 = v.visitNodeHooked(n->Attributes);
+			auto _c3 = v.visitNodeHooked(n->Qualifier);
+			auto _c4 = v.visitNodesHooked(n->TypeArguments);
+			return v.factory->updateImportTypeNode(n, _c0, _c1, _c2, _c3, _c4);
 		}
 		case Kind::IndexSignature:
 		{
 			auto* n = static_cast<IndexSignatureDeclaration*>(this);
-			return v.factory->updateIndexSignatureDeclaration(n, v.visitModifiersHooked(n->modifiers), v.visitNodesHooked(n->Parameters), v.visitNodeHooked(n->Type));
+			auto _c0 = v.visitModifiersHooked(n->modifiers);
+			auto _c1 = v.visitNodesHooked(n->Parameters);
+			auto _c2 = v.visitNodeHooked(n->Type);
+			return v.factory->updateIndexSignatureDeclaration(n, _c0, _c1, _c2);
 		}
 		case Kind::IndexedAccessType:
 		{
 			auto* n = static_cast<IndexedAccessTypeNode*>(this);
-			return v.factory->updateIndexedAccessTypeNode(n, v.visitNodeHooked(n->ObjectType), v.visitNodeHooked(n->IndexType));
+			auto _c0 = v.visitNodeHooked(n->ObjectType);
+			auto _c1 = v.visitNodeHooked(n->IndexType);
+			return v.factory->updateIndexedAccessTypeNode(n, _c0, _c1);
 		}
 		case Kind::InferType:
 		{
@@ -1470,7 +1631,12 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::InterfaceDeclaration:
 		{
 			auto* n = static_cast<InterfaceDeclaration*>(this);
-			return v.factory->updateInterfaceDeclaration(n, v.visitModifiersHooked(n->modifiers), v.visitNodeHooked(n->name), v.visitNodesHooked(n->TypeParameters), v.visitNodesHooked(n->HeritageClauses), v.visitNodesHooked(n->Members));
+			auto _c0 = v.visitModifiersHooked(n->modifiers);
+			auto _c1 = v.visitNodeHooked(n->name);
+			auto _c2 = v.visitNodesHooked(n->TypeParameters);
+			auto _c3 = v.visitNodesHooked(n->HeritageClauses);
+			auto _c4 = v.visitNodesHooked(n->Members);
+			return v.factory->updateInterfaceDeclaration(n, _c0, _c1, _c2, _c3, _c4);
 		}
 		case Kind::IntersectionType:
 		{
@@ -1480,7 +1646,9 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::JSDoc:
 		{
 			auto* n = static_cast<JSDoc*>(this);
-			return v.factory->updateJSDoc(n, v.visitNodesHooked(n->Comment), v.visitNodesHooked(n->Tags));
+			auto _c0 = v.visitNodesHooked(n->Comment);
+			auto _c1 = v.visitNodesHooked(n->Tags);
+			return v.factory->updateJSDoc(n, _c0, _c1);
 		}
 		case Kind::JSDocAllType:
 		{
@@ -1489,42 +1657,65 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::JSDocAugmentsTag:
 		{
 			auto* n = static_cast<JSDocAugmentsTag*>(this);
-			return v.factory->updateJSDocAugmentsTag(n, v.visitNodeHooked(n->TagName), v.visitNodeHooked(n->ClassName), v.visitNodesHooked(n->Comment));
+			auto _c0 = v.visitNodeHooked(n->TagName);
+			auto _c1 = v.visitNodeHooked(n->ClassName);
+			auto _c2 = v.visitNodesHooked(n->Comment);
+			return v.factory->updateJSDocAugmentsTag(n, _c0, _c1, _c2);
 		}
 		case Kind::JSDocCallbackTag:
 		{
 			auto* n = static_cast<JSDocCallbackTag*>(this);
-			return v.factory->updateJSDocCallbackTag(n, v.visitNodeHooked(n->TagName), v.visitNodeHooked(n->TypeExpression), v.visitNodeHooked(n->name), v.visitNodesHooked(n->Comment));
+			auto _c0 = v.visitNodeHooked(n->TagName);
+			auto _c1 = v.visitNodeHooked(n->TypeExpression);
+			auto _c2 = v.visitNodeHooked(n->name);
+			auto _c3 = v.visitNodesHooked(n->Comment);
+			return v.factory->updateJSDocCallbackTag(n, _c0, _c1, _c2, _c3);
 		}
 		case Kind::JSDocDeprecatedTag:
 		{
 			auto* n = static_cast<JSDocDeprecatedTag*>(this);
-			return v.factory->updateJSDocDeprecatedTag(n, v.visitNodeHooked(n->TagName), v.visitNodesHooked(n->Comment));
+			auto _c0 = v.visitNodeHooked(n->TagName);
+			auto _c1 = v.visitNodesHooked(n->Comment);
+			return v.factory->updateJSDocDeprecatedTag(n, _c0, _c1);
 		}
 		case Kind::JSDocImplementsTag:
 		{
 			auto* n = static_cast<JSDocImplementsTag*>(this);
-			return v.factory->updateJSDocImplementsTag(n, v.visitNodeHooked(n->TagName), v.visitNodeHooked(n->ClassName), v.visitNodesHooked(n->Comment));
+			auto _c0 = v.visitNodeHooked(n->TagName);
+			auto _c1 = v.visitNodeHooked(n->ClassName);
+			auto _c2 = v.visitNodesHooked(n->Comment);
+			return v.factory->updateJSDocImplementsTag(n, _c0, _c1, _c2);
 		}
 		case Kind::JSDocImportTag:
 		{
 			auto* n = static_cast<JSDocImportTag*>(this);
-			return v.factory->updateJSDocImportTag(n, v.visitNodeHooked(n->TagName), v.visitNodeHooked(n->ImportClause), v.visitNodeHooked(n->ModuleSpecifier), v.visitNodeHooked(n->Attributes), v.visitNodesHooked(n->Comment));
+			auto _c0 = v.visitNodeHooked(n->TagName);
+			auto _c1 = v.visitNodeHooked(n->ImportClause);
+			auto _c2 = v.visitNodeHooked(n->ModuleSpecifier);
+			auto _c3 = v.visitNodeHooked(n->Attributes);
+			auto _c4 = v.visitNodesHooked(n->Comment);
+			return v.factory->updateJSDocImportTag(n, _c0, _c1, _c2, _c3, _c4);
 		}
 		case Kind::JSDocLink:
 		{
 			auto* n = static_cast<JSDocLink*>(this);
-			return v.factory->updateJSDocLink(n, v.visitNodeHooked(n->name), n->text);
+			auto _c0 = v.visitNodeHooked(n->name);
+			auto _c1 = n->text;
+			return v.factory->updateJSDocLink(n, _c0, _c1);
 		}
 		case Kind::JSDocLinkCode:
 		{
 			auto* n = static_cast<JSDocLinkCode*>(this);
-			return v.factory->updateJSDocLinkCode(n, v.visitNodeHooked(n->name), n->text);
+			auto _c0 = v.visitNodeHooked(n->name);
+			auto _c1 = n->text;
+			return v.factory->updateJSDocLinkCode(n, _c0, _c1);
 		}
 		case Kind::JSDocLinkPlain:
 		{
 			auto* n = static_cast<JSDocLinkPlain*>(this);
-			return v.factory->updateJSDocLinkPlain(n, v.visitNodeHooked(n->name), n->text);
+			auto _c0 = v.visitNodeHooked(n->name);
+			auto _c1 = n->text;
+			return v.factory->updateJSDocLinkPlain(n, _c0, _c1);
 		}
 		case Kind::JSDocNameReference:
 		{
@@ -1549,63 +1740,98 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::JSDocOverloadTag:
 		{
 			auto* n = static_cast<JSDocOverloadTag*>(this);
-			return v.factory->updateJSDocOverloadTag(n, v.visitNodeHooked(n->TagName), v.visitNodeHooked(n->TypeExpression), v.visitNodesHooked(n->Comment));
+			auto _c0 = v.visitNodeHooked(n->TagName);
+			auto _c1 = v.visitNodeHooked(n->TypeExpression);
+			auto _c2 = v.visitNodesHooked(n->Comment);
+			return v.factory->updateJSDocOverloadTag(n, _c0, _c1, _c2);
 		}
 		case Kind::JSDocOverrideTag:
 		{
 			auto* n = static_cast<JSDocOverrideTag*>(this);
-			return v.factory->updateJSDocOverrideTag(n, v.visitNodeHooked(n->TagName), v.visitNodesHooked(n->Comment));
+			auto _c0 = v.visitNodeHooked(n->TagName);
+			auto _c1 = v.visitNodesHooked(n->Comment);
+			return v.factory->updateJSDocOverrideTag(n, _c0, _c1);
 		}
 		case Kind::JSDocParameterTag:
 		case Kind::JSDocPropertyTag:
 		{
 			auto* n = static_cast<JSDocParameterOrPropertyTag*>(this);
-			return v.factory->updateJSDocParameterOrPropertyTag(n, v.visitNodeHooked(n->TagName), v.visitNodeHooked(n->name), n->IsBracketed, v.visitNodeHooked(n->TypeExpression), n->IsNameFirst, v.visitNodesHooked(n->Comment));
+			auto _c0 = v.visitNodeHooked(n->TagName);
+			auto _c1 = v.visitNodeHooked(n->name);
+			auto _c2 = n->IsBracketed;
+			auto _c3 = v.visitNodeHooked(n->TypeExpression);
+			auto _c4 = n->IsNameFirst;
+			auto _c5 = v.visitNodesHooked(n->Comment);
+			return v.factory->updateJSDocParameterOrPropertyTag(n, _c0, _c1, _c2, _c3, _c4, _c5);
 		}
 		case Kind::JSDocPrivateTag:
 		{
 			auto* n = static_cast<JSDocPrivateTag*>(this);
-			return v.factory->updateJSDocPrivateTag(n, v.visitNodeHooked(n->TagName), v.visitNodesHooked(n->Comment));
+			auto _c0 = v.visitNodeHooked(n->TagName);
+			auto _c1 = v.visitNodesHooked(n->Comment);
+			return v.factory->updateJSDocPrivateTag(n, _c0, _c1);
 		}
 		case Kind::JSDocProtectedTag:
 		{
 			auto* n = static_cast<JSDocProtectedTag*>(this);
-			return v.factory->updateJSDocProtectedTag(n, v.visitNodeHooked(n->TagName), v.visitNodesHooked(n->Comment));
+			auto _c0 = v.visitNodeHooked(n->TagName);
+			auto _c1 = v.visitNodesHooked(n->Comment);
+			return v.factory->updateJSDocProtectedTag(n, _c0, _c1);
 		}
 		case Kind::JSDocPublicTag:
 		{
 			auto* n = static_cast<JSDocPublicTag*>(this);
-			return v.factory->updateJSDocPublicTag(n, v.visitNodeHooked(n->TagName), v.visitNodesHooked(n->Comment));
+			auto _c0 = v.visitNodeHooked(n->TagName);
+			auto _c1 = v.visitNodesHooked(n->Comment);
+			return v.factory->updateJSDocPublicTag(n, _c0, _c1);
 		}
 		case Kind::JSDocReadonlyTag:
 		{
 			auto* n = static_cast<JSDocReadonlyTag*>(this);
-			return v.factory->updateJSDocReadonlyTag(n, v.visitNodeHooked(n->TagName), v.visitNodesHooked(n->Comment));
+			auto _c0 = v.visitNodeHooked(n->TagName);
+			auto _c1 = v.visitNodesHooked(n->Comment);
+			return v.factory->updateJSDocReadonlyTag(n, _c0, _c1);
 		}
 		case Kind::JSDocReturnTag:
 		{
 			auto* n = static_cast<JSDocReturnTag*>(this);
-			return v.factory->updateJSDocReturnTag(n, v.visitNodeHooked(n->TagName), v.visitNodeHooked(n->TypeExpression), v.visitNodesHooked(n->Comment));
+			auto _c0 = v.visitNodeHooked(n->TagName);
+			auto _c1 = v.visitNodeHooked(n->TypeExpression);
+			auto _c2 = v.visitNodesHooked(n->Comment);
+			return v.factory->updateJSDocReturnTag(n, _c0, _c1, _c2);
 		}
 		case Kind::JSDocSatisfiesTag:
 		{
 			auto* n = static_cast<JSDocSatisfiesTag*>(this);
-			return v.factory->updateJSDocSatisfiesTag(n, v.visitNodeHooked(n->TagName), v.visitNodeHooked(n->TypeExpression), v.visitNodesHooked(n->Comment));
+			auto _c0 = v.visitNodeHooked(n->TagName);
+			auto _c1 = v.visitNodeHooked(n->TypeExpression);
+			auto _c2 = v.visitNodesHooked(n->Comment);
+			return v.factory->updateJSDocSatisfiesTag(n, _c0, _c1, _c2);
 		}
 		case Kind::JSDocSeeTag:
 		{
 			auto* n = static_cast<JSDocSeeTag*>(this);
-			return v.factory->updateJSDocSeeTag(n, v.visitNodeHooked(n->TagName), v.visitNodeHooked(n->NameExpression), v.visitNodesHooked(n->Comment));
+			auto _c0 = v.visitNodeHooked(n->TagName);
+			auto _c1 = v.visitNodeHooked(n->NameExpression);
+			auto _c2 = v.visitNodesHooked(n->Comment);
+			return v.factory->updateJSDocSeeTag(n, _c0, _c1, _c2);
 		}
 		case Kind::JSDocSignature:
 		{
 			auto* n = static_cast<JSDocSignature*>(this);
-			return v.factory->updateJSDocSignature(n, v.visitNodesHooked(n->TypeParameters), v.visitNodesHooked(n->Parameters), v.visitNodeHooked(n->Type));
+			auto _c0 = v.visitNodesHooked(n->TypeParameters);
+			auto _c1 = v.visitNodesHooked(n->Parameters);
+			auto _c2 = v.visitNodeHooked(n->Type);
+			return v.factory->updateJSDocSignature(n, _c0, _c1, _c2);
 		}
 		case Kind::JSDocTemplateTag:
 		{
 			auto* n = static_cast<JSDocTemplateTag*>(this);
-			return v.factory->updateJSDocTemplateTag(n, v.visitNodeHooked(n->TagName), v.visitNodeHooked(n->Constraint), v.visitNodesHooked(n->TypeParameters), v.visitNodesHooked(n->Comment));
+			auto _c0 = v.visitNodeHooked(n->TagName);
+			auto _c1 = v.visitNodeHooked(n->Constraint);
+			auto _c2 = v.visitNodesHooked(n->TypeParameters);
+			auto _c3 = v.visitNodesHooked(n->Comment);
+			return v.factory->updateJSDocTemplateTag(n, _c0, _c1, _c2, _c3);
 		}
 		case Kind::JSDocText:
 		{
@@ -1614,12 +1840,18 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::JSDocThisTag:
 		{
 			auto* n = static_cast<JSDocThisTag*>(this);
-			return v.factory->updateJSDocThisTag(n, v.visitNodeHooked(n->TagName), v.visitNodeHooked(n->TypeExpression), v.visitNodesHooked(n->Comment));
+			auto _c0 = v.visitNodeHooked(n->TagName);
+			auto _c1 = v.visitNodeHooked(n->TypeExpression);
+			auto _c2 = v.visitNodesHooked(n->Comment);
+			return v.factory->updateJSDocThisTag(n, _c0, _c1, _c2);
 		}
 		case Kind::JSDocThrowsTag:
 		{
 			auto* n = static_cast<JSDocThrowsTag*>(this);
-			return v.factory->updateJSDocThrowsTag(n, v.visitNodeHooked(n->TagName), v.visitNodeHooked(n->TypeExpression), v.visitNodesHooked(n->Comment));
+			auto _c0 = v.visitNodeHooked(n->TagName);
+			auto _c1 = v.visitNodeHooked(n->TypeExpression);
+			auto _c2 = v.visitNodesHooked(n->Comment);
+			return v.factory->updateJSDocThrowsTag(n, _c0, _c1, _c2);
 		}
 		case Kind::JSDocTypeExpression:
 		{
@@ -1632,22 +1864,33 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 			std::vector<Node*> jsdocPropertyTags;
 			jsdocPropertyTags.reserve(n->JSDocPropertyTags.size());
 			for (auto* c : n->JSDocPropertyTags) jsdocPropertyTags.push_back(v.visitNodeHooked(c));
-			return v.factory->updateJSDocTypeLiteral(n, std::move(jsdocPropertyTags), n->IsArrayType);
+			auto _c0 = std::move(jsdocPropertyTags);
+			auto _c1 = n->IsArrayType;
+			return v.factory->updateJSDocTypeLiteral(n, _c0, _c1);
 		}
 		case Kind::JSDocTypeTag:
 		{
 			auto* n = static_cast<JSDocTypeTag*>(this);
-			return v.factory->updateJSDocTypeTag(n, v.visitNodeHooked(n->TagName), v.visitNodeHooked(n->TypeExpression), v.visitNodesHooked(n->Comment));
+			auto _c0 = v.visitNodeHooked(n->TagName);
+			auto _c1 = v.visitNodeHooked(n->TypeExpression);
+			auto _c2 = v.visitNodesHooked(n->Comment);
+			return v.factory->updateJSDocTypeTag(n, _c0, _c1, _c2);
 		}
 		case Kind::JSDocTypedefTag:
 		{
 			auto* n = static_cast<JSDocTypedefTag*>(this);
-			return v.factory->updateJSDocTypedefTag(n, v.visitNodeHooked(n->TagName), v.visitNodeHooked(n->TypeExpression), v.visitNodeHooked(n->name), v.visitNodesHooked(n->Comment));
+			auto _c0 = v.visitNodeHooked(n->TagName);
+			auto _c1 = v.visitNodeHooked(n->TypeExpression);
+			auto _c2 = v.visitNodeHooked(n->name);
+			auto _c3 = v.visitNodesHooked(n->Comment);
+			return v.factory->updateJSDocTypedefTag(n, _c0, _c1, _c2, _c3);
 		}
 		case Kind::JSDocUnknownTag:
 		{
 			auto* n = static_cast<JSDocUnknownTag*>(this);
-			return v.factory->updateJSDocUnknownTag(n, v.visitNodeHooked(n->TagName), v.visitNodesHooked(n->Comment));
+			auto _c0 = v.visitNodeHooked(n->TagName);
+			auto _c1 = v.visitNodesHooked(n->Comment);
+			return v.factory->updateJSDocUnknownTag(n, _c0, _c1);
 		}
 		case Kind::JSDocVariadicType:
 		{
@@ -1657,7 +1900,9 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::JsxAttribute:
 		{
 			auto* n = static_cast<JsxAttribute*>(this);
-			return v.factory->updateJsxAttribute(n, v.visitNodeHooked(n->name), v.visitNodeHooked(n->Initializer));
+			auto _c0 = v.visitNodeHooked(n->name);
+			auto _c1 = v.visitNodeHooked(n->Initializer);
+			return v.factory->updateJsxAttribute(n, _c0, _c1);
 		}
 		case Kind::JsxAttributes:
 		{
@@ -1676,27 +1921,40 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::JsxElement:
 		{
 			auto* n = static_cast<JsxElement*>(this);
-			return v.factory->updateJsxElement(n, v.visitNodeHooked(n->OpeningElement), v.visitNodesHooked(n->Children), v.visitNodeHooked(n->ClosingElement));
+			auto _c0 = v.visitNodeHooked(n->OpeningElement);
+			auto _c1 = v.visitNodesHooked(n->Children);
+			auto _c2 = v.visitNodeHooked(n->ClosingElement);
+			return v.factory->updateJsxElement(n, _c0, _c1, _c2);
 		}
 		case Kind::JsxExpression:
 		{
 			auto* n = static_cast<JsxExpression*>(this);
-			return v.factory->updateJsxExpression(n, v.visitNodeHooked(n->DotDotDotToken), v.visitNodeHooked(n->Expression));
+			auto _c0 = v.visitNodeHooked(n->DotDotDotToken);
+			auto _c1 = v.visitNodeHooked(n->Expression);
+			return v.factory->updateJsxExpression(n, _c0, _c1);
 		}
 		case Kind::JsxFragment:
 		{
 			auto* n = static_cast<JsxFragment*>(this);
-			return v.factory->updateJsxFragment(n, v.visitNodeHooked(n->OpeningFragment), v.visitNodesHooked(n->Children), v.visitNodeHooked(n->ClosingFragment));
+			auto _c0 = v.visitNodeHooked(n->OpeningFragment);
+			auto _c1 = v.visitNodesHooked(n->Children);
+			auto _c2 = v.visitNodeHooked(n->ClosingFragment);
+			return v.factory->updateJsxFragment(n, _c0, _c1, _c2);
 		}
 		case Kind::JsxNamespacedName:
 		{
 			auto* n = static_cast<JsxNamespacedName*>(this);
-			return v.factory->updateJsxNamespacedName(n, v.visitNodeHooked(n->Namespace), v.visitNodeHooked(n->name));
+			auto _c0 = v.visitNodeHooked(n->Namespace);
+			auto _c1 = v.visitNodeHooked(n->name);
+			return v.factory->updateJsxNamespacedName(n, _c0, _c1);
 		}
 		case Kind::JsxOpeningElement:
 		{
 			auto* n = static_cast<JsxOpeningElement*>(this);
-			return v.factory->updateJsxOpeningElement(n, v.visitNodeHooked(n->TagName), v.visitNodesHooked(n->TypeArguments), v.visitNodeHooked(n->Attributes));
+			auto _c0 = v.visitNodeHooked(n->TagName);
+			auto _c1 = v.visitNodesHooked(n->TypeArguments);
+			auto _c2 = v.visitNodeHooked(n->Attributes);
+			return v.factory->updateJsxOpeningElement(n, _c0, _c1, _c2);
 		}
 		case Kind::JsxOpeningFragment:
 		{
@@ -1705,7 +1963,10 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::JsxSelfClosingElement:
 		{
 			auto* n = static_cast<JsxSelfClosingElement*>(this);
-			return v.factory->updateJsxSelfClosingElement(n, v.visitNodeHooked(n->TagName), v.visitNodesHooked(n->TypeArguments), v.visitNodeHooked(n->Attributes));
+			auto _c0 = v.visitNodeHooked(n->TagName);
+			auto _c1 = v.visitNodesHooked(n->TypeArguments);
+			auto _c2 = v.visitNodeHooked(n->Attributes);
+			return v.factory->updateJsxSelfClosingElement(n, _c0, _c1, _c2);
 		}
 		case Kind::JsxSpreadAttribute:
 		{
@@ -1741,7 +2002,9 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::LabeledStatement:
 		{
 			auto* n = static_cast<LabeledStatement*>(this);
-			return v.factory->updateLabeledStatement(n, v.visitNodeHooked(n->Label), v.visitEmbeddedStatementHooked(n->Statement));
+			auto _c0 = v.visitNodeHooked(n->Label);
+			auto _c1 = v.visitEmbeddedStatementHooked(n->Statement);
+			return v.factory->updateLabeledStatement(n, _c0, _c1);
 		}
 		case Kind::LiteralType:
 		{
@@ -1751,22 +2014,45 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::MappedType:
 		{
 			auto* n = static_cast<MappedTypeNode*>(this);
-			return v.factory->updateMappedTypeNode(n, v.visitNodeHooked(n->ReadonlyToken), v.visitNodeHooked(n->TypeParameter), v.visitNodeHooked(n->NameType), v.visitNodeHooked(n->QuestionToken), v.visitNodeHooked(n->Type), v.visitNodesHooked(n->Members));
+			auto _c0 = v.visitNodeHooked(n->ReadonlyToken);
+			auto _c1 = v.visitNodeHooked(n->TypeParameter);
+			auto _c2 = v.visitNodeHooked(n->NameType);
+			auto _c3 = v.visitNodeHooked(n->QuestionToken);
+			auto _c4 = v.visitNodeHooked(n->Type);
+			auto _c5 = v.visitNodesHooked(n->Members);
+			return v.factory->updateMappedTypeNode(n, _c0, _c1, _c2, _c3, _c4, _c5);
 		}
 		case Kind::MetaProperty:
 		{
 			auto* n = static_cast<MetaProperty*>(this);
-			return v.factory->updateMetaProperty(n, n->KeywordToken, v.visitNodeHooked(n->name));
+			auto _c0 = n->KeywordToken;
+			auto _c1 = v.visitNodeHooked(n->name);
+			return v.factory->updateMetaProperty(n, _c0, _c1);
 		}
 		case Kind::MethodDeclaration:
 		{
 			auto* n = static_cast<MethodDeclaration*>(this);
-			return v.factory->updateMethodDeclaration(n, v.visitModifiersHooked(n->modifiers), v.visitNodeHooked(n->AsteriskToken), v.visitNodeHooked(n->name), v.visitNodeHooked(n->PostfixToken), v.visitNodesHooked(n->TypeParameters), v.visitParametersHooked(n->Parameters), v.visitNodeHooked(n->Type), v.visitNodeHooked(n->FullSignature), v.visitFunctionBodyHooked(n->Body));
+			auto _c0 = v.visitModifiersHooked(n->modifiers);
+			auto _c1 = v.visitNodeHooked(n->AsteriskToken);
+			auto _c2 = v.visitNodeHooked(n->name);
+			auto _c3 = v.visitNodeHooked(n->PostfixToken);
+			auto _c4 = v.visitNodesHooked(n->TypeParameters);
+			auto _c5 = v.visitParametersHooked(n->Parameters);
+			auto _c6 = v.visitNodeHooked(n->Type);
+			auto _c7 = v.visitNodeHooked(n->FullSignature);
+			auto _c8 = v.visitFunctionBodyHooked(n->Body);
+			return v.factory->updateMethodDeclaration(n, _c0, _c1, _c2, _c3, _c4, _c5, _c6, _c7, _c8);
 		}
 		case Kind::MethodSignature:
 		{
 			auto* n = static_cast<MethodSignatureDeclaration*>(this);
-			return v.factory->updateMethodSignatureDeclaration(n, v.visitModifiersHooked(n->modifiers), v.visitNodeHooked(n->name), v.visitNodeHooked(n->PostfixToken), v.visitNodesHooked(n->TypeParameters), v.visitNodesHooked(n->Parameters), v.visitNodeHooked(n->Type));
+			auto _c0 = v.visitModifiersHooked(n->modifiers);
+			auto _c1 = v.visitNodeHooked(n->name);
+			auto _c2 = v.visitNodeHooked(n->PostfixToken);
+			auto _c3 = v.visitNodesHooked(n->TypeParameters);
+			auto _c4 = v.visitNodesHooked(n->Parameters);
+			auto _c5 = v.visitNodeHooked(n->Type);
+			return v.factory->updateMethodSignatureDeclaration(n, _c0, _c1, _c2, _c3, _c4, _c5);
 		}
 		case Kind::MissingDeclaration:
 		{
@@ -1781,7 +2067,12 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::ModuleDeclaration:
 		{
 			auto* n = static_cast<ModuleDeclaration*>(this);
-			return v.factory->updateModuleDeclaration(n, v.visitModifiersHooked(n->modifiers), n->Keyword, v.visitNodeHooked(n->name), v.visitNodeHooked(n->Attributes), v.visitNodeHooked(n->Body));
+			auto _c0 = v.visitModifiersHooked(n->modifiers);
+			auto _c1 = n->Keyword;
+			auto _c2 = v.visitNodeHooked(n->name);
+			auto _c3 = v.visitNodeHooked(n->Attributes);
+			auto _c4 = v.visitNodeHooked(n->Body);
+			return v.factory->updateModuleDeclaration(n, _c0, _c1, _c2, _c3, _c4);
 		}
 		case Kind::NamedExports:
 		{
@@ -1796,7 +2087,11 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::NamedTupleMember:
 		{
 			auto* n = static_cast<NamedTupleMember*>(this);
-			return v.factory->updateNamedTupleMember(n, v.visitNodeHooked(n->DotDotDotToken), v.visitNodeHooked(n->name), v.visitNodeHooked(n->QuestionToken), v.visitNodeHooked(n->Type));
+			auto _c0 = v.visitNodeHooked(n->DotDotDotToken);
+			auto _c1 = v.visitNodeHooked(n->name);
+			auto _c2 = v.visitNodeHooked(n->QuestionToken);
+			auto _c3 = v.visitNodeHooked(n->Type);
+			return v.factory->updateNamedTupleMember(n, _c0, _c1, _c2, _c3);
 		}
 		case Kind::NamespaceExport:
 		{
@@ -1806,7 +2101,9 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::NamespaceExportDeclaration:
 		{
 			auto* n = static_cast<NamespaceExportDeclaration*>(this);
-			return v.factory->updateNamespaceExportDeclaration(n, v.visitModifiersHooked(n->modifiers), v.visitNodeHooked(n->name));
+			auto _c0 = v.visitModifiersHooked(n->modifiers);
+			auto _c1 = v.visitNodeHooked(n->name);
+			return v.factory->updateNamespaceExportDeclaration(n, _c0, _c1);
 		}
 		case Kind::NamespaceImport:
 		{
@@ -1816,7 +2113,10 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::NewExpression:
 		{
 			auto* n = static_cast<NewExpression*>(this);
-			return v.factory->updateNewExpression(n, v.visitNodeHooked(n->Expression), v.visitNodesHooked(n->TypeArguments), v.visitNodesHooked(n->Arguments));
+			auto _c0 = v.visitNodeHooked(n->Expression);
+			auto _c1 = v.visitNodesHooked(n->TypeArguments);
+			auto _c2 = v.visitNodesHooked(n->Arguments);
+			return v.factory->updateNewExpression(n, _c0, _c1, _c2);
 		}
 		case Kind::NoSubstitutionTemplateLiteral:
 		{
@@ -1825,7 +2125,9 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::NonNullExpression:
 		{
 			auto* n = static_cast<NonNullExpression*>(this);
-			return v.factory->updateNonNullExpression(n, v.visitNodeHooked(n->Expression), n->flags);
+			auto _c0 = v.visitNodeHooked(n->Expression);
+			auto _c1 = n->flags;
+			return v.factory->updateNonNullExpression(n, _c0, _c1);
 		}
 		case Kind::NotEmittedStatement:
 		{
@@ -1842,7 +2144,9 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::ObjectLiteralExpression:
 		{
 			auto* n = static_cast<ObjectLiteralExpression*>(this);
-			return v.factory->updateObjectLiteralExpression(n, v.visitNodesHooked(n->Properties), n->MultiLine);
+			auto _c0 = v.visitNodesHooked(n->Properties);
+			auto _c1 = n->MultiLine;
+			return v.factory->updateObjectLiteralExpression(n, _c0, _c1);
 		}
 		case Kind::OmittedExpression:
 		{
@@ -1856,7 +2160,13 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::Parameter:
 		{
 			auto* n = static_cast<ParameterDeclaration*>(this);
-			return v.factory->updateParameterDeclaration(n, v.visitModifiersHooked(n->modifiers), v.visitNodeHooked(n->DotDotDotToken), v.visitNodeHooked(n->name), v.visitNodeHooked(n->QuestionToken), v.visitNodeHooked(n->Type), v.visitNodeHooked(n->Initializer));
+			auto _c0 = v.visitModifiersHooked(n->modifiers);
+			auto _c1 = v.visitNodeHooked(n->DotDotDotToken);
+			auto _c2 = v.visitNodeHooked(n->name);
+			auto _c3 = v.visitNodeHooked(n->QuestionToken);
+			auto _c4 = v.visitNodeHooked(n->Type);
+			auto _c5 = v.visitNodeHooked(n->Initializer);
+			return v.factory->updateParameterDeclaration(n, _c0, _c1, _c2, _c3, _c4, _c5);
 		}
 		case Kind::ParenthesizedExpression:
 		{
@@ -1876,12 +2186,16 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::PostfixUnaryExpression:
 		{
 			auto* n = static_cast<PostfixUnaryExpression*>(this);
-			return v.factory->updatePostfixUnaryExpression(n, v.visitNodeHooked(n->Operand), n->Operator);
+			auto _c0 = v.visitNodeHooked(n->Operand);
+			auto _c1 = n->Operator;
+			return v.factory->updatePostfixUnaryExpression(n, _c0, _c1);
 		}
 		case Kind::PrefixUnaryExpression:
 		{
 			auto* n = static_cast<PrefixUnaryExpression*>(this);
-			return v.factory->updatePrefixUnaryExpression(n, n->Operator, v.visitNodeHooked(n->Operand));
+			auto _c0 = n->Operator;
+			auto _c1 = v.visitNodeHooked(n->Operand);
+			return v.factory->updatePrefixUnaryExpression(n, _c0, _c1);
 		}
 		case Kind::PrivateIdentifier:
 		{
@@ -1890,27 +2204,48 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::PropertyAccessExpression:
 		{
 			auto* n = static_cast<PropertyAccessExpression*>(this);
-			return v.factory->updatePropertyAccessExpression(n, v.visitNodeHooked(n->Expression), v.visitNodeHooked(n->QuestionDotToken), v.visitNodeHooked(n->name), n->flags);
+			auto _c0 = v.visitNodeHooked(n->Expression);
+			auto _c1 = v.visitNodeHooked(n->QuestionDotToken);
+			auto _c2 = v.visitNodeHooked(n->name);
+			auto _c3 = n->flags;
+			return v.factory->updatePropertyAccessExpression(n, _c0, _c1, _c2, _c3);
 		}
 		case Kind::PropertyAssignment:
 		{
 			auto* n = static_cast<PropertyAssignment*>(this);
-			return v.factory->updatePropertyAssignment(n, v.visitModifiersHooked(n->modifiers), v.visitNodeHooked(n->name), v.visitNodeHooked(n->PostfixToken), v.visitNodeHooked(n->Type), v.visitNodeHooked(n->Initializer));
+			auto _c0 = v.visitModifiersHooked(n->modifiers);
+			auto _c1 = v.visitNodeHooked(n->name);
+			auto _c2 = v.visitNodeHooked(n->PostfixToken);
+			auto _c3 = v.visitNodeHooked(n->Type);
+			auto _c4 = v.visitNodeHooked(n->Initializer);
+			return v.factory->updatePropertyAssignment(n, _c0, _c1, _c2, _c3, _c4);
 		}
 		case Kind::PropertyDeclaration:
 		{
 			auto* n = static_cast<PropertyDeclaration*>(this);
-			return v.factory->updatePropertyDeclaration(n, v.visitModifiersHooked(n->modifiers), v.visitNodeHooked(n->name), v.visitNodeHooked(n->PostfixToken), v.visitNodeHooked(n->Type), v.visitNodeHooked(n->Initializer));
+			auto _c0 = v.visitModifiersHooked(n->modifiers);
+			auto _c1 = v.visitNodeHooked(n->name);
+			auto _c2 = v.visitNodeHooked(n->PostfixToken);
+			auto _c3 = v.visitNodeHooked(n->Type);
+			auto _c4 = v.visitNodeHooked(n->Initializer);
+			return v.factory->updatePropertyDeclaration(n, _c0, _c1, _c2, _c3, _c4);
 		}
 		case Kind::PropertySignature:
 		{
 			auto* n = static_cast<PropertySignatureDeclaration*>(this);
-			return v.factory->updatePropertySignatureDeclaration(n, v.visitModifiersHooked(n->modifiers), v.visitNodeHooked(n->name), v.visitNodeHooked(n->PostfixToken), v.visitNodeHooked(n->Type), v.visitNodeHooked(n->Initializer));
+			auto _c0 = v.visitModifiersHooked(n->modifiers);
+			auto _c1 = v.visitNodeHooked(n->name);
+			auto _c2 = v.visitNodeHooked(n->PostfixToken);
+			auto _c3 = v.visitNodeHooked(n->Type);
+			auto _c4 = v.visitNodeHooked(n->Initializer);
+			return v.factory->updatePropertySignatureDeclaration(n, _c0, _c1, _c2, _c3, _c4);
 		}
 		case Kind::QualifiedName:
 		{
 			auto* n = static_cast<QualifiedName*>(this);
-			return v.factory->updateQualifiedName(n, v.visitNodeHooked(n->Left), v.visitNodeHooked(n->Right));
+			auto _c0 = v.visitNodeHooked(n->Left);
+			auto _c1 = v.visitNodeHooked(n->Right);
+			return v.factory->updateQualifiedName(n, _c0, _c1);
 		}
 		case Kind::RegularExpressionLiteral:
 		{
@@ -1929,7 +2264,9 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::SatisfiesExpression:
 		{
 			auto* n = static_cast<SatisfiesExpression*>(this);
-			return v.factory->updateSatisfiesExpression(n, v.visitNodeHooked(n->Expression), v.visitNodeHooked(n->Type));
+			auto _c0 = v.visitNodeHooked(n->Expression);
+			auto _c1 = v.visitNodeHooked(n->Type);
+			return v.factory->updateSatisfiesExpression(n, _c0, _c1);
 		}
 		case Kind::SemicolonClassElement:
 		{
@@ -1938,17 +2275,32 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::SetAccessor:
 		{
 			auto* n = static_cast<SetAccessorDeclaration*>(this);
-			return v.factory->updateSetAccessorDeclaration(n, v.visitModifiersHooked(n->modifiers), v.visitNodeHooked(n->name), v.visitNodesHooked(n->TypeParameters), v.visitParametersHooked(n->Parameters), v.visitNodeHooked(n->Type), v.visitNodeHooked(n->FullSignature), v.visitFunctionBodyHooked(n->Body));
+			auto _c0 = v.visitModifiersHooked(n->modifiers);
+			auto _c1 = v.visitNodeHooked(n->name);
+			auto _c2 = v.visitNodesHooked(n->TypeParameters);
+			auto _c3 = v.visitParametersHooked(n->Parameters);
+			auto _c4 = v.visitNodeHooked(n->Type);
+			auto _c5 = v.visitNodeHooked(n->FullSignature);
+			auto _c6 = v.visitFunctionBodyHooked(n->Body);
+			return v.factory->updateSetAccessorDeclaration(n, _c0, _c1, _c2, _c3, _c4, _c5, _c6);
 		}
 		case Kind::ShorthandPropertyAssignment:
 		{
 			auto* n = static_cast<ShorthandPropertyAssignment*>(this);
-			return v.factory->updateShorthandPropertyAssignment(n, v.visitModifiersHooked(n->modifiers), v.visitNodeHooked(n->name), v.visitNodeHooked(n->PostfixToken), v.visitNodeHooked(n->Type), v.visitNodeHooked(n->EqualsToken), v.visitNodeHooked(n->ObjectAssignmentInitializer));
+			auto _c0 = v.visitModifiersHooked(n->modifiers);
+			auto _c1 = v.visitNodeHooked(n->name);
+			auto _c2 = v.visitNodeHooked(n->PostfixToken);
+			auto _c3 = v.visitNodeHooked(n->Type);
+			auto _c4 = v.visitNodeHooked(n->EqualsToken);
+			auto _c5 = v.visitNodeHooked(n->ObjectAssignmentInitializer);
+			return v.factory->updateShorthandPropertyAssignment(n, _c0, _c1, _c2, _c3, _c4, _c5);
 		}
 		case Kind::SourceFile:
 		{
 			auto* n = static_cast<SourceFile*>(this);
-			return v.factory->updateSourceFile(n, v.visitTopLevelStatementsHooked(n->Statements), v.visitTokenHooked(n->EndOfFileToken));
+			auto _c0 = v.visitTopLevelStatementsHooked(n->Statements);
+			auto _c1 = v.visitTokenHooked(n->EndOfFileToken);
+			return v.factory->updateSourceFile(n, _c0, _c1);
 		}
 		case Kind::SpreadAssignment:
 		{
@@ -1967,7 +2319,9 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::SwitchStatement:
 		{
 			auto* n = static_cast<SwitchStatement*>(this);
-			return v.factory->updateSwitchStatement(n, v.visitNodeHooked(n->Expression), v.visitNodeHooked(n->CaseBlock));
+			auto _c0 = v.visitNodeHooked(n->Expression);
+			auto _c1 = v.visitNodeHooked(n->CaseBlock);
+			return v.factory->updateSwitchStatement(n, _c0, _c1);
 		}
 		case Kind::SyntaxList:
 		{
@@ -1980,22 +2334,34 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::SyntheticExpression:
 		{
 			auto* n = static_cast<SyntheticExpression*>(this);
-			return v.factory->updateSyntheticExpression(n, n->Type, n->IsSpread, v.visitNodeHooked(n->TupleNameSource));
+			auto _c0 = n->Type;
+			auto _c1 = n->IsSpread;
+			auto _c2 = v.visitNodeHooked(n->TupleNameSource);
+			return v.factory->updateSyntheticExpression(n, _c0, _c1, _c2);
 		}
 		case Kind::SyntheticReferenceExpression:
 		{
 			auto* n = static_cast<SyntheticReferenceExpression*>(this);
-			return v.factory->updateSyntheticReferenceExpression(n, v.visitNodeHooked(n->Expression), v.visitNodeHooked(n->ThisArg));
+			auto _c0 = v.visitNodeHooked(n->Expression);
+			auto _c1 = v.visitNodeHooked(n->ThisArg);
+			return v.factory->updateSyntheticReferenceExpression(n, _c0, _c1);
 		}
 		case Kind::TaggedTemplateExpression:
 		{
 			auto* n = static_cast<TaggedTemplateExpression*>(this);
-			return v.factory->updateTaggedTemplateExpression(n, v.visitNodeHooked(n->Tag), v.visitNodeHooked(n->QuestionDotToken), v.visitNodesHooked(n->TypeArguments), v.visitNodeHooked(n->Template), n->flags);
+			auto _c0 = v.visitNodeHooked(n->Tag);
+			auto _c1 = v.visitNodeHooked(n->QuestionDotToken);
+			auto _c2 = v.visitNodesHooked(n->TypeArguments);
+			auto _c3 = v.visitNodeHooked(n->Template);
+			auto _c4 = n->flags;
+			return v.factory->updateTaggedTemplateExpression(n, _c0, _c1, _c2, _c3, _c4);
 		}
 		case Kind::TemplateExpression:
 		{
 			auto* n = static_cast<TemplateExpression*>(this);
-			return v.factory->updateTemplateExpression(n, v.visitNodeHooked(n->Head), v.visitNodesHooked(n->TemplateSpans));
+			auto _c0 = v.visitNodeHooked(n->Head);
+			auto _c1 = v.visitNodesHooked(n->TemplateSpans);
+			return v.factory->updateTemplateExpression(n, _c0, _c1);
 		}
 		case Kind::TemplateHead:
 		{
@@ -2004,12 +2370,16 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::TemplateLiteralType:
 		{
 			auto* n = static_cast<TemplateLiteralTypeNode*>(this);
-			return v.factory->updateTemplateLiteralTypeNode(n, v.visitNodeHooked(n->Head), v.visitNodesHooked(n->TemplateSpans));
+			auto _c0 = v.visitNodeHooked(n->Head);
+			auto _c1 = v.visitNodesHooked(n->TemplateSpans);
+			return v.factory->updateTemplateLiteralTypeNode(n, _c0, _c1);
 		}
 		case Kind::TemplateLiteralTypeSpan:
 		{
 			auto* n = static_cast<TemplateLiteralTypeSpan*>(this);
-			return v.factory->updateTemplateLiteralTypeSpan(n, v.visitNodeHooked(n->Type), v.visitNodeHooked(n->Literal));
+			auto _c0 = v.visitNodeHooked(n->Type);
+			auto _c1 = v.visitNodeHooked(n->Literal);
+			return v.factory->updateTemplateLiteralTypeSpan(n, _c0, _c1);
 		}
 		case Kind::TemplateMiddle:
 		{
@@ -2018,7 +2388,9 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::TemplateSpan:
 		{
 			auto* n = static_cast<TemplateSpan*>(this);
-			return v.factory->updateTemplateSpan(n, v.visitNodeHooked(n->Expression), v.visitNodeHooked(n->Literal));
+			auto _c0 = v.visitNodeHooked(n->Expression);
+			auto _c1 = v.visitNodeHooked(n->Literal);
+			return v.factory->updateTemplateSpan(n, _c0, _c1);
 		}
 		case Kind::TemplateTail:
 		{
@@ -2180,7 +2552,10 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::TryStatement:
 		{
 			auto* n = static_cast<TryStatement*>(this);
-			return v.factory->updateTryStatement(n, v.visitNodeHooked(n->TryBlock), v.visitNodeHooked(n->CatchClause), v.visitNodeHooked(n->FinallyBlock));
+			auto _c0 = v.visitNodeHooked(n->TryBlock);
+			auto _c1 = v.visitNodeHooked(n->CatchClause);
+			auto _c2 = v.visitNodeHooked(n->FinallyBlock);
+			return v.factory->updateTryStatement(n, _c0, _c1, _c2);
 		}
 		case Kind::TupleType:
 		{
@@ -2191,12 +2566,18 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::JSTypeAliasDeclaration:
 		{
 			auto* n = static_cast<TypeAliasDeclaration*>(this);
-			return v.factory->updateTypeAliasDeclaration(n, v.visitModifiersHooked(n->modifiers), v.visitNodeHooked(n->name), v.visitNodesHooked(n->TypeParameters), v.visitNodeHooked(n->Type));
+			auto _c0 = v.visitModifiersHooked(n->modifiers);
+			auto _c1 = v.visitNodeHooked(n->name);
+			auto _c2 = v.visitNodesHooked(n->TypeParameters);
+			auto _c3 = v.visitNodeHooked(n->Type);
+			return v.factory->updateTypeAliasDeclaration(n, _c0, _c1, _c2, _c3);
 		}
 		case Kind::TypeAssertionExpression:
 		{
 			auto* n = static_cast<TypeAssertion*>(this);
-			return v.factory->updateTypeAssertion(n, v.visitNodeHooked(n->Type), v.visitNodeHooked(n->Expression));
+			auto _c0 = v.visitNodeHooked(n->Type);
+			auto _c1 = v.visitNodeHooked(n->Expression);
+			return v.factory->updateTypeAssertion(n, _c0, _c1);
 		}
 		case Kind::TypeLiteral:
 		{
@@ -2211,27 +2592,41 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::TypeOperator:
 		{
 			auto* n = static_cast<TypeOperatorNode*>(this);
-			return v.factory->updateTypeOperatorNode(n, n->Operator, v.visitNodeHooked(n->Type));
+			auto _c0 = n->Operator;
+			auto _c1 = v.visitNodeHooked(n->Type);
+			return v.factory->updateTypeOperatorNode(n, _c0, _c1);
 		}
 		case Kind::TypeParameter:
 		{
 			auto* n = static_cast<TypeParameterDeclaration*>(this);
-			return v.factory->updateTypeParameterDeclaration(n, v.visitModifiersHooked(n->modifiers), v.visitNodeHooked(n->name), v.visitNodeHooked(n->Constraint), v.visitNodeHooked(n->Expression), v.visitNodeHooked(n->DefaultType));
+			auto _c0 = v.visitModifiersHooked(n->modifiers);
+			auto _c1 = v.visitNodeHooked(n->name);
+			auto _c2 = v.visitNodeHooked(n->Constraint);
+			auto _c3 = v.visitNodeHooked(n->Expression);
+			auto _c4 = v.visitNodeHooked(n->DefaultType);
+			return v.factory->updateTypeParameterDeclaration(n, _c0, _c1, _c2, _c3, _c4);
 		}
 		case Kind::TypePredicate:
 		{
 			auto* n = static_cast<TypePredicateNode*>(this);
-			return v.factory->updateTypePredicateNode(n, v.visitNodeHooked(n->AssertsModifier), v.visitNodeHooked(n->ParameterName), v.visitNodeHooked(n->Type));
+			auto _c0 = v.visitNodeHooked(n->AssertsModifier);
+			auto _c1 = v.visitNodeHooked(n->ParameterName);
+			auto _c2 = v.visitNodeHooked(n->Type);
+			return v.factory->updateTypePredicateNode(n, _c0, _c1, _c2);
 		}
 		case Kind::TypeQuery:
 		{
 			auto* n = static_cast<TypeQueryNode*>(this);
-			return v.factory->updateTypeQueryNode(n, v.visitNodeHooked(n->ExprName), v.visitNodesHooked(n->TypeArguments));
+			auto _c0 = v.visitNodeHooked(n->ExprName);
+			auto _c1 = v.visitNodesHooked(n->TypeArguments);
+			return v.factory->updateTypeQueryNode(n, _c0, _c1);
 		}
 		case Kind::TypeReference:
 		{
 			auto* n = static_cast<TypeReferenceNode*>(this);
-			return v.factory->updateTypeReferenceNode(n, v.visitNodeHooked(n->TypeName), v.visitNodesHooked(n->TypeArguments));
+			auto _c0 = v.visitNodeHooked(n->TypeName);
+			auto _c1 = v.visitNodesHooked(n->TypeArguments);
+			return v.factory->updateTypeReferenceNode(n, _c0, _c1);
 		}
 		case Kind::UnionType:
 		{
@@ -2241,17 +2636,25 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::VariableDeclaration:
 		{
 			auto* n = static_cast<VariableDeclaration*>(this);
-			return v.factory->updateVariableDeclaration(n, v.visitNodeHooked(n->name), v.visitNodeHooked(n->ExclamationToken), v.visitNodeHooked(n->Type), v.visitNodeHooked(n->Initializer));
+			auto _c0 = v.visitNodeHooked(n->name);
+			auto _c1 = v.visitNodeHooked(n->ExclamationToken);
+			auto _c2 = v.visitNodeHooked(n->Type);
+			auto _c3 = v.visitNodeHooked(n->Initializer);
+			return v.factory->updateVariableDeclaration(n, _c0, _c1, _c2, _c3);
 		}
 		case Kind::VariableDeclarationList:
 		{
 			auto* n = static_cast<VariableDeclarationList*>(this);
-			return v.factory->updateVariableDeclarationList(n, v.visitNodesHooked(n->Declarations), n->flags);
+			auto _c0 = v.visitNodesHooked(n->Declarations);
+			auto _c1 = n->flags;
+			return v.factory->updateVariableDeclarationList(n, _c0, _c1);
 		}
 		case Kind::VariableStatement:
 		{
 			auto* n = static_cast<VariableStatement*>(this);
-			return v.factory->updateVariableStatement(n, v.visitModifiersHooked(n->modifiers), v.visitNodeHooked(n->DeclarationList));
+			auto _c0 = v.visitModifiersHooked(n->modifiers);
+			auto _c1 = v.visitNodeHooked(n->DeclarationList);
+			return v.factory->updateVariableStatement(n, _c0, _c1);
 		}
 		case Kind::VoidExpression:
 		{
@@ -2261,17 +2664,23 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::WhileStatement:
 		{
 			auto* n = static_cast<WhileStatement*>(this);
-			return v.factory->updateWhileStatement(n, v.visitNodeHooked(n->Expression), v.visitIterationBodyHooked(n->Statement));
+			auto _c0 = v.visitNodeHooked(n->Expression);
+			auto _c1 = v.visitIterationBodyHooked(n->Statement);
+			return v.factory->updateWhileStatement(n, _c0, _c1);
 		}
 		case Kind::WithStatement:
 		{
 			auto* n = static_cast<WithStatement*>(this);
-			return v.factory->updateWithStatement(n, v.visitNodeHooked(n->Expression), v.visitEmbeddedStatementHooked(n->Statement));
+			auto _c0 = v.visitNodeHooked(n->Expression);
+			auto _c1 = v.visitEmbeddedStatementHooked(n->Statement);
+			return v.factory->updateWithStatement(n, _c0, _c1);
 		}
 		case Kind::YieldExpression:
 		{
 			auto* n = static_cast<YieldExpression*>(this);
-			return v.factory->updateYieldExpression(n, v.visitNodeHooked(n->AsteriskToken), v.visitNodeHooked(n->Expression));
+			auto _c0 = v.visitNodeHooked(n->AsteriskToken);
+			auto _c1 = v.visitNodeHooked(n->Expression);
+			return v.factory->updateYieldExpression(n, _c0, _c1);
 		}
 		default:
 			return this;
