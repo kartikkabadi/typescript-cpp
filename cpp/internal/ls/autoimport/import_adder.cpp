@@ -535,7 +535,7 @@ std::unique_ptr<Fix> importAdder::getImportFixForSymbol(
 			fixes.push_back(std::move(f));
 		}
 	}
-	std::sort(fixes.begin(), fixes.end(),
+	std::stable_sort(fixes.begin(), fixes.end(),
 	          [&](const std::unique_ptr<Fix>& a, const std::unique_ptr<Fix>& b) {
 		          return view->CompareFixesForRanking(a.get(), b.get()) < 0;
 	          });

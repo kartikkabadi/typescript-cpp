@@ -321,7 +321,7 @@ std::vector<std::unique_ptr<FixAndExport>> View::GetCompletions(
 	// The client does additional sorting by SortText and Label; we only need a
 	// stable relative ordering between completions the client considers
 	// equivalent.
-	std::sort(fixes.begin(), fixes.end(),
+	std::stable_sort(fixes.begin(), fixes.end(),
 	          [this](const std::unique_ptr<FixAndExport>& a,
 	                 const std::unique_ptr<FixAndExport>& b) {
 		          return CompareFixesForSorting(a->Fix.get(), b->Fix.get()) < 0;

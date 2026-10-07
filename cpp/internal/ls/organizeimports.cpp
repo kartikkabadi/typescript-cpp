@@ -277,7 +277,7 @@ void organizeImportsWorker(
 	if (shouldCombine) {
 		auto grouped = groupByModuleSpecifier(processedImports);
 		if (shouldSort) {
-			std::sort(grouped.begin(), grouped.end(),
+			std::stable_sort(grouped.begin(), grouped.end(),
 			          [&comparer](const std::vector<Node*>& a,
 			                      const std::vector<Node*>& b) {
 				          if (a.empty() || b.empty()) {
@@ -300,7 +300,7 @@ void organizeImportsWorker(
 			    importGroup_, comparer.moduleSpecifierComparer,
 			    specifierComparer, sourceFile, changeTracker);
 			if (shouldSort) {
-				std::sort(coalesced.begin(), coalesced.end(),
+				std::stable_sort(coalesced.begin(), coalesced.end(),
 				          [&comparer](Node* a, Node* b) {
 					          return lsutil::
 					                     CompareImportsOrRequireStatements(
@@ -318,7 +318,7 @@ void organizeImportsWorker(
 	}
 
 	if (shouldSort && !shouldCombine) {
-		std::sort(newImportDecls.begin(), newImportDecls.end(),
+		std::stable_sort(newImportDecls.begin(), newImportDecls.end(),
 		          [&comparer](Node* a, Node* b) {
 			          return lsutil::CompareImportsOrRequireStatements(
 			                     a, b, comparer.moduleSpecifierComparer) <
@@ -552,7 +552,7 @@ std::string getImportAttributesKey(Node* attributes) {
 	key += " ";
 
 	auto attrNodes = importAttrs->Attributes->nodes;
-	std::sort(attrNodes.begin(), attrNodes.end(),
+	std::stable_sort(attrNodes.begin(), attrNodes.end(),
 	          [](Node* a, Node* b) {
 		          auto aName = a->as<ImportAttribute>()->Node::name()->text();
 		          auto bName = b->as<ImportAttribute>()->Node::name()->text();
@@ -712,7 +712,7 @@ std::vector<Node*> coalesceImportsWorker(
 				continue;
 			}
 
-			std::sort(group.namespaceImports.begin(),
+			std::stable_sort(group.namespaceImports.begin(),
 			          group.namespaceImports.end(),
 			          [&comparer](Node* a, Node* b) {
 				          auto* n1 = a->as<ImportDeclaration>()

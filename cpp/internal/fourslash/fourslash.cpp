@@ -2691,7 +2691,9 @@ TextRange FourslashTest::updateTextRangeForTextEdits(
 		    .length = (int)edit->NewText.size(),
 		});
 	}
-	std::sort(spans.begin(), spans.end(),
+	// stable_sort: Go's slices.SortFunc preserves equal-key order
+	// (same-position edits must keep insertion order).
+	std::stable_sort(spans.begin(), spans.end(),
 	          [](const textEditSpan& a, const textEditSpan& b) {
 		          return a.start < b.start;
 	          });
@@ -3693,7 +3695,8 @@ void FourslashTest::VerifyOutliningSpans(
 		    {ranges.size(), actualRanges.size()});
 	}
 
-	std::sort(ranges.begin(), ranges.end(),
+	// stable_sort: Go's slices.SortFunc preserves equal-key order.
+	std::stable_sort(ranges.begin(), ranges.end(),
 	          [](const std::shared_ptr<RangeMarker>& a,
 	             const std::shared_ptr<RangeMarker>& b) {
 		          return lsproto::ComparePositions(a->LSPos(),
@@ -5302,7 +5305,8 @@ void FourslashTest::editScriptAndUpdateMarkersWorker(
     const std::vector<TextChange>& changes) {
 	// Sort changes by position (ascending) so we can apply in reverse
 	std::vector<TextChange> sortedChanges = changes;
-	std::sort(sortedChanges.begin(), sortedChanges.end(),
+	// stable_sort: Go's slices.SortFunc preserves equal-key order.
+	std::stable_sort(sortedChanges.begin(), sortedChanges.end(),
 	          [](const TextChange& a, const TextChange& b) {
 		          return a.pos() < b.pos();
 	          });
@@ -6159,7 +6163,9 @@ void FourslashTest::BaselineAutoImportsCompletions(
 			// }
 			// allChanges := append(allChanges, completionChange)
 			// sorted from back-of-file-most to front-of-file-most
-			std::sort(
+			// stable_sort: Go's slices.SortFunc preserves equal-key
+			// order (same-position edits keep insertion order).
+			std::stable_sort(
 			    allChanges.begin(), allChanges.end(),
 			    [](const std::shared_ptr<lsproto::TextEdit>& a,
 			       const std::shared_ptr<lsproto::TextEdit>& b) {

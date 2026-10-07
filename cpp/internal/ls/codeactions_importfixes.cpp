@@ -593,7 +593,7 @@ std::vector<fixInfo*> sortFixInfo(std::vector<fixInfo*> fixes,
 	// Sort by:
 	// 1. JSX namespace fixes last
 	// 2. Fix comparison using view.CompareFixes
-	std::sort(sorted.begin(), sorted.end(),
+	std::stable_sort(sorted.begin(), sorted.end(),
 	          [&](fixInfo* a, fixInfo* b) {
 		          // JSX namespace fixes should come last
 		          if (int c = compareBooleans(a->isJsxNamespaceFix,

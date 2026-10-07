@@ -398,7 +398,7 @@ void mergeChildren(
 				         (*source->Children)->end());
 			auto merged = mergeExpandos(**target->Children);
 			*target->Children = std::move(merged);
-			std::sort((*target->Children)->begin(),
+			std::stable_sort((*target->Children)->begin(),
 			          (*target->Children)->end(),
 					  [](const std::shared_ptr<lsp::lsproto::DocumentSymbol>& a,
 						 const std::shared_ptr<lsp::lsproto::DocumentSymbol>& b) {
@@ -1192,7 +1192,7 @@ ProvideWorkspaceSymbols(gostd::Context ctx,
 		}
 	}
 	// Sort the DeclarationInfos and return the top 256 matches.
-	std::sort(infos.begin(), infos.end(),
+	std::stable_sort(infos.begin(), infos.end(),
 			  [](const DeclarationInfo& a, const DeclarationInfo& b) {
 				  return compareDeclarationInfos(a, b) < 0;
 			  });

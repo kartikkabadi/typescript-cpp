@@ -8556,7 +8556,7 @@ std::string snippetPrinter::printAndFormatNodeWithSettings(
 	if (!writer->escapes.empty()) {
 		allChanges.insert(allChanges.end(), writer->escapes.begin(),
 		                  writer->escapes.end());
-		std::sort(allChanges.begin(), allChanges.end(),
+		std::stable_sort(allChanges.begin(), allChanges.end(),
 		          [](const TextChange& a, const TextChange& b) {
 			          return compareTextRanges(
 			                 static_cast<const TextRange&>(a),

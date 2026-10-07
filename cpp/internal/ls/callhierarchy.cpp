@@ -588,7 +588,7 @@ std::vector<::tsc::Node*> findAllInitialDeclarations(checker::Checker* c,
 						  int(decl->pos())};
 	}
 
-	std::sort(indices.begin(), indices.end(), [&](int a, int b) {
+	std::stable_sort(indices.begin(), indices.end(), [&](int a, int b) {
 		if (keys[a].file != keys[b].file) {
 			return keys[a].file < keys[b].file;
 		}
@@ -1136,7 +1136,7 @@ LanguageService::convertCallSiteGroupToIncomingCall(
 		return nullptr;
 	}
 
-	std::sort(fromRanges.begin(), fromRanges.end(),
+	std::stable_sort(fromRanges.begin(), fromRanges.end(),
 			  [](const lsp::lsproto::Range& a,
 			     const lsp::lsproto::Range& b) {
 				  return lsp::lsproto::CompareRanges(a, b) < 0;
@@ -1198,7 +1198,7 @@ LanguageService::getIncomingCalls(gostd::Context ctx,
 			symbolEntryTransformOptions{},
 			nullptr /*defaultProjectData*/);
 	if (result.CallHierarchyIncomingCalls != nullptr) {
-		std::sort(
+		std::stable_sort(
 			(*result.CallHierarchyIncomingCalls)->begin(),
 			(*result.CallHierarchyIncomingCalls)->end(),
 			[](const std::shared_ptr<lsp::lsproto::CallHierarchyIncomingCall>& a,
@@ -1285,7 +1285,7 @@ LanguageService::convertCallSiteGroupToOutgoingCall(
 		return nullptr;
 	}
 
-	std::sort(fromRanges.begin(), fromRanges.end(),
+	std::stable_sort(fromRanges.begin(), fromRanges.end(),
 			  [](const lsp::lsproto::Range& a,
 			     const lsp::lsproto::Range& b) {
 				  return lsp::lsproto::CompareRanges(a, b) < 0;
@@ -1336,7 +1336,7 @@ LanguageService::getOutgoingCalls(compiler::SimpleProgram* program,
 		}
 	}
 
-	std::sort(result.begin(), result.end(),
+	std::stable_sort(result.begin(), result.end(),
 			  [](const std::shared_ptr<lsp::lsproto::CallHierarchyOutgoingCall>& a,
 				 const std::shared_ptr<lsp::lsproto::CallHierarchyOutgoingCall>& b) {
 				  if (a->To->Uri != b->To->Uri) {

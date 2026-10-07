@@ -390,7 +390,7 @@ void addToExistingImport(change::Tracker* ct, SourceFile* file,
 					        ct->nodeFactory->newIdentifier(
 					            namedImport->name)));
 				}
-				std::sort(newSpecifiers.begin(), newSpecifiers.end(),
+				std::stable_sort(newSpecifiers.begin(), newSpecifiers.end(),
 				          [&](Node* a, Node* b) {
 					          return specifierComparer(a, b) < 0;
 				          });
@@ -733,7 +733,7 @@ void insertImports(change::Tracker* ct, SourceFile* sourceFile,
 	auto& comparer = orgCmp.first;
 	auto& isSorted = orgCmp.second;
 	std::vector<Node*> sortedNewImports = imports;
-	std::sort(sortedNewImports.begin(), sortedNewImports.end(),
+	std::stable_sort(sortedNewImports.begin(), sortedNewImports.end(),
 	          [&](Node* a, Node* b) {
 		          return lsutil::CompareImportsOrRequireStatements(a, b,
 		                                                           comparer) <

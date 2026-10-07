@@ -325,7 +325,7 @@ std::pair<lsp::lsproto::Range, spanmap::Fidelity> semanticTokenLSPRange(
 // semantictokens.go:193 — sortSemanticTokens
 void sortSemanticTokens(std::vector<semanticToken>& tokens,
 						lsconv::Converters* converters) {
-	std::sort(tokens.begin(), tokens.end(),
+	std::stable_sort(tokens.begin(), tokens.end(),
 			  [&](const semanticToken& a, const semanticToken& b) {
 				  auto [aRange, _a] = semanticTokenLSPRange(a, converters);
 				  auto [bRange, _b] = semanticTokenLSPRange(b, converters);

@@ -404,11 +404,11 @@ CacheStats* Registry::GetCacheStats() {
 		    bucket->DependencyNames.get(), packageNames.release()});
 	}
 
-	std::sort(stats->ProjectBuckets.begin(), stats->ProjectBuckets.end(),
+	std::stable_sort(stats->ProjectBuckets.begin(), stats->ProjectBuckets.end(),
 	          [](const BucketStats& a, const BucketStats& b) {
 		          return a.Name < b.Name;
 	          });
-	std::sort(stats->NodeModulesBuckets.begin(),
+	std::stable_sort(stats->NodeModulesBuckets.begin(),
 	          stats->NodeModulesBuckets.end(),
 	          [](const BucketStats& a, const BucketStats& b) {
 		          return a.Name < b.Name;
