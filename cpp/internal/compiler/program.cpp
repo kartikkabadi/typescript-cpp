@@ -317,7 +317,8 @@ SimpleProgram::SimpleProgram(CompilerHost* host_,
                              std::vector<std::string> rootFileNames,
                              tsoptions::ParsedCommandLine* config,
                              bool skipModuleResolution_,
-                             tracing::Tracing* tracing_)
+                             tracing::Tracing* tracing_,
+                             const ProgramOptions* programOpts)
 	: options(opts), skipModuleResolution(skipModuleResolution_),
 	  tr_(tracing_) {
 	host = host_;
@@ -335,10 +336,14 @@ SimpleProgram::SimpleProgram(CompilerHost* host_,
 	}
 	// === end slice: incremental ===
 
-	// program.go:285 NewProgram — seed the ProgramOptions the file
-	// loader, mapper and reuse machinery read (loader.opts). The
-	// options/factories fields this ctor has no caller wiring for stay
-	// zero-valued.
+	// program.go:285 NewProgram — Go builds &Program{opts: opts}, so the
+	// caller's ProgramOptions are installed BEFORE
+	// processAllProgramFiles and loader-visible fields
+	// (UseSourceOfProjectReference, TypingsLocation,
+	// CreateModuleResolver) are in effect while files load. programOpts
+	// is null only on the convenience-ctor paths, which have no caller
+	// wiring — those fields stay zero-valued there.
+	opts_ = programOpts != nullptr ? *programOpts : ProgramOptions{};
 	opts_.Host = host;
 	opts_.Config = commandLine_;
 	opts_.Tracing = tr_;
@@ -2744,8 +2749,7 @@ SimpleProgram* NewProgram(const ProgramOptions& opts) {
 	                            *opts.Config->ParsedConfig->CompilerOptions,
 	                            opts.Config->ParsedConfig->FileNames,
 	                            opts.Config, opts.SkipModuleResolution,
-	                            opts.Tracing);
-	p->opts_ = opts;
+	                            opts.Tracing, &opts);
 	// === slice: project ===
 	// program.go:299 NewProgram -> initCheckerPool: the pool is created
 	// by opts.CreateCheckerPool when non-nil; when nil Go builds its own

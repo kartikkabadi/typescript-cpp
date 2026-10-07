@@ -1000,7 +1000,8 @@ public:
 	              std::vector<std::string> rootFileNames,
 	              tsoptions::ParsedCommandLine* config,
 	              bool skipModuleResolution,
-	              tracing::Tracing* tracing = nullptr);
+	              tracing::Tracing* tracing = nullptr,
+	              const ProgramOptions* programOpts = nullptr);
 
 	// --- checker.Program interface ---
 	const CompilerOptions* Options() override { return &options; }

@@ -115,14 +115,21 @@ returns `0/0` — the match is case-sensitive; run as
 7. **Baseline-file diffs** (~6 fails). `vSQuickInfo/*DisplayParts*VS`,
    `vsFindAllRefs*` baseline files differ — batch B documents these as an
    existing family (baseline-accept not ours to run). Left FAILING.
+   **RESOLVED post-merge**: all 34 `*VS` tests pass on the merged HEAD —
+   earlier sibling fixes healed this family, no stale oracles found.
 8. **Rename/documentHighlight/references assertion diffs** (~15 fails, scattered):
    single-site mismatches — e.g. `assertion failed: import { helper }`,
    `Diagnostics do not match`, marker-position off-by-one. Individually noted
-   in the runner output.
+   in the runner output. **RESOLVED** — see "Residuals sweep" below:
+   tests_c_references/navbar/misc = 412/412 (4 GOOS-gated skips), and the
+   quickinfo2/formatting2/sighelp/dochigh/comments/gotoimpl/gototypedeff
+   sweep = 834/834.
 9. **Harness-level timeouts** (~4). `TestAutoImportPackageJsonFilterExistingImport2`,
    `TestWorkspaceSymbolMultiProjectNonExistentRef` (signal 11) and siblings —
    per-test alarm fired; consistent with #1/#3 (multi-project/project-reference
-   machinery).
+   machinery). `TestWorkspaceSymbolMultiProjectNonExistentRef` **FIXED**
+   (nil `commandLine` dereference — see "Residuals sweep" below); the
+   whole `*AcrossProject*` family now passes.
 
 ## Divergences found and fixed
 
@@ -231,6 +238,70 @@ pre-existing on the un-fixed tree (same for `TestCodeLensAcrossProjects`
 SEGV and `TestCodeLensOnFunctionAcrossProjects1`, which timed out there).
 All `TestContentMapper*` and `*CodeLens`/`Diagnostics` name-filter runs
 clean.
+
+### Residuals sweep (`devin/cpp-fsc-residuals`, branch off the merged
+`devin/cpp-port` HEAD e239bea263)
+
+Four divergences fixed; one whole cross-project family eliminated.
+
+1. **GOOS-gated test files ported unconditionally** (9 tests now SKIP).
+   Go test files named `*_js_test.go` are constrained to `GOOS=js` by the
+   toolchain's filename suffix rule — they never compile or run on linux
+   (verified: `go test -list` shows none of them; `go test -run` says "no
+   tests to run"). The transpiler registered them anyway, and they can
+   never pass (no reference baselines exist — Go never generated them).
+   Each ported function now `t->Skip`s with the GOOS-gate reason:
+   `TestFindAllRefsJsDocTemplateTag_{class,function}_js`,
+   `TestFindAllRefsJsDocTypeDef_js`, `TestFindAllRefs_importType_js`
+   (tests_c_references), `TestAutoImportPackageJsonImports{,Pattern,
+   Pattern_ts}_js` (tests_c_autoimport2),
+   `TestDocCommentTemplateFunctionWithParameters_js`
+   (tests_c_comments), `TestImportNameCodeFix_all_js`
+   (tests_c_codefix2).
+
+2. **`usageWithMarker` slice drop** (`tests_c_statemaps.cpp`,
+   `TestFindAllRefsSpecialHandlingOfLocalness`). The transpiler emitted
+   `tc.usage + "/*ref*/" + tc.usage.substr(idx)` for Go's
+   `usage[:idx] + "/*ref*/" + usage[idx:]` — marker landed after the
+   statement (`shared.dog();/*ref*/dog();`) instead of inside the
+   reference, corrupting every subtest's file content.
+
+3. **`ProgramOptions` seeded post-ctor** (`cpp/internal/compiler/
+   program.{h,cpp}` — the residual behind the "cross-project
+   orchestrator" residuals in clusters 2/5/9). Go does
+   `&Program{opts: opts}` before `processAllProgramFiles`, so
+   `loader.opts` sees `UseSourceOfProjectReference`, `TypingsLocation`
+   and `CreateModuleResolver` during the parse. The C++ impl ctor seeded
+   only Host/Config/Tracing and `NewProgram` overwrote `p->opts_` after
+   the constructor had already run the loader — so
+   `canUseProjectReferenceSource()` was false mid-parse and referenced
+   projects' source files never joined the program. The impl ctor now
+   takes `const ProgramOptions*` and installs it before the loader runs.
+   Heals: `TestFindAllRefsSpecialHandlingOfLocalness` (5 subtests),
+   `TestCallHierarchyAcrossProject`, `TestCodeLensAcrossProjects`,
+   `TestCodeLensOnFunctionAcrossProjects1`,
+   `TestImplementationsAcrossProjects`,
+   `TestFindAllRefsReExportInMultiProjectSolution`.
+
+4. **Nil `commandLine` dereference** (`cpp/internal/project/
+   configfileregistrybuilder.cpp`, `TestWorkspaceSymbolMultiProjectNonExistentRef`
+   SIGSEGV). When a referenced project's `tsconfig.json` doesn't exist,
+   `reloadIfNeeded` leaves `entry->commandLine` nil; `updateRootFilesWatch`
+   then called `WildcardDirectories()`/`LiteralFileNames()`/
+   `ExtendedSourceFiles()` — all nil-receiver-safe in Go — on a null
+   pointer. Guarded at the call site (the file's established convention
+   for Go's nil-receiver semantics).
+
+Verification on the merged HEAD:
+- `-run 'TestContentMapper|TestOrganizeImports|TestCallHierarchy'` =
+  **186/186** (was 130/131 + the ContentMapper suite's 55 — every
+  previously-failing named test now passes).
+- tests_c_references + tests_c_navbar + tests_c_misc = **412/412** with
+  4 GOOS-gated skips.
+- tests_c_quickinfo2 + tests_c_formatting2 + tests_c_sighelp +
+  tests_c_dochigh + tests_c_comments + tests_c_gotoimpl +
+  tests_gototypedeff = **834/834**.
+- `tscpp check` smoke: 60/60 conformance files exit clean.
 
 ## Fixed vs left
 

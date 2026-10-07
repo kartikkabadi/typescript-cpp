@@ -2277,6 +2277,7 @@ REGISTER_FOURSLASH_TEST(TestFindAllRefsJsDocImportTag, TestFindAllRefsJsDocImpor
 static void TestFindAllRefsJsDocTemplateTag_class_js(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
+		t->Skip({"Go *_js_test.go file: GOOS js-gated, never compiled on this platform"}); return;
 		const std::string content = R"TS(// @allowJs: true
 // @Filename: /a.js
 /** @template /*1*/T */
@@ -2312,6 +2313,7 @@ REGISTER_FOURSLASH_TEST(TestFindAllRefsJsDocTemplateTag_class, TestFindAllRefsJs
 static void TestFindAllRefsJsDocTemplateTag_function_js(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
+		t->Skip({"Go *_js_test.go file: GOOS js-gated, never compiled on this platform"}); return;
 		const std::string content = R"TS(// @allowJs: true
 // @Filename: /a.js
 /**
@@ -2345,6 +2347,7 @@ REGISTER_FOURSLASH_TEST(TestFindAllRefsJsDocTemplateTag_function, TestFindAllRef
 static void TestFindAllRefsJsDocTypeDef_js(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
+		t->Skip({"Go *_js_test.go file: GOOS js-gated, never compiled on this platform"}); return;
 		const std::string content = R"TS(// @allowJs: true
 // @Filename: /a.js
 /** /*1*/@typedef {number} /*2*/T */
@@ -4105,6 +4108,7 @@ REGISTER_FOURSLASH_TEST(TestFindAllRefs_importType_js4, TestFindAllRefs_importTy
 static void TestFindAllRefs_importType_js(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
+		t->Skip({"Go *_js_test.go file: GOOS js-gated, never compiled on this platform"}); return;
 		const std::string content = R"TS(// @allowJs: true
 // @checkJs: true
 // @Filename: /a.js
