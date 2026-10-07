@@ -77,9 +77,21 @@ returns `0/0` — the match is case-sensitive; run as
    `contentmappertest::NewSpawner` + `FourslashOptions.ContentMapperSpawner`;
    the mapped files never get a project attached server-side. Left FAILING —
    product divergence, owned elsewhere.
-2. **codeLens SEGV/UAF** (~10 fails). `TestCodeLens*` and
-   `TestContentMapper*CodeLens` die with signal 11 (one `free(): invalid pointer`
-   abort). Ownership/lifetime bug in the codelens slice — left FAILING.
+2. ~~**codeLens SEGV/UAF** (~10 fails).~~ **FIXED** — see "Divergences found
+   and fixed" below. `TestCodeLens*` and `TestContentMapper*CodeLens` died
+   with signal 11 / `free(): invalid pointer` / write-side deadlock timeouts.
+   Two crash root causes plus three baseline-fidelity divergences
+   uncovered during verification, all fixed on `devin/cpp-fsc-codelens`:
+   post-fix the 7 single-project `TestCodeLens*` tests PASS; the 4
+   `TestContentMapper*CodeLens` tests now fail via cluster 1's
+   `[-32603] no project found for URI` instead of crashing; and the 2
+   cross-project tests (`TestCodeLensAcrossProjects`,
+   `TestCodeLensOnFunctionAcrossProjects1`) now fail on baseline content
+   diffs rooted in the project-reference/declaration-map machinery
+   (cluster 3/5: dependent projects never gain the referenced project's
+   source file, so cross-project references/implementations enumerate 1
+   location instead of 2–3). Those residuals are not crashes and belong to
+   the other clusters.
 3. **Declaration-map state baseline hangs** (~25 timeouts). `tests_c_statemaps` +
    `TestDeclarationMaps*`: `// @stateBaseline: true` tests on
    project-reference declaration maps time out in the child (SIGALRM kill).
@@ -111,6 +123,54 @@ returns `0/0` — the match is case-sensitive; run as
    `TestWorkspaceSymbolMultiProjectNonExistentRef` (signal 11) and siblings —
    per-test alarm fired; consistent with #1/#3 (multi-project/project-reference
    machinery).
+
+## Divergences found and fixed
+
+Cluster-2 codeLens crashes — all eliminated on `devin/cpp-fsc-codelens`
+(7/9 `TestCodeLens` pass; remaining 2 + 4 ContentMapper are non-crash
+baseline/error diffs described in cluster 2 above):
+
+1. **`handleCodeLensResolve` double-free of the request `CodeLens`**
+   (`cpp/internal/lsp/lsp_handlers.cpp`). Go's `ResolveCodeLens` returns the
+   same `*lsproto.CodeLens` it was passed (GC-shared); the C++ handler
+   wrapped that borrowed pointer in a fresh `shared_ptr`, creating a second
+   control block — the params owner then freed the object the response
+   still held. Depending on heap layout this produced signal 11, a
+   `free(): invalid pointer` abort, or a marshal failure that killed the
+   client's `MessageRouter`, leaving the synchronous `io.Pipe` undrained
+   and the test deadlocked until the 180s alarm. Fixed with the aliasing
+   `shared_ptr<CodeLens>(params, r.first)` idiom already used by
+   `handleCompletionItemResolve` (same GC-vs-RAII family).
+2. **Nil `serializedConfigFileRegistry` deref** in
+   `printConfigFileRegistryDiff` (`cpp/internal/fourslash/statebaseline.cpp`).
+   The field is null until the first baseline snapshot; Go's
+   `ForEachTestConfigEntry`/`ForEachTestConfigFileNamesEntry` are
+   nil-receiver-safe (`if c != nil`) but the port called them
+   unconditionally → SEGV inside `openFile`'s
+   `baselineProjectsAfterNotification`. Guarded at the call site (matches
+   the existing `GetTestConfigEntry` guards in the same file).
+3. **Uninitialized `TextDocumentItem.Version`** in `FourslashTest::openFile`
+   (`cpp/internal/fourslash/fourslash.cpp`). `TextDocumentItem i;`
+   default-init left `int32_t Version` indeterminate — serialized as
+   `"version": 1` where Go's zero value emits 0 in every didOpen baseline
+   record. Fixed by value-initializing (`make_shared<TextDocumentItem>()`).
+4. **`diffTable::print` missing separator space**
+   (`cpp/internal/fourslash/statebaseline.cpp`). Go emits
+   `"%-*s %s"` (padded key + literal space + value); the port dropped the
+   literal space, shaving one column off every diff-table row in every
+   `// @stateBaseline:` baseline. Restored.
+5. **`SemicolonPreference` had no Go zero value**
+   (`cpp/internal/ls/lsutil/lsutil.h`, `userpreferences.cpp`).
+   `FormatCodeSettings::Semicolons` defaulted to `Ignore` (that default
+   belongs only to `GetDefaultFormatCodeSettings()`), so every
+   default-constructed `UserPreferences` serialized
+   `"format": {"semicolons": "ignore"}` into didChangeConfiguration
+   settings and — worse — `trackerimpl`'s
+   `options.Semicolons == Ignore` auto-detect check returned true for
+   unset preferences (Go `""` ≠ `"ignore"` → false). Added an `Unset`
+   enumerant as the field default; `serializeSemicolonPreference` maps it
+   to nil so the `format` key is omitted like Go. Faithful semantics
+   restored beyond the baseline diff.
 
 ## Fixed vs left
 

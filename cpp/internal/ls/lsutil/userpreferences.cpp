@@ -250,8 +250,8 @@ JsonAny serializeIndentStyle(IndentStyle v) {
 // IncludeInlayParameterNameHints have Kind() == String.
 JsonAny serializeSemicolonPreference(const SemicolonPreference& v) {
 	// SemicolonPreference has Kind() == String in Go; it serializes through
-	// the generic string branch. Its zero value does not exist in C++ (the
-	// enum's minimum is Ignore == "ignore").
+	// the generic string branch, so the "" zero value (Unset) returns nil.
+	if (v == SemicolonPreference::Unset) return JsonAny();
 	return serializeString(v == SemicolonPreference::Insert ? "insert" :
 		(v == SemicolonPreference::Remove ? "remove" : "ignore"));
 }

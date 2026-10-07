@@ -127,9 +127,11 @@ void diffTable::print(gostd::io::Writer* w, const std::string& header) {
 	for (auto& key : diffKeys) {
 		auto value = diff.GetOrZero(key);
 		// fmt.Fprintf(w, "%s%-*s %s\n", indent, keyWidth+1, key, value)
+		// — the literal space before %s is part of the output even when
+		// value is empty (trailing whitespace in the baseline).
 		gostr::fprint(w, options.indent + "  " +
 		                     gostr::padRight(key, keyWidth + 1) +
-		                     value + "\n");
+		                     " " + value + "\n");
 	}
 }
 
@@ -670,42 +672,51 @@ void FourslashTest::printConfigFileRegistryDiff(
 		        });
 	    });
 
-	stateBaseline_->serializedConfigFileRegistry
-	    ->ForEachTestConfigEntry(
-	        [&](tspath::Path path, project::TestConfigEntry* entry) {
-		        if (configFileRegistry->GetTestConfigEntry(path) ==
-		            nullptr) {
-			        configDiffsTable->setHasChange();
-			        configDiffsTable->add(
-			            std::string(path),
-			            [entry](gostd::io::Writer* w) {
-				            gostr::fprint(
-				                w,
-				                gostd::sprintf(
-				                    "  [%s] *deleted*\n",
-				                    {entry->FileName}));
-			            });
-		        }
-	        });
-	stateBaseline_->serializedConfigFileRegistry
-	    ->ForEachTestConfigFileNamesEntry(
-	        [&](tspath::Path path,
-	            project::TestConfigFileNamesEntry* entry) {
-		        if (configFileRegistry
-		                ->GetTestConfigFileNamesEntry(path) ==
-		            nullptr) {
-			        configFileNamesDiffsTable->setHasChange();
-			        configFileNamesDiffsTable->add(
-			            std::string(path),
-			            [path](gostd::io::Writer* w) {
-				            gostr::fprint(
-				                w,
-				                gostd::sprintf(
-				                    "  [%s] *deleted*\n",
-				                    {std::string(path)}));
-			            });
-		        }
-	        });
+	// serializedConfigFileRegistry may be null on the first diff — Go's
+	// ForEachTestConfigEntry/ForEachTestConfigFileNamesEntry are
+	// nil-receiver-safe (`if c != nil`), so guard at the call site.
+	if (auto* serializedRegistry =
+	        stateBaseline_->serializedConfigFileRegistry;
+	    serializedRegistry != nullptr) {
+		serializedRegistry->ForEachTestConfigEntry(
+		    [&](tspath::Path path, project::TestConfigEntry* entry) {
+			    if (configFileRegistry->GetTestConfigEntry(path) ==
+			        nullptr) {
+				    configDiffsTable->setHasChange();
+				    configDiffsTable->add(
+				        std::string(path),
+				        [entry](gostd::io::Writer* w) {
+					        gostr::fprint(
+					            w,
+					            gostd::sprintf(
+					                "  [%s] *deleted*\n",
+					                {entry->FileName}));
+				        });
+			    }
+		    });
+	}
+	if (auto* serializedRegistry =
+	        stateBaseline_->serializedConfigFileRegistry;
+	    serializedRegistry != nullptr) {
+		serializedRegistry->ForEachTestConfigFileNamesEntry(
+		    [&](tspath::Path path,
+		        project::TestConfigFileNamesEntry* entry) {
+			    if (configFileRegistry
+			            ->GetTestConfigFileNamesEntry(path) ==
+			        nullptr) {
+				    configFileNamesDiffsTable->setHasChange();
+				    configFileNamesDiffsTable->add(
+				        std::string(path),
+				        [path](gostd::io::Writer* w) {
+					        gostr::fprint(
+					            w,
+					            gostd::sprintf(
+					                "  [%s] *deleted*\n",
+					                {std::string(path)}));
+				        });
+			    }
+		    });
+	}
 	stateBaseline_->serializedConfigFileRegistry =
 	    configFileRegistry;
 	configDiffsTable->print(w);

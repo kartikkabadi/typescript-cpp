@@ -63,12 +63,16 @@ inline constexpr IndentStyle IndentStyleBlock = IndentStyle::Block;
 inline constexpr IndentStyle IndentStyleSmart = IndentStyle::Smart;
 
 // SemicolonPreference — formatcodeoptions.go:37
-// Go: `type SemicolonPreference string` ("ignore" | "insert" | "remove").
+// Go: `type SemicolonPreference string` ("ignore" | "insert" | "remove");
+// its zero value is "" (unset), which serializes to nil and compares
+// unequal to every real value.
 enum class SemicolonPreference : int32_t {
+	Unset,
 	Ignore,
 	Insert,
 	Remove,
 };
+inline constexpr SemicolonPreference SemicolonPreferenceUnset = SemicolonPreference::Unset;
 inline constexpr SemicolonPreference SemicolonPreferenceIgnore = SemicolonPreference::Ignore;
 inline constexpr SemicolonPreference SemicolonPreferenceInsert = SemicolonPreference::Insert;
 inline constexpr SemicolonPreference SemicolonPreferenceRemove = SemicolonPreference::Remove;
@@ -107,7 +111,7 @@ struct FormatCodeSettings : EditorSettings {
 	Tristate PlaceOpenBraceOnNewLineForControlBlocks = Tristate::Unknown;                     // raw:"placeOpenBraceOnNewLineForControlBlocks" config:"format.placeOpenBraceOnNewLineForControlBlocks"
 	Tristate InsertSpaceBeforeTypeAnnotation = Tristate::Unknown;                             // raw:"insertSpaceBeforeTypeAnnotation" config:"format.insertSpaceBeforeTypeAnnotation"
 	Tristate IndentMultiLineObjectLiteralBeginningOnBlankLine = Tristate::Unknown;            // raw:"indentMultiLineObjectLiteralBeginningOnBlankLine" config:"format.indentMultiLineObjectLiteralBeginningOnBlankLine"
-	enum SemicolonPreference Semicolons = SemicolonPreference::Ignore;                        // raw:"semicolons" config:"format.semicolons"
+	enum SemicolonPreference Semicolons = SemicolonPreference::Unset;                         // raw:"semicolons" config:"format.semicolons"
 	Tristate IndentSwitchCase = Tristate::Unknown;                                            // raw:"indentSwitchCase" config:"format.indentSwitchCase"
 
 	// ToLSFormatOptions — formatcodeoptions.go:116
