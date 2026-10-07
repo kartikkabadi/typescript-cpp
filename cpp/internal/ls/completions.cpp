@@ -7768,15 +7768,14 @@ const std::vector<lsproto::CompletionItem*>& jsDocTagCompletionItems() {
 }
 
 // printer.cpp:43 getNewLineCharacter — printer's copy is file-local.
+// Matches Go: NewLineKind.GetNewLineCharacter returns "\n" for every value
+// except CRLF (including None).
 std::string getNewLineCharacter(NewLineKind newLine) {
 	switch (newLine) {
 	case NewLineKind::CarriageReturnLineFeed:
 		return "\r\n";
-	case NewLineKind::LineFeed:
-		return "\n";
-	case NewLineKind::None:
 	default:
-		return "";
+		return "\n";
 	}
 }
 

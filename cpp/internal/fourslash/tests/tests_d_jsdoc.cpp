@@ -53,7 +53,7 @@ function abcdef(x, y) { }
 		tsc::gotest::assert::Equal(t, item->Label, "/** */");
 		fourslash::assertDeepEqual(t, item->Kind, std::make_shared<std::decay_t<decltype(lsproto::CompletionItemKindText)>>(lsproto::CompletionItemKindText), "DeepEqual mismatch");
 		fourslash::assertDeepEqual(t, item->Detail, std::make_shared<std::string>("JSDoc comment"), "DeepEqual mismatch");
-		fourslash::assertDeepEqual(t, item->SortText, std::make_shared<std::string>("\x00"), "DeepEqual mismatch");
+		fourslash::assertDeepEqual(t, item->SortText, std::make_shared<std::string>(std::string("\x00", 1)), "DeepEqual mismatch");
 		fourslash::assertDeepEqual(t, item->CommitCharacters, std::make_shared<std::vector<std::string>>(std::vector<std::string>{}), "DeepEqual mismatch");
 		fourslash::assertDeepEqual(t, item->InsertTextFormat, std::make_shared<std::decay_t<decltype(lsproto::InsertTextFormatSnippet)>>(lsproto::InsertTextFormatSnippet), "DeepEqual mismatch");
 		tsc::gotest::assert::Assert(t, item->TextEdit != nullptr);

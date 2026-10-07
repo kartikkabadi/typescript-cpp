@@ -1102,6 +1102,15 @@ public:
 		}
 		return {it->second.moduleReference, it->second.specifier};
 	}
+	// program.go GetImportHelpersImportSpecifier — consult
+	// importHelpersImportSpecifiers.
+	Node* GetImportHelpersImportSpecifier(const std::string& path) override {
+		auto it = importHelpersImportSpecifiers.find(path);
+		if (it == importHelpersImportSpecifiers.end()) {
+			return nullptr;
+		}
+		return it->second;
+	}
 	// === slice: ls-foundation ===
 	// program.go:235 UsesUriStyleNodeCoreModules
 	Tristate UsesUriStyleNodeCoreModules() const {

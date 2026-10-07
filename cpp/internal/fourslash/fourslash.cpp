@@ -555,7 +555,7 @@ std::shared_ptr<std::vector<T>> sliceOfVecDeleted(std::initializer_list<T> items
 
 std::shared_ptr<lsproto::CompletionClientCapabilities>
 defaultCompletionCapabilities() {
-	static auto p = std::make_shared<lsproto::CompletionClientCapabilities>(
+	auto p = std::make_shared<lsproto::CompletionClientCapabilities>(
 	    [] {
 		    lsproto::CompletionClientCapabilities c;
 		    c.CompletionItem =
@@ -588,7 +588,7 @@ defaultCompletionCapabilities() {
 
 std::shared_ptr<lsproto::DefinitionClientCapabilities>
 defaultDefinitionCapabilities() {
-	static auto p = [] {
+	auto p = [] {
 		lsproto::DefinitionClientCapabilities c;
 		c.LinkSupport = ptrTrue;
 		return std::make_shared<lsproto::DefinitionClientCapabilities>(c);
@@ -598,7 +598,7 @@ defaultDefinitionCapabilities() {
 
 std::shared_ptr<lsproto::TypeDefinitionClientCapabilities>
 defaultTypeDefinitionCapabilities() {
-	static auto p = [] {
+	auto p = [] {
 		lsproto::TypeDefinitionClientCapabilities c;
 		c.LinkSupport = ptrTrue;
 		return std::make_shared<lsproto::TypeDefinitionClientCapabilities>(
@@ -609,7 +609,7 @@ defaultTypeDefinitionCapabilities() {
 
 std::shared_ptr<lsproto::ImplementationClientCapabilities>
 defaultImplementationCapabilities() {
-	static auto p = [] {
+	auto p = [] {
 		lsproto::ImplementationClientCapabilities c;
 		c.LinkSupport = ptrTrue;
 		return std::make_shared<
@@ -619,7 +619,7 @@ defaultImplementationCapabilities() {
 }
 
 std::shared_ptr<lsproto::HoverClientCapabilities> defaultHoverCapabilities() {
-	static auto p = [] {
+	auto p = [] {
 		lsproto::HoverClientCapabilities c;
 		c.ContentFormat = sliceOf<lsproto::MarkupKind>(
 		    {lsproto::MarkupKindMarkdown, lsproto::MarkupKindPlainText});
@@ -630,7 +630,7 @@ std::shared_ptr<lsproto::HoverClientCapabilities> defaultHoverCapabilities() {
 
 std::shared_ptr<lsproto::ExperimentalClientCapabilities>
 defaultExperimentalCapabilities() {
-	static auto p = [] {
+	auto p = [] {
 		lsproto::ExperimentalClientCapabilities c;
 		c.HoverVerbosityLevel = ptrTrue;
 		return std::make_shared<lsproto::ExperimentalClientCapabilities>(c);
@@ -640,7 +640,7 @@ defaultExperimentalCapabilities() {
 
 std::shared_ptr<lsproto::SignatureHelpClientCapabilities>
 defaultSignatureHelpCapabilities() {
-	static auto p = [] {
+	auto p = [] {
 		lsproto::SignatureHelpClientCapabilities c;
 		c.SignatureInformation =
 		    std::make_shared<lsproto::ClientSignatureInformationOptions>(
@@ -672,7 +672,7 @@ defaultSignatureHelpCapabilities() {
 
 std::shared_ptr<lsproto::DocumentSymbolClientCapabilities>
 defaultDocumentSymbolCapabilities() {
-	static auto p = [] {
+	auto p = [] {
 		lsproto::DocumentSymbolClientCapabilities c;
 		c.HierarchicalDocumentSymbolSupport = ptrTrue;
 		return std::make_shared<lsproto::DocumentSymbolClientCapabilities>(
@@ -683,7 +683,7 @@ defaultDocumentSymbolCapabilities() {
 
 std::shared_ptr<lsproto::FoldingRangeClientCapabilities>
 defaultFoldingRangeCapabilities() {
-	static auto p = [] {
+	auto p = [] {
 		lsproto::FoldingRangeClientCapabilities c;
 		c.RangeLimit = (uint32_t)5000;
 		// LineFoldingOnly: ptrTrue,
@@ -710,7 +710,7 @@ defaultFoldingRangeCapabilities() {
 }
 
 std::shared_ptr<lsproto::ClientDiagnosticsTagOptions> defaultTagOptions() {
-	static auto p = [] {
+	auto p = [] {
 		lsproto::ClientDiagnosticsTagOptions o;
 		o.ValueSet = {lsproto::DiagnosticTagUnnecessary,
 		              lsproto::DiagnosticTagDeprecated};
@@ -721,7 +721,7 @@ std::shared_ptr<lsproto::ClientDiagnosticsTagOptions> defaultTagOptions() {
 
 std::shared_ptr<lsproto::DiagnosticClientCapabilities>
 defaultDiagnosticCapabilities() {
-	static auto p = [] {
+	auto p = [] {
 		lsproto::DiagnosticClientCapabilities c;
 		c.RelatedInformation = ptrTrue;
 		c.TagSupport = defaultTagOptions();
@@ -732,7 +732,7 @@ defaultDiagnosticCapabilities() {
 
 std::shared_ptr<lsproto::PublishDiagnosticsClientCapabilities>
 defaultPublishDiagnosticCapabilities() {
-	static auto p = [] {
+	auto p = [] {
 		lsproto::PublishDiagnosticsClientCapabilities c;
 		c.RelatedInformation = ptrTrue;
 		c.TagSupport = defaultTagOptions();
@@ -744,7 +744,7 @@ defaultPublishDiagnosticCapabilities() {
 
 std::shared_ptr<lsproto::WorkspaceEditClientCapabilities>
 defaultWorkspaceEditCapabilities() {
-	static auto p = [] {
+	auto p = [] {
 		lsproto::WorkspaceEditClientCapabilities c;
 		c.DocumentChanges = ptrTrue;
 		c.ResourceOperations = sliceOf<lsproto::ResourceOperationKind>(
@@ -1039,18 +1039,13 @@ void FourslashTest::GoToEachMarker(
     gostd::testing::T* t, const std::vector<std::string>& markerNames,
     const std::function<void(std::shared_ptr<Marker>, int)>& action) {
 	std::vector<std::shared_ptr<Marker>> markers;
-	if (markerNames.empty()) {
-		markers = Markers();
-	} else {
-		markers.reserve(markerNames.size());
-		for (auto& name : markerNames) {
-			auto it = testData->MarkerPositions.find(name);
-			if (it == testData->MarkerPositions.end()) {
-				t->Fatalf("Marker '%s' not found", {name});
-			}
-			markers.push_back(it->second);
-		}
-	}
+	// fourslash.go: GoToEachMarker checks `len(markers) == 0` on a freshly
+	// declared nil slice (always true), so Go ALWAYS iterates f.Markers()
+	// and markerNames is ignored — the else branch below is dead code
+	// upstream. Ported faithfully: TestAllowRenameOfImportPath relies on it
+	// (it names [|a|] ranges, which never enter MarkerPositions, and is
+	// vacuous in Go because the content has no /* */ markers).
+	markers = Markers();
 	for (size_t i = 0; i < markers.size(); i++) {
 		goToMarker(t, markers[i].get());
 		action(markers[i], (int)i);
