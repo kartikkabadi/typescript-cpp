@@ -902,8 +902,8 @@ LanguageService::getJSDocSnippetCompletionRange(const ContextPtr& ctx,
 	    lsproto::TextEditOrInsertReplaceEdit{
 	        .TextEdit = std::make_shared<lsproto::TextEdit>(
 	            lsproto::TextEdit{
-	                .NewText = newText,
 	                .Range = replacementRange,
+	                .NewText = newText,
 	            })});
 }
 
