@@ -790,7 +790,18 @@ Type* Checker::getTypeOfVariableOrParameterOrProperty(Symbol* symbol) {
 	// attributed here via Diagnostic::producedDuringCheckOf. The entry must
 	// be cleared during re-resolution — typeResolutionHasProperty reads
 	// resolvedType != nullptr to detect cycles.
-	if (links->resolvedType != nullptr && staleForCheckFile(links->resolvedTypeCheckFile)) {
+	// A resolvedType that was assigned by contextual typing (via
+	// assignTypeToParameterAndFixTypeParameters) must persist across the
+	// staleness boundary: Go prefers that assigned type over recomputation
+	// (checker.go:16870-16875), and parameters of context-sensitive
+	// signatures are resolved with reportErrors=false, so there are no
+	// diagnostics for the re-resolution to re-emit anyway. Recomputing
+	// instead is actively harmful: the re-resolution can run inside the
+	// enclosing call's resolvingSignature window, where the contextual
+	// signature is unavailable and the parameter degrades to 'any'.
+	if (links->resolvedType != nullptr &&
+		!isParameterOfContextSensitiveSignature(symbol) &&
+		staleForCheckFile(links->resolvedTypeCheckFile)) {
 		links->resolvedType = nullptr;
 	}
 	if (links->resolvedType == nullptr) {

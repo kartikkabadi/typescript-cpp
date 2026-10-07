@@ -2424,9 +2424,17 @@ std::vector<int> getPossibleSymbolReferencePositions(
 		// char before and after it have to be a non-identifier char).
 		int endPosition = position + symbolNameLength;
 
-		if ((position == 0 || !isIdentifierPart(text[position - 1])) &&
+		// Go reads a single *byte* as a rune (rune(text[i])), so a multi-byte
+		// UTF-8 char's first byte is tested on its own — e.g. 0xC2 of '¬' reads
+		// as U+00C2 'Â' which IS an identifier part, so 'obj¬' is rejected.
+		// Cast through unsigned char to reproduce that byte-as-rune behavior
+		// (a signed char would sign-extend to a large char32_t).
+		if ((position == 0 ||
+		     !isIdentifierPart(static_cast<char32_t>(static_cast<unsigned char>(
+		         text[position - 1])))) &&
 		    (endPosition == sourceLength ||
-		     !isIdentifierPart(text[endPosition]))) {
+		     !isIdentifierPart(static_cast<char32_t>(static_cast<unsigned char>(
+		         text[endPosition]))))) {
 			// Found a real match.  Keep searching.
 			positions.push_back(position);
 		}
