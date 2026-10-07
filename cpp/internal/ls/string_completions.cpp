@@ -138,7 +138,9 @@ std::string stripQuotes(const std::string& name) {
 }
 
 // strings.TrimLeft (unicode whitespace only — scanner's IsWhiteSpaceLike).
-std::string trimLeftSpace(std::string_view s) {
+// Returns a view: callers assign it to std::string_view, so materializing a
+// std::string here would leave them dangling on a destroyed temporary.
+std::string_view trimLeftSpace(std::string_view s) {
 	size_t i = 0;
 	while (i < s.size()) {
 		int w = 0;
@@ -146,7 +148,7 @@ std::string trimLeftSpace(std::string_view s) {
 		if (!isWhiteSpaceLike(ch)) break;
 		i += w;
 	}
-	return std::string(s.substr(i));
+	return s.substr(i);
 }
 
 } // namespace

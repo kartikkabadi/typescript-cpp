@@ -326,7 +326,10 @@ CommentRange* getRangeOfEnclosingComment(SourceFile* file, int position,
 			(position == int(commentRange.end()) &&
 			 (commentRange.kind == Kind::SingleLineCommentTrivia ||
 			  position == int(file->Text().size())))) {
-			return &commentRange;
+			// Go `return &commentRange` escapes the loop variable to the heap;
+			// `commentRanges` is a local vector that dies with this frame, so
+			// the pointer must outlive it — copy out (callers never mutate).
+			return new CommentRange(commentRange);
 		}
 	}
 	return nullptr;

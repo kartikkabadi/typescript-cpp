@@ -53,9 +53,9 @@ static std::string getOutputPathWithoutChangingExtension(
 		    {getRelativePathFromDirectory(
 		        host->CommonSourceDirectory(), inputFileName,
 		        ComparePathsOptions{
-		            .currentDirectory = host->GetCurrentDirectory(),
 		            .useCaseSensitiveFileNames =
 		                host->UseCaseSensitiveFileNames(),
+		            .currentDirectory = host->GetCurrentDirectory(),
 		        })});
 	}
 	return std::string(inputFileName);
@@ -76,8 +76,8 @@ OutputPaths GetOutputPathsFor(SourceFile* sourceFile,
 	    comparePaths(
 	        sourceFile->FileName(), ownOutputFilePath,
 	        ComparePathsOptions{
-	            .currentDirectory = host->GetCurrentDirectory(),
 	            .useCaseSensitiveFileNames = host->UseCaseSensitiveFileNames(),
+	            .currentDirectory = host->GetCurrentDirectory(),
 	        }) == 0;
 	OutputPaths paths;
 	if (sourceFile->ContentMapper().empty() &&
@@ -129,9 +129,9 @@ std::string GetOutputJSFileName(std::string_view inputFileName,
 	if (!fileExtensionIs(outputFileName, extensionJson) ||
 	    comparePaths(inputFileName, outputFileName,
 	                 ComparePathsOptions{
-	                     .currentDirectory = host->GetCurrentDirectory(),
 	                     .useCaseSensitiveFileNames =
 	                         host->UseCaseSensitiveFileNames(),
+	                     .currentDirectory = host->GetCurrentDirectory(),
 	                 }) != 0) {
 		return outputFileName;
 	}

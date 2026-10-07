@@ -176,8 +176,9 @@ std::vector<TextChange> FormatOnEnter(const FormatRequestContext& ctx, SourceFil
 	// if the character at the end of the span is a line break, we shouldn't include it, because it indicates we don't want to
 	// touch the current line at all. Also, on some OSes the line break consists of two characters (\r\n), we should test if the
 	// previous character before the end of format span is line break character as well.
+	int w2 = 0;
 	char32_t ch = decodeUtf8Rune(std::string_view(sourceFile->text).substr(endOfFormatSpan),
-								 nullptr);
+								 &w2);
 	if (isLineBreak(ch)) {
 		endOfFormatSpan--;
 	}

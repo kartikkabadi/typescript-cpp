@@ -884,8 +884,9 @@ void formatSpanWorker::trimTrailingWhitespacesForLines(int line1, int line2,
 		int whitespaceStart = getTrailingWhitespaceStartPosition(lineStartPosition, lineEndPosition);
 		if (whitespaceStart != -1) {
 			if (whitespaceStart != lineStartPosition) {
+				int w = 0;
 				char32_t ch = decodeUtf8Rune(
-					std::string_view(sourceFile->text).substr(whitespaceStart - 1), nullptr);
+					std::string_view(sourceFile->text).substr(whitespaceStart - 1), &w);
 				TSC_ASSERT(!isWhiteSpaceSingleLine(ch), "not whitespace");
 			}
 			recordDelete(whitespaceStart, lineEndPosition + 1 - whitespaceStart);

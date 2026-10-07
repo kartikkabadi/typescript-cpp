@@ -64,9 +64,9 @@ Project* NewInferredProject(
 	p->CommandLine = newInferredProjectCommandLine(
 	    compilerOptions, rootFileNames, projectReferences, contentMappers,
 	    tspath::ComparePathsOptions{
-	        .currentDirectory = currentDirectory,
 	        .useCaseSensitiveFileNames =
 	            builder->fs->fs->UseCaseSensitiveFileNames(),
+	        .currentDirectory = currentDirectory,
 	    });
 	return p;
 }
@@ -85,9 +85,9 @@ Project* newSyntheticProject(
 	project->CommandLine = newInferredProjectCommandLine(
 	    compilerOptions, rootFileNames, projectReferences, contentMappers,
 	    tspath::ComparePathsOptions{
-	        .currentDirectory = currentDirectory,
 	        .useCaseSensitiveFileNames =
 	            builder->fs->fs->UseCaseSensitiveFileNames(),
+	        .currentDirectory = currentDirectory,
 	    });
 	return project;
 }
