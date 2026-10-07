@@ -22,6 +22,7 @@
 #include <charconv>
 #include <map>
 #include <set>
+#include <stdexcept>
 #include <utility>
 
 #include "internal/api/encoder/encoder.h"

@@ -3,6 +3,7 @@
 #include "internal/patience/patience.h"
 
 #include <algorithm>
+#include <stdexcept>
 #include <unordered_map>
 
 namespace tsc::patience {

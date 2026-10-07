@@ -1,5 +1,6 @@
 // js_emit_baseline.go — the JS emit baseliner: DoJSEmitBaseline +
 // fileOutput, declarationCompilationContext plumbing.
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <vector>

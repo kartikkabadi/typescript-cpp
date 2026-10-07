@@ -10,6 +10,8 @@
 #include "internal/project/project.h"
 #include "internal/vfs/osvfs/osvfs.h"
 
+#include <stdexcept>
+
 namespace tsc::api {
 
 // NewStdioServer — server.go:44.

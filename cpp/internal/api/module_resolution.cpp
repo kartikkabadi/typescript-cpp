@@ -4,6 +4,7 @@
 #include "internal/api/module_resolution.h"
 
 #include <cstring>
+#include <stdexcept>
 
 #include "internal/core/types.h"
 #include "internal/diagnostics/diagnostics.h"
