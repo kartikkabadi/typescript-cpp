@@ -451,10 +451,10 @@ lsproto::CommandOrCodeAction convertToLSPCodeAction(
 	        lsproto::CodeAction{
 	            .Title = action->Description,
 	            .Kind = std::make_shared<lsproto::CodeActionKind>(kind),
-	            .Edit = std::make_shared<lsproto::WorkspaceEdit>(
-	                lsproto::WorkspaceEdit{.Changes = changes}),
 	            .Diagnostics = std::make_shared<lsproto::Slice<
 	                std::shared_ptr<lsproto::Diagnostic>>>(diagnostics),
+	            .Edit = std::make_shared<lsproto::WorkspaceEdit>(
+	                lsproto::WorkspaceEdit{.Changes = changes}),
 	        }),
 	};
 }
