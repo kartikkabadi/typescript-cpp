@@ -764,6 +764,9 @@ int main(int argc, char** argv) {
 	// the process. (No SIGPIPE exists on Windows; the ignore is a no-op.)
 #ifdef _WIN32
 	w32::signalImpl(SIGPIPE, SIG_IGN);
+	// Go writes raw bytes to stdout/stderr; the CRT's default text mode
+	// would translate \n -> \r\n. Pin fds 0-2 to binary for byte-parity.
+	w32::setBinaryStdio();
 #else
 	std::signal(SIGPIPE, SIG_IGN);
 #endif

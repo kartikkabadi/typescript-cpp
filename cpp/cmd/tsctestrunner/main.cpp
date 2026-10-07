@@ -27,6 +27,9 @@
 #include "internal/execute/tsctests/tests/registry.h"
 #include "internal/gostd/testing.h"
 #include "internal/repo/paths.h"
+#ifdef _WIN32
+#include "internal/win32/w32compat.h"
+#endif
 
 namespace fs = std::filesystem;
 
@@ -56,6 +59,10 @@ void dumpLocalBaselines(const std::string& destRoot) {
 }  // namespace
 
 int main(int argc, char** argv) {
+#ifdef _WIN32
+	// Byte-parity with Go: pin stdout/stderr to binary mode.
+	w32::setBinaryStdio();
+#endif
 	std::string runPattern;
 	std::string dumpDir;
 	bool listOnly = false;
