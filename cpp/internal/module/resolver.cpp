@@ -583,10 +583,14 @@ resolutionState::resolveTypeReferenceDirective(
 
 std::string resolutionState::getCandidateFromTypeRoot(
     const std::string& typeRoot) {
+	// mangled must outlive the combinePaths call — Go's nameForLookup owns
+	// the string; a string_view bound to the temporary would dangle (ASAN).
+	std::string mangled;
 	std::string_view nameForLookup = name;
 	if (typeRoot.ends_with("/node_modules/@types") ||
 	    typeRoot.ends_with("/node_modules/@types/")) {
-		nameForLookup = mangleScopedPackageName(name);
+		mangled = mangleScopedPackageName(name);
+		nameForLookup = mangled;
 	}
 	return tspath::combinePaths(typeRoot, {nameForLookup});
 }

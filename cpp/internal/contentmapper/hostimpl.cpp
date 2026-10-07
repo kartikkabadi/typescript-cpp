@@ -1601,9 +1601,12 @@ gostd::Error projectLease::release() {
 							result = gostd::joinError({result, err});
 						}
 					}
-					hostPtr->projects->erase(it);
+					// Read the identity before erase: entry is a
+					// reference into the freed map node (Go keeps it
+					// alive via GC).
 					releasedIdentities.push_back(
 					    entry->mapper->Identity());
+					hostPtr->projects->erase(it);
 				}
 			}
 		}
