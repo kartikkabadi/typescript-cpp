@@ -1629,9 +1629,13 @@ void host::release(const std::vector<std::string>& identities) {
 				auto& entry = it->second;
 				entry->refs--;
 				if (entry->refs == 0) {
+					// Read the closer before erase: entry is a
+					// reference into the freed map node (Go keeps it
+					// alive via GC).
+					auto closer = entry->closer;
 					conns->erase(it);
-					if (entry->closer != nullptr) {
-						closers.push_back(entry->closer);
+					if (closer != nullptr) {
+						closers.push_back(closer);
 					}
 				}
 			}
