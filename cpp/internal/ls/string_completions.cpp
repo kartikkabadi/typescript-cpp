@@ -991,9 +991,14 @@ LanguageService::getCompletionEntriesForNonRelativeModules(
 				return {std::monostate{}, false};
 			};
 
+			// nodeModulesDirectoryOrImportsLookup must outlive the
+			// forEachAncestorDirectoryStoppingAtGlobalCache call below:
+			// the reassigned ancestorLookup captures it by reference.
+			std::function<std::pair<std::monostate, bool>(
+			    std::string_view)>
+			    nodeModulesDirectoryOrImportsLookup;
 			if (!fragmentDirectory.empty() && resolvePackageJsonExports) {
-				auto nodeModulesDirectoryOrImportsLookup =
-				    ancestorLookup;
+				nodeModulesDirectoryOrImportsLookup = ancestorLookup;
 				ancestorLookup = [&](std::string_view ancestor)
 				    -> std::pair<std::monostate, bool> {
 					std::vector<std::string> components =
