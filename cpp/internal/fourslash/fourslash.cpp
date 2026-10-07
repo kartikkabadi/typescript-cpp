@@ -2722,7 +2722,10 @@ std::string FourslashTest::applyEditsToContent(
     std::string content,
     std::vector<std::shared_ptr<lsproto::TextEdit>> edits) {
 	auto script = getScriptInfo(activeFilename);
-	std::sort(edits.begin(), edits.end(),
+	// stable_sort: Go's slices.SortFunc preserves insertion order on
+	// equal keys; std::sort scrambles same-position edits
+	// deterministically (TestCodeFixClassImplementInterfaceMemberOrdering).
+	std::stable_sort(edits.begin(), edits.end(),
 	          [&](const std::shared_ptr<lsproto::TextEdit>& a,
 	              const std::shared_ptr<lsproto::TextEdit>& b) {
 		          auto aStart =
