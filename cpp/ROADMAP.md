@@ -70,12 +70,12 @@ oracle before moving on.
 - [x] `execute/tsctests` harness (`tsctestrunner`): **99/99** Go scenario
       ports pass (build/watch/commandline/composite/declarationEmit/noEmit,
       incl. Windows-path VFS).
-- [ ] fourslash LS-test harness — `fourslashrunner` landed (fork-per-test
-      runner, static registry); batch A = 93 tests, **91 PASS / 2 SKIP** —
-      100% parity with the Go oracle (the 2 skips are Go's own `t.Skip`).
-      All 8 batch-A divergences root-caused + fixed
-      (`internal/fourslash/tests/REPORT_A.md`); batch B (~150-200 more
-      tests) in flight.
+- [x] fourslash LS-test harness — `fourslashrunner` (fork-per-test
+      runner, static registry) + Go→C++ test transpiler. **4,560 tests
+      ported — 4,130 / 4,130 PASS (100%), 430 faithful skips** (upstream
+      `t.Skip`, GOOS-gated, feature-gated). Zero crashes/asserts/timeouts
+      across the suite. Every divergence root-caused to a real port bug —
+      see `internal/fourslash/tests/REPORT_{A,B,C,D}.md`.
 
 ## Performance work
 
