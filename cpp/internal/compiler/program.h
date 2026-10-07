@@ -1102,6 +1102,14 @@ public:
 		}
 		return {it->second.moduleReference, it->second.specifier};
 	}
+	// program.go GetImportHelpersImportSpecifier — consult
+	// importHelpersImportSpecifiers (the synthetic `import "tslib"`
+	// specifier the file loader created for this file, if any).
+	Node* GetImportHelpersImportSpecifier(const std::string& path) override {
+		auto it = importHelpersImportSpecifiers.find(path);
+		return it != importHelpersImportSpecifiers.end() ? it->second
+		                                             : nullptr;
+	}
 	// === slice: ls-foundation ===
 	// program.go:235 UsesUriStyleNodeCoreModules
 	Tristate UsesUriStyleNodeCoreModules() const {
