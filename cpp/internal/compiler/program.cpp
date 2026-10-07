@@ -1074,7 +1074,11 @@ tspath::Path SimpleProgram::toPath(const std::string& fileName) const {
 }
 
 tspath::ComparePathsOptions SimpleProgram::comparePathsOptions() const {
-	return {host->UseCaseSensitiveFileNames(), host->GetCurrentDirectory()};
+	// program.go:94 — p.comparePathsOptions is a stored field that is never
+	// initialized on a fresh Program (Go zero value {false, ""}); the only
+	// write is the UpdateProgram clone at program.go:407 which copies the
+	// same zero value forward. It is NOT computed from the host.
+	return {};
 }
 
 SourceFile* SimpleProgram::GetSourceFile(const std::string& fileName) {
