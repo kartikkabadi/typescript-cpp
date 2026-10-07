@@ -2753,6 +2753,7 @@ REGISTER_FOURSLASH_TEST(TestAutoImportPackageJsonImportsLength2, TestAutoImportP
 static void TestAutoImportPackageJsonImportsPattern_js(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
+		t->Skip({"Go *_js_test.go file: GOOS js-gated, never compiled on this platform"}); return;
 		const std::string content = R"TS(// @module: node18
 // @Filename: /package.json
 {
@@ -2799,6 +2800,7 @@ REGISTER_FOURSLASH_TEST(TestAutoImportPackageJsonImportsPattern_js_ts, TestAutoI
 static void TestAutoImportPackageJsonImportsPattern_ts_js(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
+		t->Skip({"Go *_js_test.go file: GOOS js-gated, never compiled on this platform"}); return;
 		const std::string content = R"TS(// @module: node18
 // @Filename: /package.json
 {
@@ -2960,6 +2962,7 @@ REGISTER_FOURSLASH_TEST(TestAutoImportPackageJsonImports_capsInPath2, TestAutoIm
 static void TestAutoImportPackageJsonImports_js(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
+		t->Skip({"Go *_js_test.go file: GOOS js-gated, never compiled on this platform"}); return;
 		const std::string content = R"TS(// @module: node18
 // @Filename: /package.json
 {

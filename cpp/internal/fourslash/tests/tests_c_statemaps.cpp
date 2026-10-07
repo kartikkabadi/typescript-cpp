@@ -1631,7 +1631,10 @@ static void TestFindAllRefsSpecialHandlingOfLocalness(gostd::testing::T* t) {
 					export const foo = local;)TS"), R"TS(shared.foo.bar();)TS", "bar"}}) {
 				t->Run((std::string("TestFindAllRefsSpecialHandlingOfLocalness") + tc.name), [&](gostd::testing::T* t) {
 	t->Parallel();
-	auto usageWithMarker = ((tc.usage + std::string("/*ref*/")) + tc.usage.substr(static_cast<int>((tc.usage).find(tc.referenceTerm))));
+	// Go: tc.usage[:idx] + "/*ref*/" + tc.usage[idx:] — the transpiler
+	// dropped the leading slice, producing usage+"/*ref*/"+usage[idx:]
+	// (marker after the statement instead of inside the reference).
+	auto usageWithMarker = ((tc.usage.substr(0, static_cast<int>((tc.usage).find(tc.referenceTerm))) + std::string("/*ref*/")) + tc.usage.substr(static_cast<int>((tc.usage).find(tc.referenceTerm))));
 	auto content = (((((std::string(R"TS(
 // @stateBaseline: true
 // @Filename: /solution/tsconfig.json

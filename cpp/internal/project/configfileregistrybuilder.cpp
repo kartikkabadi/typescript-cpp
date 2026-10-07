@@ -177,36 +177,41 @@ void configFileRegistryBuilder::updateRootFilesWatch(
 	bool includeWorkspace = false;
 	bool includeTsconfigDir = false;
 	auto tsconfigDir = tspath::getDirectoryPath(fileName);
-	auto* wildcardDirectories =
-	    entry->commandLine->WildcardDirectories();
 	tspath::ComparePathsOptions comparePathsOptions{
 	    .useCaseSensitiveFileNames =
 	        fs->UseCaseSensitiveFileNames(),
 	    .currentDirectory = sessionOptions->CurrentDirectory,
 	};
-	for (auto& [dir, _] : *wildcardDirectories) {
-		if (tspath::containsPath(sessionOptions->CurrentDirectory,
-		                         dir, comparePathsOptions)) {
-			includeWorkspace = true;
-		} else if (tspath::containsPath(tsconfigDir, dir,
-		                                comparePathsOptions)) {
-			includeTsconfigDir = true;
-		} else {
-			externalDirectories.push_back(dir);
+	// entry->commandLine is nil when the config file couldn't be parsed
+	// (e.g. it doesn't exist); Go's WildcardDirectories/LiteralFileNames
+	// are nil-receiver-safe and iterate empty here.
+	if (entry->commandLine != nullptr) {
+		auto* wildcardDirectories =
+		    entry->commandLine->WildcardDirectories();
+		for (auto& [dir, _] : *wildcardDirectories) {
+			if (tspath::containsPath(sessionOptions->CurrentDirectory,
+			                         dir, comparePathsOptions)) {
+				includeWorkspace = true;
+			} else if (tspath::containsPath(tsconfigDir, dir,
+			                                comparePathsOptions)) {
+				includeTsconfigDir = true;
+			} else {
+				externalDirectories.push_back(dir);
+			}
 		}
-	}
-	for (auto& rootFileName :
-	     entry->commandLine->LiteralFileNames()) {
-		if (tspath::containsPath(sessionOptions->CurrentDirectory,
-		                         rootFileName,
-		                         comparePathsOptions)) {
-			includeWorkspace = true;
-		} else if (tspath::containsPath(tsconfigDir, rootFileName,
-		                                comparePathsOptions)) {
-			includeTsconfigDir = true;
-		} else {
-			externalDirectories.push_back(
-			    tspath::getDirectoryPath(rootFileName));
+		for (auto& rootFileName :
+		     entry->commandLine->LiteralFileNames()) {
+			if (tspath::containsPath(sessionOptions->CurrentDirectory,
+			                         rootFileName,
+			                         comparePathsOptions)) {
+				includeWorkspace = true;
+			} else if (tspath::containsPath(tsconfigDir, rootFileName,
+			                                comparePathsOptions)) {
+				includeTsconfigDir = true;
+			} else {
+				externalDirectories.push_back(
+				    tspath::getDirectoryPath(rootFileName));
+			}
 		}
 	}
 
@@ -218,7 +223,9 @@ void configFileRegistryBuilder::updateRootFilesWatch(
 		globs.push_back(getRecursiveGlobPattern(tsconfigDir));
 	}
 	for (auto& extendedFileName :
-	     entry->commandLine->ExtendedSourceFiles()) {
+	     entry->commandLine != nullptr
+	         ? entry->commandLine->ExtendedSourceFiles()
+	         : std::vector<std::string>{}) {
 		if (includeWorkspace &&
 		    tspath::containsPath(sessionOptions->CurrentDirectory,
 		                         extendedFileName,

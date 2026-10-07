@@ -1862,6 +1862,7 @@ REGISTER_FOURSLASH_TEST(TestDocCommentTemplateFunctionExpression, TestDocComment
 static void TestDocCommentTemplateFunctionWithParameters_js(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
+		t->Skip({"Go *_js_test.go file: GOOS js-gated, never compiled on this platform"}); return;
 		const std::string content = R"TS(// @allowJs: true
 // @Filename: /a.js
 /*0*/
