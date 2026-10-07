@@ -157,11 +157,21 @@ std::pair<std::string, bool> base64Decode(std::string_view in) {
 // root value, no duplicate object member names, no invalid UTF-8.
 // ---------------------------------------------------------------------------
 
+// JsonMember is defined after JsonValue: an object member embeds JsonValue
+// by value, so it cannot be a pair<string, JsonValue> (pair lacks the
+// incomplete-element support that vector<T> has).
+struct JsonMember;
+
 struct JsonValue {
 	enum Kind : char { Null, Bool, Number, String, Array, Object } kind = Null;
 	std::string str;                                    // String text / raw Number literal
 	std::vector<JsonValue> items;                       // Array
-	std::vector<std::pair<std::string, JsonValue>> members; // Object
+	std::vector<JsonMember> members;                    // Object
+};
+
+struct JsonMember {
+	std::string name;
+	JsonValue value;
 };
 
 bool isUtf8Continuation(unsigned char c) { return (c & 0xC0) == 0x80; }
@@ -430,7 +440,7 @@ struct JsonParser {
 				}
 				// jsontext default: duplicate member names are an error
 				for (auto& m : out.members) {
-					if (m.first == name) {
+					if (m.name == name) {
 						return false;
 					}
 				}
@@ -443,7 +453,7 @@ struct JsonParser {
 				if (!value(member, depth + 1)) {
 					return false;
 				}
-				out.members.emplace_back(std::move(name), std::move(member));
+				out.members.push_back({std::move(name), std::move(member)});
 				ws();
 				if (pos >= s.size()) {
 					return false;
@@ -571,8 +581,8 @@ bool unmarshalRawSourceMap(const JsonValue& v, RawSourceMap& out) {
 		return false;
 	}
 	for (auto& member : v.members) {
-		const std::string& name = member.first;
-		const JsonValue& val = member.second;
+		const std::string& name = member.name;
+		const JsonValue& val = member.value;
 		if (name == "version") {
 			if (!unmarshalInt(val, out.Version)) return false;
 		} else if (name == "file") {

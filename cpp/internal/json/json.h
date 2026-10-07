@@ -243,6 +243,11 @@ concept UnmarshalerFrom = requires(T& v, Decoder& d) {
 // ==== DOM substrate (contentmapper) ====
 // Dom is one parsed JSON node; raw keeps the node's exact source bytes so
 // `json.Value` fields decode as raw passthroughs.
+// DomMember is defined after Dom: an object member embeds Dom by value, so
+// it cannot be pair<string, Dom> (pair lacks vector<T>'s incomplete-element
+// support — libstdc++14 static_asserts on the incomplete Dom).
+struct DomMember;
+
 struct Dom {
 	enum class K { Null, Bool, Number, String, Array, Object };
 	K kind = K::Null;
@@ -250,7 +255,13 @@ struct Dom {
 	bool boolVal = false;
 	std::string strVal;   // decoded (String), or number text (Number)
 	std::vector<Dom> arr;
-	std::vector<std::pair<std::string, Dom>> obj;
+	std::vector<DomMember> obj;
+};
+
+struct DomMember {
+	std::string name;
+	Dom value;
+	DomMember(std::string n, Dom v) : name(std::move(n)), value(std::move(v)) {}
 };
 
 // parse — jsontext.Unmarshal of a whole value: strict JSON, rejects trailing

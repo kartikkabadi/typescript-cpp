@@ -493,16 +493,15 @@ inline std::string marshalDom(const json::Dom& d, json::Encoder& enc) {
 		if (auto e = enc.writeToken(json::BeginObject); !e.empty()) return e;
 		auto members = d.obj;
 		std::sort(members.begin(), members.end(),
-		          [](const std::pair<std::string, json::Dom>& a,
-		             const std::pair<std::string, json::Dom>& b) {
-			          return a.first < b.first;
+		          [](const json::DomMember& a, const json::DomMember& b) {
+			          return a.name < b.name;
 		          });
 		for (auto& m : members) {
 			if (auto e = enc.writeValue(std::string_view(
-			        json::marshalString(m.first)));
+			        json::marshalString(m.name)));
 			    !e.empty())
 				return e;
-			if (auto e = marshalDom(m.second, enc); !e.empty()) return e;
+			if (auto e = marshalDom(m.value, enc); !e.empty()) return e;
 		}
 		return enc.writeToken(json::EndObject);
 	}

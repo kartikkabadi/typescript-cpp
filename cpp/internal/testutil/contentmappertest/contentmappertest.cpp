@@ -326,7 +326,7 @@ unmarshalCompilerOptionsMap(const json::Value& raw) {
 	auto m =
 	    std::make_shared<collections::OrderedMap<std::string, json::Value>>();
 	for (const auto& kv : d.obj) {
-		m->Set(kv.first, json::Value(std::string(kv.second.raw)));
+		m->Set(kv.name, json::Value(std::string(kv.value.raw)));
 	}
 	return {m, nullptr};
 }
