@@ -4165,7 +4165,7 @@ void FourslashTest::VerifyBaselineSignatureHelp(gostd::testing::T* t) {
 
 		// Show active parameter if specified, and the signature
 		// text.
-		if (activeParamPtr != nullptr &&
+		if (activeParamPtr != nullptr && *activeParamPtr != nullptr &&
 		    (*activeParamPtr)->Uinteger != nullptr &&
 		    sig->Parameters != nullptr) {
 			int activeParamIndex =
