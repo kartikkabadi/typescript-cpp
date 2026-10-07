@@ -85,13 +85,23 @@ oracle before moving on.
 - [x] PGO / LTO build profile.
 - [x] Parallel parse across files (`tscpp parse-all` — ~3.9× vs Go serial
       on the 26,002-file corpus).
-- [x] FENNEL checker pool (parallel diagnostics/emit, ~250% CPU).
-- [x] Emit-context arena release (decl-emit RSS 4 GB → 462 MB).
+- [x] FENNEL checker pool (parallel diagnostics/emit, ~250-300% CPU).
+- [x] Emit-context arena release (decl-emit RSS 4 GB → ~340 MB).
+- [x] mimalloc drop-in (mprotect storm 21,635→22 calls/run).
+- [x] Parallel file parse (faithful filesparser.go:269 port — parse phase
+      0.107 s → 0.034 s on perfproj, at parity with Go).
 - [ ] Interned strings for identifiers & type references.
-- [ ] **Gate: tscpp ≥ 3× Go `tsc --noEmit` — NOT MET yet.** After the two
-      structural fixes above: project emit 1.95× slower, --noEmit 2.33×,
-      --declaration 2.37× (was 3.35/3.26/10.5×). Remaining gap is per-CPU
-      hot-path work — see `cpp/tools/perf/PERF_REPORT.md`.
+- [ ] **Gate: tscpp ≥ 3× Go `tsc --noEmit` — NOT MET; closed as
+      contract-incompatible.** Final RUNS=9 medians on the 100-file
+      perfproj: emit **1.049×**, --noEmit **0.991×**, --declaration
+      **0.995×** — i.e. wall-clock parity (faster than Go on 2 of 3
+      surfaces). The residual profile is flat (top symbol ~2.3%) and is
+      composed of faithful-work shared with Go, contract-bound owning
+      copies, and order-locked hashtable order that byte-identical output
+      forbids changing. A ≥3× win requires non-faithful data-structure or
+      scheduling changes — see `cpp/tools/perf/PERF_REPORT.md` (verdict +
+      floor decomposition) and `cpp/tools/perf/HOTPATHS.md` (per-phase
+      archaeology).
 
 ## Conformance rules
 

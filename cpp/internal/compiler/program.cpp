@@ -421,6 +421,12 @@ SimpleProgram::SimpleProgram(CompilerHost* host_,
 	// loader's pathForLibFileCache) alive for the program's lifetime; move
 	// the owning cache so libFiles' values don't dangle.
 	pathForLibFileCache = std::move(loader.pathForLibFileCache);
+	// Same lifetime fix for the unresolved-resolution placeholders whose
+	// raw pointers sit in resolvedModules (filesParser dies with the
+	// loader — see program.h resolvedModuleArena).
+	resolvedModuleArena = std::move(parser.resolvedModuleArena);
+	resolvedModuleKeepAlive =
+	    std::move(parser.resolvedModuleKeepAlive);
 	missingFiles = std::move(parser.missingFiles);
 	redirectTargetsMap = std::move(parser.redirectTargetsMap);
 	redirectFilesByPath = std::move(parser.redirectFilesByPath);

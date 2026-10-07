@@ -6060,6 +6060,13 @@ Node* Checker::getThisContainer(Node* node,
 }
 
 void Checker::sortSymbols(std::vector<Symbol*>& symbols) {
+	sortSymbols(std::span<Symbol*>(symbols));
+}
+
+// checker.go:25460 sortSymbols — subrange overload so getNamedMembers can
+// sort the contained/inherited halves in place like Go's
+// slices.SortFunc(result[:containedCount]) without copy-out vectors.
+void Checker::sortSymbols(std::span<Symbol*> symbols) {
 	std::sort(symbols.begin(), symbols.end(),
 	          [this](Symbol* a, Symbol* b) {
 		          return compareSymbols(a, b) < 0;
@@ -7832,12 +7839,12 @@ std::vector<Symbol*> Checker::getNamedMembers(const SymbolTable& members,
 			result.push_back(symbol);
 		}
 	}
-	std::vector<Symbol*> first(result.begin(), result.begin() + containedCount);
-	std::vector<Symbol*> rest(result.begin() + containedCount, result.end());
-	sortSymbols(first);
-	sortSymbols(rest);
-	std::copy(first.begin(), first.end(), result.begin());
-	std::copy(rest.begin(), rest.end(), result.begin() + containedCount);
+	// checker.go:22462-22463 — sort the two halves in place (contained
+	// members first); the copy-out/copy-back vectors were a port
+	// artifact, not something Go does.
+	sortSymbols(std::span<Symbol*>(result.data(), containedCount));
+	sortSymbols(std::span<Symbol*>(result.data() + containedCount,
+	                             result.size() - containedCount));
 	return result;
 }
 

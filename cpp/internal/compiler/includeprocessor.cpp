@@ -847,7 +847,22 @@ void updateFileIncludeProcessor(SimpleProgram* p) {
 	fresh.reasonArena = std::move(old.reasonArena);
 	fresh.processingDiagArena = std::move(old.processingDiagArena);
 	fresh.diagArena = std::move(old.diagArena);
-	p->includeProcessor_ = std::move(fresh);
+	// Field-wise move (was `p->includeProcessor_ = std::move(fresh)`) —
+	// the arenaMu mutex makes the struct non-assignable; a fresh mutex is
+	// equivalent to a moved one.
+	old.fileIncludeReasons = std::move(fresh.fileIncludeReasons);
+	old.processingDiagnostics = std::move(fresh.processingDiagnostics);
+	old.reasonArena = std::move(fresh.reasonArena);
+	old.processingDiagArena = std::move(fresh.processingDiagArena);
+	old.diagArena = std::move(fresh.diagArena);
+	old.computedDiagnostics_ = std::move(fresh.computedDiagnostics_);
+	old.reasonToReferenceLocation =
+	    std::move(fresh.reasonToReferenceLocation);
+	old.includeReasonToRelatedInfo =
+	    std::move(fresh.includeReasonToRelatedInfo);
+	old.redirectAndFileFormat = std::move(fresh.redirectAndFileFormat);
+	old.compilerOptionsSyntax = fresh.compilerOptionsSyntax;
+	old.compilerOptionsSyntaxComputed = fresh.compilerOptionsSyntaxComputed;
 }
 
 // includeprocessor.go:98 getCompilerOptionsObjectLiteralSyntax —

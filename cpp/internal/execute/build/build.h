@@ -53,6 +53,11 @@ namespace tsc::execute::build {
 
 namespace etsc = ::tsc::execute::tsc;
 
+// Defined in orchestrator.cpp. The explicit declaration keeps `struct
+// workGroup*` signatures binding here instead of resolving to
+// tsc::workGroup (core/utilities.h) in TUs that see both.
+struct workGroup;
+
 // build-domain times are filesystem mtimes (file_clock); Sys.Now() values
 // are converted via std::chrono::file_clock::from_sys.
 using fileTime = std::filesystem::file_time_type;
