@@ -599,7 +599,7 @@ void Checker::checkExternalEmitHelpers(Node* location, ExternalEmitHelpers helpe
 				continue;
 			}
 			for (const std::string& name : getHelperNames(helper)) {
-				SymbolTable exports = getExportsOfModule(helpersModule);
+				const SymbolTable& exports = getExportsOfModule(helpersModule);
 				Symbol* symbol = resolveSymbol(getSymbol(exports, name, SymbolFlagsValue));
 				if (symbol == nullptr) {
 					error(location,

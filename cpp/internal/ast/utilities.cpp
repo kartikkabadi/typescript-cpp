@@ -1002,7 +1002,8 @@ std::string EntityNameToString(
 namespace tsc {
 
 bool moduleExportNameIsDefault(Node* node) {
-	return node->text() == InternalSymbolNameDefault;
+	std::string scratch;
+	return node->textView(scratch) == InternalSymbolNameDefault;
 }
 
 bool expressionIsAlias(Node* node) {

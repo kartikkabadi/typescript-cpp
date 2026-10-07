@@ -608,7 +608,7 @@ bool EmitResolver::IsImportRequiredByAugmentation(Node* decl) {
 	if (importTarget == file) {
 		return false;
 	}
-	SymbolTable exports = checker->getExportsOfModule(file->Symbol);
+	const SymbolTable& exports = checker->getExportsOfModule(file->Symbol);
 	for (auto& kv : exports) {
 		Symbol* s = kv.second;
 		Symbol* merged = checker->getMergedSymbol(s);
@@ -1215,7 +1215,7 @@ std::vector<Node*> EmitResolver::CreateLateBoundIndexSignatures(
 	Symbol* instanceIndexSymbol = checker->getIndexSymbol(sym);
 	std::vector<IndexInfo*> instanceInfos;
 	if (instanceIndexSymbol != nullptr) {
-		SymbolTable members = checker->getMembersOfSymbol(sym);
+		const SymbolTable& members = checker->getMembersOfSymbol(sym);
 		std::vector<Symbol*> siblingSymbols;
 		siblingSymbols.reserve(members.size());
 		for (auto& kv : members) {

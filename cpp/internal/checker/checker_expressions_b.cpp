@@ -1972,14 +1972,14 @@ bool Checker::isMethodAccessForCall(Node* node) {
 
 // Lookup the private identifier lexically.
 Symbol* Checker::lookupSymbolForPrivateIdentifierDeclaration(
-    const std::string& propName, Node* location) {
+    std::string_view propName, Node* location) {
 	for (Node* containingClass =
 	         getContainingClassExcludingClassDecorators(location);
 	     containingClass != nullptr;
 	     containingClass = getContainingClass(containingClass)) {
 		Symbol* symbol = containingClass->symbol();
 		std::string name =
-		    getSymbolNameForPrivateIdentifier(symbol, propName);
+		    getSymbolNameForPrivateIdentifier(symbol, std::string(propName));
 		auto it = symbol->members.find(name);
 		if (it != symbol->members.end()) {
 			return it->second;
@@ -2064,12 +2064,15 @@ void Checker::reportNonexistentProperty(Node* propNode, Type* containingType,
 		return;
 	}
 	Diagnostic* diagnostic = nullptr;
+	// One text() copy per call (was per-lookup): the name is needed as a real
+	// string for the const string& property-index signatures.
+	const std::string propText = propNode->text();
 	if (!isPrivateIdentifier(propNode) &&
 	    (containingType->flags & TypeFlagsUnion) != 0 &&
 	    (containingType->flags & TypeFlagsPrimitive) == 0) {
 		for (Type* subtype : containingType->types()) {
-			if (getPropertyOfType(subtype, propNode->text()) == nullptr &&
-			    getApplicableIndexInfoForName(subtype, propNode->text()) ==
+			if (getPropertyOfType(subtype, propText) == nullptr &&
+			    getApplicableIndexInfoForName(subtype, propText) ==
 			        nullptr) {
 				diagnostic = NewDiagnosticChainForNode(
 				    diagnostic, propNode, Property_0_does_not_exist_on_type_1,
@@ -2079,7 +2082,7 @@ void Checker::reportNonexistentProperty(Node* propNode, Type* containingType,
 			}
 		}
 	}
-	if (typeHasStaticProperty(propNode->text(), containingType)) {
+	if (typeHasStaticProperty(propText, containingType)) {
 		std::string propName = declarationNameToString(propNode);
 		std::string typeName = TypeToString(containingType);
 		diagnostic = NewDiagnosticChainForNode(
@@ -2089,7 +2092,7 @@ void Checker::reportNonexistentProperty(Node* propNode, Type* containingType,
 	} else {
 		Type* promisedType = GetPromisedTypeOfPromise(containingType);
 		if (promisedType != nullptr &&
-		    getPropertyOfType(promisedType, propNode->text()) != nullptr) {
+		    getPropertyOfType(promisedType, propText) != nullptr) {
 			diagnostic = NewDiagnosticChainForNode(
 			    diagnostic, propNode, Property_0_does_not_exist_on_type_1,
 			    {declarationNameToString(propNode),

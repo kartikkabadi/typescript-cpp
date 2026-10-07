@@ -685,8 +685,10 @@ Type* Checker::getTypeOfExpression(Node* node) {
 		return quickType;
 	}
 	// If a type has been cached for the node, return it.
-	if (Type* cachedType = flowTypeCache[node]; cachedType != nullptr) {
-		return cachedType;
+	Type* cachedFlow = nullptr;
+	if (auto it = flowTypeCache.find(node); it != flowTypeCache.end()) { cachedFlow = it->second; }
+	if (cachedFlow != nullptr) {
+		return cachedFlow;
 	}
 	int startInvocationCount = flowInvocationCount;
 	Type* t = checkExpressionEx(node, CheckModeTypeOnly);
@@ -818,8 +820,10 @@ Type* Checker::checkExpressionCachedEx(Node* node, CheckMode checkMode) {
 // and requesting the contextual type might cause a circularity or other bad behaviour.
 // It sets the contextual type of the node to any before calling getTypeOfExpression.
 Type* Checker::getContextFreeTypeOfExpression(Node* node) {
-	if (Type* cached = contextFreeTypes[node]; cached != nullptr) {
-		return cached;
+	Type* cachedCF = nullptr;
+	if (auto it = contextFreeTypes.find(node); it != contextFreeTypes.end()) { cachedCF = it->second; }
+	if (cachedCF != nullptr) {
+		return cachedCF;
 	}
 	pushContextualType(node, anyType, false /*isCache*/);
 	Type* t = checkExpressionEx(node, CheckModeSkipContextSensitive);

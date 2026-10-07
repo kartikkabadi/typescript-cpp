@@ -1310,7 +1310,7 @@ SymbolTable Checker::addInheritedMembers(SymbolTable symbols,
 InterfaceType* Checker::resolveDeclaredMembers(Type* t) {
 	InterfaceType* d = t->AsInterfaceType();
 	if (!d->declaredMembersResolved) {
-		SymbolTable members = getMembersOfSymbol(t->symbol);
+		const SymbolTable& members = getMembersOfSymbol(t->symbol);
 		d->declaredMembersResolved = true;
 		d->declaredMembers = members;
 		d->declaredCallSignatures =
@@ -1503,7 +1503,7 @@ bool Checker::isNumericComputedName(Node* name) {
 }
 
 Symbol* Checker::getIndexSymbol(Symbol* symbol) {
-	SymbolTable members = getMembersOfSymbol(symbol);
+	const SymbolTable& members = getMembersOfSymbol(symbol);
 	auto it = members.find(InternalSymbolNameIndex);
 	return it != members.end() ? it->second : nullptr;
 }
@@ -1561,7 +1561,7 @@ void Checker::resolveAnonymousTypeMembers(Type* t) {
 	Symbol* symbol = getMergedSymbol(t->symbol);
 	if (symbol->flags & SymbolFlagsTypeLiteral) {
 		setStructuredTypeMembers(t, {}, {}, {}, {});
-		SymbolTable members = getMembersOfSymbol(symbol);
+		const SymbolTable& members = getMembersOfSymbol(symbol);
 		std::vector<Signature*> callSignatures =
 			getSignaturesOfSymbol(getSymbolFromTable(members, InternalSymbolNameCall));
 		std::vector<Signature*> constructSignatures =

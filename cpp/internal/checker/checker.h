@@ -1886,7 +1886,7 @@ public:
 	std::vector<Symbol*> getPropertiesOfType(Type* t);
 	Type* getTypeOfPropertyOfType(Type* t, const std::string& name);
 	Type* getTypeOfSymbol(Symbol* symbol);
-	SymbolTable getMembersOfSymbol(Symbol* symbol);
+	const SymbolTable& getMembersOfSymbol(Symbol* symbol);
 	Type* getDeclaredTypeOfSymbol(Symbol* symbol);
 	Type* tryGetDeclaredTypeOfSymbol(Symbol* symbol);
 	Type* getDeclaredTypeOfClassOrInterface(Symbol* symbol);
@@ -1967,7 +1967,7 @@ public:
 	Type* createArrayTypeEx(Type* elementType, bool readonly);
 	// Name resolution wiring (checker.go createNameResolver +
 	// nameresolver hooks)
-	Symbol* getSymbol(SymbolTable& symbols, std::string_view name,
+	Symbol* getSymbol(const SymbolTable& symbols, std::string_view name,
 	                SymbolFlags meaning);
 	// aligned to Go signature getAwaitedTypeEx(t, errorNode, diagnosticMessage, args ...any)
 	Type* getAwaitedTypeEx(Type* type, Node* errorNode,
@@ -2106,15 +2106,15 @@ public:
 	bool hasLateBindableIndexSignature(Node* node);
 	bool isLateBindableIndexSignature(Node* node);
 	bool isTypeUsableAsIndexSignatureDeclaration(Type* t);
-	SymbolTable getExportsOfSymbol(Symbol* symbol);
-	SymbolTable getResolvedMembersOrExportsOfSymbol(Symbol* symbol,
-												  MembersOrExportsResolutionKind resolutionKind);
+	const SymbolTable& getExportsOfSymbol(Symbol* symbol);
+	const SymbolTable& getResolvedMembersOrExportsOfSymbol(Symbol* symbol,
+														   MembersOrExportsResolutionKind resolutionKind);
 	Symbol* lateBindMember(Symbol* parent, SymbolTable& earlySymbols, SymbolTable& lateSymbols,
 						   Node* decl);
 	void lateBindIndexSignature(Symbol* parent, SymbolTable& earlySymbols, SymbolTable& lateSymbols,
 								Node* decl);
 	void addDeclarationToLateBoundSymbol(Symbol* symbol, Node* member, SymbolFlags symbolFlags);
-	SymbolTable getExportsOfModule(Symbol* moduleSymbol);
+	const SymbolTable& getExportsOfModule(Symbol* moduleSymbol);
 	std::pair<SymbolTable, std::unordered_map<std::string, Node*>> getExportsOfModuleWorker(
 		Symbol* moduleSymbol);
 	SymbolTable combineSymbolTables(const SymbolTable& first, const SymbolTable& second);
@@ -2527,7 +2527,7 @@ public:
 	bool isValidIndexKeyType(Type* t);
 	bool isGenericType(Type* t);
 	// grammarchecks.go dependencies stubbed — owned by other slices
-	Symbol* lookupSymbolForPrivateIdentifierDeclaration(const std::string& propName, Node* location);
+	Symbol* lookupSymbolForPrivateIdentifierDeclaration(std::string_view propName, Node* location);
 	std::pair<std::string, bool> tryGetNameFromType(Type* t);
 
 	// === slice: declchecks === (checker_declchecks.cpp)

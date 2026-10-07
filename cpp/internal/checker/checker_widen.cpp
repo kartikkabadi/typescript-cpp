@@ -57,7 +57,8 @@ static bool isFreshLiteralType(Type* t) {
 }
 
 Type* Checker::getStringLiteralType(const std::string& value) {
-	Type* t = stringLiteralTypes[value];
+	Type* t = nullptr;
+	if (auto it = stringLiteralTypes.find(value); it != stringLiteralTypes.end()) { t = it->second; }
 	if (t == nullptr) {
 		t = newLiteralType(TypeFlagsStringLiteral, value, nullptr);
 		stringLiteralTypes[value] = t;
@@ -74,7 +75,8 @@ Type* Checker::getNumberLiteralType(Number value) {
 		return nanType;
 	}
 	uint64_t bits = std::bit_cast<uint64_t>(value.v);
-	Type* t = numberLiteralTypes[bits];
+	Type* t = nullptr;
+	if (auto it = numberLiteralTypes.find(bits); it != numberLiteralTypes.end()) { t = it->second; }
 	if (t == nullptr) {
 		t = newLiteralType(TypeFlagsNumberLiteral, value, nullptr);
 		numberLiteralTypes[bits] = t;
@@ -84,7 +86,8 @@ Type* Checker::getNumberLiteralType(Number value) {
 
 Type* Checker::getBigIntLiteralType(const PseudoBigInt& value) {
 	std::string key = value.string();
-	Type* t = bigintLiteralTypes[key];
+	Type* t = nullptr;
+	if (auto it = bigintLiteralTypes.find(key); it != bigintLiteralTypes.end()) { t = it->second; }
 	if (t == nullptr) {
 		t = newLiteralType(TypeFlagsBigIntLiteral, value, nullptr);
 		bigintLiteralTypes[key] = t;
@@ -123,7 +126,8 @@ Type* Checker::getEnumLiteralType(const LiteralValue& value, Symbol* enumSymbol,
 		// NaN is not a usable map key (NaN != NaN), so cache NaN enum types
 		// separately by enum symbol.
 		if (std::get<Number>(value).isNaN()) {
-			Type* t = enumNaNLiteralTypes[enumSymbol];
+			Type* t = nullptr;
+			if (auto it = enumNaNLiteralTypes.find(enumSymbol); it != enumNaNLiteralTypes.end()) { t = it->second; }
 			if (t == nullptr) {
 				t = newLiteralType(flags, value, nullptr);
 				t->symbol = symbol;
@@ -142,7 +146,8 @@ Type* Checker::getEnumLiteralType(const LiteralValue& value, Symbol* enumSymbol,
 	} else {
 		key.value = std::get<PseudoBigInt>(value);
 	}
-	Type* t = enumLiteralTypes[key];
+	Type* t = nullptr;
+	if (auto it = enumLiteralTypes.find(key); it != enumLiteralTypes.end()) { t = it->second; }
 	if (t == nullptr) {
 		t = newLiteralType(flags, value, nullptr);
 		t->symbol = symbol;

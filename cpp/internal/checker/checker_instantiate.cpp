@@ -799,7 +799,8 @@ Type* Checker::getObjectTypeInstantiation(Type* t, TypeMapper* m, TypeAlias* ali
 		data->instantiations[getTypeInstantiationKey(typeParameters, target->alias, false)] =
 			target;
 	}
-	Type* result = data->instantiations[key];
+	Type* result = nullptr;
+	if (auto it = data->instantiations.find(key); it != data->instantiations.end()) { result = it->second; }
 	if (result == nullptr) {
 		TypeMapper* newMapper = newTypeMapper(typeParameters, typeArguments);
 		if ((target->objectFlags & ObjectFlagsSingleSignatureType) != 0 && m != nullptr) {
@@ -946,7 +947,8 @@ Type* Checker::getConditionalTypeInstantiation(Type* t, TypeMapper* mapper,
 		std::vector<Type*> typeArguments =
 			mapVec(root->outerTypeParameters, [mapper](Type* tp) { return mapper->map(tp); });
 		CacheKey key = getConditionalTypeKey(typeArguments, alias, forConstraint);
-		Type* result = root->instantiations[key];
+		Type* result = nullptr;
+		if (auto it = root->instantiations.find(key); it != root->instantiations.end()) { result = it->second; }
 		if (result == nullptr) {
 			TypeMapper* newMapper = newTypeMapper(root->outerTypeParameters, typeArguments);
 			Type* checkType = root->checkType;

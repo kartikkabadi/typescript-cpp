@@ -372,7 +372,7 @@ Symbol* Checker::getSymbolOfNameOrPropertyAccessExpression(Node* name) {
 					Symbol* symbol = getSymbolOfDeclaration(container);
 					// Handle unqualified references to class static members
 					// and class or interface instance members
-					auto exports = getExportsOfSymbol(symbol);
+					const auto& exports = getExportsOfSymbol(symbol);
 					result = getMergedSymbol(getSymbol(
 					    exports, std::string(name->text()), meaning));
 					if (result == nullptr) {

@@ -728,7 +728,7 @@ Type* Checker::getJSXFragmentType(Node* node) {
 		resolvedAlias = resolveAlias(jsxFactorySymbol);
 	}
 
-	SymbolTable reactExports = getExportsOfSymbol(resolvedAlias);
+	const SymbolTable& reactExports = getExportsOfSymbol(resolvedAlias);
 	Symbol* typeSymbol = getSymbol(reactExports, ReactNames.Fragment,
 		SymbolFlagsBlockScopedVariable);
 	if (typeSymbol != nullptr) {
@@ -1492,7 +1492,7 @@ JsxReferenceKind Checker::getJsxReferenceKind(Node* node) {
 Signature* Checker::createSignatureForJSXIntrinsic(Node* node, Type* result) {
 	Type* elementType = errorType;
 	if (Symbol* namespace_ = getJsxNamespaceAt(node); namespace_ != nullptr) {
-		SymbolTable exports = getExportsOfSymbol(namespace_);
+		const SymbolTable& exports = getExportsOfSymbol(namespace_);
 		if (Symbol* typeSymbol = getSymbol(exports, JsxNames.Element, SymbolFlagsType);
 			typeSymbol != nullptr) {
 			elementType = getDeclaredTypeOfSymbol(typeSymbol);
@@ -1633,7 +1633,7 @@ Type* Checker::getJsxElementTypeTypeAt(Node* location) {
 // jsx.go:1293
 Type* Checker::getJsxType(const std::string& name, Node* location) {
 	if (Symbol* namespace_ = getJsxNamespaceAt(location); namespace_ != nullptr) {
-		SymbolTable exports = getExportsOfSymbol(namespace_);
+		const SymbolTable& exports = getExportsOfSymbol(namespace_);
 		if (!exports.empty()) {
 			if (Symbol* typeSymbol = getSymbol(exports, name, SymbolFlagsType);
 				typeSymbol != nullptr) {
@@ -1663,7 +1663,7 @@ Symbol* Checker::getJsxNamespaceAt(Node* location) {
 				false /*isUse*/, false /*excludeGlobals*/);
 		}
 		if (resolvedNamespace != nullptr) {
-			SymbolTable exportsOfResolved =
+			const SymbolTable& exportsOfResolved =
 				getExportsOfSymbol(resolveSymbol(resolvedNamespace));
 			Symbol* candidate = resolveSymbol(
 				getSymbol(exportsOfResolved, JsxNames.JSX, SymbolFlagsNamespace));
