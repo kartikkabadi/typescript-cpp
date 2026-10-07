@@ -2173,7 +2173,8 @@ std::optional<std::string> withoutStartAndEnd(const std::string& s,
                                               const std::string& end) {
 	if (s.starts_with(start) && s.ends_with(end) &&
 	    s.size() >= start.size() + end.size()) {
-		return s.substr(start.size(), s.size() - end.size());
+		return s.substr(start.size(),
+		                s.size() - start.size() - end.size());
 	}
 	return std::nullopt;
 }
