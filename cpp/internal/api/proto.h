@@ -371,6 +371,10 @@ struct EnsurePrograms {
 // CreateSnapshotParams are the parameters for creating a new independent snapshot.
 // (Go embeds SnapshotRequestChangesParams; C++ inherits.)
 struct CreateSnapshotParams : SnapshotRequestChangesParams {
+    // UserPreferences configures language service behavior in the new snapshot.
+    std::shared_ptr<ls::lsutil::UserPreferences> UserPreferences;
+    // PrepareAutoImports identifies the file whose auto-import indexes should be ready in the new snapshot.
+    std::shared_ptr<DocumentIdentifier> PrepareAutoImports;
     // FileNotifications describes host file system changes to invalidate while creating the snapshot.
     std::shared_ptr<FileNotifications> FileNotifications;
     // FileSystem supplies file contents and directory listings for the new snapshot.

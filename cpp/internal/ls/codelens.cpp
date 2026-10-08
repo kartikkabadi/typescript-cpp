@@ -128,7 +128,7 @@ lsp::lsproto::CodeLensResponse LanguageService::ProvideCodeLenses(
 	gostd::Context ctx, lsp::lsproto::DocumentUri documentURI) {
 	SourceFile* file = getProgramAndFile(documentURI).second;
 
-	lsutil::CodeLensUserPreferences userPrefs = UserPreferences().CodeLens;
+	lsutil::CodeLensUserPreferences userPrefs = UserPreferences().CodeLensUserPreferences;
 	if (!tristateIsTrue(userPrefs.ReferencesCodeLensEnabled) &&
 		!tristateIsTrue(userPrefs.ImplementationsCodeLensEnabled)) {
 		return lsp::lsproto::CodeLensResponse{};

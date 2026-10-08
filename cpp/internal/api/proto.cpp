@@ -798,6 +798,8 @@ std::string SnapshotRequestChangesParams::unmarshalJSONFrom(json::Decoder& dec) 
 
 // unmarshalField — CreateSnapshotParams.go member decode; returns {false, ""} for unmatched names.
 std::pair<bool, std::string> CreateSnapshotParams::unmarshalField(std::string_view n, json::Decoder& d) {
+	if (fieldIs(n, "userPreferences")) return {true, json::unmarshalDecode(d, &UserPreferences)};
+	if (fieldIs(n, "prepareAutoImports")) return {true, json::unmarshalDecode(d, &PrepareAutoImports)};
 	if (fieldIs(n, "fileNotifications")) return {true, json::unmarshalDecode(d, &FileNotifications)};
 	if (fieldIs(n, "fileSystem")) return {true, json::unmarshalDecode(d, &FileSystem)};
 	return SnapshotRequestChangesParams::unmarshalField(n, d);
@@ -2553,6 +2555,8 @@ std::string SnapshotRequestChangesParams::marshalJSONTo(json::Encoder& enc) cons
 std::string CreateSnapshotParams::marshalJSONTo(json::Encoder& enc) const {
 	objWriter w{enc};
 	w.begin();
+	if (UserPreferences) w.member("userPreferences", UserPreferences);
+	if (PrepareAutoImports) w.member("prepareAutoImports", PrepareAutoImports);
 	if (FileNotifications) w.member("fileNotifications", FileNotifications);
 	if (FileSystem) w.member("fileSystem", FileSystem);
 	return w.end();

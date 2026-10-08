@@ -2673,9 +2673,9 @@ void TestSession(T* t) {
 		       session->Configure(lsutil::NewDefaultUserPreferences());
 		       // Change user preferences for code lens and inlay hints.
 		       auto newPrefs = session->Config();
-		       newPrefs.CodeLens.ReferencesCodeLensEnabled =
+		       newPrefs.CodeLensUserPreferences.ReferencesCodeLensEnabled =
 		           tsc::Tristate::True;
-		       newPrefs.InlayHints
+		       newPrefs.InlayHintsPreferences
 		           .IncludeInlayFunctionLikeReturnTypeHints =
 		           tsc::Tristate::True;
 
@@ -2740,7 +2740,7 @@ void TestSession(T* t) {
 		                           ->Program;
 
 		auto preferences = session->Config();
-		preferences.CodeLens.ReferencesCodeLensEnabled =
+		preferences.CodeLensUserPreferences.ReferencesCodeLensEnabled =
 		    tsc::Tristate::True;
 		session->Configure(preferences);
 		{
@@ -2787,7 +2787,7 @@ void TestSession(T* t) {
 			return gostd::Error(nullptr);
 		};
 		auto prefs = lsutil::NewDefaultUserPreferences();
-		prefs.CodeLens.ReferencesCodeLensEnabled =
+		prefs.CodeLensUserPreferences.ReferencesCodeLensEnabled =
 		    tsc::Tristate::True;
 
 		session->Configure(prefs);
@@ -2880,7 +2880,7 @@ void TestSession(T* t) {
 		    lsutil::JsonObject{{"js/ts", configMap1}}));
 		auto actualConfig1 = session->Config();
 		auto expectedPrefs1 = lsutil::NewDefaultUserPreferences();
-		expectedPrefs1.UseAliasesForRename = tsc::Tristate::True;
+		expectedPrefs1.ProvidePrefixAndSuffixTextForRename = tsc::Tristate::True;
 		expectedPrefs1.QuotePreference = lsutil::QuotePreferenceSingle;
 		expectedPrefs1.OrganizeImportsSort =
 		    lsutil::OrganizeImportsSortOrdinalIgnoreCase;
@@ -2906,7 +2906,7 @@ void TestSession(T* t) {
 		    lsutil::JsonObject{{"js/ts", configMap2}}));
 		auto actualConfig2 = session->Config();
 		auto expectedPrefs2 = lsutil::NewDefaultUserPreferences();
-		expectedPrefs2.UseAliasesForRename = tsc::Tristate::False;
+		expectedPrefs2.ProvidePrefixAndSuffixTextForRename = tsc::Tristate::False;
 		expectedPrefs2.QuotePreference = lsutil::QuotePreferenceDouble;
 		expectedPrefs2.OrganizeImportsSort =
 		    lsutil::OrganizeImportsSortOrdinal;

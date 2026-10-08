@@ -3172,10 +3172,10 @@ log(/*q3*/[|q|] + 1);)TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr, content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
 		f->VerifyNoErrors(t);
 		f->VerifyBaselineFindAllReferences(t, {"q0", "q1", "q2", "q3", "z0", "z1", "z2"});
-		f->VerifyBaselineRename(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.UseAliasesForRename = Tristate::True}), {f->Ranges()[1], f->Ranges()[3], f->Ranges()[10], f->Ranges()[11]});
-		f->VerifyBaselineRename(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.UseAliasesForRename = Tristate::False}), {f->Ranges()[1], f->Ranges()[3], f->Ranges()[10], f->Ranges()[11]});
-		f->VerifyBaselineRename(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.UseAliasesForRename = Tristate::True}), {f->Ranges()[5], f->Ranges()[7], f->Ranges()[8]});
-		f->VerifyBaselineRename(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.UseAliasesForRename = Tristate::False}), {f->Ranges()[5], f->Ranges()[7], f->Ranges()[8]});
+		f->VerifyBaselineRename(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.ProvidePrefixAndSuffixTextForRename = Tristate::True}), {f->Ranges()[1], f->Ranges()[3], f->Ranges()[10], f->Ranges()[11]});
+		f->VerifyBaselineRename(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.ProvidePrefixAndSuffixTextForRename = Tristate::False}), {f->Ranges()[1], f->Ranges()[3], f->Ranges()[10], f->Ranges()[11]});
+		f->VerifyBaselineRename(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.ProvidePrefixAndSuffixTextForRename = Tristate::True}), {f->Ranges()[5], f->Ranges()[7], f->Ranges()[8]});
+		f->VerifyBaselineRename(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.ProvidePrefixAndSuffixTextForRename = Tristate::False}), {f->Ranges()[5], f->Ranges()[7], f->Ranges()[8]});
 	});
 }
 REGISTER_FOURSLASH_TEST(TestFindAllRefsPrefixSuffixPreference, TestFindAllRefsPrefixSuffixPreference);
@@ -3481,7 +3481,7 @@ type fullType2 = import('./foo/types')./*foo4*/[|foo|]./*full2*/[|Full|];)TS";
 		f->VerifyBaselineRename(t, nullptr, {f->Ranges()[3]});
 		f->VerifyBaselineRename(t, nullptr, {f->Ranges()[5], f->Ranges()[10]});
 		f->VerifyBaselineRename(t, nullptr, {f->Ranges()[7], f->Ranges()[8]});
-		f->VerifyBaselineRename(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.UseAliasesForRename = Tristate::False}), {f->Ranges()[7], f->Ranges()[8], f->Ranges()[10], f->Ranges()[3], f->Ranges()[5]});
+		f->VerifyBaselineRename(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.ProvidePrefixAndSuffixTextForRename = Tristate::False}), {f->Ranges()[7], f->Ranges()[8], f->Ranges()[10], f->Ranges()[3], f->Ranges()[5]});
 	});
 }
 REGISTER_FOURSLASH_TEST(TestFindAllRefsReExportsUseInImportType, TestFindAllRefsReExportsUseInImportType);

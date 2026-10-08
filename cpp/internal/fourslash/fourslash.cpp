@@ -296,7 +296,7 @@ newFourslash(gostd::testing::T* t, const std::string& content,
 		    return it->second->lineMap;
 	    });
 	f->testData = std::make_shared<TestData>(std::move(testData));
-	f->stateEnableFormatting = true;
+	f->stateFormatEnabled = true;
 	f->reportFormatOnTypeCrash = true;
 	f->userPreferences = lsutil::NewDefaultUserPreferences();
 	f->vfs = fs;
@@ -5077,7 +5077,7 @@ void FourslashTest::Paste(gostd::testing::T* t,
 	editScriptAndUpdateMarkers(t, activeFilename, start, start, text);
 
 	// post-paste fomatting
-	if (stateEnableFormatting) {
+	if (stateFormatEnabled) {
 		auto params = std::make_shared<
 		    lsproto::DocumentRangeFormattingParams>();
 		params->TextDocument.Uri =
@@ -5252,7 +5252,7 @@ void FourslashTest::typeText(gostd::testing::T* t,
 		        script, (TextPos)offset);
 
 		// Handle post-keystroke formatting
-		if (stateEnableFormatting) {
+		if (stateFormatEnabled) {
 			auto params = std::make_shared<
 			    lsproto::DocumentOnTypeFormattingParams>();
 			params->TextDocument.Uri =
@@ -6284,11 +6284,11 @@ void FourslashTest::verifyBaselineRename(
 
 		gostr::Builder renameOptions;
 		if (preferences != nullptr) {
-			if (preferences->UseAliasesForRename !=
+			if (preferences->ProvidePrefixAndSuffixTextForRename !=
 			    Tristate::Unknown) {
 				renameOptions.WriteString(gostd::sprintf(
 				    "// @useAliasesForRename: %v\n",
-				    {preferences->UseAliasesForRename ==
+				    {preferences->ProvidePrefixAndSuffixTextForRename ==
 				         Tristate::True}));
 			}
 			if (preferences->QuotePreference !=

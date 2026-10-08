@@ -2218,7 +2218,7 @@ std::pair<std::string, gostd::Error> Session::NpmInstall(
 void Session::refreshInlayHintsIfNeeded(
     const lsutil::UserPreferences& oldPrefs,
     const lsutil::UserPreferences& newPrefs) {
-	if (!(oldPrefs.InlayHints == newPrefs.InlayHints)) {
+	if (!(oldPrefs.InlayHintsPreferences == newPrefs.InlayHintsPreferences)) {
 		if (client->RefreshInlayHints(backgroundContext()) !=
 		        nullptr &&
 		    options->LoggingEnabled) {
@@ -2231,7 +2231,7 @@ void Session::refreshInlayHintsIfNeeded(
 void Session::refreshCodeLensIfNeeded(
     const lsutil::UserPreferences& oldPrefs,
     const lsutil::UserPreferences& newPrefs) {
-	if (!(oldPrefs.CodeLens == newPrefs.CodeLens)) {
+	if (!(oldPrefs.CodeLensUserPreferences == newPrefs.CodeLensUserPreferences)) {
 		if (client->RefreshCodeLens(backgroundContext()) !=
 		        nullptr &&
 		    options->LoggingEnabled) {
@@ -2248,7 +2248,7 @@ void Session::refreshDiagnosticsIfNeeded(
 	        newPrefs.CustomConfigFileName ||
 	    oldPrefs.ReportStyleChecksAsWarnings !=
 	        newPrefs.ReportStyleChecksAsWarnings ||
-	    !(oldPrefs.EnableValidation == newPrefs.EnableValidation)) {
+	    !(oldPrefs.ValidateEnabled == newPrefs.ValidateEnabled)) {
 		ScheduleDiagnosticsRefresh();
 	}
 }
@@ -2271,9 +2271,9 @@ void Session::publishProgramDiagnostics(
 	if (!options->PushDiagnosticsEnabled) {
 		return;
 	}
-	if (newSnapshot->UserPreferences().EnableValidation == Tristate::False) {
+	if (newSnapshot->UserPreferences().ValidateEnabled == Tristate::False) {
 		if (oldSnapshot->UserPreferences()
-		        .EnableValidation == Tristate::False) {
+		        .ValidateEnabled == Tristate::False) {
 			return;
 		}
 		for (auto& kv :
@@ -2396,7 +2396,7 @@ void Session::publishProjectDiagnostics(
     lsconv::Converters* converters) {
 	auto diagnostics = diagnostics_;
 	auto ctx = ctx_;
-	if (Config().EnableValidation == Tristate::False) {
+	if (Config().ValidateEnabled == Tristate::False) {
 		diagnostics.clear();
 	}
 	ctx = WithCurrentLocale(ctx);
@@ -2422,7 +2422,7 @@ void Session::publishProjectDiagnostics(
 // EnqueuePublishGlobalDiagnostics — session.go:1965.
 void Session::EnqueuePublishGlobalDiagnostics() {
 	if (!options->PushDiagnosticsEnabled ||
-	    Config().EnableValidation == Tristate::False) {
+	    Config().ValidateEnabled == Tristate::False) {
 		return;
 	}
 	bool expected = false;

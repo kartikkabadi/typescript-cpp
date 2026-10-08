@@ -123,6 +123,13 @@ std::pair<Snapshot*, gostd::Error> SnapshotHost::CloneSnapshot(
 	change.apiRequest = apiRequest;
 	change.fileChanges = fileChanges;
 	if (apiRequest != nullptr) {
+		change.newConfig = apiRequest->UserPreferences;
+		if (!apiRequest->PrepareAutoImports.empty()) {
+			static_cast<ResourceRequest&>(change) =
+			    baseSnapshot->resourceRequestForDocument(
+			        apiRequest->PrepareAutoImports);
+			change.AutoImports = apiRequest->PrepareAutoImports;
+		}
 		change.fs = apiRequest->FileSystem;
 		change.fileSystemOverride =
 		    apiRequest->FileSystem != nullptr;

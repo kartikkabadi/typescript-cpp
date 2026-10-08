@@ -1033,7 +1033,7 @@ struct FourslashTest {
 	std::unordered_map<std::string, std::shared_ptr<scriptInfo>> scriptInfos;
 	std::shared_ptr<testConverters> converters;
 
-	bool stateEnableFormatting = false;
+	bool stateFormatEnabled = false;
 	bool reportFormatOnTypeCrash = false;
 	lsutil::UserPreferences userPreferences;
 	lsproto::Position currentCaretPosition;

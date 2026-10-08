@@ -375,6 +375,9 @@ public:
 	handleCreateSnapshot(gostd::Context ctx, const CreateSnapshotParams* params);
 	std::pair<std::unique_ptr<CreateSnapshotResponse>, gostd::Error>
 	handleUpdateSnapshot(gostd::Context ctx, const UpdateSnapshotParams* params);
+	gostd::Error validatePreparedAutoImports(
+	    gostd::Context ctx, project::Snapshot* snapshot,
+	    const DocumentIdentifier* file);
 	std::pair<std::unique_ptr<project::APISnapshotRequest>, gostd::Error>
 	toAPISnapshotRequest(gostd::Context ctx,
 	                     const SnapshotRequestChangesParams* changes);

@@ -1177,7 +1177,7 @@ std::vector<SymbolAndEntries*> LanguageService::getSymbolAndEntries(
 	} else {
 		options.use = referenceUseRename;
 		options.useAliasesForRename =
-		    tristateIsTrueOrUnknown(UserPreferences().UseAliasesForRename);
+		    tristateIsTrueOrUnknown(UserPreferences().ProvidePrefixAndSuffixTextForRename);
 	}
 	return getReferencedSymbolsForNode(ctx, position, node, program,
 	                                 program->GetSourceFiles(), options);

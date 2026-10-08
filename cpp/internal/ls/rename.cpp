@@ -155,7 +155,7 @@ const DiagnosticMessage* wouldRenameInOtherNodeModules(
 	SourceFile* originalFile, Symbol* symbol, checker::Checker* ch,
 	lsutil::UserPreferences preferences) {
 	Symbol* sym = symbol;
-	if (!tristateIsTrueOrUnknown(preferences.UseAliasesForRename) &&
+	if (!tristateIsTrueOrUnknown(preferences.ProvidePrefixAndSuffixTextForRename) &&
 		(sym->flags & SymbolFlagsAlias) != 0) {
 		::tsc::Node* importSpecifier =
 			findFirst(sym->declarations, &isImportSpecifier);
@@ -367,7 +367,7 @@ LanguageService::symbolAndEntriesToRename(gostd::Context ctx,
 	lsutil::QuotePreference quotePreference =
 		lsutil::GetQuotePreference(sourceFile, UserPreferences());
 	bool useAliasesForRename =
-		tristateIsTrueOrUnknown(UserPreferences().UseAliasesForRename);
+		tristateIsTrueOrUnknown(UserPreferences().ProvidePrefixAndSuffixTextForRename);
 
 	for (auto* entry : entries) {
 		lsp::lsproto::DocumentUri uri = getFileNameOfEntry(entry);

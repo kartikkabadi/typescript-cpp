@@ -2171,6 +2171,11 @@ Session::handleCreateSnapshot(gostd::Context ctx,
 	if (err) {
 		return {nullptr, err};
 	}
+	apiRequest->UserPreferences = params->UserPreferences.get();
+	if (params->PrepareAutoImports != nullptr) {
+		apiRequest->PrepareAutoImports =
+		    params->PrepareAutoImports->ToURI(GetCurrentDirectory());
+	}
 
 	snapshotOpenState openState =
 	    reconcileSnapshotOpens(apiRequest.get(), snapshotOpenState{});
@@ -2199,6 +2204,11 @@ Session::handleCreateSnapshot(gostd::Context ctx,
 		return {nullptr,
 		        gostd::errorf("%w: failed to create snapshot: %w",
 		                      {ErrClientError, err2})};
+	}
+	if (gostd::Error perr = validatePreparedAutoImports(
+	        ctx, snapshot, params->PrepareAutoImports.get())) {
+		snapshot->Deref();
+		return {nullptr, perr};
 	}
 	if (gostd::Error merr = moduleResolutionError(snapshot)) {
 		snapshot->Deref();
@@ -2229,6 +2239,11 @@ Session::handleUpdateSnapshot(gostd::Context ctx,
 	auto [apiRequest, err2] = toAPISnapshotRequest(ctx, changes);
 	if (err2) {
 		return {nullptr, err2};
+	}
+	apiRequest->UserPreferences = changes->UserPreferences.get();
+	if (changes->PrepareAutoImports != nullptr) {
+		apiRequest->PrepareAutoImports =
+		    changes->PrepareAutoImports->ToURI(GetCurrentDirectory());
 	}
 	snapshotOpenState openState = reconcileSnapshotOpens(
 	    apiRequest.get(),
@@ -2264,6 +2279,11 @@ Session::handleUpdateSnapshot(gostd::Context ctx,
 		return {nullptr,
 		        gostd::errorf("%w: failed to update snapshot: %w",
 		                      {ErrClientError, err3})};
+	}
+	if (gostd::Error perr = validatePreparedAutoImports(
+	        ctx, snapshot, changes->PrepareAutoImports.get())) {
+		snapshot->Deref();
+		return {nullptr, perr};
 	}
 	if (gostd::Error merr = moduleResolutionError(snapshot)) {
 		snapshot->Deref();
@@ -2473,6 +2493,32 @@ Session::toAPISnapshotRequest(gostd::Context ctx,
 	}
 	return {std::move(apiRequest), nullptr};
 }
+
+// validatePreparedAutoImports — session.go:1629.
+gostd::Error Session::validatePreparedAutoImports(
+    gostd::Context ctx, project::Snapshot* snapshot,
+    const DocumentIdentifier* file) {
+	if (file == nullptr) {
+		return nullptr;
+	}
+	if (gostd::Error cerr = gostd::ctxErr(ctx)) {
+		return cerr;
+	}
+	lsproto::DocumentUri uri = file->ToURI(GetCurrentDirectory());
+	auto* proj = snapshot->GetDefaultProject(uri);
+	if (proj == nullptr || snapshot->AutoImportRegistry() == nullptr ||
+	    !ls::autoimport::IsPreparedForImportingFile(
+	        snapshot->AutoImportRegistry(),
+	        lsproto::documentUriFileName(uri),
+	        ls::autoimport::InternProjectID(
+	            project::idString(proj->ID())),
+	        snapshot->UserPreferences())) {
+		return gostd::errorf("%w: could not prepare auto-imports for %s",
+		                     {ErrClientError, file->String()});
+	}
+	return nullptr;
+}
+
 
 // toLanguageServerSnapshotUpdate — session.go:1444.
 std::pair<std::unique_ptr<languageServerSnapshotUpdate>, gostd::Error>
@@ -7233,8 +7279,8 @@ Session::handleGetCompletionsAtPosition(
 		if (sourceFile == nullptr) {
 			return {nullptr, nullptr};
 		}
-		auto [langSvc, e] = setupLanguageService(snapshot, program,
-		                                       params->Project, "");
+		auto [langSvc, e] = setupLanguageService(
+		    snapshot, program, params->Project, sourceFile->FileName());
 		if (e) {
 			return {nullptr, e};
 		}
@@ -7254,6 +7300,12 @@ Session::handleGetCompletionsAtPosition(
 	}
 	auto [result, runErr] = run(sd->snapshot, program);
 	if (gostd::errorIs(runErr, ls::ErrNeedsAutoImports)) {
+		if (params->IncludeSymbol) {
+			return {nullptr,
+			        gostd::errorf(
+			            "%w: snapshot is not prepared for auto-imports for %s",
+			            {ErrClientError, params->File.String()})};
+		}
 		auto* preparedSnapshot = snapshotHost->CloneSnapshotWithAutoImports(
 		    ctx, sd->snapshot,
 		    params->File.ToURI(GetCurrentDirectory()), nullptr);

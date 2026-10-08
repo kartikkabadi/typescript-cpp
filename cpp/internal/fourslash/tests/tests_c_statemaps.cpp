@@ -277,7 +277,7 @@ class Point2 implements Pointable {
 		auto __fsp = fourslash::NewFourslash(t, nullptr, content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
 		f->GoToMarker(t, "impl");
 		f->GoToMarker(t, "temp");
-		f->VerifyBaselineCodeLens(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.CodeLens = lsutil::CodeLensUserPreferences{.ReferencesCodeLensEnabled = Tristate::True, .ImplementationsCodeLensEnabled = Tristate::True, .ReferencesCodeLensShowOnAllFunctions = Tristate::True, .ImplementationsCodeLensShowOnInterfaceMethods = Tristate::True, .ImplementationsCodeLensShowOnAllClassMethods = Tristate::True}}));
+		f->VerifyBaselineCodeLens(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.CodeLensUserPreferences = lsutil::CodeLensUserPreferences{.ReferencesCodeLensEnabled = Tristate::True, .ImplementationsCodeLensEnabled = Tristate::True, .ReferencesCodeLensShowOnAllFunctions = Tristate::True, .ImplementationsCodeLensShowOnInterfaceMethods = Tristate::True, .ImplementationsCodeLensShowOnAllClassMethods = Tristate::True}}));
 		f->CloseFileOfMarker(t, "temp");
 		f->GoToMarker(t, "temp");
 		f->CloseFileOfMarker(t, "impl");
@@ -326,7 +326,7 @@ import * as foo from '../../a/dist/foo.js';
 foo.aaa();
 )TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr, content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineCodeLens(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.CodeLens = lsutil::CodeLensUserPreferences{.ReferencesCodeLensEnabled = Tristate::True}}));
+		f->VerifyBaselineCodeLens(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.CodeLensUserPreferences = lsutil::CodeLensUserPreferences{.ReferencesCodeLensEnabled = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCodeLensOnFunctionAcrossProjects1, TestCodeLensOnFunctionAcrossProjects1);

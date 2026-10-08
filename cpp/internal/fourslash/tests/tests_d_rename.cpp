@@ -35,7 +35,7 @@ static std::vector<fourslash::MarkerOrRangeOrName> asMonVec(
 }
 
 
-static void TestRenameNamedImportUseAliasesForRenames(gostd::testing::T* t) {
+static void TestRenameNamedImportProvidePrefixAndSuffixTextForRenames(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
 		const std::string content = R"TS(// @Filename: /a.ts
@@ -46,11 +46,11 @@ export interface MyTypeA {
     foo: string;
 })TS";
 		auto __fsp1 = fourslash::NewFourslash(t, nullptr, content); auto f = __fsp1.first; auto done = __fsp1.second; TSC_DEFER(done());
-		f->VerifyBaselineRename(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.UseAliasesForRename = Tristate::False}), {"import"});
-		f->VerifyBaselineRename(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.UseAliasesForRename = Tristate::True}), {"import"});
+		f->VerifyBaselineRename(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.ProvidePrefixAndSuffixTextForRename = Tristate::False}), {"import"});
+		f->VerifyBaselineRename(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.ProvidePrefixAndSuffixTextForRename = Tristate::True}), {"import"});
 	});
 }
-REGISTER_FOURSLASH_TEST(TestRenameNamedImportUseAliasesForRenames, TestRenameNamedImportUseAliasesForRenames);
+REGISTER_FOURSLASH_TEST(TestRenameNamedImportProvidePrefixAndSuffixTextForRenames, TestRenameNamedImportProvidePrefixAndSuffixTextForRenames);
 
 static void TestRenameNamedImportDefaultInNodeModules(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -68,9 +68,9 @@ export interface Foo {
 })TS";
 		auto __fsp1 = fourslash::NewFourslash(t, nullptr, content); auto f = __fsp1.first; auto done = __fsp1.second; TSC_DEFER(done());
 		f->VerifyBaselineRename(t, nullptr, {"fooImport"});
-		f->VerifyBaselineRename(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.UseAliasesForRename = Tristate::True}), {"fooImport"});
+		f->VerifyBaselineRename(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.ProvidePrefixAndSuffixTextForRename = Tristate::True}), {"fooImport"});
 		f->GoToMarker(t, "fooImport");
-		f->VerifyRenameFailed(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.UseAliasesForRename = Tristate::False}));
+		f->VerifyRenameFailed(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.ProvidePrefixAndSuffixTextForRename = Tristate::False}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestRenameNamedImportDefaultInNodeModules, TestRenameNamedImportDefaultInNodeModules);
@@ -420,7 +420,7 @@ function foo([|{ a, ...[|{| "contextRangeIndex": 0 |}rest|] }: I|]) {
     [|rest|];
 })TS";
 		auto __fsp1 = fourslash::NewFourslash(t, nullptr, content); auto f = __fsp1.first; auto done = __fsp1.second; TSC_DEFER(done());
-		f->VerifyBaselineRename(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.UseAliasesForRename = Tristate::True}), {f->Ranges()[1]});
+		f->VerifyBaselineRename(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.ProvidePrefixAndSuffixTextForRename = Tristate::True}), {f->Ranges()[1]});
 	});
 }
 REGISTER_FOURSLASH_TEST(TestRenameRestBindingElement, TestRenameRestBindingElement);
@@ -840,7 +840,7 @@ someExportedVariable;
 		f->MarkTestAsStradaServer();
 		f->GoToFile(t, "/home/src/workspaces/project/lib/index.ts");
 		f->GoToFile(t, "/home/src/workspaces/project/src/index.ts");
-		f->VerifyBaselineRename(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.UseAliasesForRename = Tristate::True}), {"i"});
+		f->VerifyBaselineRename(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.ProvidePrefixAndSuffixTextForRename = Tristate::True}), {"i"});
 	});
 }
 REGISTER_FOURSLASH_TEST(TestRenameNamedImport, TestRenameNamedImport);
@@ -893,7 +893,7 @@ static void TestRenameModuleExportsProperties3(gostd::testing::T* t) {
 [|class [|{| "contextRangeIndex": 0 |}A|] {}|]
 module.exports = { [|A|] })TS";
 		auto __fsp1 = fourslash::NewFourslash(t, nullptr, content); auto f = __fsp1.first; auto done = __fsp1.second; TSC_DEFER(done());
-		f->VerifyBaselineRename(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.UseAliasesForRename = Tristate::True}), {f->Ranges()[1], f->Ranges()[2]});
+		f->VerifyBaselineRename(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.ProvidePrefixAndSuffixTextForRename = Tristate::True}), {f->Ranges()[1], f->Ranges()[2]});
 	});
 }
 REGISTER_FOURSLASH_TEST(TestRenameModuleExportsProperties3, TestRenameModuleExportsProperties3);
@@ -905,7 +905,7 @@ static void TestRenameModuleExportsProperties1(gostd::testing::T* t) {
 		const std::string content = R"TS([|class [|{| "contextRangeIndex": 0 |}A|] {}|]
 module.exports = { [|A|] })TS";
 		auto __fsp1 = fourslash::NewFourslash(t, nullptr, content); auto f = __fsp1.first; auto done = __fsp1.second; TSC_DEFER(done());
-		f->VerifyBaselineRename(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.UseAliasesForRename = Tristate::True}), {f->Ranges()[1], f->Ranges()[2]});
+		f->VerifyBaselineRename(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.ProvidePrefixAndSuffixTextForRename = Tristate::True}), {f->Ranges()[1], f->Ranges()[2]});
 	});
 }
 REGISTER_FOURSLASH_TEST(TestRenameModuleExportsProperties1, TestRenameModuleExportsProperties1);
@@ -1673,17 +1673,17 @@ export const h: string;
 {})TS";
 		auto __fsp1 = fourslash::NewFourslash(t, nullptr, content); auto f = __fsp1.first; auto done = __fsp1.second; TSC_DEFER(done());
 		f->GoToMarker(t, "ok");
-		f->VerifyRenameSucceeded(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.UseAliasesForRename = Tristate::True}));
-		f->VerifyRenameSucceeded(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.UseAliasesForRename = Tristate::False}));
+		f->VerifyRenameSucceeded(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.ProvidePrefixAndSuffixTextForRename = Tristate::True}));
+		f->VerifyRenameSucceeded(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.ProvidePrefixAndSuffixTextForRename = Tristate::False}));
 		f->GoToMarker(t, "ok2");
-		f->VerifyRenameSucceeded(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.UseAliasesForRename = Tristate::True}));
-		f->VerifyRenameSucceeded(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.UseAliasesForRename = Tristate::False}));
+		f->VerifyRenameSucceeded(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.ProvidePrefixAndSuffixTextForRename = Tristate::True}));
+		f->VerifyRenameSucceeded(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.ProvidePrefixAndSuffixTextForRename = Tristate::False}));
 		f->GoToMarker(t, "notOk");
-		f->VerifyRenameFailed(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.UseAliasesForRename = Tristate::True}));
-		f->VerifyRenameFailed(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.UseAliasesForRename = Tristate::False}));
+		f->VerifyRenameFailed(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.ProvidePrefixAndSuffixTextForRename = Tristate::True}));
+		f->VerifyRenameFailed(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.ProvidePrefixAndSuffixTextForRename = Tristate::False}));
 		f->GoToMarker(t, "okWithAlias");
-		f->VerifyRenameSucceeded(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.UseAliasesForRename = Tristate::True}));
-		f->VerifyRenameFailed(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.UseAliasesForRename = Tristate::False}));
+		f->VerifyRenameSucceeded(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.ProvidePrefixAndSuffixTextForRename = Tristate::True}));
+		f->VerifyRenameFailed(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.ProvidePrefixAndSuffixTextForRename = Tristate::False}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestRenameFromNodeModulesDep4, TestRenameFromNodeModulesDep4);
@@ -1704,8 +1704,8 @@ export interface Foo {
 // @link: /packages/foo -> /packages/first/node_modules/foo)TS";
 		auto __fsp1 = fourslash::NewFourslash(t, nullptr, content); auto f = __fsp1.first; auto done = __fsp1.second; TSC_DEFER(done());
 		f->GoToMarker(t, "ok");
-		f->VerifyRenameSucceeded(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.UseAliasesForRename = Tristate::True}));
-		f->VerifyRenameSucceeded(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.UseAliasesForRename = Tristate::False}));
+		f->VerifyRenameSucceeded(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.ProvidePrefixAndSuffixTextForRename = Tristate::True}));
+		f->VerifyRenameSucceeded(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.ProvidePrefixAndSuffixTextForRename = Tristate::False}));
 		f->GoToMarker(t, "ok2");
 		f->VerifyRenameSucceeded(t, nullptr);
 		f->GoToMarker(t, "ok3");
@@ -1732,8 +1732,8 @@ import { Foo } from "./index";
 declare type FooBar = Foo[/*ok3*/"[|bar|]"];)TS";
 		auto __fsp1 = fourslash::NewFourslash(t, nullptr, content); auto f = __fsp1.first; auto done = __fsp1.second; TSC_DEFER(done());
 		f->GoToMarker(t, "okWithAlias");
-		f->VerifyRenameSucceeded(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.UseAliasesForRename = Tristate::True}));
-		f->VerifyRenameFailed(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.UseAliasesForRename = Tristate::False}));
+		f->VerifyRenameSucceeded(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.ProvidePrefixAndSuffixTextForRename = Tristate::True}));
+		f->VerifyRenameFailed(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.ProvidePrefixAndSuffixTextForRename = Tristate::False}));
 		f->GoToMarker(t, "notOk");
 		f->VerifyRenameFailed(t, nullptr);
 		f->GoToMarker(t, "ok2");
@@ -1762,8 +1762,8 @@ export interface Foo {
 })TS";
 		auto __fsp1 = fourslash::NewFourslash(t, nullptr, content); auto f = __fsp1.first; auto done = __fsp1.second; TSC_DEFER(done());
 		f->GoToMarker(t, "okWithAlias");
-		f->VerifyRenameSucceeded(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.UseAliasesForRename = Tristate::True}));
-		f->VerifyRenameFailed(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.UseAliasesForRename = Tristate::False}));
+		f->VerifyRenameSucceeded(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.ProvidePrefixAndSuffixTextForRename = Tristate::True}));
+		f->VerifyRenameFailed(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.ProvidePrefixAndSuffixTextForRename = Tristate::False}));
 		f->GoToMarker(t, "notOk");
 		f->VerifyRenameFailed(t, nullptr);
 	});
@@ -1845,7 +1845,7 @@ export { name as name/**/ };
 import { name } from './a';
 const x = name.toString();)TS";
 		auto __fsp1 = fourslash::NewFourslash(t, nullptr, content); auto f = __fsp1.first; auto done = __fsp1.second; TSC_DEFER(done());
-		f->VerifyBaselineRename(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.UseAliasesForRename = Tristate::False}), {""});
+		f->VerifyBaselineRename(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.ProvidePrefixAndSuffixTextForRename = Tristate::False}), {""});
 	});
 }
 REGISTER_FOURSLASH_TEST(TestRenameExportSpecifier, TestRenameExportSpecifier);
@@ -1861,7 +1861,7 @@ export { name/**/ };
 import { name } from './a';
 const x = name.toString();)TS";
 		auto __fsp1 = fourslash::NewFourslash(t, nullptr, content); auto f = __fsp1.first; auto done = __fsp1.second; TSC_DEFER(done());
-		f->VerifyBaselineRename(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.UseAliasesForRename = Tristate::False}), {""});
+		f->VerifyBaselineRename(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.ProvidePrefixAndSuffixTextForRename = Tristate::False}), {""});
 	});
 }
 REGISTER_FOURSLASH_TEST(TestRenameExportSpecifier2, TestRenameExportSpecifier2);

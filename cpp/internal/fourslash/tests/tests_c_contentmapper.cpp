@@ -720,7 +720,7 @@ static void TestContentMapperSupplementalCodeLens(gostd::testing::T* t) {
 function outer() {}
 outer();
 )TS", std::string(testutil::contentmappertest::PrefixedSupplementalMapper), {".astro"}); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineCodeLens(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.CodeLens = lsutil::CodeLensUserPreferences{.ReferencesCodeLensEnabled = Tristate::True, .ReferencesCodeLensShowOnAllFunctions = Tristate::True}}));
+		f->VerifyBaselineCodeLens(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.CodeLensUserPreferences = lsutil::CodeLensUserPreferences{.ReferencesCodeLensEnabled = Tristate::True, .ReferencesCodeLensShowOnAllFunctions = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestContentMapperSupplementalCodeLens, TestContentMapperSupplementalCodeLens);
@@ -733,7 +733,7 @@ static void TestContentMapperDisabledSupplementalCodeLens(gostd::testing::T* t) 
 function outer() {}
 outer();
 )TS", std::string(testutil::contentmappertest::PrefixedSupplementalMapper), {".astro"}); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineCodeLens(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.CodeLens = lsutil::CodeLensUserPreferences{.ReferencesCodeLensEnabled = Tristate::True, .ReferencesCodeLensShowOnAllFunctions = Tristate::True}}));
+		f->VerifyBaselineCodeLens(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.CodeLensUserPreferences = lsutil::CodeLensUserPreferences{.ReferencesCodeLensEnabled = Tristate::True, .ReferencesCodeLensShowOnAllFunctions = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestContentMapperDisabledSupplementalCodeLens, TestContentMapperDisabledSupplementalCodeLens);
@@ -746,7 +746,7 @@ static void TestContentMapperDeduplicatesProjectedCodeLens(gostd::testing::T* t)
 function outer() {}
 outer();
 )TS", std::string(testutil::contentmappertest::PrefixedSupplementalMapper), {".astro"}); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineCodeLens(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.CodeLens = lsutil::CodeLensUserPreferences{.ReferencesCodeLensEnabled = Tristate::True, .ReferencesCodeLensShowOnAllFunctions = Tristate::True}}));
+		f->VerifyBaselineCodeLens(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.CodeLensUserPreferences = lsutil::CodeLensUserPreferences{.ReferencesCodeLensEnabled = Tristate::True, .ReferencesCodeLensShowOnAllFunctions = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestContentMapperDeduplicatesProjectedCodeLens, TestContentMapperDeduplicatesProjectedCodeLens);
@@ -759,7 +759,7 @@ static void TestContentMapperSupplementalImplementationCodeLens(gostd::testing::
 interface Service { run(): void }
 class Impl implements Service { run() {} }
 )TS", std::string(testutil::contentmappertest::PrefixedSupplementalMapper), {".astro"}); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineCodeLens(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.CodeLens = lsutil::CodeLensUserPreferences{.ImplementationsCodeLensEnabled = Tristate::True}}));
+		f->VerifyBaselineCodeLens(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.CodeLensUserPreferences = lsutil::CodeLensUserPreferences{.ImplementationsCodeLensEnabled = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestContentMapperSupplementalImplementationCodeLens, TestContentMapperSupplementalImplementationCodeLens);
@@ -1249,7 +1249,7 @@ const value = () => 1;
 {{value}}
 )TS", std::string(testutil::contentmappertest::ComponentMapper), {".vue"}); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
 		f->GoToFile(t, "/app.vue");
-		f->VerifyBaselineInlayHints(t, nullptr, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayVariableTypeHints = Tristate::True}}));
+		f->VerifyBaselineInlayHints(t, nullptr, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayVariableTypeHints = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestContentMapperInlayHintsReleaseEachRange, TestContentMapperInlayHintsReleaseEachRange);

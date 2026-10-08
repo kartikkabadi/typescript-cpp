@@ -487,28 +487,35 @@ void registryBuilder::updateBucketAndDirectoryExistence(RegistryChange& change,
 	auto start = std::chrono::steady_clock::now();
 	std::unordered_set<ProjectID*> neededProjects;
 	std::unordered_map<tspath::Path, std::string> neededDirectories;
+	auto addNeededDirectories =
+	    [&](tspath::Path path, const std::string& fileName) {
+		    if (tspath::isDynamicFileName(fileName)) {
+			    return;
+		    }
+		    std::string dir = tspath::getDirectoryPath(fileName);
+		    tspath::Path dirPath = tspath::getDirectoryPath(path);
+		    for (;;) {
+			    if (neededDirectories.count(dirPath)) {
+				    break;
+			    }
+			    neededDirectories[dirPath] = dir;
+			    tspath::Path parentPath =
+			        tspath::getDirectoryPath(dirPath);
+			    std::string parentDir =
+			        tspath::getDirectoryPath(dir);
+			    if (parentPath == dirPath || parentDir == dir) {
+				    break;
+			    }
+			    dirPath = parentPath;
+			    dir = parentDir;
+		    }
+	    };
 	for (auto& [path, fileName] : change.OpenFiles) {
 		auto [projectID, _program] = host->GetDefaultProject(path);
 		if (projectID != nullptr) {
 			neededProjects.insert(projectID);
 		}
-		if (tspath::isDynamicFileName(fileName)) {
-			continue;
-		}
-		std::string dir = fileName;
-		tspath::Path dirPath = path;
-		for (;;) {
-			dir = tspath::getDirectoryPath(dir);
-			tspath::Path lastDirPath = dirPath;
-			dirPath = tspath::getDirectoryPath(dirPath);
-			if (dirPath == lastDirPath) {
-				break;
-			}
-			if (neededDirectories.count(dirPath)) {
-				break;
-			}
-			neededDirectories[dirPath] = dir;
-		}
+		addNeededDirectories(path, fileName);
 
 		if (!specifierCache->Has(path)) {
 			specifierCache->Set(
@@ -518,6 +525,8 @@ void registryBuilder::updateBucketAndDirectoryExistence(RegistryChange& change,
 	}
 
 	if (!change.RequestedFile.empty()) {
+		addNeededDirectories(change.RequestedFile,
+		                     change.RequestedFileName);
 		auto [projectID, _program] =
 		    host->GetDefaultProject(change.RequestedFile);
 		if (projectID != nullptr) {

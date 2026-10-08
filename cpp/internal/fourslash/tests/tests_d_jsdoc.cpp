@@ -153,7 +153,7 @@ function abcdef(x) { }
 		f->GoToMarker(t, "completion");
 		f->Insert(t, "/**");
 		auto userPreferences = lsutil::NewDefaultUserPreferences();
-		userPreferences.EnableJSDocCompletions = Tristate::False;
+		userPreferences.CompleteJSDocs = Tristate::False;
 		auto list = f->GetCompletions(t, std::make_shared<lsutil::UserPreferences>(userPreferences));
 		if (list != nullptr) {
 			for (auto item : *list->Items) {

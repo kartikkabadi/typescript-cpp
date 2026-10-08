@@ -283,8 +283,8 @@ struct UserPreferences {
 	// in addition to `const objectLiteral: T = { foo }`.
 	Tristate IncludeCompletionsWithObjectLiteralMethodSnippets = Tristate::Unknown; // raw:"includeCompletionsWithObjectLiteralMethodSnippets" config:"suggest.objectLiteralMethodSnippets.enabled"
 	JsxAttributeCompletionStyle JsxAttributeCompletionStyle;                        // raw:"jsxAttributeCompletionStyle" config:"preferences.jsxAttributeCompletionStyle"
-	Tristate EnableAutoClosingTags = Tristate::Unknown;                             // raw:"autoClosingTags" config:"autoClosingTags.enabled" fallbackConfig:"autoClosingTags"
-	Tristate EnableJSDocCompletions = Tristate::Unknown;                            // raw:"completeJSDocs" config:"suggest.jsdoc.enabled" fallbackConfig:"suggest.completeJSDocs"
+	Tristate AutoClosingTags = Tristate::Unknown;                             // raw:"autoClosingTags" config:"autoClosingTags.enabled" fallbackConfig:"autoClosingTags"
+	Tristate CompleteJSDocs = Tristate::Unknown;                            // raw:"completeJSDocs" config:"suggest.jsdoc.enabled" fallbackConfig:"suggest.completeJSDocs"
 	Tristate GenerateReturnInDocTemplate = Tristate::Unknown;                       // raw:"generateReturnInDocTemplate" config:"suggest.jsdoc.generateReturns"
 
 	// ------- AutoImports --------
@@ -352,7 +352,7 @@ struct UserPreferences {
 
 	// ------- Rename -------
 
-	Tristate UseAliasesForRename = Tristate::Unknown;                  // raw:"providePrefixAndSuffixTextForRename" config:"preferences.useAliasesForRenames"
+	Tristate ProvidePrefixAndSuffixTextForRename = Tristate::Unknown;                  // raw:"providePrefixAndSuffixTextForRename" config:"preferences.useAliasesForRenames"
 	Tristate AllowRenameOfImportPath = Tristate::Unknown;              // raw:"allowRenameOfImportPath"
 
 	// ------- CodeFixes/Refactors -------
@@ -361,11 +361,11 @@ struct UserPreferences {
 
 	// ------- InlayHints -------
 
-	InlayHintsPreferences InlayHints;
+	InlayHintsPreferences InlayHintsPreferences;
 
 	// ------- CodeLens -------
 
-	CodeLensUserPreferences CodeLens;
+	CodeLensUserPreferences CodeLensUserPreferences;
 
 	// ------- Definition -------
 
@@ -378,8 +378,8 @@ struct UserPreferences {
 
 	// ------- Misc -------
 
-	Tristate EnableFormatting = Tristate::Unknown;                     // raw:"formatEnabled" config:"format.enabled" fallbackConfig:"format.enable"
-	Tristate EnableValidation = Tristate::Unknown;                     // raw:"validateEnabled" config:"validate.enabled" fallbackConfig:"validate.enable"
+	Tristate FormatEnabled = Tristate::Unknown;                     // raw:"formatEnabled" config:"format.enabled" fallbackConfig:"format.enable"
+	Tristate ValidateEnabled = Tristate::Unknown;                     // raw:"validateEnabled" config:"validate.enabled" fallbackConfig:"validate.enable"
 	Tristate DisableSuggestions = Tristate::Unknown;                   // raw:"disableSuggestions"          // !!!
 	Tristate DisableLineTextInReferences = Tristate::Unknown;          // raw:"disableLineTextInReferences" // !!!
 	Tristate DisplayPartsForJSDoc = Tristate::Unknown;                 // raw:"displayPartsForJSDoc"        // !!!
