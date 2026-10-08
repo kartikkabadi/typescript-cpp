@@ -1,0 +1,523 @@
+// collections — port of tsc/internal/collections (the subset used by the
+// module slice): OrderedMap, SyncMap, Set.
+#pragma once
+
+#include <algorithm>
+#include <functional>
+#include <mutex>
+#include <unordered_map>
+#include <unordered_set>
+#include <utility>
+#include <vector>
+
+#include "internal/json/json.h"
+
+namespace tsc::collections {
+
+// OrderedMap — insertion-ordered map mirroring
+// tsc/internal/collections/ordered_map.go. Keys keep insertion order;
+// re-Setting an existing key overwrites the value without moving it.
+template <typename K, typename V>
+struct OrderedMap {
+	std::vector<K> keys;
+	std::unordered_map<K, V> mp;
+
+	OrderedMap() = default;
+	explicit OrderedMap(size_t hint) { keys.reserve(hint); mp.reserve(hint); }
+
+	void Set(const K& key, V value) {
+		if (mp.find(key) == mp.end()) {
+			keys.push_back(key);
+		}
+		mp[key] = std::move(value);
+	}
+
+	std::pair<V*, bool> Get(const K& key) {
+		auto it = mp.find(key);
+		if (it == mp.end()) {
+			return {nullptr, false};
+		}
+		return {&it->second, true};
+	}
+	std::pair<const V*, bool> Get(const K& key) const {
+		auto it = mp.find(key);
+		if (it == mp.end()) {
+			return {nullptr, false};
+		}
+		return {&it->second, true};
+	}
+
+	// GetOrZero — returns the value or a default-constructed V.
+	V GetOrZero(const K& key) const {
+		auto it = mp.find(key);
+		if (it == mp.end()) {
+			return V{};
+		}
+		return it->second;
+	}
+
+	std::pair<std::pair<K, V>, bool> EntryAt(int index) const {
+		if (index < 0 || index >= static_cast<int>(keys.size())) {
+			return {{K{}, V{}}, false};
+		}
+		const K& key = keys[index];
+		return {{key, mp.at(key)}, true};
+	}
+
+	bool Has(const K& key) const { return mp.find(key) != mp.end(); }
+
+	// Delete — mirrors Go: returns (old value, true) when present.
+	std::pair<V, bool> Delete(const K& key) {
+		auto it = mp.find(key);
+		if (it == mp.end()) {
+			return {V{}, false};
+		}
+		V v = std::move(it->second);
+		mp.erase(it);
+		auto ki = std::find(keys.begin(), keys.end(), key);
+		if (ki != keys.end()) keys.erase(ki);
+		return {std::move(v), true};
+	}
+
+	size_t Size() const { return mp.size(); }
+
+	// Keys/Entries iterate in insertion order. Go enumerates new keys added
+	// during iteration; index-based loops reproduce that.
+	const std::vector<K>& Keys() const { return keys; }
+
+	// Entries — ordered (key, value) pairs, Go map-order semantics.
+	std::vector<std::pair<K, V>> Entries() const {
+		std::vector<std::pair<K, V>> out;
+		out.reserve(keys.size());
+		for (auto& k : keys) {
+			out.emplace_back(k, mp.at(k));
+		}
+		return out;
+	}
+
+	// === slice: testutil ===
+	// Values — collections.go orderedmap values in insertion order (Go
+	// returns an iterator; materializing is equivalent for read-only use).
+	std::vector<V> Values() const {
+		std::vector<V> out;
+		out.reserve(keys.size());
+		for (const K& k : keys) out.push_back(mp.at(k));
+		return out;
+	}
+
+	OrderedMap Clone() const { return *this; }
+
+	// Clear — ordered_map.go:183: removes all entries; the allocated
+	// capacity is kept for reuse (Go clear() semantics).
+	void Clear() { keys.clear(); mp.clear(); }
+
+	// unmarshalJSONFrom — ordered_map.go:263: json.UnmarshalerFrom.
+	// "null" is a no-op by the unmarshaler convention; non-objects
+	// error like Go.
+	std::string unmarshalJSONFrom(tsc::json::Decoder& dec) {
+		auto [token, err] = dec.readToken();
+		if (!err.empty()) return err;
+		if (token.kind() == 'n') {
+			return {};
+		}
+		if (token.kind() != '{') {
+			return "cannot unmarshal non-object JSON value into Map";
+		}
+		while (dec.peekKind() != '}') {
+			K key{};
+			V value{};
+			if (auto e = tsc::json::unmarshalDecode(dec, &key);
+			    !e.empty()) {
+				return e;
+			}
+			if (auto e = tsc::json::unmarshalDecode(dec, &value);
+			    !e.empty()) {
+				return e;
+			}
+			Set(key, std::move(value));
+		}
+		auto [endTok, endErr] = dec.readToken();
+		return endErr;
+	}
+};
+
+// NewOrderedMapWithSizeHint — ordered_map.go:34.
+template <typename K, typename V>
+inline OrderedMap<K, V>* newOrderedMapWithSizeHint(size_t hint) {
+	return new OrderedMap<K, V>{hint};
+}
+
+// OrderedSet — ordered_set.go: an insertion-ordered set built on
+// OrderedMap[T, struct{}].
+template <typename T>
+struct OrderedSet {
+private:
+	OrderedMap<T, bool> m;
+
+public:
+	OrderedSet() = default;
+	explicit OrderedSet(size_t hint) : m(hint) {}
+
+	void Add(const T& value) { m.Set(value, false); }
+	bool Has(const T& value) const { return m.Has(value); }
+	// Delete — returns true when the value was present.
+	bool Delete(const T& value) { return m.Delete(value).second; }
+	// Values — insertion order (Go returns an iterator over m.Keys()).
+	const std::vector<T>& Values() const { return m.Keys(); }
+	void Clear() { m.Clear(); }
+	size_t Size() const { return m.Size(); }
+	OrderedSet Clone() const { return OrderedSet{m}; }
+
+private:
+	explicit OrderedSet(OrderedMap<T, bool> mm) : m(std::move(mm)) {}
+};
+
+// NewOrderedSetWithSizeHint — ordered_set.go:11.
+template <typename T>
+inline OrderedSet<T>* newOrderedSetWithSizeHint(size_t hint) {
+	return new OrderedSet<T>{hint};
+}
+
+// SyncMap — mutex-guarded map mirroring tsc/internal/collections/sync_map.go.
+// LoadOrStore keeps the first stored value for a key (Go semantics).
+// Go's SyncMap isn't movable; C++ move ops exist only so containing structs
+// (e.g. module::caches) can be move-assigned like Go pointer copies.
+template <typename K, typename V, typename Hash = std::hash<K>>
+struct SyncMap {
+private:
+	mutable std::mutex mu;
+	std::unordered_map<K, V, Hash> mp;
+
+public:
+	SyncMap() = default;
+	SyncMap(const SyncMap&) = delete;
+	SyncMap& operator=(const SyncMap&) = delete;
+	SyncMap(SyncMap&& o) noexcept {
+		std::lock_guard<std::mutex> lock(o.mu);
+		mp = std::move(o.mp);
+	}
+	SyncMap& operator=(SyncMap&& o) noexcept {
+		if (this != &o) {
+			std::scoped_lock lock(mu, o.mu);
+			mp = std::move(o.mp);
+		}
+		return *this;
+	}
+
+	std::pair<V, bool> Load(const K& key) {
+		std::lock_guard<std::mutex> lock(mu);
+		auto it = mp.find(key);
+		if (it == mp.end()) {
+			return {V{}, false};
+		}
+		return {it->second, true};
+	}
+
+	void Store(const K& key, V value) {
+		std::lock_guard<std::mutex> lock(mu);
+		mp[key] = std::move(value);
+	}
+
+	// LoadOrStore — returns (stored value, true) if present, else stores and
+	// returns (value, false).
+	std::pair<V, bool> LoadOrStore(const K& key, V value) {
+		std::lock_guard<std::mutex> lock(mu);
+		auto it = mp.find(key);
+		if (it != mp.end()) {
+			return {it->second, true};
+		}
+		mp.emplace(key, value);
+		return {value, false};
+	}
+
+	bool Delete(const K& key) {
+		std::lock_guard<std::mutex> lock(mu);
+		return mp.erase(key) != 0;
+	}
+
+	// Range — Go's SyncMap.Range iterates until f returns false.
+	void Range(const std::function<bool(const K&, const V&)>& f) {
+		std::lock_guard<std::mutex> lock(mu);
+		for (auto& kv : mp) {
+			if (!f(kv.first, kv.second)) return;
+		}
+	}
+
+	size_t Size() {
+		std::lock_guard<std::mutex> lock(mu);
+		return mp.size();
+	}
+
+	// === slice: vfs ===
+	// Clear — Go's SyncMap.Clear: deletes all keys.
+	void Clear() {
+		std::lock_guard<std::mutex> lock(mu);
+		mp.clear();
+	}
+	// === end slice: vfs ===
+
+	// === slice: api ===
+	// LoadAndDelete — Go's SyncMap.LoadAndDelete: returns (old value, true)
+	// when present, deleting it in one critical section.
+	std::pair<V, bool> LoadAndDelete(const K& key) {
+		std::lock_guard<std::mutex> lock(mu);
+		auto it = mp.find(key);
+		if (it == mp.end()) {
+			return {V{}, false};
+		}
+		V v = std::move(it->second);
+		mp.erase(it);
+		return {std::move(v), true};
+	}
+	// === end slice: api ===
+};
+
+// === slice: modulespecifiers ===
+// SyncSet — mirrors tsc/internal/collections/syncset.go (mutex-guarded set
+// built on SyncMap; the bool value stands in for Go's struct{}).
+template <typename T>
+struct SyncSet {
+private:
+	SyncMap<T, bool> m;
+
+public:
+	bool Has(const T& key) { return m.Load(key).second; }
+
+	void Add(const T& key) { AddIfAbsent(key); }
+
+	// AddIfAbsent — returns true if the key was not already present
+	// (opposite of the return value of LoadOrStore).
+	bool AddIfAbsent(const T& key) {
+		auto [_, loaded] = m.LoadOrStore(key, false);
+		return !loaded;
+	}
+
+	bool Delete(const T& key) { return m.Delete(key); }
+
+	// Range — iterates until fn returns false.
+	void Range(const std::function<bool(const T&)>& fn) {
+		m.Range([&](const T& key, const bool&) { return fn(key); });
+	}
+
+	// Size — approximate count (may race with concurrent modification).
+	size_t Size() { return m.Size(); }
+
+	bool IsEmpty() { return Size() == 0; }
+
+	std::vector<T> ToSlice() {
+		std::vector<T> arr;
+		arr.reserve(Size());
+		Range([&](const T& key) {
+			arr.push_back(key);
+			return true;
+		});
+		return arr;
+	}
+};
+
+// Set — mirrors tsc/internal/collections/set.go.
+template <typename T>
+struct Set {
+private:
+	std::unordered_set<T> items;
+
+public:
+	Set() = default;
+	Set(std::initializer_list<T> init) : items(init) {}
+	// === slice: ls-autoimport === (NewSetWithSizeHint)
+	explicit Set(size_t hint) { items.reserve(hint); }
+
+	bool Has(const T& key) const { return items.count(key) != 0; }
+	void Add(const T& key) { items.insert(key); }
+	// AddIfAbsent — returns true if the key was not already present.
+	// (=== slice: ls-coreA === — mirrors collections.Set.AddIfAbsent.)
+	bool AddIfAbsent(const T& key) { return items.insert(key).second; }
+	// Reserve — capacity hint (=== slice: ls-coreA === — collections.go
+	// NewSetWithSizeHint).
+	void Reserve(size_t hint) { items.reserve(hint); }
+	void Delete(const T& key) { items.erase(key); }
+	size_t Size() const { return items.size(); }
+	void Clear() { items.clear(); }
+
+	const std::unordered_set<T>& Keys() const { return items; }
+
+	Set Clone() const { return *this; }
+
+	void AddRange(const std::vector<T>& v) {
+		for (auto& x : v) items.insert(x);
+	}
+
+	// === slice: ls-autoimport === (set.go methods needed by the registry)
+	// Len — Go's (nil *Set).Len() == 0; callers on Set* must null-check like
+	// Go. On a value Set this is Size().
+	size_t Len() const { return items.size(); }
+
+	// Union — adds all of other's keys.
+	void Union(const Set& other) { items.insert(other.items.begin(), other.items.end()); }
+
+	// UnionedWith — new set with all keys of both (nil-tolerant in Go; the
+	// Set* overloads in ls/autoimport cover the nil cases).
+	Set UnionedWith(const Set& other) const {
+		Set result = Clone();
+		result.Union(other);
+		return result;
+	}
+
+	bool Equals(const Set& other) const { return items == other.items; }
+
+	// === slice: ls-autoimport ===
+	// Equals on pointers — Go `(s *Set).Equals(other)`: equal pointers are
+	// equal, nil vs non-nil is not equal. (set.go:104)
+	static bool EqualsPtr(const Set* a, const Set* b) {
+		if (a == b) return true;
+		if (a == nullptr || b == nullptr) return false;
+		return a->items == b->items;
+	}
+
+	bool IsSubsetOf(const Set& other) const {
+		for (auto& key : items) {
+			if (!other.Has(key)) return false;
+		}
+		return true;
+	}
+
+	bool Intersects(const Set& other) const {
+		for (auto& key : items) {
+			if (other.Has(key)) return true;
+		}
+		return false;
+	}
+};
+
+// === slice: ls-autoimport ===
+// NewSetFromItems — collections.NewSetFromItems.
+template <typename T>
+inline Set<T> newSetFromItems(std::initializer_list<T> items) {
+	return Set<T>(items);
+}
+// === end slice: ls-autoimport ===
+
+// === slice: api ===
+// set.go:10 — NewSetWithSizeHint.
+template <typename T>
+inline Set<T>* newSetWithSizeHint(size_t hint) {
+	return new Set<T>{hint};
+}
+
+// ordered_map.go:301 — DiffOrderedMapsFunc iterates m2 (then m1) in
+// insertion order. `Entries` in Go is a live view; Keys()+Get reproduces it.
+// Null m1/m2 pointers act as empty maps (Go nil *OrderedMap). Null
+// std::function callbacks are skipped like Go nil funcs.
+template <typename K, typename V, typename Eq>
+void diffOrderedMapsFunc(const OrderedMap<K, V>* m1,
+                         const OrderedMap<K, V>* m2, Eq&& equalValues,
+                         const std::function<void(K, V)>& onAdded,
+                         const std::function<void(K, V)>& onRemoved,
+                         const std::function<void(K, V, V)>& onModified) {
+	if (m2 != nullptr) {
+		for (const K& k : m2->Keys()) {
+			auto [v2, ok2] = m2->Get(k);
+			if (m1 == nullptr || !m1->Get(k).second) {
+				if (onAdded) onAdded(k, *v2);
+			}
+		}
+	}
+	if (m1 != nullptr) {
+		for (const K& k : m1->Keys()) {
+			auto [v1, ok1] = m1->Get(k);
+			if (m2 != nullptr) {
+				auto [v2, ok2] = m2->Get(k);
+				if (ok2) {
+					if (!equalValues(*v1, *v2)) {
+						if (onModified) onModified(k, *v1, *v2);
+					}
+					continue;
+				}
+			}
+			if (onRemoved) onRemoved(k, *v1);
+		}
+	}
+}
+
+// ordered_map.go:295 — DiffOrderedMaps with == equality.
+template <typename K, typename V>
+void diffOrderedMaps(const OrderedMap<K, V>* m1,
+                     const OrderedMap<K, V>* m2,
+                     const std::function<void(K, V)>& onAdded,
+                     const std::function<void(K, V)>& onRemoved,
+                     const std::function<void(K, V, V)>& onModified) {
+	diffOrderedMapsFunc(
+	    m1, m2, [](const V& a, const V& b) { return a == b; }, onAdded,
+	    onRemoved, onModified);
+}
+// === end slice: api ===
+
+
+
+// === slice: ls-coreA ===
+
+// NewSetFromItems — collections.go NewSetFromItems.
+template <typename T, typename... Ts>
+Set<T> NewSetFromItems(Ts... vals) {
+	Set<T> s;
+	(s.Add(vals), ...);
+	return s;
+}
+
+// NewSetWithSizeHint — collections.go NewSetWithSizeHint.
+template <typename T>
+Set<T> NewSetWithSizeHint(size_t hint) {
+	Set<T> s;
+	s.Reserve(hint);
+	return s;
+}
+
+// === end slice: ls-coreA ===
+
+// === slice: moduletransforms ===
+
+// MultiMap — mirrors tsc/internal/collections/multimap.go: a map from a key
+// to a slice of values. `Get` on a missing key returns an empty vector (Go
+// nil slice); presence is tested with `Has` (a key is never stored with an
+// empty slice — `Remove`/`RemoveAll` erase it).
+template <typename K, typename V>
+struct MultiMap {
+	std::unordered_map<K, std::vector<V>> M;
+
+	bool Has(const K& key) const { return M.find(key) != M.end(); }
+
+	std::vector<V> Get(const K& key) const {
+		auto it = M.find(key);
+		if (it == M.end()) {
+			return {};
+		}
+		return it->second;
+	}
+
+	void Add(const K& key, const V& value) { M[key].push_back(value); }
+
+	void Remove(const K& key, const V& value) {
+		auto it = M.find(key);
+		if (it == M.end()) {
+			return;
+		}
+		auto& values = it->second;
+		auto i = std::find(values.begin(), values.end(), value);
+		if (i != values.end()) {
+			if (values.size() == 1) {
+				M.erase(it);
+			} else {
+				values.erase(i);
+			}
+		}
+	}
+
+	void RemoveAll(const K& key) { M.erase(key); }
+
+	size_t Len() const { return M.size(); }
+
+	void Clear() { M.clear(); }
+};
+// === end slice: moduletransforms ===
+
+}  // namespace tsc::collections

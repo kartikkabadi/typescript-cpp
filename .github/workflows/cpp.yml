@@ -1,0 +1,92 @@
+name: C++ front end
+
+on:
+  pull_request:
+    paths:
+      - 'cpp/**'
+      - 'tsc/**'
+      - '.github/workflows/cpp.yml'
+      - '.github/actions/setup-go/**'
+      - 'go.work*'
+  push:
+    branches: [main, devin/cpp-port]
+    paths:
+      - 'cpp/**'
+      - 'tsc/**'
+      - '.github/workflows/cpp.yml'
+      - '.github/actions/setup-go/**'
+      - 'go.work*'
+
+jobs:
+  conformance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-go
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build clang
+
+      - name: Configure + build C++ port
+        env:
+          CXX: clang++
+        run: |
+          cmake -B cpp/build -S cpp -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build cpp/build -j "$(nproc)" --target tscpp fourslashrunner tsctestrunner unittestrunner
+
+      - name: Build Go conformance oracles
+        working-directory: tsc
+        run: |
+          go build -o /tmp/parsedump ./cmd/parsedump
+          go build -o /tmp/bindump ./cmd/bindump
+          go build -o /tmp/lexdump ./cmd/lexdump
+          go build -o /tmp/checkdump ./cmd/checkdump
+
+      - name: Conformance harness regressions
+        run: python3 cpp/tools/test_conformance.py
+
+      - name: Lexer conformance (bounded)
+        env:
+          LEXDUMP: /tmp/lexdump
+        run: python3 cpp/tools/conformance_lex.py tsc/testdata/tests/cases/conformance/scanner
+
+      - name: Parser + binder conformance (bounded)
+        env:
+          PARSEDUMP: /tmp/parsedump
+          BINDUMP: /tmp/bindump
+        run: |
+          RESULTDIR=/tmp/cpp-conformance
+          mkdir -p "$RESULTDIR"
+          find tsc/testdata/tests/cases -type f \( -name '*.ts' -o -name '*.tsx' \) \
+            | grep -v '/node_modules/' | sort | head -200 > "$RESULTDIR/smoke.list"
+          xargs -P 4 -I{} cpp/tools/conformance_parse.sh {} \
+            < "$RESULTDIR/smoke.list" > "$RESULTDIR/parse_results.txt" || true
+          cpp/tools/conformance_bind.sh "$RESULTDIR/smoke.list" 4 > "$RESULTDIR/bind_results.txt" || true
+          grep FAIL "$RESULTDIR/parse_results.txt" "$RESULTDIR/bind_results.txt" || true
+          if grep -q FAIL "$RESULTDIR/parse_results.txt" "$RESULTDIR/bind_results.txt"; then
+            echo "conformance failures above" >&2
+            exit 1
+          fi
+
+      - name: Checker conformance (bounded)
+        env:
+          CHECKDUMP: /tmp/checkdump
+        run: |
+          RESULTDIR=/tmp/cpp-conformance
+          mkdir -p "$RESULTDIR"
+          find tsc/testdata/tests/cases/compiler -type f -name '*.ts' \
+            | grep -v '/node_modules/' | sort | head -150 > "$RESULTDIR/check.list"
+          cpp/tools/conformance_check.sh "$RESULTDIR/check.list" 4 > "$RESULTDIR/check_results.txt" || true
+          grep FAIL "$RESULTDIR/check_results.txt" || true
+          ! grep -q FAIL "$RESULTDIR/check_results.txt"
+
+      - name: Fourslash smoke
+        run: set -o pipefail && cpp/build/fourslashrunner -run 'TestFormatting|TestQuickInfo' 2>&1 | tail -5
+
+      - name: Unit + tsctests
+        run: |
+          cpp/build/unittestrunner
+          set -o pipefail && cpp/build/tsctestrunner 2>&1 | tail -3
