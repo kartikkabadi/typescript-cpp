@@ -907,6 +907,10 @@ LanguageService::getDocumentSymbolsForChildren(gostd::Context ctx,
 				}
 			}
 		}
+		if (node->parent->kind == Kind::SourceFile &&
+			(isImportDeclaration(node) || isImportEqualsDeclaration(node))) {
+			return false;
+		}
 		switch (node->kind) {
 		case Kind::ClassDeclaration:
 		case Kind::ClassExpression:

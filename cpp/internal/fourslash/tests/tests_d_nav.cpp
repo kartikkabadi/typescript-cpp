@@ -224,4 +224,25 @@ var dist = p.getDist();)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestNavbar01, TestNavbar01);
+
+static void TestDocumentSymbolTopLevelImports(gostd::testing::T* t) {
+	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
+		t->Parallel();
+		const std::string content = R"TS(/** @typedef {number} ImportedType */
+import DefaultComponent from "./component";
+/** @callback ImportedCallback
+ * @param {string} value
+ * @returns {number}
+ */
+import * as utils from "./utils";
+import { value, original as renamed } from "./values";
+import type { Options } from "./types";
+
+const local = 1;)TS";
+		auto __fsp1 = fourslash::NewFourslash(t, nullptr, content); auto f = __fsp1.first; auto done = __fsp1.second; TSC_DEFER(done());
+		f->VerifyBaselineDocumentSymbol(t);
+	});
+}
+REGISTER_FOURSLASH_TEST(TestDocumentSymbolTopLevelImports, TestDocumentSymbolTopLevelImports);
+
 } // namespace
