@@ -1571,9 +1571,18 @@ void Checker::checkVariableLikeDeclaration(Node* node) {
 				Type* globalDisposableType = getGlobalDisposableType();
 				if (globalDisposableType != emptyObjectType) {
 					Type* optionalDisposableType = getUnionType({globalDisposableType, nullType, undefinedType});
-					checkTypeAssignableTo(widenTypeForVariableLikeDeclaration(initializerType, node, false),
-						optionalDisposableType, initializer,
-						The_initializer_of_a_using_declaration_must_be_either_an_object_with_a_Symbol_dispose_method_or_be_null_or_undefined);
+					Type* widenedInitializerType = widenTypeForVariableLikeDeclaration(initializerType, node, false);
+					std::vector<Diagnostic*> diags;
+					if (!checkTypeAssignableToEx(widenedInitializerType, optionalDisposableType, initializer,
+						The_initializer_of_a_using_declaration_must_be_either_an_object_with_a_Symbol_dispose_method_or_be_null_or_undefined, &diags)) {
+						Type* globalAsyncDisposableType = getGlobalAsyncDisposableType();
+						Type* optionalAsyncDisposableType = getUnionType({globalAsyncDisposableType, nullType, undefinedType});
+						if (globalAsyncDisposableType != emptyObjectType && isTypeAssignableTo(widenedInitializerType, optionalAsyncDisposableType)) {
+							diags[0]->AddMessageChain(newDiagnosticChain(nullptr,
+								This_initializer_has_a_Symbol_asyncDispose_method_Did_you_mean_to_use_await_using));
+						}
+						addDiagnostic(diags[0]);
+					}
 				}
 			}
 		}
