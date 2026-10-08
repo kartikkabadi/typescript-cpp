@@ -658,7 +658,7 @@ inline constexpr TypeFacts TypeFactsObjectFacts =
 inline constexpr TypeFacts TypeFactsFunctionStrictFacts =
 	TypeFactsTypeofEQFunction | TypeFactsTypeofEQHostObject | TypeFactsTypeofNEString |
 	TypeFactsTypeofNENumber | TypeFactsTypeofNEBigInt | TypeFactsTypeofNEBoolean |
-	TypeFactsTypeofNESymbol | TypeFactsTypeofNEFunction | TypeFactsNEUndefined |
+	TypeFactsTypeofNESymbol | TypeFactsTypeofNEObject | TypeFactsNEUndefined |
 	TypeFactsNENull | TypeFactsNEUndefinedOrNull | TypeFactsTruthy;
 inline constexpr TypeFacts TypeFactsFunctionFacts =
 	TypeFactsFunctionStrictFacts | TypeFactsEQUndefined | TypeFactsEQNull |
