@@ -288,11 +288,9 @@ gostd::Error ProjectCollectionBuilder::HandleAPIRequest(
 			    std::string{request->ProgramID});
 		}
 		seenReconfiguredPrograms.Add(request->ProgramID);
-		if (apiRequest->RemovePrograms == nullptr) {
-			TSC_UNREACHABLE(
-			    "APISnapshotRequest.RemovePrograms is required");
-		}
-		if (apiRequest->RemovePrograms->Has(request->ProgramID)) {
+		// Go: (*collections.Set).Has is nil-receiver safe.
+		if (apiRequest->RemovePrograms != nullptr &&
+		    apiRequest->RemovePrograms->Has(request->ProgramID)) {
 			return gostd::newError(
 			    "synthetic program cannot be reconfigured and "
 			    "removed: " +
@@ -306,18 +304,17 @@ gostd::Error ProjectCollectionBuilder::HandleAPIRequest(
 			    std::string{request->ProgramID});
 		}
 	}
-	if (apiRequest->RemovePrograms == nullptr) {
-		TSC_UNREACHABLE(
-		    "APISnapshotRequest.RemovePrograms is required");
-	}
-	for (auto& programID : apiRequest->RemovePrograms->Keys()) {
-		auto res = syntheticProjects->Load(programID);
-		if (!res.second) {
-			return gostd::newError(
-			    "synthetic program not found for removal: " +
-			    std::string{programID});
+	// Go: (*collections.Set).Keys returns nil on a nil set.
+	if (apiRequest->RemovePrograms != nullptr) {
+		for (auto& programID : apiRequest->RemovePrograms->Keys()) {
+			auto res = syntheticProjects->Load(programID);
+			if (!res.second) {
+				return gostd::newError(
+				    "synthetic program not found for removal: " +
+				    std::string{programID});
+			}
+			deleteProject(res.first.get(), logger);
 		}
-		deleteProject(res.first.get(), logger);
 	}
 	std::vector<Project*> createdProgramsVec(
 	    apiRequest->CreatePrograms.size(), nullptr);
@@ -383,12 +380,11 @@ gostd::Error ProjectCollectionBuilder::HandleAPIRequest(
 			    "no project found for opened file: " + fileName);
 		}
 	}
-	if (apiRequest->EnsurePrograms == nullptr) {
-		TSC_UNREACHABLE(
-		    "APISnapshotRequest.EnsurePrograms is required");
-	}
-	for (auto& projectID : apiRequest->EnsurePrograms->Keys()) {
-		DidRequestProject(projectID, logger);
+	// Go: (*collections.Set).Keys returns nil on a nil set.
+	if (apiRequest->EnsurePrograms != nullptr) {
+		for (auto& projectID : apiRequest->EnsurePrograms->Keys()) {
+			DidRequestProject(projectID, logger);
+		}
 	}
 	if (apiRequest->EnsureAllPrograms) {
 		forEachProject([&](dirty::IValue<Project*>* entry) {
@@ -721,8 +717,10 @@ void logChangeFileResult(const changeFileResult& result,
 			}
 			return s;
 		}() + "]");
-		logger->Logf("Config file change affected projects: %v",
-	             args);
+		logging::logf(logger,
+		              "Config file change affected projects: %v",
+		              static_cast<const std::vector<gostd::fmtArg>&>(
+		                  args));
 	}
 	if (result.affectedFiles != nullptr &&
 	    !result.affectedFiles->empty()) {

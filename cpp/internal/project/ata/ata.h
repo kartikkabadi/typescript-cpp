@@ -190,6 +190,15 @@ struct DiscoverTypingsResult {
 	std::vector<std::string> filesToWatch;
 };
 
+// installNpmPackages — ata.go (Go package-internal function; declared
+// here so package-internal tests can call it). Batches package names into
+// <8000-char npm commands and runs each via the throttle group.
+gostd::Error installNpmPackages(
+    gostd::Context ctx, const std::vector<std::string>& packageNames,
+    countingSemaphore* semaphore,
+    const std::function<gostd::Error(const std::vector<std::string>&)>&
+        installPackages);
+
 DiscoverTypingsResult DiscoverTypings(
     vfs::FS* fs, logging::Logger* logger, const TypingsInfo* typingsInfo,
     const std::vector<std::string>& fileNames,

@@ -279,6 +279,34 @@ public:
 		return {std::move(item), nullptr};
 	}
 
+	// --- internal test hooks (dynamic_queue_test.go drives the channel
+	// machine directly; Go's `q.getAny(ctx)` / `q.idle <- state`) ---
+
+	// acquireStateForTest — getAny: wait for the state on either channel
+	// and take it. While held, Put/Get wait.
+	gostd::Error acquireStateForTest(const gostd::Context& ctx) {
+		if (auto err = gostd::ctxErr(ctx); err != nullptr) {
+			return err;
+		}
+		std::unique_lock<std::mutex> lk(st->mu);
+		while (st->loc == Loc::taken) {
+			if (waitForCtx(st, ctx, lk)) {
+				return gostd::ctxErr(ctx);
+			}
+		}
+		st->loc = Loc::taken;
+		return nullptr;
+	}
+
+	// releaseStateToIdleForTest — `q.idle <- state`.
+	void releaseStateToIdleForTest() {
+		{
+			std::lock_guard<std::mutex> lk(st->mu);
+			st->loc = Loc::idle;
+		}
+		st->cv.notify_all();
+	}
+
 private:
 	// Waits on the state cv (woken by another method returning the state, or
 	// by the ctx watcher); returns true when ctx was cancelled — Go's
@@ -563,6 +591,12 @@ class projectLoadingProgress
 		std::condition_variable cv;        // run loop: events/timer
 		std::deque<progressEvent> queue;
 		bool delayFiredPending = false;
+		// inFlight — events popped but not yet handled; lets internal
+		// tests wait for quiescence like synctest.Wait() does in Go.
+		int inFlight = 0;
+		// runExited — set when the run loop returns (Shutdown* tests wait
+		// on it so the detached thread can't outlive the object).
+		bool runExited = false;
 	};
 
 	std::shared_ptr<progressReporter> reporter;
@@ -587,6 +621,19 @@ public:
 	// finish — progress.go:99.
 	void finish(const DiagnosticMessage* message,
 	            std::vector<gostd::fmtArg> args);
+
+	// --- internal test hooks (progress_test.go drives the channel and
+	// goroutine directly; Go's synctest.Wait / direct `p.ch <- ev`) ---
+
+	// waitIdleForTest — synctest.Wait(): blocks until every queued event
+	// and pending delay-fire has been handled by the run goroutine.
+	void waitIdleForTest();
+	// fillChannelForTest — `p.ch <- ev` × cap(p.ch), bypassing the
+	// done() select (ShutdownDuringStartAndFinish fills the channel so
+	// subsequent start/finish take the done() path).
+	void fillChannelForTest();
+	// waitRunExitForTest — blocks until the run goroutine has exited.
+	void waitRunExitForTest();
 
 private:
 	// run — progress.go:110.

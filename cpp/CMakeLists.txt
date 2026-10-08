@@ -516,6 +516,8 @@ target_link_libraries(tscpp PRIVATE tsc)
 # so adding a tests/*.cpp file needs no list maintenance.
 file(GLOB tsctestrunner_tests CONFIGURE_DEPENDS
 	internal/execute/tsctests/tests/*.cpp)
+# tests_*.cpp files belong to unittestrunner (REGISTER_UNIT_TEST), not here.
+list(FILTER tsctestrunner_tests EXCLUDE REGEX "tests_.*\\.cpp")
 add_executable(tsctestrunner cmd/tsctestrunner/main.cpp
 	${tsctestrunner_tests} ${tsc_alloc_objects})
 target_link_libraries(tsctestrunner PRIVATE tsc)

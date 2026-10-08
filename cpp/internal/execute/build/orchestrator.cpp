@@ -384,28 +384,31 @@ void Orchestrator::GenerateGraph(
 }
 
 // orchestrator.go:279 Start — tsc -b entrypoint.
-etsc::CommandLineResult Orchestrator::Start() {
-	return start("", false /*onlyReferences*/)->Result;
+etsc::CommandLineResult Orchestrator::Start(gostd::Context ctx) {
+	return start(ctx, "", false /*onlyReferences*/)->Result;
 }
 
 // orchestrator.go:284 Build — orchestrator.Build() entrypoint for api.
-OrchestratorResult* Orchestrator::Build(const std::string& project) {
+OrchestratorResult* Orchestrator::Build(gostd::Context ctx,
+                                        const std::string& project) {
 	recheckAllProjects(project);
-	return start(project, false /*onlyReferences*/);
+	return start(ctx, project, false /*onlyReferences*/);
 }
 
 // orchestrator.go:290 BuildReferences.
 OrchestratorResult*
-Orchestrator::BuildReferences(const std::string& project) {
+Orchestrator::BuildReferences(gostd::Context ctx,
+                               const std::string& project) {
 	recheckAllProjects(project);
-	return start(project, true /*onlyReferences*/);
+	return start(ctx, project, true /*onlyReferences*/);
 }
 
 // orchestrator.go:295 start.
-OrchestratorResult* Orchestrator::start(const std::string& project,
+OrchestratorResult* Orchestrator::start(gostd::Context ctx,
+                                        const std::string& project,
                                         bool onlyReferences) {
 	contentMapperHost = etsc::NewContentMapperHost(
-	    gostd::contextBackground(), opts.Sys,
+	    ctx, opts.Sys,
 	    opts.Command->CompilerOptions);
 	bool closeHost = contentMapperHost != nullptr &&
 	                 (!tristateIsTrue(opts.Command->CompilerOptions->Watch) ||
@@ -444,7 +447,7 @@ OrchestratorResult* Orchestrator::start(const std::string& project,
 	}
 	auto* result = buildOrCleanOrder(order);
 	if (tristateIsTrue(opts.Command->CompilerOptions->Watch)) {
-		Watch();
+		Watch(ctx);
 		result->Result.Watcher = this;
 	}
 	return result;
@@ -607,7 +610,7 @@ bool Orchestrator::cleanProjectOutput(
 }
 
 // orchestrator.go:439 Watch.
-void Orchestrator::Watch() {
+void Orchestrator::Watch(gostd::Context ctx) {
 	wm->Lock();
 
 	if (opts.Testing == nullptr) {
@@ -630,7 +633,7 @@ void Orchestrator::Watch() {
 	wm->Unlock();
 
 	if (opts.Testing == nullptr) {
-		wm->RunLoop(gostd::contextBackground(), [this] { DoCycle(); });
+		wm->RunLoop(ctx, [this] { DoCycle(); });
 	}
 }
 

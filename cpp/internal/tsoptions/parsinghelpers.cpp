@@ -504,6 +504,7 @@ bool parseCompilerOptions(std::string_view key,
 		allOptions->TypeRoots = ParseStringArray(value);
 	} else if (key == "types") {
 		allOptions->Types = ParseStringArray(value);
+		allOptions->TypesWasSet = true;
 	} else if (key == "useDefineForClassFields") {
 		allOptions->UseDefineForClassFields = ParseTristate(value);
 	} else if (key == "useUnknownInCatchVariables") {
@@ -983,6 +984,110 @@ std::string jsonMarshal(const CompilerOptionsValue& v) {
 		return out;
 	}
 	return "null";
+}
+
+// CompilerOptionsValue::marshalJSONTo — encoding/json Marshal of the variant
+// through the stream encoder (honors MarshalIndentWrite indentation).
+std::string CompilerOptionsValue::marshalJSONTo(json::Encoder& enc) const {
+	if (v.valueless_by_exception() || std::holds_alternative<std::monostate>(v)) {
+		return enc.writeValue("null");
+	}
+	if (auto* p = std::get_if<bool>(&v)) {
+		return enc.writeValue(*p ? "true" : "false");
+	}
+	if (auto* p = std::get_if<int64_t>(&v)) {
+		return enc.writeValue(std::to_string(*p));
+	}
+	if (auto* p = std::get_if<double>(&v)) {
+		// encoding/json: integer-valued floats marshal without a fraction.
+		if (*p == std::floor(*p) && std::abs(*p) < 1e15) {
+			return enc.writeValue(std::to_string(static_cast<int64_t>(*p)));
+		}
+		return enc.writeValue(std::to_string(*p));
+	}
+	if (auto* p = std::get_if<Tristate>(&v)) {
+		return enc.writeValue(std::to_string(static_cast<int64_t>(*p)));
+	}
+	if (auto* p = std::get_if<const DiagnosticMessage*>(&v)) {
+		// *diagnostics.Message marshals as its message text.
+		return enc.writeValue(
+		    json::Value(json::marshalString(*p ? (*p)->text : "")));
+	}
+	if (auto* p = std::get_if<std::string>(&v)) {
+		return enc.writeValue(json::Value(json::marshalString(*p)));
+	}
+	if (auto* p = std::get_if<JsonStrList>(&v)) {
+		if (auto err = enc.writeToken(json::BeginArray); !err.empty()) {
+			return err;
+		}
+		for (const auto& s : *p) {
+			if (auto err = enc.writeValue(
+			        json::Value(json::marshalString(s)));
+			    !err.empty()) {
+				return err;
+			}
+		}
+		return enc.writeToken(json::EndArray);
+	}
+	if (auto* p = std::get_if<JsonArray>(&v)) {
+		if (auto err = enc.writeToken(json::BeginArray); !err.empty()) {
+			return err;
+		}
+		for (const auto& e : *p) {
+			if (auto err = e.marshalJSONTo(enc); !err.empty()) {
+				return err;
+			}
+		}
+		return enc.writeToken(json::EndArray);
+	}
+	if (auto* p = std::get_if<JsonObjectPtr>(&v)) {
+		if (*p == nullptr) {
+			return enc.writeValue("null");
+		}
+		if (auto err = enc.writeToken(json::BeginObject); !err.empty()) {
+			return err;
+		}
+		for (const auto& k : (*p)->Keys()) {
+			if (auto err = enc.writeValue(
+			        json::Value(json::marshalString(k)));
+			    !err.empty()) {
+				return err;
+			}
+			if (auto err = (*p)->Get(k).first->marshalJSONTo(enc);
+			    !err.empty()) {
+				return err;
+			}
+		}
+		return enc.writeToken(json::EndObject);
+	}
+	if (auto* p = std::get_if<JsonGoMapPtr>(&v)) {
+		if (*p == nullptr) {
+			return enc.writeValue("null");
+		}
+		// Go marshals map[string]any with keys in sorted order.
+		std::vector<std::string> keys;
+		keys.reserve((*p)->size());
+		for (const auto& [k, unused] : **p) {
+			(void)unused;
+			keys.push_back(k);
+		}
+		std::sort(keys.begin(), keys.end());
+		if (auto err = enc.writeToken(json::BeginObject); !err.empty()) {
+			return err;
+		}
+		for (const auto& k : keys) {
+			if (auto err = enc.writeValue(
+			        json::Value(json::marshalString(k)));
+			    !err.empty()) {
+				return err;
+			}
+			if (auto err = (*p)->at(k).marshalJSONTo(enc); !err.empty()) {
+				return err;
+			}
+		}
+		return enc.writeToken(json::EndObject);
+	}
+	return enc.writeValue("null");
 }
 
 }  // namespace tsc::tsoptions

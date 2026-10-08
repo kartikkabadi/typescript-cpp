@@ -57,6 +57,7 @@ Session* NewSession(SessionInit* init) {
 	session->snapshotHost = snapshotHost;
 	session->options = init->Options;
 	session->logger = sessionLogger;
+	session->keepAlive = init->KeepAlive;
 	session->backgroundCtx = init->BackgroundCtx;
 	session->toPath = snapshotHost->toPath;
 	session->client = init->Client;
@@ -1469,18 +1470,28 @@ project::Snapshot* Session::updateSnapshot(
 	auto* self = this;
 	auto capturedChange = change;
 	auto timings = contentMapperTimings_;
+	// GC lifetime: the Go closure keeps both snapshots alive until the
+	// task runs; ref them so a later snapshot change can't UAF. The old
+	// snapshot may already be fully disposed (ref() would trap), so
+	// only take a ref if one is still open — a fully-disposed snapshot
+	// object stays addressable in this codebase.
+	bool oldSnapshotRef = oldSnapshot->tryRef();
+	newSnapshot->ref();
 	if (!backgroundQueue->Enqueue(
 	        backgroundContext(),
-	        [self, oldSnapshot, newSnapshot, timings,
-	         capturedChange](const gostd::Context& ctx) {
-		    struct derefGuard {
-			    project::Snapshot* a;
-			    project::Snapshot* b;
-			    ~derefGuard() {
-				    a->Deref();
-				    b->Deref();
+	        [self, oldSnapshot, newSnapshot, timings, capturedChange,
+	         oldSnapshotRef](const gostd::Context& ctx) {
+		    struct snapsGuard {
+			    project::Snapshot* oldS;
+			    project::Snapshot* newS;
+			    bool hasOldRef;
+			    ~snapsGuard() {
+				    if (hasOldRef) {
+					    oldS->Deref();
+				    }
+				    newS->Deref();
 			    }
-		    } dg{oldSnapshot, newSnapshot};
+		    } sg{oldSnapshot, newSnapshot, oldSnapshotRef};
 		    if (self->options->LoggingEnabled) {
 			    logging::logf(self->logger, 
 			        "Adopted snapshot %d (parent %d) as "
@@ -1517,7 +1528,9 @@ project::Snapshot* Session::updateSnapshot(
 		                              oldSnapshot, newSnapshot);
 	    })) {
 		// Dropped (queue closed / context cancelled): unwind the refs.
-		oldSnapshot->Deref();
+		if (oldSnapshotRef) {
+			oldSnapshot->Deref();
+		}
 		newSnapshot->Deref();
 	}
 
@@ -1923,8 +1936,8 @@ gostd::Error Session::updateWatches(project::Snapshot* oldSnapshot,
 			    errors.insert(errors.end(), errs.begin(),
 			                  errs.end());
 		    } else if (watches->IsPending(
-		                   watchedFilesID(
-		                       newProject->contentMapperWatch))) {
+		                   watchedFilesID(newProject
+		                                      ->contentMapperWatch))) {
 			    auto errs = updateWatchNew(
 			        ctx, newProject->contentMapperWatch);
 			    errors.insert(errors.end(), errs.begin(),
@@ -2484,18 +2497,18 @@ void Session::triggerATAForUpdatedProjects(
 		if (project->ShouldTriggerATA(newSnapshot->ID())) {
 			auto* self = this;
 			auto* project_ = project;
-			// Projects are owned by their snapshot — hold a ref so
-			// the project can't be freed out from under the worker
-			// (Go's GC does the same for the goroutine's captures).
+			// GC lifetime: the Go closure keeps the project's owning
+			// snapshot alive; ref it so the queued task can't UAF
+			// after a newer snapshot replaces this one.
 			newSnapshot->ref();
 			if (!backgroundQueue->Enqueue(
 			        backgroundContext(),
 			        [self, project_,
 			         newSnapshot](const gostd::Context& ctx) {
-				    struct derefGuard {
+				    struct snapGuard {
 					    project::Snapshot* s;
-					    ~derefGuard() { s->Deref(); }
-				    } dg{newSnapshot};
+					    ~snapGuard() { s->Deref(); }
+				    } sg{newSnapshot};
 				    logging::LogTree* logTree = nullptr;
 				    if (self->options->LoggingEnabled) {
 					    logTree = logging::newLogTree(

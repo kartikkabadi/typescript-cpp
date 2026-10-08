@@ -240,6 +240,23 @@ std::string TypeAcquisition::marshalJSONTo(json::Encoder& enc) const {
 	return w.end();
 }
 
+// WatchOptions — watchoptions.go tagged fields.
+std::string WatchOptions::unmarshalJSONFrom(json::Decoder& dec) {
+	return api::readFields(dec, [this](std::string_view n, json::Decoder& d) -> std::string {
+		if (api::fieldIs(n, "watchInterval")) return json::unmarshalDecode(d, &Interval);
+		if (api::fieldIs(n, "watchFile")) return json::unmarshalDecode(d, &FileKind);
+		if (api::fieldIs(n, "watchDirectory")) return json::unmarshalDecode(d, &DirectoryKind);
+		if (api::fieldIs(n, "fallbackPolling")) return json::unmarshalDecode(d, &FallbackPolling);
+		if (api::fieldIs(n, "synchronousWatchDirectory"))
+			return json::unmarshalDecode(d, &SyncWatchDir);
+		if (api::fieldIs(n, "excludeDirectories"))
+			return json::unmarshalDecode(d, &ExcludeDir);
+		if (api::fieldIs(n, "excludeFiles"))
+			return json::unmarshalDecode(d, &ExcludeFiles);
+		return d.skipValue();
+	});
+}
+
 }  // namespace tsc
 
 namespace tsc {
@@ -476,7 +493,11 @@ std::string unmarshalCompilerOptionsField(CompilerOptions* o, std::string_view n
 	if (api::fieldIs(n, "traceResolution")) return json::unmarshalDecode(d, &o->TraceResolution);
 	if (api::fieldIs(n, "tsBuildInfoFile")) return json::unmarshalDecode(d, &o->TsBuildInfoFile);
 	if (api::fieldIs(n, "typeRoots")) return json::unmarshalDecode(d, &o->TypeRoots);
-	if (api::fieldIs(n, "types")) return json::unmarshalDecode(d, &o->Types);
+	if (api::fieldIs(n, "types")) {
+		if (auto e = json::unmarshalDecode(d, &o->Types); !e.empty()) return e;
+		o->TypesWasSet = true;
+		return {};
+	}
 	if (api::fieldIs(n, "useDefineForClassFields")) return json::unmarshalDecode(d, &o->UseDefineForClassFields);
 	if (api::fieldIs(n, "useUnknownInCatchVariables")) return json::unmarshalDecode(d, &o->UseUnknownInCatchVariables);
 	if (api::fieldIs(n, "verbatimModuleSyntax")) return json::unmarshalDecode(d, &o->VerbatimModuleSyntax);
@@ -591,6 +612,7 @@ std::string CompilerOptions::marshalJSONTo(json::Encoder& enc) const {
 	if (NoImplicitOverride != Tristate::Unknown) w.memberTristate("noImplicitOverride", NoImplicitOverride);
 	if (NoUncheckedSideEffectImports != Tristate::Unknown) w.memberTristate("noUncheckedSideEffectImports", NoUncheckedSideEffectImports);
 	if (!api::isZeroVal(OutDir)) w.member("outDir", OutDir);
+	if (!Paths.empty()) w.memberPaths("paths", Paths);
 	if (!api::isZeroVal(Plugins)) w.member("plugins", Plugins);
 	if (PreserveConstEnums != Tristate::Unknown) w.memberTristate("preserveConstEnums", PreserveConstEnums);
 	if (PreserveSymlinks != Tristate::Unknown) w.memberTristate("preserveSymlinks", PreserveSymlinks);
@@ -620,7 +642,8 @@ std::string CompilerOptions::marshalJSONTo(json::Encoder& enc) const {
 	if (TraceResolution != Tristate::Unknown) w.memberTristate("traceResolution", TraceResolution);
 	if (!api::isZeroVal(TsBuildInfoFile)) w.member("tsBuildInfoFile", TsBuildInfoFile);
 	if (!api::isZeroVal(TypeRoots)) w.member("typeRoots", TypeRoots);
-	if (!api::isZeroVal(Types)) w.member("types", Types);
+	// Go omits only a nil slice: an explicitly-set empty `types` emits [].
+	if (TypesWasSet || !api::isZeroVal(Types)) w.member("types", Types);
 	if (UseDefineForClassFields != Tristate::Unknown) w.memberTristate("useDefineForClassFields", UseDefineForClassFields);
 	if (UseUnknownInCatchVariables != Tristate::Unknown) w.memberTristate("useUnknownInCatchVariables", UseUnknownInCatchVariables);
 	if (VerbatimModuleSyntax != Tristate::Unknown) w.memberTristate("verbatimModuleSyntax", VerbatimModuleSyntax);
@@ -691,7 +714,7 @@ std::string DocumentIdentifier::unmarshalJSONFrom(json::Decoder& dec) {
 	}
 	default:
 		return std::string("DocumentIdentifier: expected string or object, got ") +
-		       std::string(1, tok.kind());
+		       json::kindString(tok.kind());
 	}
 }
 
@@ -2403,9 +2426,9 @@ std::string SnapshotRequestChangesParams::marshalJSONTo(json::Encoder& enc) cons
 	w.begin();
 	if (!OpenProjects.empty()) w.member("openProjects", OpenProjects);
 	if (!CloseProjects.empty()) w.member("closeProjects", CloseProjects);
-	if (!OpenFiles.empty()) w.member("openFiles", OpenFiles);
+	if (OpenFiles && !OpenFiles->empty()) w.member("openFiles", *OpenFiles);
 	if (!CloseFiles.empty()) w.member("closeFiles", CloseFiles);
-	if (!CreatePrograms.empty()) w.member("createPrograms", CreatePrograms);
+	if (CreatePrograms && !CreatePrograms->empty()) w.member("createPrograms", *CreatePrograms);
 	if (!ReconfigurePrograms.empty()) w.member("reconfigurePrograms", ReconfigurePrograms);
 	if (!RemovePrograms.empty()) w.member("removePrograms", RemovePrograms);
 	if (EnsurePrograms) w.member("ensurePrograms", EnsurePrograms);

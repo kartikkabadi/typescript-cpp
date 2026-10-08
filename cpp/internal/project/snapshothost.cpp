@@ -89,6 +89,9 @@ SnapshotHost* NewSnapshotHost(SessionInit* init) {
 // the single canonical cache shared by clone hosts, the Session, and
 // the API layer.
 ls::autoimport::ProjectID* SnapshotHost::internProjectID(const ID& id) {
+	// Global intern — Go keys these maps by the ProjectID interface's
+	// VALUE, so every site must produce the canonical pointer for a
+	// given id string (see internID in autoimport.h).
 	return ls::autoimport::InternProjectID(idString(id));
 }
 

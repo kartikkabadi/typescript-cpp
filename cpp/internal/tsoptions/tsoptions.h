@@ -345,6 +345,10 @@ struct CompilerOptionsValue {
 	CompilerOptionsValue(JsonObjectPtr x) : v(std::move(x)) {}
 	CompilerOptionsValue(JsonGoMapPtr x) : v(std::move(x)) {}
 
+	// encoding/json Marshal through the stream Encoder (any-valued fields,
+	// like ParsedConfig's raw options map).
+	std::string marshalJSONTo(json::Encoder& enc) const;
+
 	bool operator==(const CompilerOptionsValue&) const = default;
 	// Go enum values flowing into `any` keep their dynamic enum type but
 	// compare by the int32 underneath (reflect.CanInt); the int64 arm plays

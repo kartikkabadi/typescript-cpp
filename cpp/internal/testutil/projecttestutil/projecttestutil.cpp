@@ -25,11 +25,13 @@ void SessionUtils::SetupNpmExecutorForTypingsInstaller() {
 		return;
 	}
 
-	// The Go closure captures h (the SessionUtils); the C++ lambda
-	// captures `this`, which outlives npmExecutor (npmExecutor is a member
-	// of this).
+	// The Go closure captures h (the SessionUtils) so GC keeps fs and
+	// tiOptions alive while the session can invoke the mock. Capture
+	// the shared_ptr members by value — `this` itself may be gone by
+	// the time a background ATA task calls NpmInstall.
 	npmExecutor->NpmInstallFunc =
-	    [this](const std::string& cwd,
+	    [fs = this->fs,
+	     tiOptions = this->tiOptions](const std::string& cwd,
 	           const std::vector<std::string>& packageNames)
 	    -> std::pair<std::string, gostd::Error> {
 		// packageNames is actually npmInstallArgs due to interface
@@ -54,7 +56,7 @@ void SessionUtils::SetupNpmExecutorForTypingsInstaller() {
 			// Write typings file
 			vfs::Error werr = fs->WriteFile(
 			    cwd + "/node_modules/types-registry/index.json",
-			    createTypesRegistryFileContent());
+			    createTypesRegistryFileContent(tiOptions));
 			return {{},
 			        werr ? gostd::newError(werr.str()) : nullptr};
 		}
@@ -197,7 +199,8 @@ std::string TypesRegistryConfigText() {
 }
 
 // createTypesRegistryFileContent — projecttestutil.go:199.
-std::string SessionUtils::createTypesRegistryFileContent() {
+std::string SessionUtils::createTypesRegistryFileContent(
+    const std::shared_ptr<TypingsInstallerOptions>& tiOptions) {
 	std::string builder;
 	builder += "{\n  \"entries\": {";
 	int index = 0;
@@ -264,6 +267,8 @@ SetupWithRealFS() {
 	init.Client = clientMock.get();
 	init.NpmExecutor = npmExecutorMock.get();
 	init.Logger = sessionUtils->logger.get();
+	init.KeepAlive = {fs, clientMock, npmExecutorMock,
+	                  sessionUtils->logger};
 	project::SessionOptions options;
 	options.CurrentDirectory = wd;
 	options.DefaultLibraryPath = bundled::LibPath();
@@ -347,13 +352,22 @@ GetSessionInitOptions(const FileMap& files, project::SessionOptions* options,
 
 	auto init = std::make_unique<project::SessionInit>();
 	init->BackgroundCtx = gostd::contextBackground();
-	init->Options = options != nullptr
-	                  ? options
-	                  : new project::SessionOptions(defaultOptions);
+	// GC lifetime: Go callers pass a `*SessionOptions` that the
+	// collector keeps alive for the session's (background-work
+	// included) lifetime. Copy it into a heap object the session
+	// owns so a caller's stack frame can't be reused while queued
+	// tasks still read it.
+	std::shared_ptr<project::SessionOptions> optionsOwner(
+	    new project::SessionOptions(
+	        options != nullptr ? *options : defaultOptions));
+	init->Options = optionsOwner.get();
 	init->FS = fs;
 	init->Client = clientMock.get();
 	init->NpmExecutor = npmExecutorMock.get();
 	init->Logger = sessionUtils->logger.get();
+	init->KeepAlive = {fs, clientMock, npmExecutorMock,
+	                   sessionUtils->logger, sessionUtils->tiOptions,
+	                   std::static_pointer_cast<void>(optionsOwner)};
 	return {std::move(init), sessionUtils};
 }
 

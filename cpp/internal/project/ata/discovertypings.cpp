@@ -245,12 +245,12 @@ std::vector<std::string> addTypingNamesAndGetFilesToWatch(
 		if (!ok) {
 			continue;
 		}
-		auto [manifest, perr] =
+		auto [manifest, parseOk] =
 		    packagejson::Parse(depManifestContents);
 		// If the package has its own d.ts typings, those will take
 		// precedence. Otherwise the package name will be used
 		// to download d.ts files from DefinitelyTyped
-		if (perr || manifest.Name.Value.empty()) {
+		if (!parseOk || manifest.Name.Value.empty()) {
 			continue;
 		}
 		std::string ownTypes = manifest.Types.Value;
@@ -343,7 +343,7 @@ DiscoverTypingsResult DiscoverTypings(
 
 	// Directories to search for package.json, bower.json and other typing
 	// information
-	if (typingsInfo->CompilerOptions->Types.empty()) {
+	if (!typingsInfo->CompilerOptions->TypesWasSet) {
 		std::unordered_set<std::string> possibleSearchDirs;
 		for (const auto& fileName : filteredFileNames) {
 			possibleSearchDirs.insert(

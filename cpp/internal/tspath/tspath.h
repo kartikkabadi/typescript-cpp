@@ -746,7 +746,7 @@ inline std::string toFileNameLowerCase(std::string_view fileName) {
 		return b;
 	}
 	// Non-ASCII: lower each UTF-8 rune via unicode.ToLower except U+0130,
-	// matching Go's strings.Map over runes.
+	// matching Go's strings.Map over runes (IWithDot left unchanged).
 	std::string result;
 	result.reserve(fileName.size());
 	for (size_t i = 0; i < fileName.size();) {

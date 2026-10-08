@@ -793,9 +793,16 @@ vfs::FileInfo* statFileSystem(vfs::FS* fileSystem, const std::string& path) {
 		return nullptr;
 	}
 	if (auto info = fileSystem->Stat(path); info != nullptr) {
-		// Hand the shared_ptr's managed object out; leaked on release —
-		// matches the GC-owned requestFile/requestDirectory entries.
-		return new sharedFileInfo(std::move(info));
+		// Return the FileInfo object itself — Go returns the interface
+		// unchanged, so callers observe the host's FileInfo identity (a
+		// sharedFileInfo wrapper would break it). Keep the shared_ptr
+		// alive by leaking it; matches the GC-owned request entries.
+		static std::mutex leakedMu;
+		static std::vector<std::shared_ptr<vfs::FileInfo>> leaked;
+		vfs::FileInfo* ptr = info.get();
+		std::lock_guard<std::mutex> lock(leakedMu);
+		leaked.push_back(std::move(info));
+		return ptr;
 	}
 	if (fileSystem->DirectoryExists(path)) {
 		auto* d = new requestDirectory();

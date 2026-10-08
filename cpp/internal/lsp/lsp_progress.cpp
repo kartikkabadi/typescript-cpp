@@ -178,14 +178,23 @@ void projectLoadingProgress::run() {
 				ev = std::move(st->queue.front());
 				st->queue.pop_front();
 				gotEvent = true;
+				st->inFlight++;
 				st->notFull.notify_all();
 			} else if (st->delayFiredPending) {
 				st->delayFiredPending = false;
 				firedDelay = true;
+				st->inFlight++;
 			} else {
 				gotDone = true;
 			}
 		}
+		auto finishWork = [&] {
+			if (gotEvent || firedDelay) {
+				std::lock_guard<std::mutex> lk(st->mu);
+				st->inFlight--;
+				st->cv.notify_all();
+			}
+		};
 
 		if (gotEvent) {
 			auto text = reporter->localize(ev.message, ev.args);
@@ -216,6 +225,7 @@ void projectLoadingProgress::run() {
 					loading.Set(text, count - 1);
 				}
 				if (token.empty()) {
+					finishWork();
 					continue;
 				}
 				if (loading.Size() == 0) {
@@ -246,9 +256,46 @@ void projectLoadingProgress::run() {
 			}
 		} else if (gotDone) {
 			stopDelay();
+			{
+				std::lock_guard<std::mutex> lk(st->mu);
+				st->runExited = true;
+				st->cv.notify_all();
+			}
 			return;
 		}
+		finishWork();
 	}
+}
+
+// waitIdleForTest — synctest.Wait(): blocks until the run goroutine has
+// handled every queued event and pending delay-fire.
+void projectLoadingProgress::waitIdleForTest() {
+	auto st = this->st;
+	std::unique_lock<std::mutex> lk(st->mu);
+	st->cv.wait(lk, [&] {
+		return st->queue.empty() && !st->delayFiredPending &&
+		       st->inFlight == 0;
+	});
+}
+
+// fillChannelForTest — `p.ch <- ev` × cap(p.ch) (64), bypassing the
+// done() select so start/finish then take the done() path.
+void projectLoadingProgress::fillChannelForTest() {
+	auto st = this->st;
+	std::lock_guard<std::mutex> lk(st->mu);
+	while (st->queue.size() < 64) {
+		st->queue.push_back(progressEvent{tsc::Project_0,
+		                                {gostd::fmtArg(std::string("fill"))},
+		                                false});
+	}
+	st->cv.notify_all();
+}
+
+// waitRunExitForTest — blocks until the run goroutine has returned.
+void projectLoadingProgress::waitRunExitForTest() {
+	auto st = this->st;
+	std::unique_lock<std::mutex> lk(st->mu);
+	st->cv.wait(lk, [&] { return st->runExited; });
 }
 
 // beginOrReport — progress.go:200. Sends WorkDoneProgressBegin if not yet

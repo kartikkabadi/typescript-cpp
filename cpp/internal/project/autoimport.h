@@ -90,6 +90,9 @@ struct autoImportRegistryCloneHost : ls::autoimport::RegistryCloneHost {
 	// layer), since Go keys these maps by the ProjectID interface's
 	// value.
 	ls::autoimport::ProjectID* internID(const ID& id) {
+		// Global intern — Go keys these maps by the ProjectID
+		// interface's VALUE, so every site must produce the
+		// canonical pointer for a given id string.
 		return ls::autoimport::InternProjectID(idString(id));
 	}
 
@@ -185,7 +188,7 @@ struct autoImportRegistryCloneHost : ls::autoimport::RegistryCloneHost {
 	compiler::SimpleProgram* GetProgramForProject(
 	    ls::autoimport::ProjectID* projectID) override {
 		auto* project =
-		    projectCollection->GetProject(projectID->String());
+		    projectCollection->GetProject(ID(projectID->String()));
 		if (project == nullptr) {
 			return nullptr;
 		}

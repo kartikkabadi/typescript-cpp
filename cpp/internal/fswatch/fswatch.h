@@ -831,4 +831,109 @@ Watcher* Fanotify();
 // Default returns the recommended watcher for the current OS.
 Watcher* Default();
 
+// --- fanotify internals — fanotify_linux.go --------------------------------
+// Unexported package internals. In Go the package tests access these because
+// test files share package fswatch; in C++ they are declared here so
+// internal/fswatch/tests can reach them. Not public API.
+
+// fanotifyHandleKey uniquely identifies a filesystem object by its fsid and
+// file handle. Used as a map key for watch dispatch.
+struct fanotifyHandleKey {
+	std::array<int32_t, 2> fsid;
+	int32_t handleType = 0;
+	std::string handle; // raw handle bytes as string for map comparability
+
+	bool operator==(const fanotifyHandleKey&) const = default;
+};
+
+fanotifyHandleKey makeFanotifyHandleKey(const std::array<int32_t, 2>& fsid,
+                                        int32_t handleType,
+                                        std::string_view handleBytes);
+
+struct fanotifyHandleKeyHash {
+	size_t operator()(const fanotifyHandleKey& k) const;
+};
+
+// fanotifySubscription mirrors inotifySubscription for the fanotify backend.
+struct fanotifySubscription {
+	std::string path;
+	std::string watchPath;
+	std::shared_ptr<fswatch::dirWatch> dirWatch;
+	fanotifyHandleKey key;
+};
+
+// fanotifyDfidName holds parsed directory FID + name from an info record.
+struct fanotifyDfidName {
+	fanotifyHandleKey key;
+	std::string name; // child entry name, or "" for self-events on
+	                  // directories
+};
+
+// maybeWrapUnsupportedFilesystem tags errnos that mean the filesystem cannot
+// support fanotify FID-based watching with ErrFilesystemUnsupported so the
+// fallbackWatcher can route the watch to inotify (Go issue #63646/#63678).
+gostd::Error maybeWrapUnsupportedFilesystem(const gostd::Error& err);
+
+// fanotifyBackend is the fanotify-based watcher backend for Linux.
+struct fanotifyBackend : watcherBase {
+	int pipeFDs[2];
+	std::atomic<int32_t> pipeWriteFD{-1};
+	int fanotifyFD;
+	uint64_t markMask; // fanotifyMarkMaskRename or
+	                   // fanotifyMarkMaskMovedFromTo; 0 until first
+	                   // subscribe
+	bool noRename;     // when true, skip FAN_RENAME probe (for testing
+	                   // fallback path)
+
+	std::unordered_map<fanotifyHandleKey,
+	                   std::vector<fanotifySubscription*>,
+	                   fanotifyHandleKeyHash>
+	    subscriptions;
+
+	std::mutex endedMu;
+	std::condition_variable endedCv;
+	bool ended = false;
+
+	// Persistent buffers reused across handleEvents calls. Only accessed
+	// from the start thread, so no synchronization needed.
+	std::vector<char> readBuf;
+	std::unordered_set<std::shared_ptr<fswatch::dirWatch>> watchersTouched;
+
+	fanotifyBackend(bool noRename);
+	~fanotifyBackend() override;
+	gostd::Error start() override;
+	void closeFDs();
+	void signalEnded();
+	void shutdown() override;
+	gostd::Error subscribe(std::shared_ptr<fswatch::dirWatch> w) override;
+	gostd::Error markDir(std::shared_ptr<fswatch::dirWatch> w,
+	                     const std::string& path, const std::string& markPath);
+	gostd::Error handleEvents();
+	void handleOverflow(
+	    std::unordered_set<std::shared_ptr<fswatch::dirWatch>>& touched);
+	void handleRenameEvent(
+	    uint64_t mask, const fanotifyDfidName* dfidOld,
+	    const fanotifyDfidName* dfidNew,
+	    std::unordered_set<std::shared_ptr<fswatch::dirWatch>>& touched);
+	void handleParsedEvent(
+	    uint64_t mask, const fanotifyDfidName* dfid,
+	    std::unordered_set<std::shared_ptr<fswatch::dirWatch>>& touched);
+	bool handleSubscription(uint64_t mask, const fanotifyDfidName* dfid,
+	                        fanotifySubscription* sub);
+	void dropSubsForPathLocked(const std::string& path);
+	void dropSubsForPathAndDescendantsLocked(const std::string& path);
+	gostd::Error closeWatch(std::shared_ptr<fswatch::dirWatch> w) override;
+};
+
+// fanotifyAvailable probes whether fanotify_init succeeds with the flags
+// this backend needs.
+bool fanotifyAvailable();
+
+// newFanotifyBackend creates a fanotify backend. If noRename is true, the
+// backend skips the FAN_RENAME probe and forces the FAN_MOVED_FROM/
+// FAN_MOVED_TO fallback path; this is only used by the fanotify-no-rename
+// test watcher to exercise the fallback path on kernels that natively
+// support FAN_RENAME.
+fanotifyBackend* newFanotifyBackend(bool noRename);
+
 } // namespace tsc::fswatch

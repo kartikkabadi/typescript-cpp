@@ -5,6 +5,7 @@
 // scope guard.
 #pragma once
 
+#include <cstring>
 #include <algorithm>
 #include "internal/gostd/goseq.h"
 #include <condition_variable>
@@ -651,8 +652,14 @@ public:
 		data_.append(data);
 		cv_.notify_all();
 		// Go's io.Pipe is synchronous: a Write blocks until all data is
-		// consumed by Reads (or the pipe is closed).
+		// consumed by Reads (or the pipe is closed). Once data_ drains the
+		// write delivered everything — Go returns success even if a Close
+		// lands before the writer wakes (net.Pipe has the same race
+		// resolution).
 		cv_.wait(lk, [&] { return data_.empty() || closed_ || readClosed_; });
+		if (data_.empty()) {
+			return {(int)data.size(), nullptr};
+		}
 		if (closed_ || readClosed_) {
 			return {0, newError("io: write on closed pipe")};
 		}

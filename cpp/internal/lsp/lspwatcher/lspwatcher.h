@@ -176,6 +176,9 @@ NewWithFSWatcher(const std::shared_ptr<vfs::FS>& fs, fswatch::Watcher* watcher,
                  std::function<void(std::vector<std::shared_ptr<lsproto::FileEvent>>)> onChanges,
                  const std::shared_ptr<tsc::logging::Logger>& logger);
 
+// rootFromGlob — lspwatcher.go:549 (internal; tested by lspwatcher_test.go).
+std::string rootFromGlob(std::string pattern);
+
 // watchRoot extracts the directory the fswatch subscription should be rooted
 // at from a FileSystemWatcher (lspwatcher.go:532).
 std::pair<std::string, bool> watchRoot(const lsproto::FileSystemWatcher* fileSystemWatcher);

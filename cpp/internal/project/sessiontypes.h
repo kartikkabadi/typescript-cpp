@@ -146,6 +146,14 @@ struct SessionInit {
 	std::shared_ptr<vfs::FS> FS;
 	Client* Client = nullptr;
 	logging::Logger* Logger = nullptr;
+	// Keep-alive for the owners of every borrowed pointer above
+	// (Client, Logger, NpmExecutor, Spawner, ContentMapperLogger,
+	// ParseCache, ContentMappedParseCache, the FS graph). Go relies on
+	// GC: the session stores references and goroutines spawned by the
+	// session dereference them, so they outlive the session's
+	// background work. The session retains this list for its lifetime
+	// so callers can drop their own handles once NewSession returns.
+	std::vector<std::shared_ptr<void>> KeepAlive;
 	ata::NpmExecutor* NpmExecutor = nullptr;
 	// Lifetime pins for the raw Client/NpmExecutor above: Go's GC keeps
 	// the server object alive as long as any session goroutine (its

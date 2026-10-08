@@ -377,7 +377,7 @@ tsc::CommandLineResult tscBuildCompilation(
 	auto* orchestrator = build::NewOrchestrator(
 	    build::Options{.Sys = sys, .Command = buildCommand,
 	                   .Testing = testing});
-	return orchestrator->Start();
+	return orchestrator->Start(ctx);
 }
 
 // tscCompilation — tsc.go:122.

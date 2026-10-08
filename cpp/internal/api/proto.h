@@ -334,12 +334,15 @@ struct SnapshotRequestChangesParams {
     // becomes the file's default project. Otherwise the file is loaded into the
     // inferred project (e.g. a node_modules d.ts not in any project's import graph).
     // If a file cannot be loaded into any project, the request fails.
-    std::vector<DocumentIdentifier> OpenFiles;
+    // Go `[]DocumentIdentifier` — optional preserves nil-vs-empty, which
+    // createSnapshotOperationResponse distinguishes (`request.OpenFiles != nil`).
+    std::optional<std::vector<DocumentIdentifier>> OpenFiles;
     // CloseFiles lists files to release in the new snapshot. A file is only fully
     // closed once every API client that opened it closes it.
     std::vector<DocumentIdentifier> CloseFiles;
     // CreatePrograms describes synthetic programs to create in the snapshot.
-    std::vector<std::shared_ptr<CreateSnapshotProgramParams>> CreatePrograms;
+    // optional for Go's nil-vs-empty distinction (session.go:4651).
+    std::optional<std::vector<std::shared_ptr<CreateSnapshotProgramParams>>> CreatePrograms;
     // ReconfigurePrograms replaces the configuration of existing synthetic programs.
     std::vector<std::shared_ptr<ReconfigureSnapshotProgramParams>> ReconfigurePrograms;
     // RemovePrograms lists synthetic project handles to remove from the snapshot.

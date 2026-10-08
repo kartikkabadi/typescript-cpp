@@ -38,6 +38,10 @@ struct ClientMockPublishDiagnosticsCall {
 	gostd::Context Ctx;
 	// Params is the params argument value.
 	lsp::lsproto::PublishDiagnosticsParams* Params;
+	// ParamsOwner owns a copy of Params. Go's recording keeps the caller's
+	// heap pointer alive via GC; the C++ caller passes a borrowed stack
+	// pointer, so the mock deep-copies to preserve recorded-call semantics.
+	std::shared_ptr<lsp::lsproto::PublishDiagnosticsParams> ParamsOwner;
 };
 struct ClientMockRefreshCodeLensCall {
 	// Ctx is the ctx argument value.

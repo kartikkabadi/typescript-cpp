@@ -16,7 +16,7 @@ namespace tsc::lsp {
 // string) on the dashboard.
 static const gostd::regexp::Regexp& genericSecretKeywordRegex() {
 	static const gostd::regexp::Regexp re(
-		"(?i)(key|token|signature|sig|pwd)([([.|])");
+		"(?i)(key|token|signature|sig|pwd)([(\\[.|])");
 	return re;
 }
 

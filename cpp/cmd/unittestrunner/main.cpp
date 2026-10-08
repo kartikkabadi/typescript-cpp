@@ -22,6 +22,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <execinfo.h>
 #endif
 
 #include "internal/gostd/gostd.h"
@@ -88,9 +89,17 @@ DWORD WINAPI runTestImplW32(LPVOID arg) {
 // workers): Go tests rely on goroutine stacks that grow dynamically,
 // and deeply nested inputs (e.g. TestSelectionRangeDepthIsLimited's
 // 12k parens) need more than the default stack.
+#ifndef _WIN32
+void onCrash(int sig);
+#endif
+
 int runTestBody(const tsc::testutil::unittests::UnitTestCase& tc) {
 	signal(SIGALRM, onTestAlarm);
 	alarm(kTestTimeoutSeconds);
+#ifndef _WIN32
+	signal(SIGABRT, onCrash);
+	signal(SIGSEGV, onCrash);
+#endif
 	RunCtx ctx{&tc, 0};
 #ifdef _WIN32
 	// CreateThread takes the stack reserve directly (64MB like POSIX).
@@ -157,6 +166,16 @@ int runOne(const tsc::testutil::unittests::UnitTestCase& tc, std::string& output
 	return 1;
 }
 #else
+void onCrash(int sig) {
+	const char msg[] = "[crash backtrace]\n";
+	(void)!write(STDERR_FILENO, msg, sizeof(msg) - 1);
+	void* bt[64];
+	int n = backtrace(bt, 64);
+	backtrace_symbols_fd(bt, n, STDERR_FILENO);
+	signal(sig, SIG_DFL);
+	raise(sig);
+}
+
 int runOne(const tsc::testutil::unittests::UnitTestCase& tc, std::string& output) {
 	int pipefd[2];
 	if (pipe(pipefd) != 0) {

@@ -625,18 +625,27 @@ std::vector<Diagnostic*> SimpleProgram::collectCheckerDiagnostics(
     SourceFile* sourceFile,
     const std::function<std::vector<Diagnostic*>(checker::Checker*,
                                                SourceFile*)>& collect) {
+	return collectCheckerDiagnostics(gostd::Context{}, sourceFile,
+	                                 collect);
+}
+
+std::vector<Diagnostic*> SimpleProgram::collectCheckerDiagnostics(
+    const gostd::Context& ctx, SourceFile* sourceFile,
+    const std::function<std::vector<Diagnostic*>(checker::Checker*,
+                                               SourceFile*)>& collect) {
 	if (sourceFile != nullptr) {
 		if (SkipTypeChecking(sourceFile, false)) {
 			return {};
 		}
-		auto [c, done] = GetTypeCheckerForFileExclusive(sourceFile);
+		auto [c, done] =
+		    GetTypeCheckerForFileExclusive(ctx, sourceFile);
 		auto result = collect(c, sourceFile);
 		done();
 		return filterAndSortDiagnostics(std::move(result));
 	}
 	std::vector<Diagnostic*> result;
 	for (auto& diags :
-	     collectCheckerDiagnosticsFromFiles(files, collect)) {
+	     collectCheckerDiagnosticsFromFiles(ctx, files, collect)) {
 		result.insert(result.end(), diags.begin(), diags.end());
 	}
 	return filterAndSortDiagnostics(std::move(result));
@@ -649,10 +658,20 @@ SimpleProgram::collectCheckerDiagnosticsFromFiles(
     const std::vector<SourceFile*>& sourceFiles,
     const std::function<std::vector<Diagnostic*>(checker::Checker*,
                                                SourceFile*)>& collect) {
+	return collectCheckerDiagnosticsFromFiles(
+	    gostd::Context{}, sourceFiles, collect);
+}
+
+std::vector<std::vector<Diagnostic*>>
+SimpleProgram::collectCheckerDiagnosticsFromFiles(
+    const gostd::Context& ctx,
+    const std::vector<SourceFile*>& sourceFiles,
+    const std::function<std::vector<Diagnostic*>(checker::Checker*,
+                                               SourceFile*)>& collect) {
 	std::vector<std::vector<Diagnostic*>> diagnostics(sourceFiles.size());
 	if (compilerCheckerPool_ != nullptr) {
 		compilerCheckerPool_->forEachCheckerGroupDo(
-		    gostd::Context{}, sourceFiles, SingleThreaded(),
+		    ctx, sourceFiles, SingleThreaded(),
 		    [&](checker::Checker* c, int fileIndex, SourceFile* file) {
 			    diagnostics[fileIndex] = collect(c, file);
 		    });
@@ -662,12 +681,13 @@ SimpleProgram::collectCheckerDiagnosticsFromFiles(
 			if (SkipTypeChecking(sourceFiles[i], false)) {
 				continue;
 			}
-			wg->Queue([this, i, &diagnostics, &sourceFiles, &collect] {
-				auto [c, done] = checkerPool_->GetChecker(
-				    gostd::Context{}, sourceFiles[i]);
-				diagnostics[i] = collect(c, sourceFiles[i]);
-				done();
-			});
+			wg->Queue(
+			    [this, i, &ctx, &diagnostics, &sourceFiles, &collect] {
+				    auto [c, done] =
+				        checkerPool_->GetChecker(ctx, sourceFiles[i]);
+				    diagnostics[i] = collect(c, sourceFiles[i]);
+				    done();
+			    });
 		}
 		wg->RunAndWait();
 	}
@@ -745,8 +765,13 @@ std::vector<Diagnostic*> SimpleProgram::GetBindDiagnostics(
 // program.go:804 GetSemanticDiagnostics
 std::vector<Diagnostic*> SimpleProgram::GetSemanticDiagnostics(
     SourceFile* sourceFile) {
+	return GetSemanticDiagnostics(gostd::Context{}, sourceFile);
+}
+
+std::vector<Diagnostic*> SimpleProgram::GetSemanticDiagnostics(
+    const gostd::Context& ctx, SourceFile* sourceFile) {
 	return collectCheckerDiagnostics(
-	    sourceFile,
+	    ctx, sourceFile,
 	    [this](checker::Checker* c, SourceFile* file)
 	        -> std::vector<Diagnostic*> {
 		    return getSemanticDiagnosticsWithChecker(c, file);
@@ -2693,8 +2718,13 @@ SimpleProgram::GetPackagesMap() {
 // program.go:816 GetSuggestionDiagnostics.
 std::vector<Diagnostic*> SimpleProgram::GetSuggestionDiagnostics(
     SourceFile* sourceFile) {
+	return GetSuggestionDiagnostics(gostd::Context{}, sourceFile);
+}
+
+std::vector<Diagnostic*> SimpleProgram::GetSuggestionDiagnostics(
+    const gostd::Context& ctx, SourceFile* sourceFile) {
 	return collectCheckerDiagnostics(
-	    sourceFile,
+	    ctx, sourceFile,
 	    [this](checker::Checker* c, SourceFile* file)
 	        -> std::vector<Diagnostic*> {
 		    return getSuggestionDiagnosticsWithChecker(c, file);
@@ -2717,34 +2747,39 @@ SimpleProgram::getSuggestionDiagnosticsWithChecker(
 // port keeps the previous shared-checker semantics for nil files).
 std::pair<checker::Checker*, std::function<void()>>
 SimpleProgram::GetTypeCheckerForFileExclusive(SourceFile* file) {
+	return GetTypeCheckerForFileExclusive(gostd::Context{}, file);
+}
+
+std::pair<checker::Checker*, std::function<void()>>
+SimpleProgram::GetTypeCheckerForFileExclusive(const gostd::Context& ctx,
+                                            SourceFile* file) {
 	if (compilerCheckerPool_ != nullptr) {
 		if (file != nullptr) {
 			return compilerCheckerPool_->getCheckerForFileExclusive(
-			    gostd::Context{}, file);
+			    ctx, file);
 		}
 		return compilerCheckerPool_->getCheckerNonExclusive();
 	}
-	if (file != nullptr) {
-		return checkerPool_->GetChecker(gostd::Context{}, file);
-	}
-	return {getChecker(), []() {}};
+	// Go GetChecker(ctx, nil): an external pool still reads the checker
+	// lifetime/request ID from ctx even without a file.
+	return checkerPool_->GetChecker(ctx, file);
 }
 
 // program.go:607 GetTypeCheckerForFile — non-exclusive checkout of the
 // file's checker on the built-in pool; external pools go through the
 // CheckerPool interface (exclusive checkout + release).
 std::pair<checker::Checker*, std::function<void()>>
-SimpleProgram::getTypeCheckerForFileNonExclusive(SourceFile* file) {
+SimpleProgram::getTypeCheckerForFileNonExclusive(const gostd::Context& ctx,
+                                                 SourceFile* file) {
 	if (compilerCheckerPool_ != nullptr) {
 		if (file != nullptr) {
 			return compilerCheckerPool_->getCheckerForFileNonExclusive(file);
 		}
 		return compilerCheckerPool_->getCheckerNonExclusive();
 	}
-	if (file != nullptr) {
-		return checkerPool_->GetChecker(gostd::Context{}, file);
-	}
-	return {getChecker(), []() {}};
+	// Go GetChecker(ctx, nil): an external pool still reads the checker
+	// lifetime/request ID from ctx even without a file.
+	return checkerPool_->GetChecker(ctx, file);
 }
 
 // program.go:166 PackageJsonCacheEntries — delegates to the resolver's
