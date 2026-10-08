@@ -488,12 +488,12 @@ void TestCreateProgramReportsNonCompositeProjectReference(T* t) {
 	    gostd::contextBackground(), &params);
 	assert::NilError(t, err);
 	auto projectID = (*response->Operation->CreatedPrograms)[0].AsID();
+	GetProjectDiagnosticsParams diagParams{
+	    .Snapshot = response->Snapshot,
+	    .Project = projectID,
+	};
 	auto [diagnostics, err2] = session->handleGetProgramDiagnostics(
-	    gostd::contextBackground(),
-	    &GetProjectDiagnosticsParams{
-	        .Snapshot = response->Snapshot,
-	        .Project = projectID,
-	    });
+	    gostd::contextBackground(), &diagParams);
 	assert::NilError(t, err2);
 	std::vector<int32_t> codes;
 	codes.reserve(diagnostics.size());

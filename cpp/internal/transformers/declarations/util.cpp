@@ -11,11 +11,11 @@ bool needsScopeMarker(Node* result) {
 }
 
 // util.go:13 canHaveLiteralInitializer
-bool canHaveLiteralInitializer(DeclarationEmitHost* host, Node* node) {
+bool canHaveLiteralInitializer(printer::EmitResolver* resolver, Node* node) {
 	switch (node->kind) {
 	case Kind::PropertyDeclaration:
 	case Kind::PropertySignature:
-		return host->GetEffectiveDeclarationFlags(
+		return resolver->GetEffectiveDeclarationFlags(
 		           node, ModifierFlagsPrivate) == 0;
 	case Kind::Parameter:
 	case Kind::VariableDeclaration:
@@ -162,10 +162,10 @@ Node* unwrapParenthesizedExpression(Node* o) {
 }
 
 // util.go:149 isPrivateMethodTypeParameter
-bool isPrivateMethodTypeParameter(DeclarationEmitHost* host,
+bool isPrivateMethodTypeParameter(printer::EmitResolver* resolver,
                                   TypeParameterDeclaration* node) {
 	return node->asNode()->parent->kind == Kind::MethodDeclaration &&
-	       host->GetEffectiveDeclarationFlags(node->asNode()->parent,
+	       resolver->GetEffectiveDeclarationFlags(node->asNode()->parent,
 	                                          ModifierFlagsPrivate) != 0;
 }
 

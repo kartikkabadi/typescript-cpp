@@ -116,10 +116,13 @@ std::string pseudoBigIntToString(const PseudoBigInt& value) {
 // (deduped: canonical external def lives in checker_utilities.cpp)
 
 // newEmitResolver — emitresolver.go:45
-EmitResolver* newEmitResolver(Checker* c) {
-	// (deduped: this stub lived in checker_services.cpp)
+EmitResolver* newEmitResolver(Checker* c, printer::EmitContext* emitContext) {
+	if (emitContext == nullptr) {
+		TSC_UNREACHABLE("newEmitResolver requires an EmitContext");
+	}
 	EmitResolver* e = new EmitResolver();
 	e->checker = c;
+	e->emitContext = emitContext;
 	e->isValueAliasDeclaration = [e](Node* node) -> bool {
 		return e->isValueAliasDeclarationWorker(node);
 	};
@@ -127,6 +130,19 @@ EmitResolver* newEmitResolver(Checker* c) {
 		return e->aliasMarkingVisitorWorker(node);
 	};
 	return e;
+}
+
+// EmitResolver::EmitContext — emitresolver.go:61
+printer::EmitContext* EmitResolver::EmitContext() {
+	return emitContext;
+}
+
+// EmitResolver::nodeBuilder — emitresolver.go:65
+NodeBuilder* EmitResolver::nodeBuilder() {
+	if (requestNodeBuilder == nullptr) {
+		requestNodeBuilder = NewNodeBuilder(checker, emitContext);
+	}
+	return requestNodeBuilder;
 }
 
 // EmitResolver::GetJsxFactoryEntity — emitresolver.go:54
@@ -178,149 +194,19 @@ EvalResult EmitResolver::GetEnumMemberValue(Node* node) {
 // EmitResolver::IsDeclarationVisible — emitresolver.go:105
 bool EmitResolver::IsDeclarationVisible(Node* node) {
 	// Only lock on external API func to prevent deadlocks
-	return isDeclarationVisible(node);
+	return checker->isDeclarationVisible(node);
 }
 
-// EmitResolver::isDeclarationVisible — emitresolver.go:112
-bool EmitResolver::isDeclarationVisible(Node* node) {
-	// node = r.emitContext.ParseNode(node)
-	if (!isParseTreeNode(node)) {
-		return false;
-	}
-	if (node == nullptr) {
-		return false;
-	}
 
-	DeclarationLinks* links = declarationLinks.Get(node);
-	if (links->isVisible == Tristate::Unknown) {
-		if (determineIfDeclarationIsVisible(node)) {
-			links->isVisible = Tristate::True;
-		} else {
-			links->isVisible = Tristate::False;
-		}
-	}
-	return links->isVisible == Tristate::True;
-}
 
-// EmitResolver::determineIfDeclarationIsVisible — emitresolver.go:131
-bool EmitResolver::determineIfDeclarationIsVisible(Node* node) {
-	switch (node->kind) {
-	case Kind::JSDocCallbackTag:
-		// ast.KindJSDocEnumTag, // !!! TODO: JSDoc @enum support?
-	case Kind::JSDocTypedefTag:
-		// Top-level jsdoc type aliases are considered exported
-		// First parent is comment node, second is hosting declaration or token; we only care about those tokens or declarations whose parent is a source file
-		return node->parent != nullptr && node->parent->parent != nullptr &&
-			node->parent->parent->parent != nullptr &&
-			isSourceFile(node->parent->parent->parent);
-	case Kind::BindingElement:
-		return isDeclarationVisible(node->parent->parent);
-	case Kind::VariableDeclaration:
-	case Kind::ModuleDeclaration:
-	case Kind::ClassDeclaration:
-	case Kind::InterfaceDeclaration:
-	case Kind::TypeAliasDeclaration:
-	case Kind::JSTypeAliasDeclaration:
-	case Kind::FunctionDeclaration:
-	case Kind::EnumDeclaration:
-	case Kind::ImportEqualsDeclaration: {
-		if (isVariableDeclaration(node)) {
-			if (isBindingPattern(node->name()) &&
-				node->name()->elements().empty()) {
-				// If the binding pattern is empty, this variable declaration is not visible
-				return false;
-			}
-			// falls through
-		}
-		// External module augmentation is always visible
-		// A @typedef at top-level in an external module is always visible
-		if (isExternalModuleAugmentation(node) || isImplicitlyExportedJSDocDeclaration(node)) {
-			return true;
-		}
-		Node* parent = getDeclarationContainer(node);
-		// If the node is not exported or it is not ambient module element (except import declaration)
-		if ((checker->getCombinedModifierFlagsCached(node) & ModifierFlagsExport) == 0 &&
-			!(node->kind != Kind::ImportEqualsDeclaration && parent->kind != Kind::SourceFile &&
-			  (parent->flags & NodeFlagsAmbient) != 0)) {
-			return isGlobalSourceFile(parent);
-		}
-		// Exported members/ambient module elements (exception import declaration) are visible if parent is visible
-		return isDeclarationVisible(parent);
-	}
 
-	case Kind::PropertyDeclaration:
-	case Kind::PropertySignature:
-	case Kind::GetAccessor:
-	case Kind::SetAccessor:
-	case Kind::MethodDeclaration:
-	case Kind::MethodSignature:
-		if (checker->GetEffectiveDeclarationFlags(
-				node, ModifierFlagsPrivate | ModifierFlagsProtected) != 0) {
-			// Private/protected properties/methods are not visible
-			return false;
-		}
-		// Public properties/methods are visible if its parents are visible, so:
-		return isDeclarationVisible(node->parent);
-
-	case Kind::Constructor:
-	case Kind::ConstructSignature:
-	case Kind::CallSignature:
-	case Kind::IndexSignature:
-	case Kind::Parameter:
-	case Kind::ModuleBlock:
-	case Kind::FunctionType:
-	case Kind::ConstructorType:
-	case Kind::TypeLiteral:
-	case Kind::TypeReference:
-	case Kind::ArrayType:
-	case Kind::TupleType:
-	case Kind::UnionType:
-	case Kind::IntersectionType:
-	case Kind::ParenthesizedType:
-	case Kind::NamedTupleMember:
-		return isDeclarationVisible(node->parent);
-
-	// Default binding, import specifier and namespace import is visible
-	// only on demand so by default it is not visible
-	case Kind::ImportClause:
-	case Kind::NamespaceImport:
-	case Kind::ImportSpecifier:
-		return false;
-
-	// Type parameters are always visible
-	case Kind::TypeParameter:
-		return true;
-	// Source file and namespace export are always visible
-	case Kind::SourceFile:
-	case Kind::NamespaceExportDeclaration:
-		return true;
-
-	// Export assignments do not create name bindings outside the module
-	case Kind::ExportAssignment:
-		return false;
-
-	// An `export {X}` (without a module specifier) is itself a visible re-export of
-	// the named binding; it contributes to the symbol's external visibility.
-	case Kind::ExportSpecifier: {
-		Node* exportDecl = node->parent->parent;
-		if (isExportDeclaration(exportDecl) &&
-			exportDecl->as<ExportDeclaration>()->ModuleSpecifier == nullptr) {
-			return isDeclarationVisible(exportDecl->parent);
-		}
-		return false;
-	}
-
-	default:
-		return false;
-	}
-}
 
 // EmitResolver::PrecalculateDeclarationEmitVisibility — emitresolver.go:241
 void EmitResolver::PrecalculateDeclarationEmitVisibility(SourceFile* file) {
-	if (declarationFileLinks.Get(file->asNode())->aliasesMarked) {
+	if (checker->emitResolverLinks.declarationFileLinks.Get(file->asNode())->aliasesMarked) {
 		return;
 	}
-	declarationFileLinks.Get(file->asNode())->aliasesMarked = true;
+	checker->emitResolverLinks.declarationFileLinks.Get(file->asNode())->aliasesMarked = true;
 	// TODO: Does this even *have* to be an upfront walk? If it's not possible for a
 	// import a = a.b.c statement to chain into exposing a statement in a sibling scope,
 	// it could at least be pushed into scope entry -  then it wouldn't need to be recursive.
@@ -377,7 +263,7 @@ void EmitResolver::markLinkedAliases(Node* node) {
 
 		Symbol* nextSymbol = nullptr;
 		for (Node* declaration : exportSymbol->declarations) {
-			declarationLinks.Get(declaration)->isVisible = Tristate::True;
+			checker->emitResolverLinks.declarationLinks.Get(declaration)->isVisible = Tristate::True;
 
 			if (isInternalModuleImportEqualsDeclaration(declaration)) {
 				// Add the referenced top container visible
@@ -401,154 +287,12 @@ void EmitResolver::markLinkedAliases(Node* node) {
 // EmitResolver::IsEntityNameVisible — emitresolver.go:329
 printer::SymbolAccessibilityResult EmitResolver::IsEntityNameVisible(
 	Node* entityName, Node* enclosingDeclaration) {
-	return isEntityNameVisible(entityName, enclosingDeclaration, true);
+	return checker->isEntityNameVisible(entityName, enclosingDeclaration, true);
 }
 
-// EmitResolver::isEntityNameVisible — emitresolver.go:336
-printer::SymbolAccessibilityResult EmitResolver::isEntityNameVisible(
-	Node* entityName, Node* enclosingDeclaration, bool shouldComputeAliasToMakeVisible) {
-	// node = r.emitContext.ParseNode(entityName)
-	if (!isParseTreeNode(entityName)) {
-		return printer::SymbolAccessibilityResult{
-			.Accessibility = printer::SymbolAccessibility::NotAccessible};
-	}
 
-	SymbolFlags meaning = getMeaningOfEntityNameReference(entityName);
-	Node* firstIdentifier = getFirstIdentifier(entityName);
 
-	Symbol* symbol = checker->resolveName(enclosingDeclaration, firstIdentifier->text(),
-										meaning, nullptr, false, false);
 
-	if (symbol != nullptr && (symbol->flags & SymbolFlagsTypeParameter) != 0 &&
-		(meaning & SymbolFlagsType) != 0) {
-		return printer::SymbolAccessibilityResult{
-			.Accessibility = printer::SymbolAccessibility::Accessible};
-	}
-
-	if (symbol == nullptr && isThisIdentifier(firstIdentifier)) {
-		Symbol* sym = checker->getSymbolOfDeclaration(
-			checker->getThisContainer(firstIdentifier, false, false));
-		if (isSymbolAccessible(sym, enclosingDeclaration, meaning, false).Accessibility ==
-			printer::SymbolAccessibility::Accessible) {
-			return printer::SymbolAccessibilityResult{
-				.Accessibility = printer::SymbolAccessibility::Accessible};
-		}
-	}
-
-	if (symbol == nullptr) {
-		return printer::SymbolAccessibilityResult{
-			.Accessibility = printer::SymbolAccessibility::NotResolved,
-			.ErrorSymbolName = firstIdentifier->text(),
-			.ErrorNode = firstIdentifier,
-		};
-	}
-
-	printer::SymbolAccessibilityResult* visible =
-		hasVisibleDeclarations(symbol, shouldComputeAliasToMakeVisible);
-	if (visible != nullptr) {
-		return *visible;
-	}
-
-	return printer::SymbolAccessibilityResult{
-		.Accessibility = printer::SymbolAccessibility::NotAccessible,
-		.ErrorSymbolName = firstIdentifier->text(),
-		.ErrorNode = firstIdentifier,
-	};
-}
-
-// EmitResolver::hasVisibleDeclarations — emitresolver.go:379
-printer::SymbolAccessibilityResult* EmitResolver::hasVisibleDeclarations(
-	Symbol* symbol, bool shouldComputeAliasToMakeVisible) {
-	std::unordered_map<NodeId, Node*> aliasesToMakeVisibleSet;
-	std::unordered_map<NodeId, Node*>* aliasesToMakeVisible = nullptr;
-
-	std::function<void(Node*, Node*)> addVisibleAlias;
-	if (shouldComputeAliasToMakeVisible) {
-		aliasesToMakeVisible = &aliasesToMakeVisibleSet;
-		addVisibleAlias = [this, aliasesToMakeVisible](Node* declaration,
-													 Node* aliasingStatement) {
-			declarationLinks.Get(declaration)->isVisible = Tristate::True;
-			(*aliasesToMakeVisible)[getNodeId(declaration)] = aliasingStatement;
-		};
-	} else {
-		addVisibleAlias = noopAddVisibleAlias;
-	}
-
-	for (Node* declaration : symbol->declarations) {
-		if (isIdentifier(declaration)) {
-			continue;
-		}
-		if (!isDeclarationVisible(declaration)) {
-			// Mark the unexported alias as visible if its parent is visible
-			// because these kind of aliases can be used to name types in declaration file
-			Node* anyImportSyntax = getAnyImportSyntax(declaration);
-			if (anyImportSyntax != nullptr &&
-				!hasSyntacticModifier(anyImportSyntax, ModifierFlagsExport) && // import clause without export
-				isDeclarationVisible(anyImportSyntax->parent)) {
-				addVisibleAlias(declaration, anyImportSyntax);
-				continue;
-			}
-			if (isVariableDeclaration(declaration) && isVariableStatement(declaration->parent->parent) &&
-				!hasSyntacticModifier(declaration->parent->parent, ModifierFlagsExport) && // unexported variable statement
-				isDeclarationVisible(declaration->parent->parent->parent)) {
-				addVisibleAlias(declaration, declaration->parent->parent);
-				continue;
-			}
-			if (isLateVisibilityPaintedStatement(declaration) && // unexported top-level statement
-				!hasSyntacticModifier(declaration, ModifierFlagsExport) &&
-				isDeclarationVisible(declaration->parent)) {
-				addVisibleAlias(declaration, declaration);
-				continue;
-			}
-			if (isBindingElement(declaration)) {
-				if ((symbol->flags & SymbolFlagsAlias) != 0 && isInJSFile(declaration) &&
-					declaration->parent != nullptr && declaration->parent->parent != nullptr && // exported import-like top-level JS require statement
-					isVariableDeclaration(declaration->parent->parent) &&
-					declaration->parent->parent->parent->parent != nullptr &&
-					isVariableStatement(declaration->parent->parent->parent->parent) &&
-					!hasSyntacticModifier(declaration->parent->parent->parent->parent,
-										  ModifierFlagsExport) &&
-					declaration->parent->parent->parent->parent->parent != nullptr && // check if the thing containing the variable statement is visible (ie, the file)
-					isDeclarationVisible(declaration->parent->parent->parent->parent->parent)) {
-					addVisibleAlias(declaration, declaration->parent->parent->parent->parent);
-					continue;
-				}
-				if ((symbol->flags & SymbolFlagsBlockScopedVariable) != 0) {
-					Node* rootDeclaration = walkUpBindingElementsAndPatterns(declaration);
-					if (isParameterDeclaration(rootDeclaration)) {
-						return nullptr;
-					}
-					Node* variableStatement = rootDeclaration->parent->parent;
-					if (!isVariableStatement(variableStatement)) {
-						return nullptr;
-					}
-					if (hasSyntacticModifier(variableStatement, ModifierFlagsExport)) {
-						continue; // no alias to add, already exported
-					}
-					if (!isDeclarationVisible(variableStatement->parent)) {
-						return nullptr; // not visible
-					}
-					addVisibleAlias(declaration, variableStatement);
-					continue;
-				}
-			}
-
-			// Declaration is not visible
-			return nullptr;
-		}
-	}
-
-	std::vector<Node*> aliases;
-	if (aliasesToMakeVisible != nullptr) {
-		for (auto& kv : *aliasesToMakeVisible) {
-			aliases.push_back(kv.second);
-		}
-	}
-	return new printer::SymbolAccessibilityResult{
-		.Accessibility = printer::SymbolAccessibility::Accessible,
-		.AliasesToMakeVisible = std::move(aliases),
-	};
-}
 
 // EmitResolver::IsImplementationOfOverload — emitresolver.go:454
 bool EmitResolver::IsImplementationOfOverload(Node* node) {
@@ -658,7 +402,7 @@ bool EmitResolver::RequiresAddingImplicitUndefined(Node* declaration, Symbol* sy
 	if (!isParseTreeNode(declaration)) {
 		return false;
 	}
-	return requiresAddingImplicitUndefined(declaration, symbol, enclosingDeclaration);
+	return checker->requiresAddingImplicitUndefined(declaration, symbol, enclosingDeclaration);
 }
 
 // EmitResolver::RequiresAddingImplicitUndefinedUnsafe — emitresolver.go:554
@@ -668,82 +412,18 @@ bool EmitResolver::RequiresAddingImplicitUndefinedUnsafe(Node* declaration, Symb
 		return false;
 	}
 	// NO LOCKING - only should be called in contexts that already have a checker lock
-	return requiresAddingImplicitUndefined(declaration, symbol, enclosingDeclaration);
+	return checker->requiresAddingImplicitUndefined(declaration, symbol, enclosingDeclaration);
 }
 
-// EmitResolver::requiresAddingImplicitUndefined — emitresolver.go:562
-bool EmitResolver::requiresAddingImplicitUndefined(Node* declaration, Symbol* symbol,
-												   Node* enclosingDeclaration) {
-	// node = r.emitContext.ParseNode(node)
-	if (!isParseTreeNode(declaration)) {
-		return false;
-	}
-	switch (declaration->kind) {
-	case Kind::PropertyDeclaration:
-	case Kind::PropertySignature:
-	case Kind::JSDocPropertyTag:
-		if (symbol == nullptr) {
-			symbol = checker->getSymbolOfDeclaration(declaration);
-		}
-		{
-			Type* t = checker->getTypeOfSymbol(symbol);
-			checker->mappedSymbolLinks.Has(symbol);
-			return (symbol->flags & SymbolFlagsProperty) != 0 &&
-				(symbol->flags & SymbolFlagsOptional) != 0 && isOptionalDeclaration(declaration) &&
-				checker->reverseMappedSymbolLinks.Has(symbol) &&
-				checker->reverseMappedSymbolLinks.Get(symbol)->mappedType != nullptr &&
-				checker->containsNonMissingUndefinedType(t);
-		}
-	case Kind::Parameter:
-	case Kind::JSDocParameterTag:
-		return requiresAddingImplicitUndefinedWorker(declaration, enclosingDeclaration);
-	default:
-		TSC_UNREACHABLE("Node cannot possibly require adding undefined");
-	}
-}
 
-// EmitResolver::requiresAddingImplicitUndefinedWorker — emitresolver.go:580
-bool EmitResolver::requiresAddingImplicitUndefinedWorker(Node* parameter,
-														 Node* enclosingDeclaration) {
-	return (isRequiredInitializedParameter(parameter, enclosingDeclaration) ||
-			isOptionalUninitializedParameterProperty(parameter)) &&
-		!declaredParameterTypeContainsUndefined(parameter);
-}
 
-// EmitResolver::declaredParameterTypeContainsUndefined — emitresolver.go:585
-bool EmitResolver::declaredParameterTypeContainsUndefined(Node* parameter) {
-	// typeNode := getNonlocalEffectiveTypeAnnotationNode(parameter); // !!! JSDoc Support
-	Node* typeNode = parameter->type();
-	if (typeNode == nullptr) {
-		return false;
-	}
-	Type* t = checker->getTypeFromTypeNode(typeNode);
-	// allow error type here to avoid confusing errors that the annotation has to contain undefined when it does in cases like this:
-	//
-	// export function fn(x?: Unresolved | undefined): void {}
-	return checker->isErrorType(t) || checker->containsUndefinedType(t);
-}
 
-// EmitResolver::isOptionalUninitializedParameterProperty — emitresolver.go:599
-bool EmitResolver::isOptionalUninitializedParameterProperty(Node* parameter) {
-	return checker->strictNullChecks &&
-		isOptionalParameter(parameter) &&
-		( /*isJSDocParameterTag(parameter) ||*/ parameter->initializer() == nullptr) && // !!! TODO: JSDoc support
-		hasSyntacticModifier(parameter, ModifierFlagsParameterPropertyModifier);
-}
 
-// EmitResolver::isRequiredInitializedParameter — emitresolver.go:606
-bool EmitResolver::isRequiredInitializedParameter(Node* parameter,
-												  Node* enclosingDeclaration) {
-	if (!checker->strictNullChecks || isOptionalParameter(parameter) || /*isJSDocParameterTag(parameter) ||*/
-		parameter->initializer() == nullptr) { // !!! TODO: JSDoc Support
-		return false;
-	}
-	if (hasSyntacticModifier(parameter, ModifierFlagsParameterPropertyModifier)) {
-		return enclosingDeclaration != nullptr && isFunctionLikeDeclaration(enclosingDeclaration);
-	}
-	return true;
-}
+
+
+
+
+
 
 // EmitResolver::isOptionalParameter — emitresolver.go:614
 bool EmitResolver::isOptionalParameter(Node* node) {
@@ -999,13 +679,13 @@ Node* EmitResolver::GetReferencedExportContainer(Node* node, bool prefixLocals) 
 
 // EmitResolver::SetReferencedImportDeclaration — emitresolver.go:870
 void EmitResolver::SetReferencedImportDeclaration(Node* node, Node* ref) {
-	jsxLinks.Get(node)->importRef = ref;
+	checker->emitResolverLinks.jsxLinks.Get(node)->importRef = ref;
 }
 
 // EmitResolver::GetReferencedImportDeclaration — emitresolver.go:875
 Node* EmitResolver::GetReferencedImportDeclaration(Node* node) {
 	if (!isParseTreeNode(node)) {
-		return jsxLinks.Get(node)->importRef;
+		return checker->emitResolverLinks.jsxLinks.Get(node)->importRef;
 	}
 
 	Symbol* symbol = checker->getReferencedValueOrAliasSymbol(node);
@@ -1072,7 +752,7 @@ Node* EmitResolver::GetReferencedMemberValueDeclaration(Node* node) {
 
 // EmitResolver::CreateReturnTypeOfSignatureDeclaration — emitresolver.go:946
 Node* EmitResolver::CreateReturnTypeOfSignatureDeclaration(
-	printer::EmitContext* emitContext, Node* signatureDeclaration,
+	Node* signatureDeclaration,
 	Node* enclosingDeclaration, nodebuilder::Flags flags,
 	nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker) {
 	Node* original = emitContext->parseNode(signatureDeclaration);
@@ -1080,14 +760,14 @@ Node* EmitResolver::CreateReturnTypeOfSignatureDeclaration(
 		return emitContext->factory.newKeywordTypeNode(Kind::AnyKeyword);
 	}
 
-	NodeBuilder* requestNodeBuilder = NewNodeBuilder(checker, emitContext); // TODO: cache per-context
+	NodeBuilder* requestNodeBuilder = nodeBuilder();
 	return requestNodeBuilder->SerializeReturnTypeForSignature(original, enclosingDeclaration,
 															   flags, internalFlags, tracker);
 }
 
 // EmitResolver::CreateTypeParametersOfSignatureDeclaration — emitresolver.go:958
 std::vector<Node*> EmitResolver::CreateTypeParametersOfSignatureDeclaration(
-	printer::EmitContext* emitContext, Node* signatureDeclaration,
+	Node* signatureDeclaration,
 	Node* enclosingDeclaration, nodebuilder::Flags flags,
 	nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker) {
 	Node* original = emitContext->parseNode(signatureDeclaration);
@@ -1095,14 +775,14 @@ std::vector<Node*> EmitResolver::CreateTypeParametersOfSignatureDeclaration(
 		return {};
 	}
 
-	NodeBuilder* requestNodeBuilder = NewNodeBuilder(checker, emitContext); // TODO: cache per-context
+	NodeBuilder* requestNodeBuilder = nodeBuilder();
 	return requestNodeBuilder->SerializeTypeParametersForSignature(original, enclosingDeclaration,
 																   flags, internalFlags, tracker);
 }
 
 // EmitResolver::CreateTypeOfDeclaration — emitresolver.go:970
 Node* EmitResolver::CreateTypeOfDeclaration(
-	printer::EmitContext* emitContext, Node* declaration, Node* enclosingDeclaration,
+	Node* declaration, Node* enclosingDeclaration,
 	nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags,
 	nodebuilder::SymbolTracker* tracker) {
 	Node* original = emitContext->parseNode(declaration);
@@ -1110,7 +790,7 @@ Node* EmitResolver::CreateTypeOfDeclaration(
 		return emitContext->factory.newKeywordTypeNode(Kind::AnyKeyword);
 	}
 
-	NodeBuilder* requestNodeBuilder = NewNodeBuilder(checker, emitContext); // TODO: cache per-context
+	NodeBuilder* requestNodeBuilder = nodeBuilder();
 	// // Get type of the symbol if this is the valid symbol otherwise get type at location
 	Symbol* symbol = checker->getSymbolOfDeclaration(declaration);
 	return requestNodeBuilder->SerializeTypeForDeclaration(
@@ -1119,7 +799,7 @@ Node* EmitResolver::CreateTypeOfDeclaration(
 }
 
 // EmitResolver::CreateLiteralConstValue — emitresolver.go:983
-Node* EmitResolver::CreateLiteralConstValue(printer::EmitContext* emitContext, Node* node,
+Node* EmitResolver::CreateLiteralConstValue(Node* node,
 											nodebuilder::SymbolTracker* tracker) {
 	node = emitContext->parseNode(node);
 	Type* t = checker->getTypeOfSymbol(checker->getSymbolOfDeclaration(node));
@@ -1129,7 +809,7 @@ Node* EmitResolver::CreateLiteralConstValue(printer::EmitContext* emitContext, N
 
 	Node* enumResult = nullptr;
 	if ((t->flags & TypeFlagsEnumLike) != 0) {
-		NodeBuilder* requestNodeBuilder = NewNodeBuilder(checker, emitContext); // TODO: cache per-context
+		NodeBuilder* requestNodeBuilder = nodeBuilder();
 		enumResult = requestNodeBuilder->SymbolToExpression(
 			t->symbol, SymbolFlagsValue, node, nodebuilder::FlagsNone,
 			nodebuilder::InternalFlagsNone, tracker);
@@ -1188,7 +868,7 @@ Node* EmitResolver::CreateLiteralConstValue(printer::EmitContext* emitContext, N
 
 // EmitResolver::CreateTypeOfExpression — emitresolver.go:1034
 Node* EmitResolver::CreateTypeOfExpression(
-	printer::EmitContext* emitContext, Node* expression, Node* enclosingDeclaration,
+	Node* expression, Node* enclosingDeclaration,
 	nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags,
 	nodebuilder::SymbolTracker* tracker) {
 	expression = emitContext->parseNode(expression);
@@ -1196,7 +876,7 @@ Node* EmitResolver::CreateTypeOfExpression(
 		return emitContext->factory.newKeywordTypeNode(Kind::AnyKeyword);
 	}
 
-	NodeBuilder* requestNodeBuilder = NewNodeBuilder(checker, emitContext); // TODO: cache per-context
+	NodeBuilder* requestNodeBuilder = nodeBuilder();
 	return requestNodeBuilder->SerializeTypeForExpression(
 		expression, enclosingDeclaration,
 		flags | nodebuilder::FlagsMultilineObjectLiterals, internalFlags, tracker);
@@ -1204,7 +884,7 @@ Node* EmitResolver::CreateTypeOfExpression(
 
 // EmitResolver::CreateLateBoundIndexSignatures — emitresolver.go:1046
 std::vector<Node*> EmitResolver::CreateLateBoundIndexSignatures(
-	printer::EmitContext* emitContext, Node* container, Node* enclosingDeclaration,
+	Node* container, Node* enclosingDeclaration,
 	nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags,
 	nodebuilder::SymbolTracker* tracker) {
 	container = emitContext->parseNode(container);
@@ -1224,7 +904,7 @@ std::vector<Node*> EmitResolver::CreateLateBoundIndexSignatures(
 		instanceInfos = checker->getIndexInfosOfIndexSymbol(instanceIndexSymbol, siblingSymbols);
 	}
 
-	NodeBuilder* requestNodeBuilder = NewNodeBuilder(checker, emitContext); // TODO: cache per-context
+	NodeBuilder* requestNodeBuilder = nodeBuilder();
 
 	std::vector<Node*> result;
 	for (int i = 0; i < 2; i++) {
@@ -1252,7 +932,7 @@ std::vector<Node*> EmitResolver::CreateLateBoundIndexSignatures(
 						return c->name() != nullptr &&
 							isComputedPropertyName(c->name()) &&
 							isEntityNameExpression(c->name()->expression()) &&
-							isEntityNameVisible(c->name()->expression(), enclosingDeclaration, false)
+							checker->isEntityNameVisible(c->name()->expression(), enclosingDeclaration, false)
 									.Accessibility == printer::SymbolAccessibility::Accessible;
 					});
 				if (allComponentComputedNamesSerializable) {
@@ -1447,12 +1127,12 @@ std::vector<Symbol*> EmitResolver::GetPropertiesOfContainerFunction(Node* node) 
 
 // EmitResolver::TryJSTypeNodeToTypeNode — emitresolver.go:1273
 Node* EmitResolver::TryJSTypeNodeToTypeNode(
-	printer::EmitContext* emitContext, Node* typeNode, Node* enclosingDeclaration,
+	Node* typeNode, Node* enclosingDeclaration,
 	nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags,
 	nodebuilder::SymbolTracker* tracker) {
 	typeNode = emitContext->parseNode(typeNode);
 
-	NodeBuilder* requestNodeBuilder = NewNodeBuilder(checker, emitContext); // TODO: cache per-context
+	NodeBuilder* requestNodeBuilder = nodeBuilder();
 	return requestNodeBuilder->TryJSTypeNodeToTypeNode(typeNode, enclosingDeclaration, flags,
 													   internalFlags, tracker);
 }

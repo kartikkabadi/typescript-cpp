@@ -1297,13 +1297,11 @@ LiteralValue Checker::GetConstantValue(Node* node) {
 std::pair<Signature*, std::vector<Signature*>>
 Checker::getResolvedSignatureWorker(Node* node, CheckMode checkMode,
 									int argumentCount) {
-	printer::EmitContext emitContext;
-	Node* parsedNode = emitContext.parseNode(node);
 	apparentArgumentCount = &argumentCount;
 	std::vector<Signature*> candidatesOutArray;
 	Signature* res = nullptr;
-	if (parsedNode != nullptr) {
-		res = getResolvedSignature(parsedNode, &candidatesOutArray, checkMode);
+	if (node != nullptr && isParseTreeNode(node)) {
+		res = getResolvedSignature(node, &candidatesOutArray, checkMode);
 	}
 	apparentArgumentCount = nullptr;
 	return {res, candidatesOutArray};

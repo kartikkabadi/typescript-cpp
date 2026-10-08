@@ -201,6 +201,14 @@ symbolDisplayInfo getQuickInfoAndDeclarationAtLocation(
 		nodebuilder::FlagsUseAliasDefinedOutsideCurrentScope |
 		nodebuilder::FlagsWriteTypeParametersInQualifiedName;
 
+	printer::EmitContext* displayEmitContext = nullptr;
+	auto getEmitContext = [&]() -> printer::EmitContext* {
+		if (displayEmitContext == nullptr) {
+			displayEmitContext = printer::NewEmitContext();
+		}
+		return displayEmitContext;
+	};
+
 	// writeTypeClassified writes a type to dpw with proper classification (punctuation, symbols, keywords).
 	// Falls back to flat text when vsCapability is false or when TypeToTypeNode fails.
 	auto writeTypeClassified = [&](checker::Type* t, ::tsc::Node* enclosing,
@@ -210,7 +218,11 @@ symbolDisplayInfo getQuickInfoAndDeclarationAtLocation(
 			dpw->Write(c->TypeToStringEx(t, enclosing, flags, vc));
 			return;
 		}
-		printer::EmitContext* emitContext = printer::NewEmitContext();
+		printer::EmitContext* emitContext = getEmitContext();
+		struct DeferRelease {
+			printer::EmitContext* ec;
+			~DeferRelease() { ec->releaseArenas(); }
+		} deferRelease{emitContext};
 		auto* idToSymbol = new std::unordered_map<::tsc::Node*, ::tsc::Symbol*>();
 		checker::NodeBuilder* nb = c->getNodeBuilderEx(idToSymbol);
 		nodebuilder::Flags combinedFlags =
@@ -262,7 +274,11 @@ symbolDisplayInfo getQuickInfoAndDeclarationAtLocation(
 				sigOutput = Kind::CallSignature;
 			}
 		}
-		printer::EmitContext* emitContext = printer::NewEmitContext();
+		printer::EmitContext* emitContext = getEmitContext();
+		struct DeferRelease {
+			printer::EmitContext* ec;
+			~DeferRelease() { ec->releaseArenas(); }
+		} deferRelease{emitContext};
 		auto* idToSymbol = new std::unordered_map<::tsc::Node*, ::tsc::Symbol*>();
 		checker::NodeBuilder* nb = c->getNodeBuilderEx(idToSymbol);
 		nodebuilder::Flags combinedFlags =
@@ -316,7 +332,7 @@ symbolDisplayInfo getQuickInfoAndDeclarationAtLocation(
 		}
 		::tsc::Node* attributes =
 			declaration->as<ModuleDeclaration>()->Attributes;
-		printer::EmitContext* emitContext = printer::NewEmitContext();
+		printer::EmitContext* emitContext = getEmitContext();
 		emitContext->setEmitFlags(attributes, printer::EFSingleLine);
 		printer::PrinterOptions options;
 		options.NewLine = NewLineKind::LineFeed;

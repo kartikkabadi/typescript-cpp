@@ -709,10 +709,9 @@ Type* Checker::GetTypeAtLocation(Node* node) {
 	return getTypeOfNode(getReparsedNodeForNode(node));
 }
 
-// checker.go:32652 — GetEmitResolver
-EmitResolver* Checker::GetEmitResolver() {
-	std::call_once(emitResolverOnce, [&] { emitResolver = newEmitResolver(this); });
-	return emitResolver;
+// checker.go:32652 — NewEmitResolver
+EmitResolver* Checker::NewEmitResolver(printer::EmitContext* emitContext) {
+	return newEmitResolver(this, emitContext);
 }
 
 // === dep stubs — removed when owner slice lands ===

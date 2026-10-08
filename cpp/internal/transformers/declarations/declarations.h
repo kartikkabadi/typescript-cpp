@@ -50,9 +50,6 @@ struct DeclarationEmitHost : checker::Program {
 	                                       bool forceDtsPaths) = 0;
 	virtual bool SourceFileMayBeEmitted(SourceFile* file,
 	                                    bool forceDtsEmit) = 0;
-	virtual ModifierFlags GetEffectiveDeclarationFlags(
-	    Node* node, ModifierFlags flags) = 0;
-	virtual printer::EmitResolver* GetEmitResolver() = 0;
 };
 
 // transform.go:57/63 DeclarationTransformer — public emit-path surface.
@@ -64,7 +61,7 @@ struct DeclarationTransformer : transformers::Transformer {
 
 // transform.go:103 NewDeclarationTransformer
 DeclarationTransformer* NewDeclarationTransformer(
-    DeclarationEmitHost* host, printer::EmitContext* emitContext,
+    DeclarationEmitHost* host, printer::EmitResolver* resolver,
     const CompilerOptions* options, std::string_view declarationFilePath,
     std::string_view declarationMapPath);
 
@@ -179,7 +176,7 @@ SymbolTrackerImpl* NewSymbolTracker(DeclarationEmitHost* host,
 // ---------------------------------------------------------------------------
 
 bool needsScopeMarker(Node* result);
-bool canHaveLiteralInitializer(DeclarationEmitHost* host, Node* node);
+bool canHaveLiteralInitializer(printer::EmitResolver* resolver, Node* node);
 bool canProduceDiagnostics(Node* node);
 bool canReuseModifierNodes(const std::vector<Node*>& nodes);
 bool isDeclarationAndNotVisible(printer::EmitContext* emitContext,
@@ -190,7 +187,7 @@ bool isAlwaysType(Node* node);
 ModifierFlags maskModifierFlags(Node* node, ModifierFlags modifierMask,
                                 ModifierFlags modifierAdditions);
 Node* unwrapParenthesizedExpression(Node* o);
-bool isPrivateMethodTypeParameter(DeclarationEmitHost* host,
+bool isPrivateMethodTypeParameter(printer::EmitResolver* resolver,
                                   TypeParameterDeclaration* node);
 bool shouldEmitFunctionProperties(FunctionDeclaration* input);
 Node* getEffectiveBaseTypeNode(Node* node);

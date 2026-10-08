@@ -152,7 +152,7 @@ struct EmitHost {
 	virtual std::optional<std::string> WriteFile(std::string_view fileName,
 	                                             std::string_view text) = 0;
 	virtual ModuleKind GetEmitModuleFormatOfFile(SourceFile* file) = 0;
-	virtual EmitResolver* GetEmitResolver() = 0;
+	virtual EmitResolver* NewEmitResolver(EmitContext* emitContext) = 0;
 	virtual ::tsc::checker::SourceOutputAndProjectReference*
 	GetProjectReferenceFromSource(const tspath::Path& path) = 0;
 	virtual bool IsSourceFileFromExternalLibrary(SourceFile* file) = 0;

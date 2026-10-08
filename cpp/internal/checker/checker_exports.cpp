@@ -452,7 +452,7 @@ bool Checker::RequiresAddingImplicitUndefined(Node* node) {
 	if (symbol == nullptr) {
 		return false;
 	}
-	return GetEmitResolver()->RequiresAddingImplicitUndefined(
+	return requiresAddingImplicitUndefined(
 		node, symbol, enclosingDeclaration);
 }
 

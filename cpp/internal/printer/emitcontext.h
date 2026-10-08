@@ -863,9 +863,6 @@ inline EmitContext* NewEmitContext() { return new EmitContext(); }
 // value like atomic.AddUint32.
 uint32_t nextAutoGenerateId();
 
-// GetEmitContext (emitcontext.go:57) — pooled; the returned function resets and
-// releases the context.
-std::pair<EmitContext*, std::function<void()>> GetEmitContext();
 
 // --- NameGenerator (namegenerator.go) -----------------------------------------
 

@@ -647,11 +647,14 @@ struct DeclarationTransformerImpl : DeclarationTransformer {
 
 // transform.go:103 NewDeclarationTransformer
 DeclarationTransformer* NewDeclarationTransformer(
-	DeclarationEmitHost* host, printer::EmitContext* context,
+	DeclarationEmitHost* host, printer::EmitResolver* resolver,
 	const CompilerOptions* compilerOptions,
 	std::string_view declarationFilePath,
 	std::string_view declarationMapPath) {
-	printer::EmitResolver* resolver = host->GetEmitResolver();
+	if (resolver == nullptr || resolver->EmitContext() == nullptr) {
+		TSC_UNREACHABLE("DeclarationTransformer requires an EmitResolver with an EmitContext");
+	}
+	printer::EmitContext* context = resolver->EmitContext();
 	auto* state = new SymbolTrackerSharedState();
 	state->isolatedDeclarations =
 		tristateIsTrue(compilerOptions->IsolatedDeclarations);
@@ -1535,7 +1538,7 @@ Node* DeclarationTransformerImpl::transformExpressionWithTypeArguments(
 // transform.go:827 transformTypeParameterDeclaration
 Node* DeclarationTransformerImpl::transformTypeParameterDeclaration(
 	TypeParameterDeclaration* input) {
-	if (isPrivateMethodTypeParameter(host, input) &&
+	if (isPrivateMethodTypeParameter(resolver, input) &&
 	    (input->DefaultType != nullptr || input->Constraint != nullptr)) {
 		return factory()->updateTypeParameterDeclaration(
 			input, input->modifiers, input->name, nullptr,
@@ -1712,7 +1715,7 @@ Node* DeclarationTransformerImpl::transformSetAccessorDeclaration(
 		nullptr, // accessors shouldn't have type params
 		updateAccessorParamList(
 			input->asNode(),
-			host->GetEffectiveDeclarationFlags(
+			resolver->GetEffectiveDeclarationFlags(
 				emitContext()->parseNode(input->asNode()),
 				ModifierFlagsPrivate) != 0),
 		nullptr, nullptr, nullptr);
@@ -1729,7 +1732,7 @@ Node* DeclarationTransformerImpl::transformGetAccesorDeclaration(
 		nullptr, // accessors shouldn't have type params
 		updateAccessorParamList(
 			input->asNode(),
-			host->GetEffectiveDeclarationFlags(
+			resolver->GetEffectiveDeclarationFlags(
 				emitContext()->parseNode(input->asNode()),
 				ModifierFlagsPrivate) != 0),
 		ensureType(input->asNode(), false), nullptr, nullptr);
@@ -1822,7 +1825,7 @@ Node* DeclarationTransformerImpl::omitPrivateMethodType(Node* input) {
 // transform.go:1122 transformMethodSignatureDeclaration
 Node* DeclarationTransformerImpl::transformMethodSignatureDeclaration(
 	MethodSignatureDeclaration* input) {
-	if (host->GetEffectiveDeclarationFlags(
+	if (resolver->GetEffectiveDeclarationFlags(
 	        emitContext()->parseNode(input->asNode()),
 	        ModifierFlagsPrivate) != 0) {
 		return omitPrivateMethodType(input->asNode());
@@ -1841,7 +1844,7 @@ Node* DeclarationTransformerImpl::transformMethodSignatureDeclaration(
 // transform.go:1140 transformMethodDeclaration
 Node* DeclarationTransformerImpl::transformMethodDeclaration(
 	MethodDeclaration* input) {
-	if (host->GetEffectiveDeclarationFlags(
+	if (resolver->GetEffectiveDeclarationFlags(
 	        emitContext()->parseNode(input->asNode()),
 	        ModifierFlagsPrivate) != 0) {
 		return omitPrivateMethodType(input->asNode());
@@ -2016,8 +2019,7 @@ Node* DeclarationTransformerImpl::transformExportAssignment(
 	Node* initializer = nullptr;
 	if (isPrimitiveLiteralValue(unwrapParenthesizedExpression(expression),
 	                          true)) {
-		initializer = resolver->CreateLiteralConstValue(
-			emitContext(), emitContext()->parseNode(assignment), tracker);
+		initializer = resolver->CreateLiteralConstValue(emitContext()->parseNode(assignment), tracker);
 	}
 	if (initializer == nullptr) {
 		type_ = ensureType(assignment, false);
@@ -2303,9 +2305,9 @@ Node* DeclarationTransformerImpl::transformCommonJSExportWorker(
 			preserveJsDoc(statement, input);
 			removeAllComments(assignment);
 			return factory()->newSyntaxList({statement, assignment});
-		} else if (host->GetEmitResolver()->GetReferencedValueDeclaration(
+		} else if (resolver->GetReferencedValueDeclaration(
 		               name) == input ||
-		           host->GetEmitResolver()->GetReferencedValueDeclaration(
+		           resolver->GetReferencedValueDeclaration(
 		               name) == nullptr) {
 			// only inline to a export var if the `name` lookup points at this
 			// assignment or nothing - if it points at something else, we must
@@ -2499,7 +2501,7 @@ void DeclarationTransformerImpl::removeAllComments(Node* node) {
 // transform.go:1637 ensureType
 Node* DeclarationTransformerImpl::ensureType(Node* node, bool ignorePrivate) {
 	if (!ignorePrivate &&
-	    host->GetEffectiveDeclarationFlags(emitContext()->parseNode(node),
+	    resolver->GetEffectiveDeclarationFlags(emitContext()->parseNode(node),
 	                                       ModifierFlagsPrivate) != 0) {
 		// Private nodes emit no types (except private parameter properties,
 		// whose parameter types are actually visible)
@@ -2532,8 +2534,7 @@ Node* DeclarationTransformerImpl::ensureType(Node* node, bool ignorePrivate) {
 				jsFlags &=
 					~nodebuilder::FlagsWriteClassExpressionAsTypeLiteral;
 			}
-			Node* res = resolver->TryJSTypeNodeToTypeNode(
-				emitContext(), node->type(), enclosingDeclaration, jsFlags,
+			Node* res = resolver->TryJSTypeNodeToTypeNode(node->type(), enclosingDeclaration, jsFlags,
 				declarationEmitInternalNodeBuilderFlags, tracker);
 			if (res != nullptr) {
 				return res;
@@ -2561,12 +2562,10 @@ Node* DeclarationTransformerImpl::ensureType(Node* node, bool ignorePrivate) {
 		flags &= ~nodebuilder::FlagsWriteClassExpressionAsTypeLiteral;
 	}
 	if (hasInferredType(node)) {
-		typeNode = resolver->CreateTypeOfDeclaration(
-			emitContext(), node, enclosingDeclaration, flags,
+		typeNode = resolver->CreateTypeOfDeclaration(node, enclosingDeclaration, flags,
 			declarationEmitInternalNodeBuilderFlags, tracker);
 	} else if (isFunctionLike(node)) {
-		typeNode = resolver->CreateReturnTypeOfSignatureDeclaration(
-			emitContext(), node, enclosingDeclaration, flags,
+		typeNode = resolver->CreateReturnTypeOfSignatureDeclaration(node, enclosingDeclaration, flags,
 			declarationEmitInternalNodeBuilderFlags, tracker);
 	} else {
 		TSC_UNREACHABLE("Unexpected node kind in ensureType");
@@ -2584,7 +2583,7 @@ Node* DeclarationTransformerImpl::ensureType(Node* node, bool ignorePrivate) {
 
 // transform.go:1701 shouldPrintWithInitializer
 bool DeclarationTransformerImpl::shouldPrintWithInitializer(Node* node) {
-	return canHaveLiteralInitializer(host, node) &&
+	return canHaveLiteralInitializer(resolver, node) &&
 	       node->initializer() != nullptr &&
 	       resolver->IsLiteralConstDeclaration(
 	           emitContext()->mostOriginal(node));
@@ -2832,7 +2831,7 @@ Node* DeclarationTransformerImpl::stripExportModifiers(Node* statement) {
 	Node* parseNode = emitContext()->parseNode(statement);
 	if (isImportEqualsDeclaration(statement) ||
 	    (parseNode != nullptr &&
-	     host->GetEffectiveDeclarationFlags(parseNode,
+	     resolver->GetEffectiveDeclarationFlags(parseNode,
 	                                        ModifierFlagsDefault) != 0) ||
 	    !canHaveModifiers(statement)) {
 		// `export import` statements should remain as-is, as imports are _not_
@@ -2913,8 +2912,7 @@ NodeList* DeclarationTransformerImpl::buildClassMembers(
 			nullptr, nullptr);
 	}
 
-	std::vector<Node*> lateIndexes = resolver->CreateLateBoundIndexSignatures(
-		emitContext(), classNode, enclosingDeclaration,
+	std::vector<Node*> lateIndexes = resolver->CreateLateBoundIndexSignatures(classNode, enclosingDeclaration,
 		declarationEmitNodeBuilderFlags,
 		declarationEmitInternalNodeBuilderFlags, tracker);
 
@@ -3002,8 +3000,7 @@ Node* DeclarationTransformerImpl::transformClassDeclaration(
 
 		Node* varDecl = factory()->newVariableDeclaration(
 			newId, nullptr,
-			resolver->CreateTypeOfExpression(
-				emitContext(), extendsClause->expression(),
+			resolver->CreateTypeOfExpression(extendsClause->expression(),
 				input->asNode(), declarationEmitNodeBuilderFlags,
 				declarationEmitInternalNodeBuilderFlags, tracker),
 			nullptr);
@@ -3374,7 +3371,7 @@ ModifierFlags DeclarationTransformerImpl::ensureModifierFlags(Node* node) {
 // transform.go:2358 ensureTypeParams
 NodeList* DeclarationTransformerImpl::ensureTypeParams(Node* node,
                                                        NodeList* params) {
-	if (host->GetEffectiveDeclarationFlags(emitContext()->parseNode(node),
+	if (resolver->GetEffectiveDeclarationFlags(emitContext()->parseNode(node),
 	                                       ModifierFlagsPrivate) != 0) {
 		return nullptr;
 	}
@@ -3396,8 +3393,7 @@ NodeList* DeclarationTransformerImpl::ensureTypeParams(Node* node,
 	FunctionLikeDataRef data = node->functionLikeData();
 	if (data.fullSignature != nullptr && *data.fullSignature != nullptr) {
 		if (std::vector<Node*> nodes =
-		        resolver->CreateTypeParametersOfSignatureDeclaration(
-		            emitContext(), node, enclosingDeclaration,
+		        resolver->CreateTypeParametersOfSignatureDeclaration(node, enclosingDeclaration,
 		            declarationEmitNodeBuilderFlags,
 		            declarationEmitInternalNodeBuilderFlags, tracker);
 		    !nodes.empty()) {
@@ -3416,7 +3412,7 @@ NodeList* DeclarationTransformerImpl::ensureTypeParams(Node* node,
 // transform.go:2392 updateParamList
 NodeList* DeclarationTransformerImpl::updateParamList(Node* node,
                                                       NodeList* params) {
-	if (host->GetEffectiveDeclarationFlags(emitContext()->parseNode(node),
+	if (resolver->GetEffectiveDeclarationFlags(emitContext()->parseNode(node),
 	                                       ModifierFlagsPrivate) != 0 ||
 	    params->nodes.empty()) {
 		return factory()->newNodeList({});
@@ -3461,8 +3457,7 @@ Node* DeclarationTransformerImpl::ensureNoInitializer(Node* node) {
 		if (!isPrimitiveLiteralValue(unwrappedInitializer, true)) {
 			tracker->ReportInferenceFallback(node);
 		}
-		return resolver->CreateLiteralConstValue(
-			emitContext(), emitContext()->parseNode(node), tracker);
+		return resolver->CreateLiteralConstValue(emitContext()->parseNode(node), tracker);
 	}
 	return nullptr;
 }

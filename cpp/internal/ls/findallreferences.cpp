@@ -917,7 +917,7 @@ nonLocalDefinition* LanguageService::getNonLocalDefinition(
 	compiler::SimpleProgram* program = GetProgram();
 	auto [checker, done] = program->GetTypeCheckerForFileExclusive(nullptr);
 	doneGuard doneGuard_{done};
-	checker::EmitResolver* emitResolver = checker->GetEmitResolver();
+	checker::EmitResolver* emitResolver = checker->NewEmitResolver(printer::NewEmitContext());
 	for (auto* d : entry->definition->symbol->declarations) {
 		if (isDefinitionVisible(emitResolver, d)) {
 			auto [file, sp] = getFileAndStartPosFromDeclaration(d);

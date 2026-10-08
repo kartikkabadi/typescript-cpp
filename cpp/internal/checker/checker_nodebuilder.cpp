@@ -3300,7 +3300,7 @@ bool NodeBuilderImpl::isTriviallySerializableComputedName(Node* e) {
 		return false;
 	}
 	// TODO: going through emit resolver here is weird. Relayer these APIs.
-	return ch->GetEmitResolver()->isEntityNameVisible(e->name()->expression(),
+	return ch->isEntityNameVisible(e->name()->expression(),
 	                                        ctx->enclosingDeclaration, false)
 	           .Accessibility ==
 	       printer::SymbolAccessibility::Accessible;
@@ -3468,7 +3468,7 @@ Node* NodeBuilderImpl::serializeTypeForDeclaration(Node* declaration,
 	    (isParameterDeclaration(declaration) ||
 	     isPropertySignatureDeclaration(declaration) ||
 	     isPropertyDeclaration(declaration)) &&
-	    ch->GetEmitResolver()->requiresAddingImplicitUndefined(
+	    ch->requiresAddingImplicitUndefined(
 		    declaration, symbol, ctx->enclosingDeclaration);
 	bool addUndefinedForParameter =
 	    requiresAddingUndefined &&

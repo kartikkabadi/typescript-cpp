@@ -27,7 +27,7 @@ namespace tsc::compiler {
 // IsEmitBlocked).
 struct emitHost : transformers::declarations::DeclarationEmitHost, printer::EmitHost {
 	SimpleProgram* program{};
-	checker::EmitResolver* emitResolver{};
+	std::function<checker::EmitResolver*(printer::EmitContext*)> newEmitResolver;
 
 	// --- emitHost.go delegations ---
 	const CompilerOptions* Options() override {
@@ -55,8 +55,9 @@ struct emitHost : transformers::declarations::DeclarationEmitHost, printer::Emit
 	                                     std::string_view text) override {
 		return program->Host()->WriteFile(fileName, text);
 	}
-	printer::EmitResolver* GetEmitResolver() override {
-		return emitResolver;
+	printer::EmitResolver* NewEmitResolver(
+	    printer::EmitContext* emitContext) override {
+		return newEmitResolver(emitContext);
 	}
 	bool IsSourceFileFromExternalLibrary(SourceFile* file) override {
 		return program->IsSourceFileFromExternalLibrary(file);
@@ -109,10 +110,6 @@ struct emitHost : transformers::declarations::DeclarationEmitHost, printer::Emit
 	}
 	bool FileExists(const std::string& path) override {
 		return program->FileExists(path);
-	}
-	ModifierFlags GetEffectiveDeclarationFlags(
-	    Node* node, ModifierFlags flags) override {
-		return GetEmitResolver()->GetEffectiveDeclarationFlags(node, flags);
 	}
 	transformers::declarations::OutputPaths* GetOutputPathsFor(SourceFile* file,
 	                                             bool forceDtsPaths) override;
@@ -197,23 +194,26 @@ struct emitter {
 
 	void emit();
 	std::vector<transformers::declarations::DeclarationTransformer*>
-	getDeclarationTransformers(printer::EmitContext* emitContext,
+	getDeclarationTransformers(checker::EmitResolver* emitResolver,
 	                           SourceFile* sourceFile,
 	                           const std::string& declarationFilePath,
 	                           const std::string& declarationMapPath);
-	SourceFile* runScriptTransformers(printer::EmitContext* emitContext,
+	SourceFile* runScriptTransformers(checker::EmitResolver* emitResolver,
 	                                  SourceFile* sourceFile);
 	std::pair<SourceFile*, std::vector<Diagnostic*>>
-	runDeclarationTransformers(printer::EmitContext* emitContext,
+	runDeclarationTransformers(checker::EmitResolver* emitResolver,
 	                           SourceFile* sourceFile,
 	                           const std::string& declarationFilePath,
 	                           const std::string& declarationMapPath);
-	void emitJSFile(SourceFile* sourceFile, const std::string& jsFilePath,
+	void emitJSFile(checker::EmitResolver* emitResolver,
+	                SourceFile* sourceFile, const std::string& jsFilePath,
 	                const std::string& sourceMapFilePath);
-	void emitDeclarationFile(SourceFile* sourceFile,
+	void emitDeclarationFile(checker::EmitResolver* emitResolver,
+	                         SourceFile* sourceFile,
 	                         const std::string& declarationFilePath,
 	                         const std::string& declarationMapPath);
-	void printSourceFile(const std::string& jsFilePath,
+	void printSourceFile(printer::EmitContext* emitContext,
+	                     const std::string& jsFilePath,
 	                     const std::string& sourceMapFilePath,
 	                     SourceFile* sourceFile, printer::Printer* printer_,
 	                     const CompilerOptions* mapOptions,
@@ -237,7 +237,7 @@ transformers::Transformer* getModuleTransformer(
 
 // emitter.go:107 getScriptTransformers
 std::vector<transformers::Transformer*> getScriptTransformers(
-    printer::EmitContext* emitContext, printer::EmitHost* host,
+    checker::EmitResolver* emitResolver, printer::EmitHost* host,
     SourceFile* sourceFile);
 
 // emitter.go:396 shouldEmitSourceMaps

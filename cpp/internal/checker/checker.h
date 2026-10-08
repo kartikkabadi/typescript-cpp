@@ -941,20 +941,27 @@ NodeBuilder* NewNodeBuilderEx(
 
 // EmitResolver — emitresolver.go:34. Go's checkerMu is elided: the C++ checker
 // is single-threaded, so every lock in emitresolver.go compiles away.
-struct EmitResolver : binder::ReferenceResolver {
-	Checker* checker{};
-	std::function<bool(Node*)> isValueAliasDeclaration;
-	std::function<bool(Node*)> aliasMarkingVisitor;
-	binder::ReferenceResolver* referenceResolver{};
-
+struct EmitResolverLinks {
 	Arena jsxLinksArena;
 	LinkStore<Node*, JSXLinks> jsxLinks{&jsxLinksArena};
 	Arena declarationLinksArena;
 	LinkStore<Node*, DeclarationLinks> declarationLinks{&declarationLinksArena};
 	Arena declarationFileLinksArena;
 	LinkStore<Node*, DeclarationFileLinks> declarationFileLinks{&declarationFileLinksArena};
+};
+
+struct EmitResolver : binder::ReferenceResolver {
+	Checker* checker{};
+	std::function<bool(Node*)> isValueAliasDeclaration;
+	std::function<bool(Node*)> aliasMarkingVisitor;
+	binder::ReferenceResolver* referenceResolver{};
+
+	printer::EmitContext* emitContext{};
+	NodeBuilder* requestNodeBuilder{};
 
 	// Locking API surface (locks elided — see note above).
+	printer::EmitContext* EmitContext();
+	NodeBuilder* nodeBuilder();
 	Node* GetJsxFactoryEntity(Node* location);
 	Node* GetJsxFragmentFactoryEntity(Node* location);
 	bool IsOptionalParameter(Node* node);
@@ -989,31 +996,22 @@ struct EmitResolver : binder::ReferenceResolver {
 	std::string GetElementAccessExpressionName(
 	    ElementAccessExpression* expression) override;
 	Node* GetReferencedMemberValueDeclaration(Node* node) override;
-	Node* CreateReturnTypeOfSignatureDeclaration(printer::EmitContext* emitContext, Node* signatureDeclaration, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
-	std::vector<Node*> CreateTypeParametersOfSignatureDeclaration(printer::EmitContext* emitContext, Node* signatureDeclaration, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
-	Node* CreateTypeOfDeclaration(printer::EmitContext* emitContext, Node* declaration, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
-	Node* CreateLiteralConstValue(printer::EmitContext* emitContext, Node* node, nodebuilder::SymbolTracker* tracker);
-	Node* CreateTypeOfExpression(printer::EmitContext* emitContext, Node* expression, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
-	std::vector<Node*> CreateLateBoundIndexSignatures(printer::EmitContext* emitContext, Node* container, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
+	Node* CreateReturnTypeOfSignatureDeclaration(Node* signatureDeclaration, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
+	std::vector<Node*> CreateTypeParametersOfSignatureDeclaration(Node* signatureDeclaration, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
+	Node* CreateTypeOfDeclaration(Node* declaration, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
+	Node* CreateLiteralConstValue(Node* node, nodebuilder::SymbolTracker* tracker);
+	Node* CreateTypeOfExpression(Node* expression, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
+	std::vector<Node*> CreateLateBoundIndexSignatures(Node* container, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
 	ModifierFlags GetEffectiveDeclarationFlags(Node* node, ModifierFlags flags);
 	LiteralValue GetConstantValue(Node* node);
 	printer::TypeReferenceSerializationKind GetTypeReferenceSerializationKind(Node* typeName, Node* location);
 	std::vector<Symbol*> GetPropertiesOfContainerFunction(Node* node);
-	Node* TryJSTypeNodeToTypeNode(printer::EmitContext* emitContext, Node* typeNode, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
+	Node* TryJSTypeNodeToTypeNode(Node* typeNode, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
 	bool IsThisPropertyAssignmentDeclarationRedundant(Node* node);
 
 	// Internal workers (unlocked in Go).
-	bool isDeclarationVisible(Node* node);
-	bool determineIfDeclarationIsVisible(Node* node);
 	bool aliasMarkingVisitorWorker(Node* node);
 	void markLinkedAliases(Node* node);
-	printer::SymbolAccessibilityResult isEntityNameVisible(Node* entityName, Node* enclosingDeclaration, bool shouldComputeAliasToMakeVisible);
-	printer::SymbolAccessibilityResult* hasVisibleDeclarations(Symbol* symbol, bool shouldComputeAliasToMakeVisible);
-	bool requiresAddingImplicitUndefined(Node* declaration, Symbol* symbol, Node* enclosingDeclaration);
-	bool requiresAddingImplicitUndefinedWorker(Node* parameter, Node* enclosingDeclaration);
-	bool declaredParameterTypeContainsUndefined(Node* parameter);
-	bool isOptionalUninitializedParameterProperty(Node* parameter);
-	bool isRequiredInitializedParameter(Node* parameter, Node* enclosingDeclaration);
 	bool isOptionalParameter(Node* node);
 	printer::SymbolAccessibilityResult isSymbolAccessible(Symbol* symbol, Node* enclosingDeclaration, SymbolFlags meaning, bool shouldComputeAliasToMarkVisible);
 	bool isValueAliasDeclarationWorker(Node* node);
@@ -1022,7 +1020,7 @@ struct EmitResolver : binder::ReferenceResolver {
 };
 
 // newEmitResolver — emitresolver.go:45
-EmitResolver* newEmitResolver(Checker* checker);
+EmitResolver* newEmitResolver(Checker* checker, printer::EmitContext* emitContext);
 
 // Relater (relater.go)
 
@@ -1713,8 +1711,7 @@ public:
 	std::function<bool(Type*)> isStringIndexSignatureOnlyType;
 	std::function<bool(Node*)> markNodeAssignments;
 	TypeComparer compareTypesAssignable{};
-	EmitResolver* emitResolver{};
-	std::once_flag emitResolverOnce;
+	EmitResolverLinks emitResolverLinks;
 	std::string _jsxNamespace;
 	Node* _jsxFactoryEntity{};
 	std::unordered_set<Node*> skipDirectInferenceNodes;
@@ -3633,7 +3630,18 @@ public:
 	Symbol* getApplicableIndexSymbol(Type* t, Type* keyType);
 	Type* getRegularTypeOfExpression(Node* expr);
 	Type* GetTypeAtLocation(Node* node);
-	EmitResolver* GetEmitResolver();
+	EmitResolver* NewEmitResolver(printer::EmitContext* emitContext);
+
+	// Emit-support workers moved off EmitResolver (emitsupport.go)
+	bool isDeclarationVisible(Node* node);
+	bool determineIfDeclarationIsVisible(Node* node);
+	printer::SymbolAccessibilityResult isEntityNameVisible(Node* entityName, Node* enclosingDeclaration, bool shouldComputeAliasToMakeVisible);
+	printer::SymbolAccessibilityResult* hasVisibleDeclarations(Symbol* symbol, bool shouldComputeAliasToMakeVisible);
+	bool requiresAddingImplicitUndefined(Node* declaration, Symbol* symbol, Node* enclosingDeclaration);
+	bool requiresAddingImplicitUndefinedWorker(Node* parameter, Node* enclosingDeclaration);
+	bool declaredParameterTypeContainsUndefined(Node* parameter);
+	bool isOptionalUninitializedParameterProperty(Node* parameter);
+	bool isRequiredInitializedParameter(Node* parameter, Node* enclosingDeclaration);
 	Type* getImportAttributesTypeForModuleSpecifier(Node* moduleSpecifier);
 	Symbol* getSymbolOfPartOfRightHandSideOfImportEquals(Node* entityName);
 	// expr/jsx/emitresolver-owned deps (stubs until those slices land)
