@@ -1289,6 +1289,9 @@ public:
 	          std::unordered_map<int, CommentDirective>>
 	getDiagnosticsWithPrecedingDirectives(
 	    SourceFile* sourceFile, std::vector<Diagnostic*> diags);
+	// program.go:1543 applyContentMapperDiagnosticDirectives.
+	static std::vector<Diagnostic*> applyContentMapperDiagnosticDirectives(
+	    SourceFile* sourceFile, std::vector<Diagnostic*> diags);
 
 	// === slice: incremental ===
 	// --- ProgramLike members (see program.go:1957) ---
@@ -1761,5 +1764,10 @@ bool importSyntaxAffectsModuleResolution(const CompilerOptions* options);
 // fileloader.go:630 ContentMapperProjectDiagnostic — fileless diagnostic
 // for project setup or mapper initialization.
 Diagnostic* ContentMapperProjectDiagnostic(const gostd::Error& err);
+
+// fileloader.go:522 ContentMapperProjectErrorDiagnostic — diagnostic message
+// for a project setup error.
+const DiagnosticMessage*
+ContentMapperProjectErrorDiagnostic(const gostd::Error& err);
 
 }  // namespace tsc::compiler

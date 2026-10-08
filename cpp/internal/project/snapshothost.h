@@ -60,12 +60,10 @@ struct SnapshotHost {
 	// snapshot owned by this host.
 	void RetainSnapshot(Snapshot* snapshot);
 
-	// projectIDCache — C++ adapter: Go's autoimport maps are keyed by
+	// internProjectID — C++ adapter: Go's autoimport maps are keyed by
 	// the ProjectID interface value; we key by ProjectID* pointer, so
-	// one intern cache must be shared by every clone host built from
-	// this SnapshotHost and by Session::internProjectID.
-	std::unordered_map<ID, std::unique_ptr<ls::autoimport::ProjectID>>
-	    projectIDCache;
+	// all ID→ProjectID* interning goes through the single canonical
+	// ls::autoimport::InternProjectID cache.
 	ls::autoimport::ProjectID* internProjectID(const ID& id);
 
 	// CloneSnapshot — snapshothost.go:102. Derives a snapshot from

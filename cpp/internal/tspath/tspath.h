@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "internal/stringutil/stringutil.h"
+#include "internal/stringutil/unicode_lower.h"
 
 namespace tsc {
 // From ast/ast.h — re-declared so this header need not include ast.h.
@@ -744,18 +745,26 @@ inline std::string toFileNameLowerCase(std::string_view fileName) {
 		}
 		return b;
 	}
-	// Non-ASCII: fold each UTF-8 rune except U+0130. Cases needing wide
-	// lowercasing are rare in file names; decode and ASCII-fold the common
-	// subset, pass other multi-byte sequences through.
+	// Non-ASCII: lower each UTF-8 rune via unicode.ToLower except U+0130,
+	// matching Go's strings.Map over runes.
 	std::string result;
 	result.reserve(fileName.size());
-	for (size_t i = 0; i < fileName.size(); i++) {
+	for (size_t i = 0; i < fileName.size();) {
 		char c = fileName[i];
 		if ((uint8_t)c < 0x80) {
 			result += (c >= 'A' && c <= 'Z') ? (char)(c + 32) : c;
-		} else {
-			result += c;
+			i++;
+			continue;
 		}
+		int width = 0;
+		char32_t r = decodeUtf8Rune(fileName.substr(i), &width);
+		if (r != 0x130) {
+			r = unicodeToLower(r);
+		}
+		char buf[4];
+		int n = encodeUtf8Rune(r, buf);
+		result.append(buf, n);
+		i += width;
 	}
 	return result;
 }
@@ -1478,6 +1487,30 @@ getCommonParents(
 	}
 
 	return {resultPaths, ignored};
+}
+
+// StartsWithDirectory — path.go:1257.
+inline bool startsWithDirectory(std::string_view fileName,
+                                std::string_view directoryName,
+                                bool useCaseSensitiveFileNames) {
+	if (directoryName.empty()) {
+		return false;
+	}
+	auto canonicalDirectoryName =
+	    getCanonicalFileName(directoryName, useCaseSensitiveFileNames);
+	// Go: TrimSuffix("/", ...), then TrimSuffix("\\", ...) — one each.
+	if (!canonicalDirectoryName.empty() &&
+	    canonicalDirectoryName.back() == '/') {
+		canonicalDirectoryName.pop_back();
+	}
+	if (!canonicalDirectoryName.empty() &&
+	    canonicalDirectoryName.back() == '\\') {
+		canonicalDirectoryName.pop_back();
+	}
+	auto canonicalFileName =
+	    getCanonicalFileName(fileName, useCaseSensitiveFileNames);
+	return canonicalFileName.starts_with(canonicalDirectoryName + "/") ||
+	       canonicalFileName.starts_with(canonicalDirectoryName + "\\");
 }
 
 // === slice: project ===

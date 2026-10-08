@@ -1308,10 +1308,15 @@ void Session::tryAdoptSnapshotChangeInBackground(
 	// session's current snapshot or release it if the session has
 	// moved on.
 	auto* self = this;
+	// baseSnapshot is captured by raw pointer (the Go goroutine relies
+	// on GC); take a ref for the task. newSnapshot's clone ref is
+	// consumed by adoptSnapshotChange itself.
+	baseSnapshot->ref();
 	backgroundQueue->Enqueue(
 	    backgroundContext(),
 	    [self, baseSnapshot, newSnapshot](const gostd::Context& ctx) {
 		    self->adoptSnapshotChange(baseSnapshot, newSnapshot);
+		    baseSnapshot->Deref();
 	    });
 }
 
@@ -1325,6 +1330,18 @@ void Session::adoptSnapshotChange(project::Snapshot* baseSnapshot,
 		// clone's initial ref is transferred to become the session's
 		// ref for its current snapshot.
 		snapshot = newSnapshot;
+		// Read everything the logging below needs before releasing
+		// the session's refs — a concurrent updateSnapshot may free
+		// either snapshot once the lock is dropped (the Go code can
+		// read them later thanks to GC).
+		int64_t oldSnapshotId = oldSnapshot->id;
+		int64_t newSnapshotId = newSnapshot->id;
+		int64_t newSnapshotParentId = newSnapshot->parentId;
+		auto* newBuilderLogs = newSnapshot->builderLogs;
+		std::string builderLogs;
+		if (newBuilderLogs != nullptr) {
+			builderLogs = newBuilderLogs->String();
+		}
 		oldSnapshot->Deref();
 		auto contentMapperTimings =
 		    takeContentMapperTimingDelta();
@@ -1333,45 +1350,49 @@ void Session::adoptSnapshotChange(project::Snapshot* baseSnapshot,
 			logging::logf(logger, 
 			    "Adopted snapshot %d (parent %d) as current "
 			    "session snapshot (replacing %d)",
-			    {gostd::fmtArg(int64_t(newSnapshot->id)),
-			     gostd::fmtArg(int64_t(newSnapshot->parentId)),
-			     gostd::fmtArg(int64_t(oldSnapshot->id))});
-			if (newSnapshot->builderLogs != nullptr) {
-				logging::log(logger, newSnapshot->builderLogs->String());
+			    {gostd::fmtArg(newSnapshotId),
+			     gostd::fmtArg(newSnapshotParentId),
+			     gostd::fmtArg(oldSnapshotId)});
+			if (newBuilderLogs != nullptr) {
+				logging::log(logger, builderLogs);
 			}
 			logContentMapperTimings(contentMapperTimings);
 		}
-	} else {
-		// Session has moved on to a newer snapshot; discard this
-		// one. Release the clone's initial ref. If a handler is
-		// still using the snapshot, its own ref keeps it alive.
-		snapshotMu.unlock();
-		if (options->LoggingEnabled) {
-			logging::logf(logger, 
-			    "Discarded snapshot %d (parent %d); session has "
-			    "moved on to snapshot %d",
-			    {gostd::fmtArg(int64_t(newSnapshot->id)),
-			     gostd::fmtArg(int64_t(newSnapshot->parentId)),
-			     gostd::fmtArg(int64_t(oldSnapshot->id))});
-			if (newSnapshot->builderLogs != nullptr) {
-				auto logs = newSnapshot->builderLogs->String();
-				if (!logs.empty()) {
-					logging::logf(logger, 
-					    "--- Discarded snapshot %d builder "
-					    "logs (NOT adopted) ---",
-					    {gostd::fmtArg(
-					        int64_t(newSnapshot->id))});
-					logging::log(logger, logs);
-					logging::logf(logger, 
-					    "--- End discarded snapshot %d "
-					    "builder logs ---",
-					    {gostd::fmtArg(
-					        int64_t(newSnapshot->id))});
-				}
-			}
-		}
-		newSnapshot->Deref();
+		return;
 	}
+	// Session has moved on to a newer snapshot; discard this
+	// one. Release the clone's initial ref. If a handler is
+	// still using the snapshot, its own ref keeps it alive.
+	// Read everything the logging below needs before unlocking, as
+	// above.
+	int64_t oldSnapshotId = oldSnapshot->id;
+	int64_t newSnapshotId = newSnapshot->id;
+	int64_t newSnapshotParentId = newSnapshot->parentId;
+	std::string builderLogs;
+	if (newSnapshot->builderLogs != nullptr) {
+		builderLogs = newSnapshot->builderLogs->String();
+	}
+	snapshotMu.unlock();
+	if (options->LoggingEnabled) {
+		logging::logf(logger, 
+		    "Discarded snapshot %d (parent %d); session has "
+		    "moved on to snapshot %d",
+		    {gostd::fmtArg(newSnapshotId),
+		     gostd::fmtArg(newSnapshotParentId),
+		     gostd::fmtArg(oldSnapshotId)});
+		if (!builderLogs.empty()) {
+			logging::logf(logger, 
+			    "--- Discarded snapshot %d builder "
+			    "logs (NOT adopted) ---",
+			    {gostd::fmtArg(newSnapshotId)});
+			logging::log(logger, builderLogs);
+			logging::logf(logger, 
+			    "--- End discarded snapshot %d "
+			    "builder logs ---",
+			    {gostd::fmtArg(newSnapshotId)});
+		}
+	}
+	newSnapshot->Deref();
 }
 
 // updateSnapshot — session.go:1320.
@@ -1404,13 +1425,19 @@ project::Snapshot* Session::updateSnapshot(
 	if (callerRef) {
 		newSnapshot->ref();
 	}
+	// The background task below captures both snapshots by raw
+	// pointer (the Go goroutine relies on GC). Take refs on its
+	// behalf now, while both are guaranteed alive — oldSnapshot still
+	// holds the session's ref at this point.
+	oldSnapshot->ref();
+	newSnapshot->ref();
 	contentmapper::Timings contentMapperTimings_;
 	if (newSnapshot != oldSnapshot) {
 		// Release the session's reference to the old snapshot. The
 		// new snapshot's clone ref (1) is transferred to become the
 		// session's ref for its current snapshot. Other holders
-		// (e.g. active handlers) keep the old snapshot alive via
-		// their own refs until they complete.
+		// (e.g. active handlers, the background task below) keep the
+		// old snapshot alive via their own refs until they complete.
 		oldSnapshot->Deref();
 		contentMapperTimings_ = takeContentMapperTimingDelta();
 	}
@@ -1465,6 +1492,9 @@ project::Snapshot* Session::updateSnapshot(
 		        oldSnapshot, newSnapshot);
 		    self->warmAutoImportCache(ctx, capturedChange,
 		                              oldSnapshot, newSnapshot);
+		    // Release the refs taken for this task in updateSnapshot.
+		    newSnapshot->Deref();
+		    oldSnapshot->Deref();
 	    });
 
 	return newSnapshot;
@@ -1739,8 +1769,8 @@ gostd::Error Session::updateWatches(project::Snapshot* oldSnapshot,
 	    oldSnapshot->ConfigFileRegistry->configs,
 	    newSnapshot->ConfigFileRegistry->configs,
 	    [](configFileEntry* a, configFileEntry* b) {
-		    return a->rootFilesWatch->ID() ==
-		           b->rootFilesWatch->ID();
+		    return watchedFilesID(a->rootFilesWatch) ==
+		           watchedFilesID(b->rootFilesWatch);
 	    },
 	    [&](const tspath::Path&, configFileEntry* addedEntry) {
 		    auto errs = updateWatch<PatternsAndIgnored>(
@@ -1771,10 +1801,10 @@ gostd::Error Session::updateWatches(project::Snapshot* oldSnapshot,
 		    oldSnapshot->ConfigFileRegistry->configs.find(path);
 		if (it != oldSnapshot->ConfigFileRegistry->configs.end()) {
 			auto* oldEntry = it->second;
-			if (oldEntry->rootFilesWatch->ID() ==
-			    newEntry->rootFilesWatch->ID()) {
+			if (watchedFilesID(oldEntry->rootFilesWatch) ==
+			    watchedFilesID(newEntry->rootFilesWatch)) {
 				if (watches->IsPending(
-				        newEntry->rootFilesWatch->ID())) {
+				        watchedFilesID(newEntry->rootFilesWatch))) {
 					auto errs =
 					    updateWatch<PatternsAndIgnored>(
 					        ctx, nullptr,
@@ -1829,8 +1859,8 @@ gostd::Error Session::updateWatches(project::Snapshot* oldSnapshot,
 	    },
 	    [&](const ID&, Project* oldProject,
 	        Project* newProject) {
-		    if (oldProject->programFilesWatch->ID() !=
-		        newProject->programFilesWatch->ID()) {
+		    if (watchedFilesID(oldProject->programFilesWatch) !=
+		        watchedFilesID(newProject->programFilesWatch)) {
 			    auto errs = updateWatch(
 			        ctx, oldProject->programFilesWatch,
 			        newProject->programFilesWatch);
@@ -1838,15 +1868,15 @@ gostd::Error Session::updateWatches(project::Snapshot* oldSnapshot,
 			                  errs.end());
 		    } else {
 			    if (watches->IsPending(
-			        newProject->programFilesWatch->ID())) {
+			        watchedFilesID(newProject->programFilesWatch))) {
 				    auto errs = updateWatchNew(
 				        ctx, newProject->programFilesWatch);
 				    errors.insert(errors.end(),
 				                  errs.begin(), errs.end());
 			    }
 		    }
-		    if (oldProject->typingsWatch->ID() !=
-		        newProject->typingsWatch->ID()) {
+		    if (watchedFilesID(oldProject->typingsWatch) !=
+		        watchedFilesID(newProject->typingsWatch)) {
 			    auto errs = updateWatch(
 			        ctx, oldProject->typingsWatch,
 			        newProject->typingsWatch);
@@ -1854,23 +1884,23 @@ gostd::Error Session::updateWatches(project::Snapshot* oldSnapshot,
 			                  errs.end());
 		    } else {
 			    if (watches->IsPending(
-			        newProject->typingsWatch->ID())) {
+			        watchedFilesID(newProject->typingsWatch))) {
 				    auto errs = updateWatchNew(
 				        ctx, newProject->typingsWatch);
 				    errors.insert(errors.end(),
 				                  errs.begin(), errs.end());
 			    }
 		    }
-		    if (oldProject->contentMapperWatch->ID() !=
-		        newProject->contentMapperWatch->ID()) {
+		    if (watchedFilesID(oldProject->contentMapperWatch) !=
+		        watchedFilesID(newProject->contentMapperWatch)) {
 			    auto errs = updateWatch(
 			        ctx, oldProject->contentMapperWatch,
 			        newProject->contentMapperWatch);
 			    errors.insert(errors.end(), errs.begin(),
 			                  errs.end());
 		    } else if (watches->IsPending(
-		                   newProject->contentMapperWatch
-		                       ->ID())) {
+		                   watchedFilesID(
+		                       newProject->contentMapperWatch))) {
 			    auto errs = updateWatchNew(
 			        ctx, newProject->contentMapperWatch);
 			    errors.insert(errors.end(), errs.begin(),
@@ -1878,14 +1908,14 @@ gostd::Error Session::updateWatches(project::Snapshot* oldSnapshot,
 		    }
 	    });
 
-	if (oldSnapshot->autoImportsWatch->ID() !=
-	    newSnapshot->autoImportsWatch->ID()) {
+	if (watchedFilesID(oldSnapshot->autoImportsWatch) !=
+	    watchedFilesID(newSnapshot->autoImportsWatch)) {
 		auto errs = updateWatch(ctx, oldSnapshot->autoImportsWatch,
 		                        newSnapshot->autoImportsWatch);
 		errors.insert(errors.end(), errs.begin(), errs.end());
 	} else {
 		if (watches->IsPending(
-		        newSnapshot->autoImportsWatch->ID())) {
+		        watchedFilesID(newSnapshot->autoImportsWatch))) {
 			auto errs =
 			    updateWatchNew(ctx, newSnapshot->autoImportsWatch);
 			errors.insert(errors.end(), errs.begin(),
@@ -2544,11 +2574,10 @@ void Session::warmAutoImportCache(const gostd::Context& ctx,
 		if (project == nullptr) {
 			return;
 		}
-		if (newSnapshot->AutoImports
-		        ->IsPreparedForImportingFile(
-		            lsp::lsproto::documentUriFileName(
-		                changedFile),
-		            internProjectID(project->ID()), prefs)) {
+		if (ls::autoimport::IsPreparedForImportingFile(
+		        newSnapshot->AutoImports,
+		        lsp::lsproto::documentUriFileName(changedFile),
+		        internProjectID(project->ID()), prefs)) {
 			return;
 		}
 

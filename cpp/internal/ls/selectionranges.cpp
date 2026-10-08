@@ -5,6 +5,10 @@
 
 namespace tsc::ls {
 
+// selectionranges.go:179 — createSyntaxList has external linkage (like the
+// Go package-level fn) so unit tests in ls_test can call the same helpers.
+::tsc::Node* createSyntaxList(NodeFactory* factory, std::vector<::tsc::Node*> children);
+
 namespace {
 
 // core.NewTextRange
@@ -56,8 +60,6 @@ std::vector<::tsc::Node*> splitChildren(NodeFactory* factory,
 										std::vector<::tsc::Node*> children,
 										std::function<bool(::tsc::Node*)> pivotOn,
 										bool separateTrailingSemicolon);
-::tsc::Node* createSyntaxList(NodeFactory* factory, std::vector<::tsc::Node*> children);
-
 // selectionranges.go:69 — getSelectionChildren
 std::vector<::tsc::Node*> getSelectionChildren(NodeFactory* factory, ::tsc::Node* node,
 											 SourceFile* sourceFile) {
@@ -178,7 +180,11 @@ std::vector<::tsc::Node*> splitChildren(NodeFactory* factory,
 	return result;
 }
 
+} // namespace
+
 // selectionranges.go:179 — createSyntaxList
+// (external linkage like the Go package-level fn — the ls unit tests call
+// getSmartSelectionRange from another TU)
 ::tsc::Node* createSyntaxList(NodeFactory* factory, std::vector<::tsc::Node*> children) {
 	::tsc::Node* list = factory->newSyntaxList(children);
 	list->loc = newTextRange(int(children.front()->pos()), int(children.back()->end()));
@@ -432,8 +438,6 @@ lsp::lsproto::SelectionRange* getSmartSelectionRange(LanguageService* l, SourceF
 	}
 	return ranges->build(root);
 }
-
-} // namespace
 
 // ============================================================================
 // selectionranges.go — ProvideSelectionRanges

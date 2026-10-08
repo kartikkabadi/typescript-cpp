@@ -175,22 +175,24 @@ void Index::insertAsWords(const std::shared_ptr<Export>& value) {
 	}
 }
 
-// Index.Clone — index.go:152. Nil-receiver tolerant like Go.
-std::unique_ptr<Index> Index::Clone(
-    const std::function<bool(const std::shared_ptr<Export>&)>& filter) const {
-	if (this == nullptr) {
+// Index.Clone — index.go:152. Nil-receiver tolerant like Go; free function
+// because calling a member on nullptr is UB (see autoimport.h).
+std::unique_ptr<Index> Clone(
+    const Index* idx,
+    const std::function<bool(const std::shared_ptr<Export>&)>& filter) {
+	if (idx == nullptr) {
 		return nullptr;
 	}
 
 	auto newIdx = std::make_unique<Index>();
-	newIdx->entries.reserve(entries.size());
-	newIdx->index.reserve(index.size());
+	newIdx->entries.reserve(idx->entries.size());
+	newIdx->index.reserve(idx->index.size());
 
 	// Build mapping from old index to new index for filtered entries
 	std::unordered_map<int, int> oldToNew;
-	oldToNew.reserve(entries.size());
-	for (size_t oldIndex = 0; oldIndex < entries.size(); oldIndex++) {
-		const auto& entry = entries[oldIndex];
+	oldToNew.reserve(idx->entries.size());
+	for (size_t oldIndex = 0; oldIndex < idx->entries.size(); oldIndex++) {
+		const auto& entry = idx->entries[oldIndex];
 		if (filter(entry)) {
 			int newIndex = static_cast<int>(newIdx->entries.size());
 			newIdx->entries.push_back(entry);
@@ -199,7 +201,7 @@ std::unique_ptr<Index> Index::Clone(
 	}
 
 	// Rebuild the index with remapped indices
-	for (const auto& kv : index) {
+	for (const auto& kv : idx->index) {
 		std::vector<int> newIndices;
 		newIndices.reserve(kv.second.size());
 		for (int oldIndex : kv.second) {

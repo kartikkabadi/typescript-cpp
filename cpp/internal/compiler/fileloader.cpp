@@ -327,8 +327,8 @@ static Diagnostic* contentMapperMappingDiagnostic(
 
 // fileloader.go:522 ContentMapperProjectErrorDiagnostic — localized
 // diagnostic message for a project setup error.
-static const DiagnosticMessage* contentMapperProjectErrorDiagnostic(
-    const gostd::Error& err) {
+const DiagnosticMessage*
+ContentMapperProjectErrorDiagnostic(const gostd::Error& err) {
 	if (auto* projectError =
 	        gostd::errorAs<contentmapper::ProjectError*>(err)) {
 		switch (projectError->Kind) {
@@ -387,7 +387,7 @@ static Diagnostic* contentMapperTransformDiagnostic(
 		}
 		case contentmapper::TransformErrorKindProject:
 			return contentMapperTransformDiagnosticChain(
-			    file, label, contentMapperProjectErrorDiagnostic(err));
+			    file, label, ContentMapperProjectErrorDiagnostic(err));
 		case contentmapper::TransformErrorKindRequest:
 			return contentMapperTransformDiagnosticChain(
 			    file, label,
@@ -559,7 +559,7 @@ Diagnostic* ContentMapperProjectDiagnostic(const gostd::Error& err) {
 		return contentMapperInitializationDiagnostic("" /*label*/, err);
 	}
 	return tsoptions::newCompilerDiagnostic(
-	    contentMapperProjectErrorDiagnostic(err));
+	    ContentMapperProjectErrorDiagnostic(err));
 }
 
 // fileloader.go:637 contentMapperUnavailable — whether mapper failed

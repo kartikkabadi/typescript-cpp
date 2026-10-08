@@ -2498,7 +2498,8 @@ std::pair<int, int> getECMALineAndUTF16CharacterOfPosition(SourceFile* sourceFil
 	auto& lineMap = getECMALineStarts(sourceFile);
 	int line = computeLineOfPosition(lineMap, pos);
 	int character = utf16Len(
-		sourceFile->text.substr(lineMap[line], pos - lineMap[line]));
+		std::string_view(sourceFile->text)
+			.substr(lineMap[line], pos - lineMap[line]));
 	return {line, character};
 }
 
@@ -2513,7 +2514,8 @@ int getECMAEndLinePosition(SourceFile* sourceFile, int line) {
 	int pos = getECMALineStarts(sourceFile)[line];
 	for (;;) {
 		int size;
-		char32_t ch = decodeUtf8Rune(sourceFile->text.substr(pos), &size);
+		char32_t ch = decodeUtf8Rune(
+			std::string_view(sourceFile->text).substr(pos), &size);
 		if (size == 0 || isLineBreak(ch))
 			return pos - 1;
 		pos += size;
@@ -2606,7 +2608,7 @@ Kind identifierToKeywordKind(const Identifier* node) {
 
 static std::string stripLeadingJSDocComment(std::string_view line);
 
-static bool isJSDocTypeExpressionOrChild(const Node* node) {
+bool isJSDocTypeExpressionOrChild(const Node* node) {
 	if (isJSDocTypeExpression(node))
 		return true;
 	if ((node->flags & (NodeFlagsJSDoc | NodeFlagsReparsed)) == 0)
@@ -2619,7 +2621,7 @@ static bool isJSDocTypeExpressionOrChild(const Node* node) {
 	return false;
 }
 
-static std::string normalizeJSDocTypeSourceText(std::string_view text) {
+std::string normalizeJSDocTypeSourceText(std::string_view text) {
 	auto lineStarts = computeECMALineStarts(text);
 	if (lineStarts.size() == 1)
 		return stripLeadingJSDocComment(text);
@@ -2632,8 +2634,21 @@ static std::string normalizeJSDocTypeSourceText(std::string_view text) {
 		if (i + 1 < lineStarts.size())
 			lineEnd = lineStarts[i + 1];
 		std::string_view line = text.substr(lineStarts[i], lineEnd - lineStarts[i]);
-		while (!line.empty() && isLineBreak(line.back()))
-			line.remove_suffix(1);
+		// strings.TrimRightFunc(line, IsLineBreak): the trimmed unit is a
+		// rune — multi-byte breaks (U+2028/2029) must not survive as tail bytes.
+		while (!line.empty()) {
+			size_t rstart = line.size() - 1;
+			while (rstart > 0 &&
+			       (static_cast<unsigned char>(line[rstart]) & 0xC0) == 0x80) {
+				rstart--;
+			}
+			int w;
+			char32_t r = decodeUtf8Rune(line.substr(rstart), &w);
+			if (w <= 0 || rstart + w != line.size() || !isLineBreak(r)) {
+				break;
+			}
+			line.remove_suffix(w);
+		}
 		result += stripLeadingJSDocComment(line);
 	}
 	return result;

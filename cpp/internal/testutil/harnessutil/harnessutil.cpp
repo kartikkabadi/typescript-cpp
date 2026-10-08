@@ -1092,7 +1092,11 @@ testLibFolderMap() {
 			}
 			std::sort(entries.begin(), entries.end());
 			for (auto it = entries.rbegin(); it != entries.rend(); ++it) {
-				stack.push_back(*it); // reversed so iteration pops in order
+				// Only directories are descended (Go fs.WalkDir); pushing
+				// files makes directory_iterator fail with ENOTDIR.
+				if (fsns::is_directory(*it)) {
+					stack.push_back(*it); // reversed so iteration pops in order
+				}
 			}
 			for (auto& p : entries) {
 				if (fsns::is_directory(p)) continue;

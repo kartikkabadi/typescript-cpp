@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "internal/core/types.h"
+#include "internal/packagejson/packagejson.h"
 #include "internal/tspath/tspath.h"
 
 namespace tsc {
@@ -159,6 +160,20 @@ GetModuleSpecifiersForFileWithInfo(
 	const CompilerOptions* compilerOptions, checker::Program* host,
 	const UserPreferences& userPreferences,
 	const ModuleSpecifierOptions& options, bool forAutoImports);
+
+// specifiers.go:252 — containsIgnoredPath (package-internal helper; declared
+// here for the ported Go unit test that calls it by name).
+bool containsIgnoredPath(const std::string& s);
+
+// specifiers.go:1204 — tryGetModuleNameFromExportsOrImports (package-internal;
+// declared here for the ported Go unit test).
+std::string tryGetModuleNameFromExportsOrImports(
+    const CompilerOptions* options, checker::Program* host,
+    const std::string& targetFilePath, const std::string& packageDirectory,
+    const std::string& packageName,
+    const packagejson::ExportsOrImports& exports,
+    const std::vector<std::string>& conditions, MatchingMode mode,
+    bool isImports, bool preferTsExtension);
 
 // specifiers.go:259 — ContainsNodeModules
 bool ContainsNodeModules(const std::string& s);

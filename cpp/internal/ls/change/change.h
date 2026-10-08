@@ -308,4 +308,8 @@ lsutil::FormatCodeSettings GetFormatCodeSettingsForWriting(lsutil::FormatCodeSet
 void deleteDeclaration(Tracker* t, std::unordered_map<Node*, bool>& deletedNodesInLists,
 					   SourceFile* sourceFile, Node* node);
 
+// trackerimpl.go:105
+bool textEditsConflict(const lsp::lsproto::TextEdit& a, const lsp::lsproto::TextEdit& b,
+					   bool multipleProjections);
+
 } // namespace tsc::ls::change

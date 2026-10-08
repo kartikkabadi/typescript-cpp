@@ -117,8 +117,9 @@ std::string assertNeverDetail(const T& member) {
     } else {
         msg = "Debug failure. " + std::string(reason);
     }
-    // runtime.Breakpoint()
-    tscUnreachable(msg.c_str());
+    // Go panics with the message; panic maps to a thrown std::string so
+    // tests can recover/assert it (uncaught throws still abort).
+    throw std::string(msg);
 }
 
 // FailBadSyntaxKind — debug.go:17. Callers pass *ast.Node.
@@ -133,6 +134,8 @@ template <class N, class... Msgs>
     std::string kindStr;
     if constexpr (requires { node->KindString(); }) {
         kindStr = node->KindString();
+    } else if constexpr (requires { node.KindString(); }) {
+        kindStr = node.KindString();
     } else {
         kindStr = std::string(kindToString(node->kind));
     }

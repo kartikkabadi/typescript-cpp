@@ -293,24 +293,28 @@ ProjectID* InternProjectID(std::string id) {
 	return it->second.get();
 }
 
-// IsPreparedForImportingFile — registry.go:354.
-bool Registry::IsPreparedForImportingFile(
-    const std::string& fileName, ProjectID* projectID,
+// IsPreparedForImportingFile — registry.go:354. Free function: the Go
+// method is nil-receiver safe; see the header comment.
+bool IsPreparedForImportingFile(
+    const Registry* r, const std::string& fileName, ProjectID* projectID,
     const lsutil::UserPreferences& preferences) {
-	auto it = projects.find(projectID);
-	if (it == projects.end()) {
+	if (r == nullptr) {
+		return false;
+	}
+	auto it = r->projects.find(projectID);
+	if (it == r->projects.end()) {
 		return false;
 	}
 	RegistryBucket* projectBucket = it->second;
-	tspath::Path path = toPath(fileName);
+	tspath::Path path = r->toPath(fileName);
 	if (projectBucket->state.possiblyNeedsRebuildForFile(path, preferences)) {
 		return false;
 	}
 
 	tspath::Path dirPath = tspath::getDirectoryPath(path);
 	for (;;) {
-		auto dirIt = nodeModules.find(dirPath);
-		if (dirIt != nodeModules.end()) {
+		auto dirIt = r->nodeModules.find(dirPath);
+		if (dirIt != r->nodeModules.end()) {
 			if (dirIt->second->state.possiblyNeedsRebuildForFile(path,
 			                                                   preferences)) {
 				return false;
@@ -1911,7 +1915,7 @@ void registryBuilder::updateNodeModulesBucket(
 	auto indexStart = std::chrono::steady_clock::now();
 
 	// Clone the existing index, excluding exports from dirty packages
-	auto newIndex = existingBucket->index->Clone(
+	auto newIndex = Clone(existingBucket->index.get(),
 	    [&](const std::shared_ptr<Export>& exp) {
 		    return dirtyPackages == nullptr ||
 		           !dirtyPackages->Has(exp->PackageName);

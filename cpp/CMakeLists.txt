@@ -491,3 +491,9 @@ add_executable(unittestrunner cmd/unittestrunner/main.cpp
 	internal/testutil/unittests/registry.cpp ${UNIT_TEST_SOURCES}
 	${tsc_alloc_objects})
 target_link_libraries(unittestrunner PRIVATE tsc)
+
+# In-process single-test runner for debugging under gdb.
+add_executable(utdbg cmd/unittestrunner/dbg_main.cpp
+	internal/testutil/unittests/registry.cpp ${UNIT_TEST_SOURCES}
+	${tsc_alloc_objects})
+target_link_libraries(utdbg PRIVATE tsc)

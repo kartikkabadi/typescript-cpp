@@ -355,7 +355,7 @@ void MapFS::setEntry(const std::string& realpath,
                      const canonicalPath& canonical,
                      fstest::MapFile file) {
 	if (realpath.empty() || canonical.empty()) {
-		TSC_UNREACHABLE("empty path");
+		throw std::string{"empty path"};
 	}
 
 	auto s = std::make_shared<sys>();
@@ -396,7 +396,7 @@ std::string baseName(std::string_view p) {
 Error MapFS::mkdirAll(const std::string& p0, FileMode perm) {
 	std::string p = p0;
 	if (p.empty()) {
-		TSC_UNREACHABLE("empty path");
+		throw std::string{"empty path"};
 	}
 
 	// Fast path; already exists.
@@ -526,14 +526,12 @@ struct testReadDirFile final : ReadDirFile {
 		for (size_t i = 0; i < list.size(); i++) {
 			auto [info, ierr] = list[i]->Info();
 			if (ierr) {
-				TSC_UNREACHABLE(ierr.str().c_str());
+				throw std::string{ierr.str()};
 			}
 			auto [newInfo, ok] = convertInfo(info);
 			if (!ok) {
-				TSC_UNREACHABLE(
-				    ("unexpected synthesized dir: \"" +
-				     info->Name() + "\"")
-				        .c_str());
+				throw std::string{"unexpected synthesized dir: \"" +
+				     info->Name() + "\""};
 			}
 			entries[i] = vfs::fileInfoToDirEntry(newInfo);
 		}
@@ -556,16 +554,15 @@ MapFS::Open(const std::string& name) {
 
 	auto [info, serr] = f->Stat();
 	if (serr) {
-		TSC_UNREACHABLE(serr.str().c_str());
+		throw std::string{serr.str()};
 	}
 
 	auto [newInfo, ok] = convertInfo(info);
 	if (!ok) {
 		// This is a synthesized dir.
 		if (name != ".") {
-			TSC_UNREACHABLE(("unexpected synthesized dir: \"" + name +
-			                 "\"")
-			                    .c_str());
+			throw std::string{"unexpected synthesized dir: \"" + name +
+			                 "\""};
 		}
 		auto fi = std::make_shared<testFileInfo>();
 		fi->inner = info;
@@ -642,7 +639,7 @@ Error MapFS::WriteFile(const std::string& path, const std::string& data,
 	if (err) {
 		if (!err.is(vfs::ErrNotExist) && !isBrokenSymlinkError(err)) {
 			// No other errors are possible.
-			TSC_UNREACHABLE(err.str().c_str());
+			throw std::string{err.str()};
 		}
 	} else {
 		if (!file->Mode.IsRegular()) {
@@ -685,7 +682,7 @@ Error MapFS::AppendFile(const std::string& path, const std::string& data,
 	if (err) {
 		if (!err.is(vfs::ErrNotExist) && !isBrokenSymlinkError(err)) {
 			// No other errors are possible.
-			TSC_UNREACHABLE(err.str().c_str());
+			throw std::string{err.str()};
 		}
 	} else {
 		if (!file->Mode.IsRegular()) {
@@ -831,10 +828,9 @@ convertMapFS(const fstest::MapFS& input, bool useCaseSensitiveFileNames,
 			auto& other = it->second;
 			auto lo = std::min(path, other);
 			auto hi = std::max(path, other);
-			TSC_UNREACHABLE(("duplicate path: \"" + lo +
+			throw std::string{"duplicate path: \"" + lo +
 			                 "\" and \"" + hi +
-			                 "\" have the same canonical path")
-			                    .c_str());
+			                 "\" have the same canonical path"};
 		}
 		canonicalPaths[canonical] = path;
 	}
@@ -859,11 +855,9 @@ convertMapFS(const fstest::MapFS& input, bool useCaseSensitiveFileNames,
 		// the realpath to each of them.
 		if (auto dir = dirName(p); !dir.empty()) {
 			if (auto err = m->mkdirAll(dir, FileMode{0777}); err) {
-				TSC_UNREACHABLE(
-				    ("failed to create intermediate directories "
+				throw std::string{"failed to create intermediate directories "
 				     "for \"" +
-				     p + "\": " + err.str())
-				        .c_str());
+				     p + "\": " + err.str()};
 			}
 		}
 		m->setEntry(p, m->getCanonicalPath(p), *file);
@@ -876,14 +870,12 @@ namespace {
 
 void checkPath(std::string_view p, bool& posix, bool& windows) {
 	if (!tspath::isRootedDiskPath(p)) {
-		TSC_UNREACHABLE(("non-rooted path \"" + std::string{p} + "\"")
-		                    .c_str());
+		throw std::string{"non-rooted path \"" + std::string{p} + "\""};
 	}
 	if (tspath::removeTrailingDirectorySeparator(
 	        tspath::normalizePath(p)) != p) {
-		TSC_UNREACHABLE(("non-normalized path \"" + std::string{p} +
-		                 "\"")
-		                    .c_str());
+		throw std::string{"non-normalized path \"" + std::string{p} +
+		                  "\""};
 	}
 	if (p.starts_with('/')) {
 		posix = true;
@@ -940,7 +932,7 @@ FromMapWithClock(const std::unordered_map<std::string, MapFileInput>& m,
 			file = **mf;
 			file.ModTime = clock->Now();
 		} else {
-			TSC_UNREACHABLE("invalid file type");
+			throw std::string{"invalid file type"};
 		}
 
 		if (file.Mode.v & FileMode::kSymlink) {
@@ -960,7 +952,7 @@ FromMapWithClock(const std::unordered_map<std::string, MapFileInput>& m,
 	}
 
 	if (posix && windows) {
-		TSC_UNREACHABLE("mixed posix and windows paths");
+		throw std::string{"mixed posix and windows paths"};
 	}
 
 	return iovfs::From(

@@ -182,4 +182,17 @@ inline void Assert(gostd::testing::T* t, bool condition,
 	}
 }
 
+// Check — gotest.tools/v3/assert.Check: like Assert but non-fatal (t.Error,
+// the test continues).
+inline void Check(gostd::testing::T* t, bool condition,
+                  std::string_view msg = "") {
+	if (!condition) {
+		if (msg.empty()) {
+			t->Error({"assertion failed"});
+		} else {
+			t->Error({std::string(msg)});
+		}
+	}
+}
+
 }  // namespace tsc::gotest::assert

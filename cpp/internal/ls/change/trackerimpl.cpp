@@ -91,18 +91,6 @@ std::vector<lsp::lsproto::TextEdit> dedupeIdenticalEdits(std::vector<lsp::lsprot
 	return deduped;
 }
 
-// textEditsConflict — trackerimpl.go:105
-bool textEditsConflict(const lsp::lsproto::TextEdit& a, const lsp::lsproto::TextEdit& b,
-					   bool multipleProjections) {
-	if (lsp::lsproto::ComparePositions(a.Range.End, b.Range.Start) > 0) {
-		return true;
-	}
-	// Different insertions at the same position are ambiguous when they may
-	// come from different projections.
-	return multipleProjections && a.Range.Start == a.Range.End && a.Range == b.Range &&
-		a.NewText != b.NewText;
-}
-
 // leadingIndentation — trackerimpl.go:208
 std::string_view leadingIndentation(std::string_view text) {
 	size_t end = 0;
@@ -120,6 +108,18 @@ bool positionsAreOnSameLine(int pos1, int pos2, SourceFile* sourceFile) {
 }
 
 } // namespace
+
+// textEditsConflict — trackerimpl.go:105
+bool textEditsConflict(const lsp::lsproto::TextEdit& a, const lsp::lsproto::TextEdit& b,
+					   bool multipleProjections) {
+	if (lsp::lsproto::ComparePositions(a.Range.End, b.Range.Start) > 0) {
+		return true;
+	}
+	// Different insertions at the same position are ambiguous when they may
+	// come from different projections.
+	return multipleProjections && a.Range.Start == a.Range.End && a.Range == b.Range &&
+		a.NewText != b.NewText;
+}
 
 // getTextChangesFromChanges — trackerimpl.go:20
 std::map<std::string, std::vector<lsp::lsproto::TextEdit>> Tracker::getTextChangesFromChanges() {

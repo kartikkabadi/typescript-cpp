@@ -305,6 +305,11 @@ int computePositionOfLineAndUTF16Character(
 // utilities.go
 bool tokenIsIdentifierOrKeyword(Kind token);
 Kind identifierToKeywordKind(const Identifier* node);
+// Package-internal helpers, exposed for the scanner unit test (scanner_test.go
+// is in `package scanner`).
+bool isJSDocTypeExpressionOrChild(const Node* node);
+std::string normalizeJSDocTypeSourceText(std::string_view text);
+
 std::string getTextOfNodeFromSourceText(std::string_view sourceText,
                                         const Node* node, bool includeTrivia);
 std::string getSourceTextOfNodeFromSourceFile(SourceFile* sourceFile,

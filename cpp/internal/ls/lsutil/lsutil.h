@@ -825,3 +825,15 @@ inline bool isDeprecatedDeclaration(Node* declaration) {
 }
 
 } // namespace tsc::ls::lsutil::detail
+
+namespace tsc::ls::lsutil {
+
+// --- test access (userpreferences_test.go) ---
+// The Go tests live in-package and call unexported helpers; these give the
+// C++ test ports the same access. Defined in userpreferences.cpp.
+UserPreferences TestWithConfig(UserPreferences p, const JsonObject& config);
+UserPreferences AllFieldsNonZeroUserPreferences();
+// Defined in organizeimports.cpp.
+StringComparer TestGetOrganizeImportsPresetStringComparer(OrganizeImportsSort sort);
+
+} // namespace tsc::ls::lsutil

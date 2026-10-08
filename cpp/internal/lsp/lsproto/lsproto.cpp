@@ -487,8 +487,12 @@ std::string documentUriFileName(DocumentUri uri) {
 		return uri;
 	}
 	if (uri.starts_with("file://")) {
-		// url.Parse(u).Host / .Path — minimal file-URI parse.
+		// url.Parse(u).Host / .Path — minimal file-URI parse. The parsed path
+		// excludes the query and fragment (lsp.go:24-31), so cut them first.
 		std::string_view rest = std::string_view(uri).substr(7);
+		if (auto cut = rest.find_first_of("?#"); cut != std::string_view::npos) {
+			rest = rest.substr(0, cut);
+		}
 		std::string_view host, rawPath;
 		auto slash = rest.find('/');
 		if (slash == std::string_view::npos) {

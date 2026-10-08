@@ -138,10 +138,15 @@ struct Index {
 	std::vector<Export*> SearchWordPrefix(const std::string& prefix) const;
 	// insertAsWords — index.go:114
 	void insertAsWords(const std::shared_ptr<Export>& value);
-	// Clone — index.go:152
-	std::unique_ptr<Index> Clone(
-	    const std::function<bool(const std::shared_ptr<Export>&)>& filter) const;
 };
+
+// Clone — index.go:152. Go's `idx.Clone(filter)` tolerates a nil receiver;
+// a member call on nullptr is UB in C++ and clang folds `this == nullptr`
+// away at -O2 (see spanmap.h). Free function with the receiver as the first
+// parameter so nil is handled by construction.
+std::unique_ptr<Index> Clone(
+    const Index* idx,
+    const std::function<bool(const std::shared_ptr<Export>&)>& filter);
 
 // === extract.go types (declared early: registry result types embed them) ===
 
@@ -354,10 +359,6 @@ struct Registry {
 	    specifierCache;
 
 	~Registry();
-	// IsPreparedForImportingFile — registry.go:354
-	bool IsPreparedForImportingFile(const std::string& fileName,
-	                                ProjectID* projectID,
-	                                const lsutil::UserPreferences& preferences);
 	// NodeModulesDirectories — registry.go:383
 	std::unordered_map<tspath::Path, std::string> NodeModulesDirectories();
 	// Clone — registry.go:393
@@ -367,6 +368,13 @@ struct Registry {
 	// GetCacheStats — registry.go:432
 	struct CacheStats* GetCacheStats();
 };
+
+// IsPreparedForImportingFile — registry.go:354. Free function: Go's
+// method is nil-receiver safe (nil registry returns false); a member
+// call on nullptr is UB in C++.
+bool IsPreparedForImportingFile(
+    const Registry* r, const std::string& fileName, ProjectID* projectID,
+    const lsutil::UserPreferences& preferences);
 
 // NewRegistry — registry.go:346
 std::unique_ptr<Registry> NewRegistry(

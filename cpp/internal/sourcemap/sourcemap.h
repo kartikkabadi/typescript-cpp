@@ -2,6 +2,7 @@
 // decoding, and position mapping. Field/method names mirror the Go package.
 #pragma once
 
+#include "internal/gostd/gostd.h"
 #include "internal/ast/ast.h" // TSC_UNREACHABLE / TSC_ASSERT
 #include "internal/core/arena.h"
 #include "internal/core/text.h" // TextPos, UTF16Offset, ECMALineStarts
@@ -66,10 +67,12 @@ struct RawSourceMap {
 	std::vector<std::string> Names;                               // json:"names"
 	std::string Mappings;                                         // json:"mappings"
 	std::optional<std::vector<std::optional<std::string>>> SourcesContent; // json:"sourcesContent,omitzero"
+
+	bool operator==(const RawSourceMap&) const = default;
 };
 
-// Generator (generator.go:26). Go `error` results are returned as int
-// (0 == nil), matching the established porting convention.
+// Generator (generator.go:26). Go `error` results are returned as
+// gostd::Error (nullptr == nil); callers only use truthiness.
 struct Generator {
 	tspath::ComparePathsOptions pathOptions;
 	std::string file;
@@ -101,13 +104,13 @@ struct Generator {
 
 	const std::vector<std::string>& Sources() const { return rawSources; }
 	SourceIndex AddSource(std::string_view fileName);
-	int SetSourceContent(SourceIndex sourceIndex, std::string_view content);
+	gostd::Error SetSourceContent(SourceIndex sourceIndex, std::string_view content);
 	NameIndex AddName(std::string_view name);
-	int AddGeneratedMapping(int generatedLine, UTF16Offset generatedCharacter);
-	int AddSourceMapping(int generatedLine, UTF16Offset generatedCharacter,
+	gostd::Error AddGeneratedMapping(int generatedLine, UTF16Offset generatedCharacter);
+	gostd::Error AddSourceMapping(int generatedLine, UTF16Offset generatedCharacter,
 	                     SourceIndex sourceIndex, int sourceLine,
 	                     UTF16Offset sourceCharacter);
-	int AddNamedSourceMapping(int generatedLine, UTF16Offset generatedCharacter,
+	gostd::Error AddNamedSourceMapping(int generatedLine, UTF16Offset generatedCharacter,
 	                          SourceIndex sourceIndex, int sourceLine,
 	                          UTF16Offset sourceCharacter, NameIndex nameIndex);
 	struct RawSourceMap* RawSourceMap();

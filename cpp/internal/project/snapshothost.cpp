@@ -85,13 +85,11 @@ SnapshotHost* NewSnapshotHost(SessionInit* init) {
 
 // internProjectID — C++ adapter: interns project::ID →
 // ls::autoimport::ProjectID so pointer identity matches Go's
-// value-keyed maps. Shared by clone hosts and the Session.
+// value-keyed maps. Delegates to ls::autoimport::InternProjectID —
+// the single canonical cache shared by clone hosts, the Session, and
+// the API layer.
 ls::autoimport::ProjectID* SnapshotHost::internProjectID(const ID& id) {
-	auto [it, inserted] = projectIDCache.try_emplace(id);
-	if (inserted) {
-		it->second = std::make_unique<projectIDAdapter>(id);
-	}
-	return it->second.get();
+	return ls::autoimport::InternProjectID(idString(id));
 }
 
 // RetainSnapshot — snapshothost.go:97.

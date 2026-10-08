@@ -74,15 +74,6 @@ struct autoImportBuilderFS : FileSource {
 	}
 };
 
-// projectIDAdapter — wraps project::ID as an ls::autoimport::ProjectID so
-// pointer-identity matches Go's interface-keyed maps (interned by the
-// owning host/session).
-struct projectIDAdapter : ls::autoimport::ProjectID {
-	ID id;
-	explicit projectIDAdapter(ID id) : id(std::move(id)) {}
-	std::string String() const override { return idString(id); }
-};
-
 // autoImportRegistryCloneHost — autoimport.go:71.
 struct autoImportRegistryCloneHost : ls::autoimport::RegistryCloneHost {
 	ProjectCollection* projectCollection = nullptr;
@@ -93,18 +84,13 @@ struct autoImportRegistryCloneHost : ls::autoimport::RegistryCloneHost {
 	std::mutex filesMu;
 	std::vector<ParseCacheKey> files;
 
-	// Intern cache shared with the owning SnapshotHost (and the
-	// Session) so ProjectID* identity is stable across clones — Go
-	// keys these maps by the ProjectID interface's value.
-	std::unordered_map<ID, std::unique_ptr<ls::autoimport::ProjectID>>*
-	    projectIDs = nullptr;
-
+	// ls::autoimport::InternProjectID is the single canonical intern
+	// cache — pointer identity must match every other place a
+	// ProjectID* is produced (Session::internProjectID, the API
+	// layer), since Go keys these maps by the ProjectID interface's
+	// value.
 	ls::autoimport::ProjectID* internID(const ID& id) {
-		auto [it, inserted] = projectIDs->try_emplace(id);
-		if (inserted) {
-			it->second = std::make_unique<projectIDAdapter>(id);
-		}
-		return it->second.get();
+		return ls::autoimport::InternProjectID(idString(id));
 	}
 
 	// FS implements autoimport.RegistryCloneHost.
@@ -198,13 +184,8 @@ struct autoImportRegistryCloneHost : ls::autoimport::RegistryCloneHost {
 	// GetProgramForProject implements autoimport.RegistryCloneHost.
 	compiler::SimpleProgram* GetProgramForProject(
 	    ls::autoimport::ProjectID* projectID) override {
-		auto* adapter =
-		    dynamic_cast<projectIDAdapter*>(projectID);
-		if (adapter == nullptr) {
-			TSC_UNREACHABLE("unexpected project ID type");
-		}
 		auto* project =
-		    projectCollection->GetProject(adapter->id);
+		    projectCollection->GetProject(projectID->String());
 		if (project == nullptr) {
 			return nullptr;
 		}
@@ -244,13 +225,10 @@ struct autoImportRegistryCloneHost : ls::autoimport::RegistryCloneHost {
 inline autoImportRegistryCloneHost* newAutoImportRegistryCloneHost(
     ProjectCollection* projectCollection, ParseCache* parseCache,
     snapshotFSBuilder* builder, const std::string& currentDirectory,
-    const std::function<tspath::Path(const std::string&)>& toPath,
-    std::unordered_map<ID, std::unique_ptr<ls::autoimport::ProjectID>>*
-        sharedProjectIDs) {
+    const std::function<tspath::Path(const std::string&)>& toPath) {
 	auto* host = new autoImportRegistryCloneHost();
 	host->projectCollection = projectCollection;
 	host->parseCache = parseCache;
-	host->projectIDs = sharedProjectIDs;
 	auto* fs = new autoImportBuilderFS();
 	fs->snapshotFSBuilder_ = builder;
 	host->fs = newSourceFS(false, fs, toPath);

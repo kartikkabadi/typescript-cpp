@@ -495,8 +495,7 @@ Snapshot* Snapshot::Clone(
 		// projectsWithNewProgramStructure by pointer identity.
 		auto* autoImportHost = newAutoImportRegistryCloneHost(
 		    projectCollection, store->parseCache, fsb,
-		    store->options->CurrentDirectory, store->toPath,
-		    &store->projectIDCache);
+		    store->options->CurrentDirectory, store->toPath);
 		std::unordered_map<ls::autoimport::ProjectID*, bool>
 		    projectsWithNewProgramStructure;
 		for (auto* project : projectCollection->Projects()) {
