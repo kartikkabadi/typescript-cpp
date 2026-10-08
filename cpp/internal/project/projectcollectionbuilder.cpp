@@ -960,6 +960,14 @@ void ProjectCollectionBuilder::DidRequestProjectTrees(
 	}
 	wg->RunAndWait();
 
+	// Updated configured projects may have moved open files in or out of
+	// the inferred project. Callers iterate over all language service
+	// projects, so the inferred one needs a program too.
+	cleanupInferredProject(logger);
+	if (inferredProject->Value() != nullptr) {
+		updateProgram(inferredProject, logger);
+	}
+
 	auto elapsed =
 	    duration_cast<nanoseconds>(steady_clock::now() - startTime);
 	std::string projectsStr;
