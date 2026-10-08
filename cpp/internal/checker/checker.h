@@ -1491,6 +1491,7 @@ public:
 	Arena linksArena; // arena backing symbolArenaLinkStore + link stores
 	Arena typeArena;  // arena backing all Type allocations (types never move)
 	std::unordered_map<Symbol*, Symbol*> mergedSymbols;
+	std::unordered_set<Symbol*> mergedExportsChecked;
 	NodeFactory factory;
 	nodeLinkStore<NodeLinks> nodeLinks;
 	nodeLinkStore<SignatureLinks> signatureLinks;

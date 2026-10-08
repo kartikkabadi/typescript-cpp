@@ -483,14 +483,18 @@ void Checker::checkInterfaceDeclaration(Node* node) {
 		!links->interfaceChecked || staleForCheckFile(links->interfaceCheckedFor)) {
 		links->interfaceChecked = true;
 		links->interfaceCheckedFor = checkFileTag();
+		// Check once per checker, but report on the first interface
+		// declaration, independently of which declaration is checked first.
+		Node* firstInterfaceDeclaration =
+		    getDeclarationOfKind(symbol, Kind::InterfaceDeclaration);
 		Type* t = getDeclaredTypeOfSymbol(symbol);
 		Type* typeWithThis = getTypeWithThisArgument(t, nullptr, false);
 		// run subsequent checks only if first set succeeded
-		if (checkInheritedPropertiesAreIdentical(t, node->name())) {
+		if (checkInheritedPropertiesAreIdentical(t, firstInterfaceDeclaration->name())) {
 			for (Type* baseType : getBaseTypes(t)) {
 				checkTypeAssignableTo(typeWithThis,
 					getTypeWithThisArgument(baseType, t->AsInterfaceType()->thisType, false),
-					node->name(), Interface_0_incorrectly_extends_interface_1);
+					firstInterfaceDeclaration->name(), Interface_0_incorrectly_extends_interface_1);
 			}
 			checkIndexConstraints(t, symbol, false /*isStaticIndex*/);
 		}
@@ -582,7 +586,9 @@ void Checker::checkEnumDeclaration(Node* node) {
 		links->enumChecked = true;
 		links->enumCheckedFor = checkFileTag();
 		if (enumSymbol->declarations.size() > 1) {
-			bool enumIsConst = isEnumConst(node);
+			Node* firstEnumDeclaration =
+			    getDeclarationOfKind(enumSymbol, Kind::EnumDeclaration);
+			bool enumIsConst = isEnumConst(firstEnumDeclaration);
 			// check that const is placed\omitted on all enum declarations
 			for (Node* decl : enumSymbol->declarations) {
 				if (isEnumDeclaration(decl) && isEnumConst(decl) != enumIsConst) {
@@ -2726,8 +2732,8 @@ void Checker::checkExportsOnMergedDeclarations(Node* node) {
 			return;
 		}
 	}
-	// Run the check only for the first declaration in the list.
-	if (getDeclarationOfKind(symbol, node->kind) != node) {
+	if (symbol->declarations.size() < 2 ||
+	    !mergedExportsChecked.insert(symbol).second) {
 		return;
 	}
 	DeclarationSpaces exportedDeclarationSpaces = DeclarationSpacesNone;
