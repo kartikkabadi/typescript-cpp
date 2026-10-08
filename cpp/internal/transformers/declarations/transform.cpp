@@ -1962,6 +1962,17 @@ Node* DeclarationTransformerImpl::transformExportAssignment(
 		return exportAssignment;
 	}
 
+	state->getSymbolAccessibilityDiagnostic =
+		[input](printer::SymbolAccessibilityResult&)
+		-> SymbolAccessibilityDiagnostic* {
+		auto* d = new SymbolAccessibilityDiagnostic();
+		d->diagnosticMessage =
+			Default_export_of_the_module_has_or_is_using_private_name_0;
+		d->errorNode = input;
+		return d;
+	};
+	tracker->PushErrorFallbackNode(assignment);
+
 	// Check if the expression is a class expression - emit as a class
 	// declaration + export assignment
 	Node* unwrapped =
@@ -1975,6 +1986,7 @@ Node* DeclarationTransformerImpl::transformExportAssignment(
 		}
 		Node* classDecl = transformClassExpressionToDeclaration(
 			unwrapped, newId, factory()->newModifierList(mods));
+		tracker->PopErrorFallbackNode();
 		preserveJsDoc(classDecl, input);
 		// Reuse the same name node for the export so unique names resolve
 		// consistently
@@ -1993,6 +2005,7 @@ Node* DeclarationTransformerImpl::transformExportAssignment(
 		Node* funcDecl = transformFunctionLikeToDeclaration(
 			unwrapped, newId, factory()->newModifierList(mods),
 			fullSignatureType);
+		tracker->PopErrorFallbackNode();
 		preserveJsDoc(funcDecl, input);
 		// Reuse the same name node for the export so unique names resolve
 		// consistently
@@ -2004,17 +2017,7 @@ Node* DeclarationTransformerImpl::transformExportAssignment(
 
 	// expression is non-identifier, create _default typed variable to
 	// reference
-	state->getSymbolAccessibilityDiagnostic =
-		[input](printer::SymbolAccessibilityResult&)
-		-> SymbolAccessibilityDiagnostic* {
-		auto* d = new SymbolAccessibilityDiagnostic();
-		d->diagnosticMessage =
-			Default_export_of_the_module_has_or_is_using_private_name_0;
-		d->errorNode = input;
-		return d;
-	};
 	cjsExportAssignmentName = newId;
-	tracker->PushErrorFallbackNode(assignment);
 	Node* type_ = nullptr;
 	Node* initializer = nullptr;
 	if (isPrimitiveLiteralValue(unwrapParenthesizedExpression(expression),

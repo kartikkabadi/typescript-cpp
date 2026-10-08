@@ -136,16 +136,16 @@ static Node* convertBindingElementToArrayAssignmentElement(
 		                                           element->asNode());
 		return elision;
 	}
+	Node* expression = convertBindingNameToAssignmentElementTarget(
+		emitContext, element->name());
 	if (element->as<BindingElement>()->DotDotDotToken != nullptr) {
 		Node* spread =
-			emitContext->factory.newSpreadElement(element->name());
+			emitContext->factory.newSpreadElement(expression);
 		emitContext->setOriginal(spread, element->asNode());
 		emitContext->assignCommentAndSourceMapRanges(spread,
 		                                           element->asNode());
 		return spread;
 	}
-	Node* expression = convertBindingNameToAssignmentElementTarget(
-		emitContext, element->name());
 	if (element->initializer() != nullptr) {
 		Node* assignment = emitContext->factory.newAssignmentExpression(
 			expression, element->initializer());
