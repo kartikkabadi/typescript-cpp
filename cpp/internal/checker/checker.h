@@ -1511,6 +1511,7 @@ public:
 	LinkStore<Symbol*, ReverseMappedSymbolLinks> reverseMappedSymbolLinks{&linksArena};
 	LinkStore<Symbol*, MarkedAssignmentSymbolLinks> markedAssignmentSymbolLinks{&linksArena};
 	LinkStore<Symbol*, ContainingSymbolLinks> symbolContainerLinks{&linksArena};
+	externalModuleContainerIndex* externalModuleContainers{};
 	LinkStore<SourceFile*, SourceFileLinks> sourceFileLinks{&linksArena};
 	std::optional<Scanner> regExpScanner;
 	std::unordered_map<Type*, Node*> patternForType;
@@ -2077,6 +2078,10 @@ public:
 	Symbol* getSymbolOfDeclaration(Node* node);
 	Symbol* getSymbolOfNode(Node* node);
 	Symbol* getMergedSymbol(Symbol* symbol);
+	Symbol* getResolvedTarget(Symbol* symbol);
+	std::vector<Symbol*> getExternalModuleContainers(Symbol* symbol);
+	void buildExternalModuleContainerIndex();
+	std::vector<Symbol*> scanExternalModuleContainers(Symbol* symbol);
 	void recordMergedSymbol(Symbol* target, Symbol* source);
 	Symbol* mergeSymbol(Symbol* target, Symbol* source, bool unidirectional);
 	void mergeSymbolTable(SymbolTable& target, const SymbolTable& source, bool unidirectional,

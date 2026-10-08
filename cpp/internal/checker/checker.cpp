@@ -2368,9 +2368,12 @@ void Checker::recordMergedSymbol(Symbol* target, Symbol* source) {
 	mergedSymbols[source] = target;
 }
 
+Symbol* Checker::getResolvedTarget(Symbol* symbol) {
+	return getMergedSymbol(resolveSymbol(getMergedSymbol(symbol)));
+}
+
 Symbol* Checker::getSymbolIfSameReference(Symbol* s1, Symbol* s2) {
-	if (getMergedSymbol(resolveSymbol(getMergedSymbol(s1))) ==
-		getMergedSymbol(resolveSymbol(getMergedSymbol(s2)))) {
+	if (getResolvedTarget(s1) == getResolvedTarget(s2)) {
 		return s1;
 	}
 	return nullptr;
