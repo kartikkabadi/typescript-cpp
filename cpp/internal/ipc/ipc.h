@@ -197,26 +197,33 @@ struct requestErrors {
 // waitGroup — sync.WaitGroup: go() spawns a detached thread, wait() blocks
 // until the count reaches zero.
 struct waitGroup {
-	std::mutex mu;
-	std::condition_variable cv;
-	int count = 0;
+	// Shared state — Go's GC keeps the WaitGroup alive for as long as any
+	// spawned goroutine can touch it. A detached worker's final
+	// decrement/notify can run after wait() returned and the group owner
+	// was destroyed, so the state must be heap-shared.
+	struct shared {
+		std::mutex mu;
+		std::condition_variable cv;
+		int count = 0;
+	};
+	std::shared_ptr<shared> st = std::make_shared<shared>();
 
 	void go(std::function<void()> f) {
 		{
-			std::lock_guard<std::mutex> lk(mu);
-			++count;
+			std::lock_guard<std::mutex> lk(st->mu);
+			++st->count;
 		}
-		std::thread([this, f = std::move(f)] {
+		std::thread([st = st, f = std::move(f)] {
 			f();
-			std::unique_lock<std::mutex> lk(mu);
-			--count;
+			std::unique_lock<std::mutex> lk(st->mu);
+			--st->count;
 			lk.unlock();
-			cv.notify_all();
+			st->cv.notify_all();
 		}).detach();
 	}
 	void wait() {
-		std::unique_lock<std::mutex> lk(mu);
-		cv.wait(lk, [this] { return count == 0; });
+		std::unique_lock<std::mutex> lk(st->mu);
+		st->cv.wait(lk, [st = st] { return st->count == 0; });
 	}
 };
 
@@ -433,24 +440,25 @@ NewPipeTransport(std::string_view path);
 // connection transport; only accepts one connection.
 class StdioTransport : public Transport {
 public:
-	StdioTransport(std::shared_ptr<gostd::io::ReadCloser> stdin,
-	               std::shared_ptr<gostd::io::WriteCloser> stdout)
-	    : stdin(std::move(stdin)), stdout(std::move(stdout)) {}
+	// Names stdin_/stdout_ dodge the MSVC CRT macros stdin/stdout.
+	StdioTransport(std::shared_ptr<gostd::io::ReadCloser> stdin_,
+	               std::shared_ptr<gostd::io::WriteCloser> stdout_)
+	    : stdin_(std::move(stdin_)), stdout_(std::move(stdout_)) {}
 
 	std::pair<std::shared_ptr<gostd::io::ReadWriteCloser>, gostd::Error>
 	Accept() override;
 	gostd::Error Close() override;
 
 private:
-	std::shared_ptr<gostd::io::ReadCloser> stdin;
-	std::shared_ptr<gostd::io::WriteCloser> stdout;
+	std::shared_ptr<gostd::io::ReadCloser> stdin_;
+	std::shared_ptr<gostd::io::WriteCloser> stdout_;
 	bool used = false;
 };
 
 // NewStdioTransport — transport.go:55.
 std::shared_ptr<StdioTransport> NewStdioTransport(
-    std::shared_ptr<gostd::io::ReadCloser> stdin,
-    std::shared_ptr<gostd::io::WriteCloser> stdout);
+    std::shared_ptr<gostd::io::ReadCloser> stdin_,
+    std::shared_ptr<gostd::io::WriteCloser> stdout_);
 
 // GeneratePipePath — transport_unix.go:23. A platform-appropriate pipe path
 // for the given name (os.TempDir() + name).

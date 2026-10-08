@@ -604,7 +604,8 @@ Snapshot* Snapshot::Clone(
 		    ctx, registryChange, autoImportHost,
 		    logging::fork(logger, "UpdateAutoImports"));
 		if (err == nullptr) {
-			autoImportsWatch = this->autoImportsWatch->Clone(
+			autoImportsWatch = watchedFilesClone(
+			    this->autoImportsWatch,
 			    autoImports->NodeModulesDirectories());
 		}
 

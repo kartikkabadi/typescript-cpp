@@ -12,12 +12,18 @@
 #include <limits.h>
 #include <mutex>
 
+#ifdef _WIN32
+// w32compat supplies POSIX-shaped stat/open/readdir/etc. on top of Win32,
+// with Go-on-Windows semantics (see internal/win32/w32compat.h).
+#include "internal/win32/w32compat.h"
+#else
 #include <dirent.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
+#endif
 
 #include "internal/core/version.h"
 #include "internal/stringutil/stringutil.h"
@@ -89,7 +95,11 @@ static Error errnoError(int e) {
 	case EINVAL:
 		return ErrInvalid;
 	default:
+#ifdef _WIN32
+		return Error::newError(w32::errnoText(e));
+#else
 		return Error::newError(std::strerror(e));
+#endif
 	}
 }
 
@@ -100,13 +110,25 @@ static Error pathErrno(const char* op, const std::string& path, int e) {
 // --- os file metadata ---------------------------------------------------
 
 static TimePoint fromTimespec(const timespec& ts) {
-	return TimePoint{std::chrono::seconds{ts.tv_sec} +
-	                 std::chrono::nanoseconds{ts.tv_nsec}};
+	return TimePoint{
+	    std::chrono::duration_cast<std::chrono::system_clock::duration>(
+	        std::chrono::seconds{ts.tv_sec} +
+	        std::chrono::nanoseconds{ts.tv_nsec})};
 }
 
-// modeFromStat — Go fileStat.mode mapping (os/stat.go).
+// modeFromStat — Go fileStat.mode mapping (os/stat.go /
+// os/types_windows.go on Windows).
 static FileMode modeFromStat(mode_t m) {
 	FileMode mode{static_cast<uint32_t>(m & 0777)};
+#ifdef _WIN32
+	// S_IIRREGULAR marks the "m |= ModeIrregular" case from
+	// fileStat.mode(): non-symlink reparse points (junctions, mount
+	// points, cloud placeholders). It may coexist with S_IFDIR for
+	// non-surrogate reparse dirs, mirroring Go's ModeDir|ModeIrregular.
+	if (m & S_IIRREGULAR) {
+		mode = mode | ModeIrregular;
+	}
+#endif
 	switch (m & S_IFMT) {
 	case S_IFBLK:
 		mode = mode | ModeDevice;
@@ -508,6 +530,15 @@ static auto ignoringEINTR(F fn) -> decltype(fn()) {
 	}
 }
 
+#ifdef _WIN32
+// nativepathRealpath — nativepath/realpath_windows.go: CreateFile
+// (BACKUP_SEMANTICS) + GetFinalPathNameByHandle(VOLUME_NAME_DOS) + strip
+// the \\?\ prefix. Returns a native (\\) path.
+static std::pair<std::string, int> nativepathRealpath(
+    const std::string& path) {
+	return ::realpath(path);
+}
+#else
 // nativepathRealpath — nativepath/realpath_linux.go: O_PATH + /proc/self/fd
 // trick, with EvalSymlinks-style fallback when procfs is absent.
 static std::pair<std::string, int> nativepathRealpath(
@@ -556,9 +587,34 @@ static std::pair<std::string, int> nativepathRealpath(
 		buf.resize(buf.size() * 2);
 	}
 }
+#endif // !_WIN32
 
 // filepathAbs — filepath.Abs: rooted path -> Clean; else cwd + path -> Clean.
 static std::pair<std::string, Error> filepathAbs(const std::string& path) {
+#ifdef _WIN32
+	// filepath.Abs on Windows: rooted (isAbs incl. rooted-relative rules)
+	// -> Clean with native separators; else join(Getwd(), path). Our vfs
+	// works on '/'-normalized paths, so normalize the cwd before joining.
+	if (path.empty()) {
+		std::string cwd = ::getcwdString();
+		if (cwd.empty()) {
+			return {"", errnoError(errno)};
+		}
+		return {tspath::normalizeSlashes(cwd), Error{}};
+	}
+	std::string norm = tspath::normalizeSlashes(path);
+	std::string combined;
+	if (tspath::isRootedDiskPath(norm) || norm[0] == '/') {
+		combined = norm;
+	} else {
+		std::string cwd = ::getcwdString();
+		if (cwd.empty()) {
+			return {"", errnoError(errno)};
+		}
+		combined = tspath::normalizeSlashes(cwd) + "/" + norm;
+	}
+	return {pathClean(combined), Error{}};
+#else
 	if (path.empty()) {
 		char cwd[PATH_MAX];
 		if (::getcwd(cwd, sizeof(cwd)) == nullptr) {
@@ -577,10 +633,17 @@ static std::pair<std::string, Error> filepathAbs(const std::string& path) {
 		combined = std::string{cwd} + "/" + path;
 	}
 	return {pathClean(combined), Error{}};
+#endif
 }
 
 // --- osutil/os.go --------------------------------------------------------
 
+#ifdef _WIN32
+// executable — os.Executable on Windows: GetModuleFileName(NULL).
+static std::pair<std::string, Error> executable() {
+	return {w32::selfExePath(), Error{}};
+}
+#else
 // executable — os.Executable on Linux: readlink("/proc/self/exe") minus a
 // " (deleted)" suffix.
 static std::pair<std::string, Error> executable() {
@@ -599,6 +662,7 @@ static std::pair<std::string, Error> executable() {
 	}
 	return {path, Error{}};
 }
+#endif
 
 // --- os.MkdirAll / os.Remove / os.Chtimes --------------------------------
 
@@ -676,6 +740,11 @@ static std::string swapCase(const std::string& str) {
 // We do this right at startup to minimize the chance that executable gets
 // moved or deleted.
 static bool isFileSystemCaseSensitive() {
+#ifdef _WIN32
+	// os.go:46-50: on Windows GOOS gates the probe away entirely — the
+	// filesystem is treated as case-insensitive without probing.
+	return false;
+#endif
 	auto [exe, err] = executable();
 	if (err) {
 		TSC_UNREACHABLE(("vfs: failed to get executable path: " +
@@ -715,11 +784,19 @@ static std::string osFSRealpath(const std::string& path) {
 	return tspath::normalizeSlashes(abs);
 }
 
-// isReparsePoint — nativepath.IsSymlinkOrReparsePoint (non-Windows):
-// lstat + ModeSymlink.
+// isReparsePoint — nativepath.IsSymlinkOrReparsePoint.
 static bool isReparsePoint(const std::string& path) {
+#ifdef _WIN32
+	// nativepath/symlink_windows.go: GetFileAttributesEx +
+	// FILE_ATTRIBUTE_REPARSE_POINT (any reparse tag counts).
+	struct stat st;
+	return ::lstat(path.c_str(), &st) == 0 &&
+	    (st.st_attr & FILE_ATTRIBUTE_REPARSE_POINT);
+#else
+	// symlink_other.go (!windows): lstat + ModeSymlink.
 	struct stat st;
 	return ::lstat(path.c_str(), &st) == 0 && S_ISLNK(st.st_mode);
+#endif
 }
 
 struct osFS final : vfs::FS {
@@ -839,12 +916,20 @@ struct osFS final : vfs::FS {
 	Error Remove(const std::string& path) override {
 		auto guard = blockingOpSema.Acquire();
 		// os.RemoveAll: removing a missing path is not an error.
+#ifdef _WIN32
+		// os/removeall_windows.go: readonly-bit retry + recursive empty;
+		// reparse points treated as non-dirs.
+		if (int e = w32::removeAll(path); e != 0) {
+			return makePathError("removeall", path, errnoError(e));
+		}
+#else
 		std::error_code ec;
 		std::filesystem::remove_all(path, ec);
 		if (ec) {
 			return makePathError("removeall", path,
 			                     errnoError(ec.value()));
 		}
+#endif
 		return Error{};
 	}
 
@@ -856,16 +941,18 @@ struct osFS final : vfs::FS {
 		    std::chrono::duration_cast<std::chrono::seconds>(
 		        aTime.time_since_epoch())
 		        .count(),
-		    std::chrono::duration_cast<std::chrono::nanoseconds>(
-		        aTime.time_since_epoch() % std::chrono::seconds{1})
-		        .count()};
+		    static_cast<long>(
+		        std::chrono::duration_cast<std::chrono::nanoseconds>(
+		            aTime.time_since_epoch() % std::chrono::seconds{1})
+		            .count())};
 		times[1] = timespec{
 		    std::chrono::duration_cast<std::chrono::seconds>(
 		        mTime.time_since_epoch())
 		        .count(),
-		    std::chrono::duration_cast<std::chrono::nanoseconds>(
-		        mTime.time_since_epoch() % std::chrono::seconds{1})
-		        .count()};
+		    static_cast<long>(
+		        std::chrono::duration_cast<std::chrono::nanoseconds>(
+		            mTime.time_since_epoch() % std::chrono::seconds{1})
+		            .count())};
 		if (::utimensat(AT_FDCWD, path.c_str(), times, 0) != 0) {
 			return pathErrno("chtimes", path, errno);
 		}
@@ -881,8 +968,34 @@ vfs::FS* FS() {
 
 // GetGlobalTypingsCacheLocation — os.go:193-206.
 std::string GetGlobalTypingsCacheLocation() {
-	// os.UserCacheDir: $XDG_CACHE_HOME or $HOME/.cache; os.TempDir() fallback.
 	std::string cacheDir;
+	std::string subdir;
+#ifdef _WIN32
+	// os.UserCacheDir() on Windows is %LocalAppData%; on failure Go falls
+	// back to os.TempDir(). Subdir is "Microsoft/TypeScript" on windows
+	// (os.go:199-204).
+	if (const char* lad = ::getenv("LOCALAPPDATA"); lad && *lad) {
+		cacheDir = lad;
+	}
+	if (cacheDir.empty()) {
+		// os.TempDir: TMP, then TEMP, then USERPROFILE, then GetTempPath.
+		if (const char* t = ::getenv("TMP"); t && *t) {
+			cacheDir = t;
+		} else if (const char* t = ::getenv("TEMP"); t && *t) {
+			cacheDir = t;
+		} else if (const char* t = ::getenv("USERPROFILE"); t && *t) {
+			cacheDir = t;
+		} else {
+			wchar_t tmp[MAX_PATH + 2];
+			DWORD n = GetTempPathW(MAX_PATH + 1, tmp);
+			if (n > 0) {
+				cacheDir = w32::narrow(std::wstring_view(tmp, n));
+			}
+		}
+	}
+	subdir = "Microsoft/TypeScript";
+#else
+	// os.UserCacheDir: $XDG_CACHE_HOME or $HOME/.cache; os.TempDir() fallback.
 	if (const char* xdg = ::getenv("XDG_CACHE_HOME"); xdg && *xdg) {
 		cacheDir = xdg;
 	} else if (const char* home = ::getenv("HOME"); home && *home) {
@@ -895,8 +1008,10 @@ std::string GetGlobalTypingsCacheLocation() {
 			cacheDir = "/tmp";
 		}
 	}
+	subdir = "typescript";
+#endif
 	return tspath::combinePaths(cacheDir,
-	                            {"typescript", tsc::versionMajorMinor()});
+	                            {subdir, tsc::versionMajorMinor()});
 }
 
 } // namespace tsc::vfs::osvfs

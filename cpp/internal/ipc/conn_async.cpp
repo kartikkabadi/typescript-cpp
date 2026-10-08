@@ -19,13 +19,45 @@
 #include "internal/ipc/ipc.h"
 
 #include <cstdlib>
+#ifdef _WIN32
+#include "internal/win32/w32compat.h"
+#include <dbghelp.h>
+#else
 #include <execinfo.h>
+#endif
 
 namespace tsc::ipc {
 
 // debugStack — runtime/debug.Stack().
 std::string debugStack() {
 	void* frames[64];
+#ifdef _WIN32
+	// CaptureStackBackTrace + SymFromAddr: addresses + module:func when
+	// dbghelp can resolve them (Go prints full runtime stacks — this is the
+	// closest port; output differs in detail, only used in panic dumps).
+	int n = CaptureStackBackTrace(1, 64, frames, nullptr);
+	HANDLE self = GetCurrentProcess();
+	SymInitialize(self, nullptr, TRUE);
+	std::string out;
+	char symbuf[sizeof(SYMBOL_INFO) + 256];
+	auto* sym = reinterpret_cast<SYMBOL_INFO*>(symbuf);
+	sym->SizeOfStruct = sizeof(SYMBOL_INFO);
+	sym->MaxNameLen = 255;
+	for (int i = 0; i < n; i++) {
+		DWORD64 addr = reinterpret_cast<DWORD64>(frames[i]);
+		DWORD64 disp = 0;
+		if (SymFromAddr(self, addr, &disp, sym)) {
+			out += sym->Name;
+		} else {
+			char b[32];
+			std::snprintf(b, sizeof b, "0x%llx",
+			              static_cast<unsigned long long>(addr));
+			out += b;
+		}
+		out += '\n';
+	}
+	return out;
+#else
 	int n = ::backtrace(frames, 64);
 	char** syms = ::backtrace_symbols(frames, n);
 	std::string out;
@@ -37,6 +69,7 @@ std::string debugStack() {
 		std::free(syms);
 	}
 	return out;
+#endif
 }
 
 // panicText — the `%v` text of a recovered panic value.

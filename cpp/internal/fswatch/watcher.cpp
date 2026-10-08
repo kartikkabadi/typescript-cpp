@@ -50,10 +50,27 @@ watcher& kqueueWatcher() {
 	static watcher w{"kqueue"};
 	return w;
 }
+#ifndef _WIN32
+// windows.cpp provides the ReadDirectoryChangesW-backed definition on
+// Windows (its factory is registered there, like Go's init()).
 watcher& windowsWatcher() {
 	static watcher w{"windows"};
 	return w;
 }
+#endif
+#ifdef _WIN32
+// No inotify/fanotify on Windows: define the package watchers with no
+// factory (Available() == false) so AllWatchers/Default/Inotify keep their
+// Go shape — on GOOS=windows their init()s never register factories.
+watcher& inotifyWatcher() {
+	static watcher w{"inotify"};
+	return w;
+}
+watcher& fanotifyWatcher() {
+	static watcher w{"fanotify"};
+	return w;
+}
+#endif
 fallbackWatcher& fanotifyFallbackWatcher() {
 	static fallbackWatcher w{&fanotifyWatcher(), &inotifyWatcher()};
 	return w;
@@ -84,9 +101,13 @@ Watcher* Fanotify() { return &fanotifyFallbackWatcher(); }
 
 // Default returns the recommended watcher for the current OS.
 Watcher* Default() {
-	// runtime.GOOS — this build is Linux-only; the other cases are kept for
+	// runtime.GOOS — set at build time; the other cases are kept for
 	// parity with watcher.go.
+#ifdef _WIN32
+	constexpr std::string_view goos = "windows";
+#else
 	constexpr std::string_view goos = "linux";
+#endif
 	if (goos == "linux") {
 		if (Fanotify()->available()) {
 			return Fanotify();

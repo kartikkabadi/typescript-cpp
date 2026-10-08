@@ -94,6 +94,11 @@ struct Session : ata::TypingsInstallerHost {
 	gostd::Context backgroundCtx;
 	std::function<tspath::Path(const std::string&)> toPath;
 	Client* client = nullptr;
+	// Lifetime pins for client/npmExecutor — keep the server object
+	// alive for the session's lifetime so backgroundQueue workers can
+	// always call into it (see SessionInit::ClientRef).
+	std::shared_ptr<Client> clientRef;
+	std::shared_ptr<ata::NpmExecutor> npmExecutorRef;
 	std::chrono::steady_clock::time_point startTime;
 	ata::NpmExecutor* npmExecutor = nullptr;
 	overlayFS* fs = nullptr;

@@ -254,7 +254,7 @@ struct TestSys final : etsc::System,
 	// Spawn — sys.go:304 (contentmapper.Spawner).
 	std::pair<std::shared_ptr<gostd::io::ReadWriteCloser>, gostd::Error>
 	Spawn(const std::vector<std::string>& command, const std::string& dir,
-	      gostd::io::Writer* stderr) override;
+	      gostd::io::Writer* stderr_) override;
 
 	// === CommandLineTesting — sys.go:312 ===
 	// OnEmittedFiles — sys.go:314.

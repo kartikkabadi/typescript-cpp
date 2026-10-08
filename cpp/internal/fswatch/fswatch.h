@@ -389,6 +389,7 @@ bool equalFold(std::string_view a, std::string_view b);
 
 using walkFn = std::function<gostd::Error(const std::string& path, bool isDir)>;
 
+#ifndef _WIN32
 // linux_dirent64 — the getdents64 record layout (glibc has no userspace
 // declaration). reclenOf/inoOf (walkdir_dirent_linux.go) access it.
 struct linuxDirent64 {
@@ -400,12 +401,15 @@ struct linuxDirent64 {
 };
 inline uint16_t reclenOf(const linuxDirent64* d) { return d->d_reclen; }
 inline uint64_t inoOf(const linuxDirent64* d) { return d->d_ino; }
+#endif // !_WIN32
 
 // walkDir walks dir, optionally recursively, invoking fn for each entry.
 // On Linux it uses getdents64 directly so the d_type in each record drives
-// the isDir flag without a stat.
+// the isDir flag without a stat; on Windows it is FindFirstFile-based
+// (walkdir_windows.go).
 gostd::Error walkDir(const std::string& dir, bool recursive, const walkFn& fn);
 
+#ifndef _WIN32
 // iterateDir reads fd's entries, invokes fn for the dir and each entry,
 // and recurses into subdirectories via openat(fd, name). fd is owned by
 // the caller; iterateDir does not close it. Sharing fd as the openat
@@ -428,6 +432,7 @@ struct unixDirent {
 // reused across calls.
 std::pair<std::vector<unixDirent>, gostd::Error>
 readDirEntries(int fd, std::vector<char>& buf);
+#endif // !_WIN32
 
 // walkDirGeneric is the portable walkDir implementation. It is used as the
 // primary implementation on platforms without a native version, and is

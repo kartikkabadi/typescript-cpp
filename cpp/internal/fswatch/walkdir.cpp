@@ -10,13 +10,18 @@
 
 #include "internal/fswatch/fswatch.h"
 
+#ifndef _WIN32
 #include <dirent.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <unistd.h>
+#endif
 
 namespace tsc::fswatch {
+
+#ifndef _WIN32
+// walkdir_windows.cpp provides the FindFirstFile-based walkDir on Windows.
 
 namespace {
 
@@ -152,6 +157,8 @@ readDirEntries(int fd, std::vector<char>& buf) {
 	}
 	return {entries, nullptr};
 }
+
+#endif // !_WIN32 (native walkDir / iterateDir / readDirEntries)
 
 // walkDirGeneric — walkdir.go:14-23. The portable walkDir implementation. It
 // is used as the primary implementation on platforms without a native

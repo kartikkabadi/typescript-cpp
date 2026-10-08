@@ -23,12 +23,16 @@
 #include <utility>
 #include <vector>
 
+#ifdef _WIN32
+#include "internal/win32/w32compat.h"
+#else
 #include <fcntl.h>
 #include <signal.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#endif
 
 #include "internal/bundled/bundled.h"
 #include "internal/contentmapper/contentmapper.h"
@@ -42,6 +46,16 @@
 using namespace tsc;
 
 namespace {
+
+// w32ErrText — Go os.PathError/syscall.Errno.Error() text: FormatMessage on
+// Windows, strerror elsewhere.
+static std::string w32ErrText(int e) {
+#ifdef _WIN32
+	return w32::errnoText(e);
+#else
+	return std::strerror(e);
+#endif
+}
 
 // spawnProcess launches a process and adapts its stdio to an io.ReadWriteCloser
 // (Read is its stdout, Write is its stdin).
@@ -76,7 +90,7 @@ public:
 		ssize_t n = ::read(stdoutFd, buf.data(), buf.size());
 		if (n < 0) {
 			return {0, gostd::newError(std::string("read: ") +
-			                         std::strerror(errno))};
+			                         w32ErrText(errno))};
 		}
 		if (n == 0) {
 			return {0, gostd::io::errEOF};
@@ -89,7 +103,7 @@ public:
 		ssize_t n = ::write(stdinFd, data.data(), data.size());
 		if (n < 0) {
 			return {0, gostd::newError(std::string("write: ") +
-			                         std::strerror(errno))};
+			                         w32ErrText(errno))};
 		}
 		return {static_cast<int>(n), nullptr};
 	}
@@ -162,7 +176,7 @@ public:
 // ServerOptions.Spawn wiring (lsp.go:64); declared in sys.h.
 std::pair<std::shared_ptr<gostd::io::ReadWriteCloser>, gostd::Error>
 spawnProcess(const std::vector<std::string>& command, const std::string& dir,
-             gostd::io::Writer* stderr) {
+             gostd::io::Writer* stderr_) {
 	// Go: exec.Command(command[0], command[1:]...), StdinPipe + StdoutPipe,
 	// cmd.Stderr = stderr (streamed into the io.Writer), cmd.Dir = dir.
 	int stdinPipe[2] = {-1, -1};
@@ -170,13 +184,32 @@ spawnProcess(const std::vector<std::string>& command, const std::string& dir,
 	int stderrPipe[2] = {-1, -1};
 	// O_CLOEXEC (Go os/exec uses CLOEXEC pipes): without it, a second spawned
 	// process inherits the first's parent-side fds and pins its stdin open,
-	// so the first child never sees EOF.
+	// so the first child never sees EOF. Windows: CreatePipe handles are
+	// non-inheritable by default (CLOEXEC semantics) and w32::spawnvp only
+	// marks the selected stdio handles inheritable in the child.
+#ifdef _WIN32
+	if (::pipe(stdinPipe) != 0 || ::pipe(stdoutPipe) != 0 ||
+	    ::pipe(stderrPipe) != 0) {
+#else
 	if (::pipe2(stdinPipe, O_CLOEXEC) != 0 ||
 	    ::pipe2(stdoutPipe, O_CLOEXEC) != 0 ||
 	    ::pipe2(stderrPipe, O_CLOEXEC) != 0) {
+#endif
 		return {nullptr,
-		        gostd::newError(std::string("pipe: ") + std::strerror(errno))};
+		        gostd::newError(std::string("pipe: ") + w32ErrText(errno))};
 	}
+#ifdef _WIN32
+	w32::SpawnStdio io;
+	io.stdinFd = stdinPipe[0];
+	io.stdoutFd = stdoutPipe[1];
+	io.stderrFd = stderrPipe[1];
+	pid_t pid = w32::spawnvp(command, io, dir);
+	if (pid < 0) {
+		return {nullptr,
+		        gostd::newError(std::string("spawn: ") +
+		                        w32ErrText(errno))};
+	}
+#else
 	// Build argv before fork: malloc in a forked child of a multi-threaded
 	// parent can deadlock on a lock held by another thread.
 	std::vector<char*> argv;
@@ -188,7 +221,8 @@ spawnProcess(const std::vector<std::string>& command, const std::string& dir,
 	pid_t pid = ::fork();
 	if (pid < 0) {
 		return {nullptr,
-		        gostd::newError(std::string("fork: ") + std::strerror(errno))};
+		        gostd::newError(std::string("fork: ") +
+		                        w32ErrText(errno))};
 	}
 	if (pid == 0) {
 		// Child: stdin ← pipe read, stdout → pipe write, stderr → pump pipe.
@@ -205,21 +239,22 @@ spawnProcess(const std::vector<std::string>& command, const std::string& dir,
 			// Go's exec.Cmd.Start reports the chdir error; the closest we can
 			// get post-fork is a nonzero exit with the reason on stderr.
 			std::string msg =
-			    std::string("chdir: ") + std::strerror(errno) + "\n";
+			    std::string("chdir: ") + w32ErrText(errno) + "\n";
 			(void)!::write(STDERR_FILENO, msg.data(), msg.size());
 			::_exit(1);
 		}
 		::execvp(argv[0], argv.data());
 		::_exit(127);
 	}
+#endif // !_WIN32
 	::close(stdinPipe[0]);
 	::close(stdoutPipe[1]);
 	::close(stderrPipe[1]);
 
 	// cmd.Stderr = stderr (io.Writer): pump the child's stderr bytes into it.
-	std::thread pump([fd = stderrPipe[0], stderr]() mutable {
+	std::thread pump([fd = stderrPipe[0], stderr_]() mutable {
 		std::array<char, 4096> buf{};
-		if (stderr == nullptr) {
+		if (stderr_ == nullptr) {
 			char discard[4096];
 			while (::read(fd, discard, sizeof(discard)) > 0) {
 			}
@@ -231,7 +266,7 @@ spawnProcess(const std::vector<std::string>& command, const std::string& dir,
 			if (n <= 0) {
 				break;
 			}
-			stderr->write(std::string_view(buf.data(), n));
+			stderr_->write(std::string_view(buf.data(), n));
 		}
 		::close(fd);
 	});
@@ -286,8 +321,8 @@ public:
 	// spawnProcess — contentmapper::Spawner.
 	std::pair<std::shared_ptr<gostd::io::ReadWriteCloser>, gostd::Error>
 	Spawn(const std::vector<std::string>& command, const std::string& dir,
-	      gostd::io::Writer* stderr) override {
-		return spawnProcess(command, dir, stderr);
+	      gostd::io::Writer* stderr_) override {
+		return spawnProcess(command, dir, stderr_);
 	}
 };
 
@@ -298,7 +333,7 @@ tsc::execute::tsc::System* newSystem() {
 	char buf[4096];
 	if (::getcwd(buf, sizeof(buf)) == nullptr) {
 		std::cerr << "Error getting current directory: "
-		          << std::strerror(errno) << "\n";
+		          << w32ErrText(errno) << "\n";
 		std::exit(static_cast<int>(
 		    execute::tsc::ExitStatusInvalidProject_OutputsSkipped));
 	}

@@ -27,7 +27,11 @@ void fprintln(gostd::io::Writer* w, const std::string& prefix,
 std::string formatTime(std::chrono::system_clock::time_point t) {
 	std::time_t tt = std::chrono::system_clock::to_time_t(t);
 	std::tm tm{};
+#ifdef _WIN32
+	localtime_s(&tm, &tt);
+#else
 	localtime_r(&tt, &tm);
+#endif
 	auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
 	              t.time_since_epoch())
 	              .count() %

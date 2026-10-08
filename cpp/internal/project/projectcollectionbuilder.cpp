@@ -1077,7 +1077,7 @@ void ProjectCollectionBuilder::DidUpdateATAState(
 			        p->currentDirectory,
 			        fs->fs->UseCaseSensitiveFileNames());
 			    p->typingsWatch =
-			        p->typingsWatch->Clone(typingsWatchGlobs);
+			        watchedFilesClone(p->typingsWatch, typingsWatchGlobs);
 			    p->dirty = true;
 			    p->dirtyFilePath = tspath::Path{};
 		    });

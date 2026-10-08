@@ -9,8 +9,12 @@
 #include <cstring>
 #include <memory>
 #include <string>
-#include <unistd.h>
 #include <vector>
+#ifdef _WIN32
+#include "internal/win32/w32compat.h"
+#else
+#include <unistd.h>
+#endif
 
 #include "internal/api/server.h"
 #include "internal/bundled/bundled.h"

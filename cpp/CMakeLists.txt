@@ -9,23 +9,42 @@ if(NOT CMAKE_BUILD_TYPE)
 	set(CMAKE_BUILD_TYPE Release)
 endif()
 
-add_compile_options(-Wall -Wextra -Wno-unused-parameter)
+if(WIN32)
+	# clang-cl/clang++ on Windows: MSVC-mode flags. cl-style warnings don't
+	# apply — keep the same code quality bar with clang warnings.
+	if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+		add_compile_options(-Wall -Wextra -Wno-unused-parameter
+			-Wno-microsoft-anon-tag -Wno-deprecated-declarations)
+	endif()
+
+else()
+	add_compile_options(-Wall -Wextra -Wno-unused-parameter)
+endif()
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
-	add_compile_options(-O3 -DNDEBUG)
-	set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
+	if(WIN32)
+		add_compile_options(-O2 -DNDEBUG)
+	else()
+		add_compile_options(-O3 -DNDEBUG)
+		set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
+	endif()
 endif()
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 # mimalloc drop-in allocator (vendored third_party/mimalloc, v2.1.7).
 # static.c compiles the whole allocator as one TU; alloc-override.c
-# (under MI_MALLOC_OVERRIDE) interposes the C malloc family and, on
-# Itanium-ABI compilers, the C++ operator new/delete family under
+# (under MI_MALLOC_OVERRIDE, POSIX only) interposes the C malloc family
+# and, on Itanium-ABI compilers, the C++ operator new/delete family under
 # mangled names; malloc_override.cpp supplies them on MSVC instead.
 # Built as an OBJECT library so the interposers are force-linked into
 # every executable — an archive member under GNU ld's single-pass scan
 # would be dropped (and malloc() calls would silently bind to glibc).
-option(TSCPP_MIMALLOC "Route all heap allocation through mimalloc" ON)
+# Untested with MSVC/clang-cl on Windows — default OFF there.
+if(WIN32)
+	option(TSCPP_MIMALLOC "Route all heap allocation through mimalloc" OFF)
+else()
+	option(TSCPP_MIMALLOC "Route all heap allocation through mimalloc" ON)
+endif()
 if(TSCPP_MIMALLOC)
 	# OBJECT library, not STATIC: an interposition library must be linked
 	# unconditionally. As an archive, GNU ld's single-pass scan under the
@@ -414,6 +433,11 @@ add_library(tsc STATIC
 	internal/fswatch/util.cpp
 	internal/fswatch/walkdir.cpp
 	internal/fswatch/watcher.cpp
+	internal/fswatch/windows.cpp
+	internal/fswatch/walkdir_windows.cpp
+	internal/win32/w32compat.cpp
+	internal/win32/w32proc.cpp
+	internal/ipc/transport_windows.cpp
 	# === slice: ls-autoimport ===
 	internal/project/logging/logging.cpp
 	internal/ls/autoimport/aliasresolver.cpp
@@ -465,7 +489,23 @@ add_library(tsc STATIC
 	internal/fourslash/tests/util/util.cpp
 )
 
-target_link_libraries(tsc PUBLIC z) # zlib — pprof profile writer
+# zlib — pprof profile writer. No system zlib on Windows: build the
+# source tree passed via -DTSCPP_ZLIB_SRC=<zlib source dir>.
+if(WIN32)
+	set(TSCPP_ZLIB_SRC "" CACHE PATH "zlib source tree (for pprof gzip)")
+	if(NOT TSCPP_ZLIB_SRC OR NOT EXISTS "${TSCPP_ZLIB_SRC}/zlib.h")
+		message(FATAL_ERROR
+			"-DTSCPP_ZLIB_SRC=<dir containing zlib.h> is required on Windows")
+	endif()
+	set(SKIP_INSTALL_ALL ON CACHE BOOL "" FORCE)
+	set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+	add_subdirectory("${TSCPP_ZLIB_SRC}" "${CMAKE_BINARY_DIR}/zlib")
+	target_link_libraries(tsc PUBLIC zlibstatic)
+	# dbghelp: SymFromAddr in debugStack (ipc/conn_async.cpp).
+	target_link_libraries(tsc PUBLIC dbghelp)
+else()
+	target_link_libraries(tsc PUBLIC z)
+endif()
 
 add_executable(tscpp cmd/tscpp/main.cpp cmd/tscpp/sys.cpp cmd/tscpp/lsp.cpp cmd/tscpp/api.cpp
 	${tsc_alloc_objects})
@@ -508,3 +548,14 @@ add_executable(utdbg cmd/unittestrunner/dbg_main.cpp
 	internal/testutil/unittests/registry.cpp ${UNIT_TEST_SOURCES}
 	${tsc_alloc_objects})
 target_link_libraries(utdbg PRIVATE tsc)
+
+# w32compat supplies POSIX names (read/write/open/mkdir/getpid/...) with
+# POSIX signatures; suppress the CRT's int/unsigned nonstd aliases so ours
+# are the only decls in every TU (header order can't guarantee it).
+# Scoped per-target: zlib sources legitimately need the CRT names.
+if(WIN32)
+	foreach(tscpp_target tsc tscpp tsctestrunner fourslashrunner unittestrunner utdbg)
+		target_compile_definitions(${tscpp_target} PRIVATE
+			_CRT_DECLARE_NONSTDC_NAMES=0)
+	endforeach()
+endif()

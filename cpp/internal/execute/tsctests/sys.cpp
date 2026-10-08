@@ -15,6 +15,7 @@
 #include "internal/execute/tsctests/tsctests.h"
 #include "internal/testutil/contentmappertest/contentmappertest.h"
 #include "internal/testutil/stringtestutil/stringtestutil.h"
+#include "internal/fileclock/fileclock.h"
 
 namespace tsc::execute::tsctests {
 
@@ -319,8 +320,8 @@ TestSys::GetEnvironmentVariable(std::string_view name) {
 // declares (see internal/testutil/contentmappertest).
 std::pair<std::shared_ptr<gostd::io::ReadWriteCloser>, gostd::Error>
 TestSys::Spawn(const std::vector<std::string>& command,
-               const std::string& dir, gostd::io::Writer* stderr) {
-	return testutil::contentmappertest::NewSpawner()->Spawn(command, dir, stderr);
+               const std::string& dir, gostd::io::Writer* stderr_) {
+	return testutil::contentmappertest::NewSpawner()->Spawn(command, dir, stderr_);
 }
 
 // OnEmittedFiles — sys.go:256.
@@ -361,7 +362,7 @@ void TestSys::OnEmittedFiles(
 				if (auto [_, found] = mTimesCache_->Load(path); found) {
 					mTimesCache_->Store(
 					    path,
-					    std::chrono::file_clock::from_sys(now));
+					    fileClockFromSys(now));
 				}
 			}
 		}

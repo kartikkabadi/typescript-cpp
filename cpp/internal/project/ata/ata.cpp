@@ -30,33 +30,40 @@ std::string fmtStringList(const std::vector<std::string>& v) {
 // errGroup — golang.org/x/sync/errgroup.Group: Go spawns a goroutine;
 // Wait blocks until all finish and returns the first non-nil error.
 struct errGroup {
-	std::mutex mu;
-	std::condition_variable cv;
-	int count = 0;
-	gostd::Error firstErr;
+	// Shared state — Go's GC keeps the group alive as long as any
+	// goroutine can reach it; a detached worker can outlive wait()
+	// (its final decrement/notify races the returning waiter), so the
+	// state must not live on the stack that owns the group.
+	struct shared {
+		std::mutex mu;
+		std::condition_variable cv;
+		int count = 0;
+		gostd::Error firstErr;
+	};
+	std::shared_ptr<shared> st = std::make_shared<shared>();
 
 	void go(std::function<gostd::Error()> fn) {
 		{
-			std::lock_guard<std::mutex> lk(mu);
-			++count;
+			std::lock_guard<std::mutex> lk(st->mu);
+			++st->count;
 		}
-		std::thread([this, fn = std::move(fn)] {
+		std::thread([st = st, fn = std::move(fn)] {
 			gostd::Error err = fn();
-			std::unique_lock<std::mutex> lk(mu);
-			if (err != nullptr && firstErr == nullptr) {
-				firstErr = err;
+			std::unique_lock<std::mutex> lk(st->mu);
+			if (err != nullptr && st->firstErr == nullptr) {
+				st->firstErr = err;
 			}
-			if (--count == 0) {
+			if (--st->count == 0) {
 				lk.unlock();
-				cv.notify_all();
+				st->cv.notify_all();
 			}
 		}).detach();
 	}
 
 	gostd::Error wait() {
-		std::unique_lock<std::mutex> lk(mu);
-		cv.wait(lk, [this] { return count == 0; });
-		return firstErr;
+		std::unique_lock<std::mutex> lk(st->mu);
+		st->cv.wait(lk, [st = st] { return st->count == 0; });
+		return st->firstErr;
 	}
 };
 
@@ -67,7 +74,10 @@ struct throttleGroup {
 	errGroup group;
 
 	void go(std::function<gostd::Error()> fn) {
-		group.go([this, fn = std::move(fn)]() -> gostd::Error {
+		// Capture the semaphore, not `this`: the worker outlives the
+		// throttleGroup's stack frame (Go's GC keeps both alive).
+		group.go([semaphore = semaphore,
+		          fn = std::move(fn)]() -> gostd::Error {
 			// Acquire semaphore slot — blocks until a slot is available.
 			semaphore->acquire();
 			// Release semaphore slot when done.

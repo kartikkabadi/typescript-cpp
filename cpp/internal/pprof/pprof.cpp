@@ -18,11 +18,15 @@
 #include <utility>
 #include <vector>
 
+#ifdef _WIN32
+#include "internal/win32/w32compat.h"
+#else
 #include <execinfo.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <sys/time.h>
 #include <unistd.h>
+#endif
 #include <zlib.h>
 
 #include "internal/ast/ast.h" // tscUnreachable
@@ -147,6 +151,8 @@ struct SampleStack {
 std::atomic<SampleStack*> gSamples{nullptr};
 std::atomic<size_t> gSampleCount{0};
 std::atomic<bool> gProfiling{false};
+
+#ifndef _WIN32
 struct sigaction gOldAction{};
 struct itimerval gOldTimer{};
 
@@ -165,6 +171,7 @@ void sigprofHandler(int /*sig*/, siginfo_t* /*info*/, void* /*ucontext*/) {
     // relaxed store is fine: sampling tolerates a torn tail sample
     gSampleCount.store(i + 1, std::memory_order_relaxed);
 }
+#endif // !_WIN32
 
 int64_t nowNanos() {
     return std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -215,6 +222,13 @@ std::string startCPUProfile(int fd, CPUProfileState** out) {
     gSamples.store(samples, std::memory_order_release);
     gSampleCount.store(0, std::memory_order_release);
 
+#ifdef _WIN32
+    // No SIGPROF/setitimer on Windows: Go itself collects CPU profiles via
+    // the runtime's own sampler, so a faithful Windows port would need
+    // SuspendThread+StackWalk64 machinery. Instead we run the profile
+    // lifecycle (valid gzip'd pprof header, 0 samples) and record the
+    // divergence in cpp/WINDOWS_PARITY.md.
+#else
     // warm up backtrace() outside the handler
     void* warm[8];
     ::backtrace(warm, 8);
@@ -241,6 +255,7 @@ std::string startCPUProfile(int fd, CPUProfileState** out) {
         gSamples = nullptr;
         return "failed to start profiling timer";
     }
+#endif
 
     *out = new CPUProfileState{nowNanos(), samples};
     // fd is owned by the session; sampling buffers are process-global like Go.
@@ -250,11 +265,13 @@ std::string startCPUProfile(int fd, CPUProfileState** out) {
 
 // runtime/pprof.StopCPUProfile — stop sampling and write the gzipped profile.
 void stopCPUProfile(int fd, CPUProfileState* state) {
+#ifndef _WIN32
     // disarm the timer first
     struct itimerval off {};
     ::setitimer(ITIMER_PROF, &off, nullptr);
     ::sigaction(SIGPROF, &gOldAction, nullptr);
     ::setitimer(ITIMER_PROF, &gOldTimer, nullptr);
+#endif
     gProfiling = false;
 
     int64_t endNanos = nowNanos();
@@ -269,12 +286,20 @@ void stopCPUProfile(int fd, CPUProfileState* state) {
 
     auto functionFor = [&](void* pc) -> uint64_t {
         // resolve symbol at stop time (not in the handler)
+#ifdef _WIN32
+        // No execinfo: use the raw address as the "symbol". Only reached
+        // when samples exist — the Windows sampler records none today.
+        char addrBuf[32];
+        std::snprintf(addrBuf, sizeof(addrBuf), "0x%p", pc);
+        std::string sym = addrBuf;
+#else
         char** syms = ::backtrace_symbols(&pc, 1);
         std::string sym = syms ? syms[0] : "";
-        if (syms) ::free(syms);
+        if (syms) free(syms);
         // "path(mangled+0xoff) [0xaddr]" → keep the "path(mangled+0xoff)" part
         size_t sp = sym.rfind(" [");
         if (sp != std::string::npos) sym.resize(sp);
+#endif
         auto it = fnIds.find(sym);
         if (it != fnIds.end()) return it->second;
         uint64_t id = static_cast<uint64_t>(fnIds.size()) + 1;
@@ -403,7 +428,11 @@ int openCreate(const std::string& path) {
 }
 
 std::string errnoMessage(std::string_view prefix, int e) {
+#ifdef _WIN32
+    return std::string(prefix) + ": " + w32::errnoText(e);
+#else
     return std::string(prefix) + ": " + std::strerror(e);
+#endif
 }
 
 } // namespace

@@ -10,9 +10,13 @@
 #include <utility>
 #include <vector>
 
+#ifdef _WIN32
+#include "internal/win32/w32compat.h"
+#else
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#endif
 
 #include "internal/nativepath/nativepath.h"
 
@@ -39,6 +43,7 @@ std::error_code pathError(std::string_view /*op*/, std::string_view /*path*/, in
     return std::error_code(err, std::generic_category());
 }
 
+#ifndef _WIN32
 // filepath.EvalSymlinks fallback — resolves all symlinks like realpath(3).
 std::pair<std::string, std::error_code> evalSymlinks(std::string_view path) {
     std::string p(path);
@@ -49,6 +54,7 @@ std::pair<std::string, std::error_code> evalSymlinks(std::string_view path) {
     }
     return {std::string(resolved), std::error_code{}};
 }
+#endif
 
 #ifdef __linux__
 
@@ -103,7 +109,16 @@ std::pair<std::string, std::error_code> realpathLinux(std::string_view path) {
 } // namespace
 
 std::pair<std::string, std::error_code> realpath(std::string_view path) {
-#ifdef __linux__
+#if defined(_WIN32)
+    // realpath_windows.go: openMetadata (BACKUP_SEMANTICS) +
+    // GetFinalPathNameByHandle(VOLUME_NAME_DOS) + \\?\ prefix strip.
+    // Returns the native (backslash) form; callers normalize.
+    auto [out, e] = ::realpath(std::string(path));
+    if (e != 0) {
+        return {"", pathError("CreateFile", path, e)};
+    }
+    return {std::move(out), std::error_code{}};
+#elif defined(__linux__)
     return realpathLinux(path);
 #else
     // realpath_other.go (!windows && !linux)
@@ -111,11 +126,20 @@ std::pair<std::string, std::error_code> realpath(std::string_view path) {
 #endif
 }
 
-// symlink_other.go (!windows)
 bool isSymlinkOrReparsePoint(std::string_view path) {
+#if defined(_WIN32)
+    // symlink_windows.go: GetFileAttributesEx + FILE_ATTRIBUTE_REPARSE_POINT
+    // (any reparse tag counts — junctions included).
+    std::string p(path);
+    struct stat st;
+    return ::lstat(p.c_str(), &st) == 0 &&
+        (st.st_attr & FILE_ATTRIBUTE_REPARSE_POINT);
+#else
+    // symlink_other.go (!windows)
     std::string p(path);
     struct stat st;
     return ::lstat(p.c_str(), &st) == 0 && S_ISLNK(st.st_mode);
+#endif
 }
 
 } // namespace tsc::nativepath

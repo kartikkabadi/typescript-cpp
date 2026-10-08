@@ -142,8 +142,9 @@ std::pair<lsproto::InitializeResponse, gostd::Error> Server::handleInitialize(
 	}
 	clientCapabilities = params->Capabilities->Resolve();
 	if (clientCapabilities.Window.WorkDoneProgress) {
-		projectProgress = std::make_shared<projectLoadingProgress>(
-			std::make_shared<serverProgressReporter>(this), progressDelay);
+		projectProgress = newProjectLoadingProgressFromReporter(
+			std::make_shared<serverProgressReporter>(shared_from_this()),
+			progressDelay);
 	}
 
 	auto [capabilitiesJSON, merr] =
@@ -430,6 +431,11 @@ gostd::Error Server::handleInitialized(
 	init.Logger = logger.get();
 	init.Client = this;
 	init.NpmExecutor = this;
+	// Pin the Server for the session's lifetime: session background
+	// workers call client->* / npmExecutor->* on detached threads and
+	// must not see a torn-down Server (Go's GC holds it alive).
+	init.ClientRef = shared_from_this();
+	init.NpmExecutorRef = shared_from_this();
 	sessionInitSpawner = contentMapperSpawner();
 	init.Spawner = sessionInitSpawner.get();
 	sessionInitContentMapperLogger =

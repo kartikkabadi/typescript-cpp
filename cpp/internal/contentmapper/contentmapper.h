@@ -605,7 +605,7 @@ struct Spawner {
 	virtual ~Spawner() = default;
 	virtual std::pair<std::shared_ptr<gostd::io::ReadWriteCloser>, gostd::Error>
 	Spawn(const std::vector<std::string>& command, const std::string& dir,
-	      gostd::io::Writer* stderr) = 0;
+	      gostd::io::Writer* stderr_) = 0; // stderr_: CRT macro dodge
 };
 
 struct processExitState {
@@ -624,8 +624,8 @@ struct SpawnerFunc : Spawner {
 	explicit SpawnerFunc(SpawnerFuncFn f) : fn(std::move(f)) {}
 	std::pair<std::shared_ptr<gostd::io::ReadWriteCloser>, gostd::Error>
 	Spawn(const std::vector<std::string>& command, const std::string& dir,
-	      gostd::io::Writer* stderr) override {
-		return fn(command, dir, stderr);
+	      gostd::io::Writer* stderr_) override {
+		return fn(command, dir, stderr_);
 	}
 };
 

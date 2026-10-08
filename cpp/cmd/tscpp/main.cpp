@@ -25,7 +25,12 @@
 #include <algorithm>
 
 #include <csignal>
+#ifdef _WIN32
+#include "internal/win32/w32compat.h"
+#include <process.h> // _beginthreadex
+#else
 #include <unistd.h>
+#endif
 
 #include "internal/ast/ast.h"
 #include "internal/ast/flow.h"
@@ -659,6 +664,30 @@ static void parseAll(const char* path, int workers) {
 	};
 	std::atomic<size_t> arenaBytes{0};
 	Work work{&files, &next, &totalBytes, &arenaBytes};
+#ifdef _WIN32
+	// _beginthreadex supports an explicit stack reserve like pthread_attr.
+	struct winWorker {
+		void* (*fn)(void*);
+		Work* work;
+	} winWorkerArg{workerMain, &work};
+	std::vector<uintptr_t> pool(static_cast<size_t>(workers));
+	for (int w = 0; w < workers; w++) {
+		pool[static_cast<size_t>(w)] = _beginthreadex(
+		    nullptr, static_cast<unsigned>(size_t{64} << 20),
+		    [](void* ctx) -> unsigned {
+			    auto* w = static_cast<winWorker*>(ctx);
+			    w->fn(w->work);
+			    return 0;
+		    },
+		    &winWorkerArg, 0, nullptr);
+	}
+	for (auto& t : pool) {
+		if (t != 0) {
+			WaitForSingleObject(reinterpret_cast<HANDLE>(t), INFINITE);
+			CloseHandle(reinterpret_cast<HANDLE>(t));
+		}
+	}
+#else
 	std::vector<pthread_t> pool(static_cast<size_t>(workers));
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
@@ -670,6 +699,7 @@ static void parseAll(const char* path, int workers) {
 	pthread_attr_destroy(&attr);
 	for (auto& t : pool)
 		pthread_join(t, nullptr);
+#endif
 	double ms =
 		std::chrono::duration<double, std::milli>(
 			std::chrono::steady_clock::now() - t0)
@@ -702,6 +732,14 @@ static void crashExit(int sig) {
 
 static void installCrashExitHandlers() {
 	if (std::getenv("TSCPP_NO_CRASH_HANDLER")) return;
+#ifdef _WIN32
+	// No signals/sigaltstack on Windows: route fatal SEH exceptions to the
+	// same handler shape (write debug marker + EXIT 2 + _exit(2)).
+	SetUnhandledExceptionFilter(+[](EXCEPTION_POINTERS* ep) -> LONG {
+		crashExit(static_cast<int>(ep->ExceptionRecord->ExceptionCode));
+		return EXCEPTION_CONTINUE_SEARCH;
+	});
+#else
 	static stack_t altstack;
 	altstack.ss_sp = std::malloc(SIGSTKSZ);
 	altstack.ss_size = SIGSTKSZ;
@@ -716,14 +754,22 @@ static void installCrashExitHandlers() {
 	for (int sig : {SIGSEGV, SIGBUS, SIGFPE, SIGILL, SIGABRT}) {
 		sigaction(sig, &sa, nullptr);
 	}
+#endif
 }
 
 int main(int argc, char** argv) {
 	installCrashExitHandlers();
 	// Go's runtime ignores SIGPIPE except for writes to stdout/stderr —
 	// writes to a dead mapper child's stdin must fail with EPIPE, not kill
-	// the process.
+	// the process. (No SIGPIPE exists on Windows; the ignore is a no-op.)
+#ifdef _WIN32
+	w32::signalImpl(SIGPIPE, SIG_IGN);
+	// Go writes raw bytes to stdout/stderr; the CRT's default text mode
+	// would translate \n -> \r\n. Pin fds 0-2 to binary for byte-parity.
+	w32::setBinaryStdio();
+#else
 	std::signal(SIGPIPE, SIG_IGN);
+#endif
 	if (argc < 2) {
 		std::fprintf(
 			stderr,

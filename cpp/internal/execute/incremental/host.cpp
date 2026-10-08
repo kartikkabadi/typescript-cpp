@@ -3,6 +3,7 @@
 // CompilerHost::fs; mtime uses FS().Stat()/Chtimes exactly like Go
 // (atime is ignored like Go's Chtimes(fileName, time.Time{}, mTime)).
 #include "internal/execute/incremental/incremental.h"
+#include "internal/fileclock/fileclock.h"
 
 namespace tsc::execute::incremental {
 
@@ -25,7 +26,7 @@ public:
 	    std::filesystem::file_time_type mTime) override {
 		if (auto err = host_->fs->Chtimes(
 		        fileName, vfs::TimePoint{std::chrono::seconds{-62135596800}},
-		        std::chrono::file_clock::to_sys(mTime))) {
+		        fileClockToSys(mTime))) {
 			return err.str();
 		}
 		return std::nullopt;
@@ -44,7 +45,7 @@ Host* CreateHost(compiler::CompilerHost* compilerHost) {
 std::filesystem::file_time_type GetMTime(compiler::CompilerHost* host,
                                          const std::string& fileName) {
 	if (auto stat = host->fs->Stat(fileName)) {
-		return std::chrono::file_clock::from_sys(stat->ModTime());
+		return fileClockFromSys(stat->ModTime());
 	}
 	return std::filesystem::file_time_type::min();
 }

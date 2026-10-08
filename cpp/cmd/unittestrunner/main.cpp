@@ -14,11 +14,15 @@
 #include <string>
 #include <vector>
 
+#ifdef _WIN32
+#include "internal/win32/w32compat.h"
+#else
 #include <pthread.h>
 #include <signal.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#endif
 
 #include "internal/gostd/gostd.h"
 #include "internal/gostd/testing.h"
@@ -36,6 +40,117 @@ void onTestAlarm(int) {
 	_exit(1);
 }
 
+struct RunCtx {
+	const tsc::testutil::unittests::UnitTestCase* tc;
+	int code = 0;
+};
+
+void* runTestImpl(void* arg) {
+	auto* rc = static_cast<RunCtx*>(arg);
+	tsc::gostd::testing::T t;
+	// Invoke the test fn on the runner's T directly (not via t.Run): a
+	// t.Skip() in the test body must mark the top-level test skipped,
+	// while a skip inside a t.Run subtest must not — Go reports
+	// `--- SKIP: TestX/child`, `--- PASS: TestX`.
+	try {
+		rc->tc->fn(&t);
+	} catch (const tsc::gostd::testing::testGoexit&) {
+	} catch (const std::exception& e) {
+		t.Errorf("uncaught exception: %s", {e.what()});
+	} catch (...) {
+		t.Errorf("uncaught non-std::exception", {});
+	}
+	// Skip sentinel is 3, not 2: tscUnreachable exits the child with
+	// code 2 (Go panic contract), which must report as FAIL.
+	// Failed before Skipped: go test reports `--- FAIL` for a test
+	// that called Errorf then Skip — a skip can't mask a failure.
+	if (t.Failed()) rc->code = 1;
+	else if (t.Skipped()) rc->code = 3;
+	return nullptr;
+}
+
+#ifdef _WIN32
+DWORD WINAPI runTestImplW32(LPVOID arg) {
+	runTestImpl(arg);
+	return 0;
+}
+#endif
+
+// Runs the test body; returns 0 pass / 1 fail / 3 skip — shared by the
+// forked child (POSIX) and the --test-child respawn (Windows).
+// Tests run on a 64MB-stack thread (same convention as tscpp's parse
+// workers): Go tests rely on goroutine stacks that grow dynamically,
+// and deeply nested inputs (e.g. TestSelectionRangeDepthIsLimited's
+// 12k parens) need more than the default stack.
+int runTestBody(const tsc::testutil::unittests::UnitTestCase& tc) {
+	signal(SIGALRM, onTestAlarm);
+	alarm(kTestTimeoutSeconds);
+	RunCtx ctx{&tc, 0};
+#ifdef _WIN32
+	// CreateThread takes the stack reserve directly (64MB like POSIX).
+	HANDLE h = CreateThread(nullptr, SIZE_T{64} << 20, runTestImplW32,
+	                        &ctx, 0, nullptr);
+	if (h == nullptr) {
+		runTestImpl(&ctx);
+	} else {
+		WaitForSingleObject(h, INFINITE);
+		CloseHandle(h);
+	}
+#else
+	pthread_attr_t attr;
+	pthread_attr_init(&attr);
+	pthread_attr_setstacksize(&attr, size_t{64} << 20);
+	pthread_t thread;
+	if (pthread_create(&thread, &attr, runTestImpl, &ctx) != 0) {
+		runTestImpl(&ctx);
+	} else {
+		pthread_join(thread, nullptr);
+	}
+	pthread_attr_destroy(&attr);
+#endif
+	fflush(stdout);
+	fflush(stderr);
+	return ctx.code;
+}
+
+#ifdef _WIN32
+int runOne(const tsc::testutil::unittests::UnitTestCase& tc, std::string& output) {
+	// Windows has no fork: respawn this image with --test-child <name> and
+	// capture its stdout+stderr through a pipe.
+	int pipefd[2];
+	if (pipe(pipefd) != 0) {
+		fprintf(stderr, "pipe failed\n");
+		return 1;
+	}
+	w32::SpawnStdio io;
+	io.stdoutFd = pipefd[1];
+	io.mergeStderrToStdout = true;
+	std::string self = w32::selfExePath();
+	std::vector<std::string> argv{self, "--test-child", tc.name};
+	pid_t pid = w32::spawnvp(argv, io);
+	close(pipefd[1]);
+	if (pid < 0) {
+		fprintf(stderr, "spawn failed\n");
+		close(pipefd[0]);
+		return 1;
+	}
+	char buf[4096];
+	ssize_t n;
+	while ((n = read(pipefd[0], buf, sizeof(buf))) > 0) {
+		output.append(buf, static_cast<size_t>(n));
+	}
+	close(pipefd[0]);
+	int status = 0;
+	waitpid(pid, &status, 0);
+	if (WIFEXITED(status)) {
+		return WEXITSTATUS(status);
+	}
+	if (WIFSIGNALED(status)) {
+		output += "[killed by signal " + std::to_string(WTERMSIG(status)) + "]\n";
+	}
+	return 1;
+}
+#else
 int runOne(const tsc::testutil::unittests::UnitTestCase& tc, std::string& output) {
 	int pipefd[2];
 	if (pipe(pipefd) != 0) {
@@ -55,54 +170,7 @@ int runOne(const tsc::testutil::unittests::UnitTestCase& tc, std::string& output
 		dup2(pipefd[1], STDOUT_FILENO);
 		dup2(pipefd[1], STDERR_FILENO);
 		close(pipefd[1]);
-		signal(SIGALRM, onTestAlarm);
-		alarm(kTestTimeoutSeconds);
-		// Tests run on a 64MB-stack thread (same convention as
-		// tscpp's parse workers): Go tests rely on goroutine stacks
-		// that grow dynamically, and deeply nested inputs (e.g.
-		// TestSelectionRangeDepthIsLimited's 12k parens) need more
-		// than the default 8MB main-thread stack.
-		struct RunCtx {
-			const tsc::testutil::unittests::UnitTestCase* tc;
-			int code = 0;
-		};
-		auto runTest = [](void* arg) -> void* {
-			auto* rc = static_cast<RunCtx*>(arg);
-			tsc::gostd::testing::T t;
-			// Invoke the test fn on the runner's T directly (not via
-			// t.Run): a t.Skip() in the test body must mark the top-level
-			// test skipped, while a skip inside a t.Run subtest must not
-			// — Go reports `--- SKIP: TestX/child`, `--- PASS: TestX`.
-			try {
-				rc->tc->fn(&t);
-			} catch (const tsc::gostd::testing::testGoexit&) {
-			} catch (const std::exception& e) {
-				t.Errorf("uncaught exception: %s", {e.what()});
-			} catch (...) {
-				t.Errorf("uncaught non-std::exception", {});
-			}
-			// Skip sentinel is 3, not 2: tscUnreachable exits the child with
-			// code 2 (Go panic contract), which must report as FAIL.
-			// Failed before Skipped: go test reports `--- FAIL` for a test
-			// that called Errorf then Skip — a skip can't mask a failure.
-			if (t.Failed()) rc->code = 1;
-			else if (t.Skipped()) rc->code = 3;
-			return nullptr;
-		};
-		RunCtx ctx{&tc, 0};
-		pthread_attr_t attr;
-		pthread_attr_init(&attr);
-		pthread_attr_setstacksize(&attr, size_t{64} << 20);
-		pthread_t thread;
-		if (pthread_create(&thread, &attr, runTest, &ctx) != 0) {
-			runTest(&ctx);
-		} else {
-			pthread_join(thread, nullptr);
-		}
-		pthread_attr_destroy(&attr);
-		fflush(stdout);
-		fflush(stderr);
-		_exit(ctx.code);
+		_exit(runTestBody(tc));
 	}
 	close(pipefd[1]);
 	char buf[4096];
@@ -121,6 +189,7 @@ int runOne(const tsc::testutil::unittests::UnitTestCase& tc, std::string& output
 	}
 	return 1;
 }
+#endif
 
 }  // namespace
 
@@ -161,6 +230,19 @@ int main(int argc, char** argv) {
 		return 0;
 	}
 
+#ifdef _WIN32
+	if (argc >= 3 && std::string(argv[1]) == "--test-child") {
+		w32::setBinaryStdio();
+		const std::string target = argv[2];
+		for (auto& tc : tsc::testutil::unittests::unitTestRegistry()) {
+			if (tc.name == target) {
+				return runTestBody(tc);
+			}
+		}
+		fprintf(stderr, "unknown test %s\n", target.c_str());
+		return 1;
+	}
+#endif
 	std::string runFilter;
 	for (int i = 1; i < argc; ++i) {
 		std::string arg = argv[i];

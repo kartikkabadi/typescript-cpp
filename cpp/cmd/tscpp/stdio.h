@@ -6,11 +6,24 @@
 #include <cerrno>
 #include <cstring>
 #include <memory>
+#ifdef _WIN32
+#include "internal/win32/w32compat.h"
+#else
 #include <unistd.h>
+#endif
 
 #include "internal/gostd/gostd.h"
 
 namespace tsc::cmd_stdio {
+
+// strerror on POSIX; w32::errnoText on Windows (Go's zerrors text).
+inline std::string stdioErrText(int e) {
+#ifdef _WIN32
+	return w32::errnoText(e);
+#else
+	return std::strerror(e);
+#endif
+}
 
 // os.Stdin — lsp.go:54 In: lsp.ToReader(os.Stdin); api.go In = os.Stdin.
 struct stdinReader : gostd::io::Reader {
@@ -19,7 +32,7 @@ struct stdinReader : gostd::io::Reader {
 			auto n = ::read(0, buf.data(), buf.size());
 			if (n < 0 && errno == EINTR) continue;
 			if (n < 0) {
-				return {0, gostd::newError(std::strerror(errno))};
+				return {0, gostd::newError(stdioErrText(errno))};
 			}
 			if (n == 0) {
 				return {0, gostd::io::errEOF};
@@ -38,7 +51,7 @@ struct fdWriterBase : gostd::io::Writer {
 			auto n = ::write(fd, data.data() + off, data.size() - off);
 			if (n < 0 && errno == EINTR) continue;
 			if (n < 0) {
-				return {(int)off, gostd::newError(std::strerror(errno))};
+				return {(int)off, gostd::newError(stdioErrText(errno))};
 			}
 			off += (size_t)n;
 		}

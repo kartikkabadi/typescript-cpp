@@ -8,7 +8,11 @@
 #include <csignal>
 #include <memory>
 #include <thread>
+#ifdef _WIN32
+#include "internal/win32/w32compat.h"
+#else
 #include <unistd.h>
+#endif
 
 #include "internal/gostd/gostd.h"
 
