@@ -639,6 +639,7 @@ struct DeclarationTransformerImpl : DeclarationTransformer {
 	Node* visitCJSExportAssignments(Node* expression);
 	Node* visitNestedExpression(Node* expression);
 	void transformExpandoAssignment(BinaryExpression* node);
+	void addExportModifierToExpandoMembers(NodeId hostId);
 	NodeId getExpandoHostId(Node* declaration);
 	void transformExpandoHost(Node* name, Node* declaration);
 	Node* createFullExpandoBlock(NodeId id);
@@ -3924,14 +3925,6 @@ void DeclarationTransformerImpl::transformExpandoAssignment(
 		setupDiagnosticContext(node->asNode());
 ScopeExit cleanup{cleanupDiagnosticContext};
 
-	if (isIdentifier(node->Right)) {
-		// alias-like, emit an `export {name}` or `export {name as alias}`
-		Node* result = transformBinaryExpressionToExportDeclaration(
-			node->asNode(), exportName);
-		expandoMembers[hostId].push_back(result);
-		return;
-	}
-
 	bool preexistingExpandoHasExport = false;
 	for (Node* m : expandoMembers[hostId]) {
 		if (isExportDeclaration(m)) {
@@ -3939,6 +3932,18 @@ ScopeExit cleanup{cleanupDiagnosticContext};
 			break;
 		}
 	}
+
+	if (isIdentifier(node->Right)) {
+		if (!preexistingExpandoHasExport) {
+			addExportModifierToExpandoMembers(hostId);
+		}
+		// alias-like, emit an `export {name}` or `export {name as alias}`
+		Node* result = transformBinaryExpressionToExportDeclaration(
+			node->asNode(), exportName);
+		expandoMembers[hostId].push_back(result);
+		return;
+	}
+
 	ModifierList* varModifiers = nullptr;
 
 	if (preexistingExpandoHasExport) {
@@ -3983,22 +3988,33 @@ ScopeExit cleanup{cleanupDiagnosticContext};
 		statements.push_back(factory()->newExportDeclaration(
 			nullptr /*modifiers*/, false /*isTypeOnly*/, namedExports,
 			nullptr /*moduleSpecifier*/, nullptr /*attributes*/));
-	}
-
-	if (statements.size() > 1 && !preexistingExpandoHasExport) {
-		// Add an `export` modifier to all existing expando members so they
-		// remain exported after the `export {}` is added
-		for (Node* decl : expandoMembers[hostId]) {
-			ModifierFlags modifierFlags =
-				ModifierFlagsExport | getCombinedModifierFlags(decl);
-			decl->setModifiers(factory()->newModifierList(
-				createModifiersFromModifierFlags(
-					modifierFlags, newModifierFromFactory,
-					*factory()->asNodeFactory())));
+		if (!preexistingExpandoHasExport) {
+			// Done before adding statements to expando members to keep the
+			// initial variable statement, before we rename anything, private
+			addExportModifierToExpandoMembers(hostId);
 		}
 	}
+
 	expandoMembers[hostId].insert(expandoMembers[hostId].end(),
 	                              statements.begin(), statements.end());
+}
+
+// transform.go:2869 addExportModifierToExpandoMembers
+void DeclarationTransformerImpl::addExportModifierToExpandoMembers(
+	NodeId hostId) {
+	// Add an `export` modifier to all existing expando members so they remain
+	// exported after the `export {}` is added
+	for (Node* decl : expandoMembers[hostId]) {
+		// only invoked when `expandoMembers` does not *yet* contain an
+		// `export` declaration, so no need to skip one here to prevent
+		// `export export {}`
+		ModifierFlags modifierFlags =
+			ModifierFlagsExport | getCombinedModifierFlags(decl);
+		decl->setModifiers(factory()->newModifierList(
+			createModifiersFromModifierFlags(modifierFlags,
+			                                 newModifierFromFactory,
+			                                 *factory()->asNodeFactory())));
+	}
 }
 
 // transform.go:2861 getExpandoHostId
