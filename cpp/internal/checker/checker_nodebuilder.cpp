@@ -4409,7 +4409,7 @@ Node* NodeBuilderImpl::createAnonymousTypeNodeEx(Type* t,
 				// around the reuse attempt so the inner recursion bottoms
 				// out via the visitedTypes guard below.
 				if (ctx->visitedTypes.count(typeId)) {
-					return createElidedInformationPlaceholder();
+					return createCyclicStructurePlaceholder();
 				}
 				ctx->visitedTypes.insert(typeId);
 				Node* typeNode = tryReuseExistingNonParameterTypeNode(
@@ -4420,7 +4420,7 @@ Node* NodeBuilderImpl::createAnonymousTypeNodeEx(Type* t,
 				}
 			}
 			if (ctx->visitedTypes.count(typeId)) {
-				return createElidedInformationPlaceholder();
+				return createCyclicStructurePlaceholder();
 			}
 			return visitAndTransformType(
 				t, &NodeBuilderImpl::createTypeNodeFromObjectType);
@@ -4459,7 +4459,7 @@ Node* NodeBuilderImpl::createAnonymousTypeNodeEx(Type* t,
 				return symbolToTypeNode(typeAlias, SymbolFlagsType,
 				                        nullptr);
 			} else {
-				return createElidedInformationPlaceholder();
+				return createCyclicStructurePlaceholder();
 			}
 		} else {
 			return visitAndTransformType(
@@ -4494,16 +4494,20 @@ Type* NodeBuilderImpl::getTypeFromTypeNode(Node* node,
 Node* NodeBuilderImpl::typeToTypeNodeOrCircularityElision(Type* t) {
 	if ((t->flags & TypeFlagsUnion) != 0) {
 		if (ctx->visitedTypes.count(t->id)) {
-			if ((ctx->flags &
-			     nodebuilder::FlagsAllowAnonymousIdentifier) == 0) {
-				ctx->encounteredError = true;
-				ctx->tracker->ReportCyclicStructureError();
-			}
-			return createElidedInformationPlaceholder();
+			return createCyclicStructurePlaceholder();
 		}
 		return visitAndTransformType(t, &NodeBuilderImpl::typeToTypeNode);
 	}
 	return typeToTypeNode(t);
+}
+
+// createCyclicStructurePlaceholder (nodebuilderimpl.go:3014).
+Node* NodeBuilderImpl::createCyclicStructurePlaceholder() {
+	if ((ctx->flags & nodebuilder::FlagsAllowAnonymousIdentifier) == 0) {
+		ctx->encounteredError = true;
+		ctx->tracker->ReportCyclicStructureError();
+	}
+	return createElidedInformationPlaceholder();
 }
 
 // conditionalTypeToTypeNode (nodebuilderimpl.go:2925).
@@ -4920,6 +4924,7 @@ Node* NodeBuilderImpl::visitAndTransformType(
 	if (id.has_value()) {
 		depth = ctx->symbolDepth[*id];
 		if (depth > 10) {
+			ctx->truncating = true;
 			return createElidedInformationPlaceholder();
 		}
 		ctx->symbolDepth[*id] = depth + 1;

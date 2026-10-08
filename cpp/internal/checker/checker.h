@@ -5124,6 +5124,7 @@ struct NodeBuilderImpl {
 	bool isActivelyExpanding();
 	Node* appendReferenceToType(Node* root, Node* ref);
 	Node* createElidedInformationPlaceholder();
+	Node* createCyclicStructurePlaceholder();
 	NodeList* mapToTypeNodes(std::vector<Type*> list, bool isBareList);
 	void setCommentRange(Node* node, Node* range_);
 	bool typeNodeIsEquivalentToType(Node* annotatedDeclaration, Type* t,
