@@ -1450,7 +1450,7 @@ project::Snapshot* Session::updateSnapshot(
 		// Release the session's reference to the old snapshot. The
 		// new snapshot's clone ref (1) is transferred to become the
 		// session's ref for its current snapshot. Other holders
-		// (e.g. active handlers, the background task below) keep the
+		// (e.g. active handlers) keep the
 		// old snapshot alive via their own refs until they complete.
 		oldSnapshot->Deref();
 		contentMapperTimings_ = takeContentMapperTimingDelta();

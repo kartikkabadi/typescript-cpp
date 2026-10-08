@@ -72,7 +72,9 @@ oracle before moving on.
       incl. Windows-path VFS).
 - [x] fourslash LS-test harness — `fourslashrunner` (fork-per-test
       runner, static registry) + Go→C++ test transpiler. **4,560 tests
-      ported — 4,130 / 4,130 PASS (100%), 430 faithful skips** (upstream
+      ported — **4,130 unique tests / 4,130 PASS (100%)** across 4,560
+      registrations (7 registrations are duplicate harness entries), 430
+      faithful skips** (upstream
       `t.Skip`, GOOS-gated, feature-gated). Zero crashes/asserts/timeouts
       across the suite. Every divergence root-caused to a real port bug —
       see `internal/fourslash/tests/REPORT_{A,B,C,D}.md`.

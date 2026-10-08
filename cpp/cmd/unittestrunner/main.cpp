@@ -56,8 +56,14 @@ void* runTestImpl(void* arg) {
 	auto* rc = static_cast<RunCtx*>(arg);
 	// The top-level T carries the registered test name (Go populates
 	// t.name for TestX itself) — tests like the stackSanitizer baselines
-	// read it via t->Name().
-	tsc::gostd::testing::T t{rc->tc->name};
+	// read it via t->Name(). Registered names are package-qualified
+	// ("lsp.TestX") but Go's top-level T.Name() returns just "TestX" —
+	// strip the package prefix.
+	std::string_view tname = rc->tc->name;
+	if (auto dot = tname.find('.'); dot != std::string_view::npos) {
+		tname = tname.substr(dot + 1);
+	}
+	tsc::gostd::testing::T t{std::string(tname)};
 	// Invoke the test fn on the runner's T directly (not via t.Run): a
 	// t.Skip() in the test body must mark the top-level test skipped,
 	// while a skip inside a t.Run subtest must not — Go reports
@@ -105,9 +111,10 @@ int runTestBody(const tsc::testutil::unittests::UnitTestCase& tc) {
 #endif
 	RunCtx ctx{&tc, 0};
 #ifdef _WIN32
-	// CreateThread takes the stack reserve directly (64MB like POSIX).
+	// STACK_SIZE_PARAM_IS_A_RESERVATION — reserve 64MB but commit lazily
+	// (flags=0 commits the full stack up front).
 	HANDLE h = CreateThread(nullptr, SIZE_T{64} << 20, runTestImplW32,
-	                        &ctx, 0, nullptr);
+	                        &ctx, STACK_SIZE_PARAM_IS_A_RESERVATION, nullptr);
 	if (h == nullptr) {
 		runTestImpl(&ctx);
 	} else {

@@ -39,7 +39,8 @@ int main(int argc, char** argv) {
 			Ctx ctx{&tc, &t};
 #ifdef _WIN32
 			HANDLE h = CreateThread(nullptr, SIZE_T{64} << 20,
-			                        runTestImplW32, &ctx, 0, nullptr);
+			                        runTestImplW32, &ctx,
+			                        STACK_SIZE_PARAM_IS_A_RESERVATION, nullptr);
 			if (h == nullptr) { runTestImpl(&ctx); }
 			else { WaitForSingleObject(h, INFINITE); CloseHandle(h); }
 #else

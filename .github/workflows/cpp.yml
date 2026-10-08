@@ -84,9 +84,9 @@ jobs:
           ! grep -q FAIL "$RESULTDIR/check_results.txt"
 
       - name: Fourslash smoke
-        run: cpp/build/fourslashrunner -run 'TestFormatting|TestQuickInfo' 2>&1 | tail -5
+        run: set -o pipefail && cpp/build/fourslashrunner -run 'TestFormatting|TestQuickInfo' 2>&1 | tail -5
 
       - name: Unit + tsctests
         run: |
           cpp/build/unittestrunner
-          cpp/build/tsctestrunner 2>&1 | tail -3
+          set -o pipefail && cpp/build/tsctestrunner 2>&1 | tail -3

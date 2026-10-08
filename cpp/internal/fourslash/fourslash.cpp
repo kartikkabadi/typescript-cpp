@@ -2686,7 +2686,9 @@ TextRange FourslashTest::updateTextRangeForTextEdits(
 		    .length = (int)edit->NewText.size(),
 		});
 	}
-	// stable_sort: Go's slices.SortFunc preserves equal-key order
+	// stable_sort: Go's slices.SortFunc (pdqsort) is not documented stable,
+	// but our oracle testing showed deterministic tie-order matching
+	// std::stable_sort — matching observed behavior is the safe port.
 	// (same-position edits must keep insertion order).
 	std::stable_sort(spans.begin(), spans.end(),
 	          [](const textEditSpan& a, const textEditSpan& b) {
@@ -2719,7 +2721,8 @@ std::string FourslashTest::applyEditsToContent(
     std::string content,
     std::vector<std::shared_ptr<lsproto::TextEdit>> edits) {
 	auto script = getScriptInfo(activeFilename);
-	// stable_sort: Go's slices.SortFunc preserves insertion order on
+	// stable_sort: Go's slices.SortFunc (pdqsort) ties preserve insertion
+	// order on observed inputs
 	// equal keys; std::sort scrambles same-position edits
 	// deterministically (TestCodeFixClassImplementInterfaceMemberOrdering).
 	std::stable_sort(edits.begin(), edits.end(),
@@ -3690,7 +3693,9 @@ void FourslashTest::VerifyOutliningSpans(
 		    {ranges.size(), actualRanges.size()});
 	}
 
-	// stable_sort: Go's slices.SortFunc preserves equal-key order.
+	// stable_sort: Go's slices.SortFunc (pdqsort) is not documented stable,
+	// but our oracle testing showed deterministic tie-order matching
+	// std::stable_sort — matching observed behavior is the safe port..
 	std::stable_sort(ranges.begin(), ranges.end(),
 	          [](const std::shared_ptr<RangeMarker>& a,
 	             const std::shared_ptr<RangeMarker>& b) {
@@ -5300,7 +5305,9 @@ void FourslashTest::editScriptAndUpdateMarkersWorker(
     const std::vector<TextChange>& changes) {
 	// Sort changes by position (ascending) so we can apply in reverse
 	std::vector<TextChange> sortedChanges = changes;
-	// stable_sort: Go's slices.SortFunc preserves equal-key order.
+	// stable_sort: Go's slices.SortFunc (pdqsort) is not documented stable,
+	// but our oracle testing showed deterministic tie-order matching
+	// std::stable_sort — matching observed behavior is the safe port..
 	std::stable_sort(sortedChanges.begin(), sortedChanges.end(),
 	          [](const TextChange& a, const TextChange& b) {
 		          return a.pos() < b.pos();

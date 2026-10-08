@@ -688,6 +688,7 @@ class Timer {
 		std::condition_variable cv;
 		bool fired = false;
 		bool stopped = false;
+		bool exited = false; // worker fully returned (post-fn) — set under mu
 		std::chrono::steady_clock::time_point deadline;
 		std::function<void()> fn;
 		std::thread worker;
@@ -696,27 +697,40 @@ class Timer {
 	std::shared_ptr<State> s;
 
 	static void run(std::shared_ptr<State> s) {
+		std::unique_lock<std::mutex> lock(s->mu);
 		for (;;) {
-			std::function<void()> fn;
-			{
-				std::unique_lock<std::mutex> lock(s->mu);
-				s->cv.wait_until(lock, s->deadline,
-				                 [&] { return s->stopped || s->fired; });
-				if (s->stopped) {
-					return;
-				}
-				// Timers created via AfterFunc never need to re-wait after
-				// the deadline passes; Reset sets a new deadline and clears
-				// `fired`, so only fire when the deadline has arrived.
-				if (std::chrono::steady_clock::now() >= s->deadline) {
-					s->fired = true;
-					fn = s->fn;
+			// Sleep until stopped, or (not already fired) the deadline.
+			// The wait re-reads s->deadline each iteration, so a Reset on a
+			// sleeping worker applies its new deadline on the next wake.
+			while (!s->stopped &&
+			       (s->fired ||
+			        std::chrono::steady_clock::now() < s->deadline)) {
+				if (s->fired) {
+					s->cv.wait(lock);
+				} else {
+					s->cv.wait_until(lock, s->deadline);
 				}
 			}
-			if (fn) {
-				fn();
+			if (s->stopped) {
+				s->exited = true;
+				s->cv.notify_all();
 				return;
 			}
+			s->fired = true;
+			std::function<void()> fn = s->fn;
+			lock.unlock();
+			fn();
+			lock.lock();
+			// If nobody re-armed the timer during fn (Reset clears fired),
+			// the timer is spent — exit so an abandoned AfterFunc doesn't
+			// leak its worker thread. A later Reset sees `exited` and
+			// respawns.
+			if (s->fired) {
+				s->exited = true;
+				return;
+			}
+			// Reset during fn re-armed the timer — loop and re-fire at the
+			// new deadline like Go.
 		}
 	}
 
@@ -739,20 +753,24 @@ public:
 	bool Stop() {
 		if (!s) return false;
 		bool ret;
+		std::thread w;
 		{
 			std::lock_guard<std::mutex> lock(s->mu);
 			ret = !s->fired;
 			s->stopped = true;
+			// Detach the handle under the lock so a concurrent Reset
+			// cannot reassign s->worker while we still inspect it.
+			w = std::move(s->worker);
 		}
 		s->cv.notify_all();
-		if (s->worker.joinable()) {
-			if (s->worker.get_id() == std::this_thread::get_id()) {
+		if (w.joinable()) {
+			if (w.get_id() == std::this_thread::get_id()) {
 				// Go's Stop never waits on a running fn — a self-join
 				// throws std::system_error. Detach instead; run()'s
 				// shared_ptr<State> keeps the state alive.
-				s->worker.detach();
+				w.detach();
 			} else {
-				s->worker.join();
+				w.join();
 			}
 		}
 		return ret;
@@ -765,29 +783,23 @@ public:
 		{
 			std::lock_guard<std::mutex> lock(s->mu);
 			ret = !s->fired;
-			bool workerExited = s->fired || s->stopped;
 			s->deadline = std::chrono::steady_clock::now() + d;
 			s->fired = false;
 			s->stopped = false;
-			if (!s->worker.joinable()) {
-				// Worker already exited and was reaped; respawn it.
+			// Respawn only when the worker has actually exited — fired/stopped
+			// alone don't imply the thread returned (fn may still be running
+			// past its last lock release), and spawning a second run() loop
+			// here would let two workers invoke fn concurrently.
+			if (s->exited) {
+				if (s->worker.joinable()) {
+					s->worker.detach();
+				}
 				s->worker = std::thread(&Timer::run, s);
-			} else if (workerExited) {
-				// Worker fired (or was stopped) — its std::thread is
-				// still joinable even after the OS thread returns, so
-				// without respawning the timer could never fire again
-				// (and assigning over a joinable thread is
-				// std::terminate). Detach rather than join: joining
-				// under the lock deadlocks when fn() is still running
-				// and itself calls Stop/Reset (it would wait on this
-				// mutex); Go's Reset never waits on a running fn.
-				// Detached threads reap themselves; run()'s
-				// shared_ptr<State> keeps state alive.
-				s->worker.detach();
-				s->worker = std::thread(&Timer::run, s);
+				s->exited = false;
 			}
-			// Sleeping worker: leave it — notify below makes it
-			// re-wait on the new deadline.
+			// Otherwise the worker is alive: the new loop in run()
+			// re-arms it — notify below wakes it to re-check the new
+			// deadline (or the cleared fired flag if it was mid-fn).
 		}
 		s->cv.notify_all();
 		return ret;

@@ -11,6 +11,7 @@ TSCPP=${TSCPP:-"$REPO_ROOT/cpp/build/tscpp"}
 run_one() {
   F="$1"
   case "$F" in /*) ;; *) F="$REPO_ROOT/$F" ;; esac
+  if [ ! -f "$F" ]; then echo "FAIL $F (missing)"; return 1; fi
   ID=$(printf '%s' "$F" | md5sum | cut -c1-12)
   (cd "$REPO_ROOT" && "$BINDUMP" "$F") > "/tmp/bind_go_$ID.txt" 2>/dev/null
   go_rc=$?
@@ -19,7 +20,7 @@ run_one() {
   # Fail closed: rc >= 126 means the tool never ran (not found / crashed) —
   # never compare two empty dumps and call it a match. Legit nonzero exits
   # on error files still get compared on output.
-  if [ "$cpp_rc" -lt 126 ] && [ "$go_rc" -lt 126 ] && cmp -s "/tmp/bind_go_$ID.txt" "/tmp/bind_cpp_$ID.txt"; then
+  if [ "$cpp_rc" -lt 126 ] && [ "$go_rc" -lt 126 ] && [ "$cpp_rc" -eq "$go_rc" ] && cmp -s "/tmp/bind_go_$ID.txt" "/tmp/bind_cpp_$ID.txt"; then
     echo "PASS $F"
   else
     echo "FAIL $F"

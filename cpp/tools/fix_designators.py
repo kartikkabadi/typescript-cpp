@@ -30,12 +30,28 @@ ORDERS = {
 
 # Auto-discovered struct field orders (hardcoded map above wins on conflicts
 # like core `Diagnostic` vs `lsproto::Diagnostic`).
-for k, v in json.load(open("/tmp/struct_orders.json")).items():
-    ORDERS.setdefault(k, v)
+# Preferred field order per struct, when available. The file is a
+# developer-local artifact (generated while fixing initializers); absent
+# is fine — callers fall back to leaving order untouched.
+import os
+if os.path.exists("/tmp/struct_orders.json"):
+    for k, v in json.load(open("/tmp/struct_orders.json")).items():
+        ORDERS.setdefault(k, v)
 
 TYPES_RE = re.compile(r"\b(" + "|".join(ORDERS) + r")\{")
 
 fixes = 0
+
+
+def skip_comment(text, i, n):
+    """Return index past a // or /* */ comment starting at i, else i."""
+    if text.startswith("//", i):
+        j = text.find("\n", i)
+        return j if j >= 0 else n
+    if text.startswith("/*", i):
+        j = text.find("*/", i + 2)
+        return j + 2 if j >= 0 else n
+    return i
 
 
 def find_matching_brace(text, open_idx):
@@ -44,6 +60,10 @@ def find_matching_brace(text, open_idx):
     n = len(text)
     while i < n:
         c = text[i]
+        ni = skip_comment(text, i, n)
+        if ni != i:
+            i = ni
+            continue
         if c == "R" and text.startswith('"', i + 1):
             # C++ raw string R"delim(...)delim"
             rm = re.match(r'R"([A-Za-z]{0,16})\(', text[i:])
@@ -80,6 +100,10 @@ def split_top_commas(body):
     n = len(body)
     while i < n:
         c = body[i]
+        ni = skip_comment(body, i, n)
+        if ni != i:
+            i = ni
+            continue
         if c == "R" and i + 1 < n and body[i + 1] == '"':
             rm = re.match(r'R"([A-Za-z]{0,16})\(', body[i:])
             if rm:

@@ -209,7 +209,7 @@ slow pass as a hang). Go's own default `-timeout 10m` is per binary;
 ### 7. unittestrunner merge — test-file port fixes (fixed)
 
 After merging `devin/cpp-port` (which added 452 registered unit tests),
-five Windows-specific breaks surfaced — all in test-harness code the
+eight Windows-specific breaks surfaced — all in test-harness code the
 earlier port predated:
 
 - `stderr` is an MSVCRT macro (`#define stderr &__iob_func()[2]`) —
