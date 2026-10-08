@@ -76,6 +76,25 @@ else()
 	set(tsc_alloc_objects "")
 endif()
 
+# Fuzz harnesses (cmd/fuzz/): libFuzzer drivers for the untrusted-byte
+# surfaces (scanner, parser, tsconfig, LSP framing). OFF by default; the
+# dedicated build dir is configured with -DTSCPP_FUZZ=ON plus sanitizer
+# flags, e.g.
+#   cmake -B build-fuzz -S cpp -G Ninja -DTSCPP_FUZZ=ON \
+#     -DCMAKE_CXX_FLAGS="-fsanitize=fuzzer-no-link,address,undefined -g -O1"
+option(TSCPP_FUZZ "Build libFuzzer drivers under cmd/fuzz" OFF)
+if(TSCPP_FUZZ)
+	# Faithful Go panics unwind to each driver's catch instead of _Exit(2).
+	add_compile_definitions(TSC_FUZZ_UNREACHABLE_THROW)
+	# mimalloc's internal allocator bypasses ASan's malloc interception and
+	# would hide heap OOB/UAF — force it off for fuzz builds.
+	if(TSCPP_MIMALLOC)
+		message(STATUS "TSCPP_FUZZ: disabling mimalloc so ASan intercepts all heap allocations")
+		set(TSCPP_MIMALLOC OFF)
+		set(tsc_alloc_objects "")
+	endif()
+endif()
+
 add_library(tsc STATIC
 	internal/ast/ast.cpp
 	internal/ast/utilities.cpp
@@ -550,6 +569,20 @@ add_executable(utdbg cmd/unittestrunner/dbg_main.cpp
 	internal/testutil/unittests/registry.cpp ${UNIT_TEST_SOURCES}
 	${tsc_alloc_objects})
 target_link_libraries(utdbg PRIVATE tsc)
+
+# Fuzz drivers — one binary per input surface, each defining
+# LLVMFuzzerTestOneInput over the same entry points the runners use.
+# Compiled only with -DTSCPP_FUZZ=ON; -fsanitize=fuzzer supplies main().
+if(TSCPP_FUZZ AND NOT WIN32)
+	file(GLOB FUZZ_SOURCES CONFIGURE_DEPENDS cmd/fuzz/fuzz_*.cpp)
+	foreach(fuzz_src ${FUZZ_SOURCES})
+		get_filename_component(fuzz_target ${fuzz_src} NAME_WE)
+		add_executable(${fuzz_target} ${fuzz_src})
+		target_link_libraries(${fuzz_target} PRIVATE tsc)
+		target_link_options(${fuzz_target} PRIVATE
+			-fsanitize=fuzzer,address,undefined)
+	endforeach()
+endif()
 
 # w32compat supplies POSIX names (read/write/open/mkdir/getpid/...) with
 # POSIX signatures; suppress the CRT's int/unsigned nonstd aliases so ours
