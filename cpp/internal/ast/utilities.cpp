@@ -1356,7 +1356,8 @@ bool isTypeDeclaration(Node* node) {
 	case Kind::EnumDeclaration:
 		return true;
 	case Kind::ImportClause:
-		return node->isTypeOnly();
+		return node->isTypeOnly() &&
+		       node->as<ImportClause>()->name != nullptr;
 	case Kind::ImportSpecifier:
 	case Kind::ExportSpecifier:
 		return node->parent->parent->isTypeOnly();
