@@ -69,10 +69,11 @@ struct SessionUtils {
 
 private:
 	// createTypesRegistryFileContent — projecttestutil.go:199.
-	std::string createTypesRegistryFileContent();
+	static std::string createTypesRegistryFileContent(
+	    const std::shared_ptr<TypingsInstallerOptions>& tiOptions);
 	// appendTypesRegistryConfig — projecttestutil.go:216.
-	void appendTypesRegistryConfig(std::string* builder, int index,
-	                               const std::string& entry);
+	static void appendTypesRegistryConfig(std::string* builder, int index,
+	                                      const std::string& entry);
 };
 
 // TypesRegistryConfigText — projecttestutil.go:162.

@@ -568,11 +568,12 @@ struct filesLoader {
 	// shared with the produced program. Its loader/host links are
 	// released after parsing (fileloader.go:223).
 	std::shared_ptr<projectReferenceFileMapper> projectReferenceFileMapper;
-	// fileloader.go:78 — first module-resolution error. (The C++
-	// module::Resolver interface does not surface errors, so this stays
-	// empty; the slot exists so processedFiles.moduleResolutionError is
-	// populated like Go.)
+	// fileloader.go:77-78 — first module-resolution error. The C++
+	// module::Resolver interface has no error channel (callback resolvers
+	// throw instead), so the two ResolveModuleName call sites catch the
+	// throw and record it here, mirroring Go's err return + Once.
 	gostd::Error moduleResolutionError;
+	OnceFlag moduleResolutionErrorOnce;
 	// fileloader.go:58-59 — counts feeding map/vector capacity hints
 	// (atomic.Int32 in Go; parse workers increment them in parallel).
 	std::atomic<int32_t> totalFileCount{0};
@@ -1138,6 +1139,11 @@ public:
 	std::vector<Diagnostic*> GetSyntacticDiagnostics(SourceFile* sourceFile);
 	std::vector<Diagnostic*> GetBindDiagnostics(SourceFile* sourceFile);
 	std::vector<Diagnostic*> GetSemanticDiagnostics(SourceFile* sourceFile);
+	// ctx overload — program.go:798 GetSemanticDiagnostics(ctx, file);
+	// needed for CheckerLifetime::Diagnostics checkouts (index-0 checker
+	// merges global diagnostics on release).
+	std::vector<Diagnostic*> GetSemanticDiagnostics(
+	    const gostd::Context& ctx, SourceFile* sourceFile);
 	std::vector<Diagnostic*> GetIncludeProcessorDiagnostics(
 	    SourceFile* sourceFile);
 	std::vector<Diagnostic*> GetDeclarationDiagnostics(SourceFile* sourceFile);
@@ -1160,14 +1166,18 @@ public:
 	// program.go:590 GetTypeChecker / :607 GetTypeCheckerForFile — Go's
 	// checker pool hands out per-file checkers; the built-in pool returns
 	// the file's associated checker, non-exclusive (getChecker is the
-	// first pool checker, matching Go's checkers[0]).
+	// first pool checker, matching Go's checkers[0]). The ContextPtr's
+	// checker-lifetime/request-id values are translated back to the
+	// gostd::Context the external pool reads.
 	std::pair<checker::Checker*, std::function<void()>> GetTypeChecker(
 	    const ContextPtr& ctx) {
-		return GetTypeCheckerForFileExclusive(nullptr);
+		return GetTypeCheckerForFileExclusive(core::contextPtrToGostd(ctx),
+		                                      nullptr);
 	}
 	std::pair<checker::Checker*, std::function<void()>> GetTypeCheckerForFile(
 	    const ContextPtr& ctx, SourceFile* file) {
-		return getTypeCheckerForFileNonExclusive(file);
+		return getTypeCheckerForFileNonExclusive(
+		    core::contextPtrToGostd(ctx), file);
 	}
 	// program.go:2171 GetResolvedTypeReferenceDirectiveFromTypeReferenceDirective.
 	module::ResolvedTypeReferenceDirective*
@@ -1261,7 +1271,18 @@ public:
 	    SourceFile* sourceFile,
 	    const std::function<std::vector<Diagnostic*>(checker::Checker*,
 	                                               SourceFile*)>& collect);
+	// ctx overloads — Go threads ctx through the checker checkout so
+	// CheckerLifetime/request-affinity reach the external checker pool.
+	std::vector<Diagnostic*> collectCheckerDiagnostics(
+	    const gostd::Context& ctx, SourceFile* sourceFile,
+	    const std::function<std::vector<Diagnostic*>(checker::Checker*,
+	                                               SourceFile*)>& collect);
 	std::vector<std::vector<Diagnostic*>> collectCheckerDiagnosticsFromFiles(
+	    const std::vector<SourceFile*>& sourceFiles,
+	    const std::function<std::vector<Diagnostic*>(checker::Checker*,
+	                                               SourceFile*)>& collect);
+	std::vector<std::vector<Diagnostic*>> collectCheckerDiagnosticsFromFiles(
+	    const gostd::Context& ctx,
 	    const std::vector<SourceFile*>& sourceFiles,
 	    const std::function<std::vector<Diagnostic*>(checker::Checker*,
 	                                               SourceFile*)>& collect);
@@ -1284,7 +1305,8 @@ public:
 	// built-in pool returns the file's checker without locking; an external
 	// pool checks the checker out through the CheckerPool interface.
 	std::pair<checker::Checker*, std::function<void()>>
-	getTypeCheckerForFileNonExclusive(SourceFile* file);
+	getTypeCheckerForFileNonExclusive(const gostd::Context& ctx,
+	                                  SourceFile* file);
 	std::pair<std::vector<Diagnostic*>,
 	          std::unordered_map<int, CommentDirective>>
 	getDiagnosticsWithPrecedingDirectives(
@@ -1295,6 +1317,8 @@ public:
 	std::vector<SourceFile*> GetSourceFiles() override { return files; }
 	std::vector<Diagnostic*> GetSuggestionDiagnostics(
 	    SourceFile* sourceFile) override;
+	std::vector<Diagnostic*> GetSuggestionDiagnostics(
+	    const gostd::Context& ctx, SourceFile* sourceFile);
 	SimpleProgram* GetProgram() override { return this; }
 
 	// --- program.go methods the incremental Program delegates to ---
@@ -1304,6 +1328,11 @@ public:
 	// caller; keeps the port's previous shared-checker semantics).
 	std::pair<checker::Checker*, std::function<void()>>
 	GetTypeCheckerForFileExclusive(SourceFile* file);
+	// ctx overload — program.go:616; external pool reads
+	// CheckerLifetime/request affinity from ctx.
+	std::pair<checker::Checker*, std::function<void()>>
+	GetTypeCheckerForFileExclusive(const gostd::Context& ctx,
+	                               SourceFile* file);
 	// === slice: ls-coreC ===
 	// program.go ContentMapperExtensions — extensions registered by the parsed
 	// command line (empty when built through the plain ctor). GetTypeChecker /

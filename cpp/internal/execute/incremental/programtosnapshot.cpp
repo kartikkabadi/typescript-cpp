@@ -24,7 +24,6 @@ std::vector<Diagnostic*>* repopulateDiagnosticsList(
 std::vector<Diagnostic*>* repopulateDiagnosticMessageChain(
     const std::vector<Diagnostic*>& chain, compiler::SimpleProgram* p,
     SourceFile* file);
-buildInfoDiagnosticWithFileName* astDiagToBuildInfoDiag(Diagnostic* d);
 
 // set.Equals — set.go:104. Same pointer -> true; either nil -> false (unless
 // both nil); otherwise maps.Equal on the members.
@@ -570,6 +569,8 @@ std::vector<Diagnostic*>* repopulateDiagnosticMessageChain(
 	return new std::vector<Diagnostic*>(std::move(result));
 }
 
+}  // namespace
+
 // programtosnapshot.go:410 astDiagToBuildInfoDiag.
 buildInfoDiagnosticWithFileName* astDiagToBuildInfoDiag(Diagnostic* d) {
 	auto* b = new buildInfoDiagnosticWithFileName();
@@ -588,7 +589,6 @@ buildInfoDiagnosticWithFileName* astDiagToBuildInfoDiag(Diagnostic* d) {
 	return b;
 }
 
-}  // namespace
 
 // programtosnapshot.go:16 programToSnapshot.
 snapshot* programToSnapshot(compiler::SimpleProgram* program,

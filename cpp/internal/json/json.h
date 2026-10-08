@@ -33,6 +33,22 @@ namespace tsc::json {
 // '0' (number).
 using Kind = char;
 
+// Kind.String — token.go:643.
+inline std::string kindString(Kind k) {
+	switch (k) {
+	case 0: return "invalid";
+	case 'n': return "null";
+	case 'f': return "false";
+	case 't': return "true";
+	case '"': return "string";
+	case '0': return "number";
+	case '{': case '}': case '[': case ']':
+		return std::string(1, k);
+	default:
+		return "<invalid jsontext.Kind: " + std::string(1, k) + ">";
+	}
+}
+
 // jsontext.Value — the raw textual representation of a complete JSON value.
 // Derived from std::string (not an alias) so marshal/unmarshal dispatch can
 // tell raw JSON text apart from Go `string` fields, which encode as quoted

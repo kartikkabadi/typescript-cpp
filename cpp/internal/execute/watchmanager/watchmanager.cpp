@@ -239,6 +239,10 @@ gostd::Error WatchManager::ReconcileWatches(
 
 	std::vector<dirWatchUpdate> additions;
 	std::vector<dirWatchUpdate> changes;
+	// Go's `delete(wm.watchedDirs, dir)` mid-iteration is legal there;
+	// std::unordered_map::erase invalidates the range-for iterator, so the
+	// node removal/free is deferred until after the diff finishes.
+	std::vector<std::pair<std::string, watchedDir*>> removed;
 
 	diffMapsFunc<std::string, watchedDir*, bool>(
 	    watchedDirs, desiredDirs,
@@ -253,7 +257,7 @@ gostd::Error WatchManager::ReconcileWatches(
 		    }
 		    additions.push_back({dir, recursive});
 	    },
-	    [this](const std::string& dir, watchedDir* const& wd) {
+	    [this, &removed](const std::string& dir, watchedDir* const& wd) {
 		    if (DebugLog != nullptr) {
 			    *DebugLog << "[watch] closing stale dir watch: " << dir
 			              << '\n';
@@ -261,11 +265,11 @@ gostd::Error WatchManager::ReconcileWatches(
 		    if (wd->closer != nullptr) {
 			    wd->closer->close();
 		    }
-		    delete wd;
-		    watchedDirs.erase(dir);
+		    removed.push_back({dir, wd});
 	    },
-	    [this, &changes](const std::string& dir, watchedDir* const& wd,
-	                     const bool& recursive) {
+	    [this, &changes,
+	     &removed](const std::string& dir, watchedDir* const& wd,
+	               const bool& recursive) {
 		    if (DebugLog != nullptr) {
 			    *DebugLog << "[watch] recreating dir watch " << dir
 			              << " (recursive "
@@ -275,10 +279,13 @@ gostd::Error WatchManager::ReconcileWatches(
 		    if (wd->closer != nullptr) {
 			    wd->closer->close();
 		    }
-		    delete wd;
-		    watchedDirs.erase(dir);
+		    removed.push_back({dir, wd});
 		    changes.push_back({dir, recursive});
 	    });
+	for (auto& [dir, wd] : removed) {
+		delete wd;
+		watchedDirs.erase(dir);
+	}
 	additions.insert(additions.end(), changes.begin(), changes.end());
 	return createDirWatches(additions);
 }

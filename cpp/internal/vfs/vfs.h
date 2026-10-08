@@ -295,6 +295,8 @@ struct Entries {
 	std::vector<std::string> files;
 	std::vector<std::string> directories;
 	std::optional<std::unordered_set<std::string>> symlinks;
+
+	bool operator==(const Entries&) const = default;
 };
 
 // FS is a file system abstraction — vfs.go.

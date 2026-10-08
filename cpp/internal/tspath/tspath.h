@@ -744,18 +744,24 @@ inline std::string toFileNameLowerCase(std::string_view fileName) {
 		}
 		return b;
 	}
-	// Non-ASCII: fold each UTF-8 rune except U+0130. Cases needing wide
-	// lowercasing are rare in file names; decode and ASCII-fold the common
-	// subset, pass other multi-byte sequences through.
+	// Non-ASCII: fold each UTF-8 rune except U+0130 — Go: strings.Map(func(r)
+	// rune { if r == IWithDot { return r }; return unicode.ToLower(r) }).
 	std::string result;
 	result.reserve(fileName.size());
-	for (size_t i = 0; i < fileName.size(); i++) {
-		char c = fileName[i];
-		if ((uint8_t)c < 0x80) {
-			result += (c >= 'A' && c <= 'Z') ? (char)(c + 32) : c;
-		} else {
-			result += c;
+	for (size_t i = 0; i < fileName.size();) {
+		int w = 0;
+		char32_t r = decodeUtf8Rune(fileName.substr(i), &w);
+		if (w <= 0) {
+			w = 1;
 		}
+		if (r == 0x0130) {  // IWithDot — left unchanged by Go.
+			result.append(fileName.substr(i, w));
+		} else {
+			char buf[4];
+			result.append(buf,
+			              encodeUtf8Rune(stringutil::toLowerRune(r), buf));
+		}
+		i += w;
 	}
 	return result;
 }

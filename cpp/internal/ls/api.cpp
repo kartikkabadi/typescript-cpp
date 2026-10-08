@@ -123,8 +123,8 @@ LanguageService::getPreparedAutoImportView(SourceFile* fromFile,
 	    canonical != nullptr) {
 		registryFile = canonical;
 	}
-	if (!registry->IsPreparedForImportingFile(registryFile->FileName(),
-	                                          projectID_, UserPreferences())) {
+	if (!registry->IsPreparedForImportingFile(
+	        registryFile->FileName(), projectID_, UserPreferences())) {
 		return {nullptr, ErrNeedsAutoImports};
 	}
 

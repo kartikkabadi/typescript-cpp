@@ -1067,11 +1067,27 @@ public:
 	                compiler::SimpleProgram* program, ls::Host* host,
 	                const std::string& activeFile);
 
+	// The LanguageService owns its host — every callsite passes a
+	// freshly allocated adapter (e.g. SnapshotLSHost, which holds a
+	// snapshot ref). Deleting the service releases the host's ref like
+	// Go's GC reclaiming the service.
+	~LanguageService() override { delete host; }
+
 	// languageservice.go:41 toPath.
 	tspath::Path toPath(const std::string& fileName);
 
 	// languageservice.go:45 GetProgram.
 	compiler::SimpleProgram* GetProgram() { return program; }
+
+	// diagnostics.go ProvideDiagnostics — exported in Go (called
+	// cross-package from lsp server and project tests).
+	std::pair<lsproto::DocumentDiagnosticResponse, gostd::Error>
+	ProvideDiagnostics(const gostd::Context& ctx,
+	                   lsproto::DocumentUri uri);
+
+	// hover.go ProvideHover — exported in Go.
+	lsp::lsproto::HoverResponse ProvideHover(
+	    gostd::Context ctx, lsp::lsproto::HoverParams* params);
 
 	// languageservice.go:49 UserPreferences.
 	const lsutil::UserPreferences& UserPreferences() { return activeConfig; }
@@ -1490,6 +1506,16 @@ public:
 	std::pair<lsp::lsproto::Range, spanmap::Fidelity> createFoldingRangeFromBounds(
 		int start, int end, SourceFile* sourceFile);
 
+	// Public in Go (languageService methods callers use directly).
+	// === slice: ls-coreC — definition.go ===
+	lsp::lsproto::DefinitionResponse ProvideDefinition(gostd::Context ctx,
+													   lsp::lsproto::DocumentUri documentURI,
+													   lsp::lsproto::Position position);
+	// === slice: ls-coreB — findallreferences.go ===
+	std::pair<lsproto::ReferencesResponse, gostd::Error> ProvideReferences(
+	    const gostd::Context& ctx, lsproto::ReferenceParams* params,
+	    CrossProjectOrchestrator* orchestrator);
+
 private:
 	friend struct sourceDefResolver;
 	autoimport::ProjectID* projectID_;
@@ -1502,8 +1528,6 @@ private:
 	// === ls-coreB merged decls (findallreferences/codeactions/signaturehelp/file_rename/diagnostics) ===
 
 	// --- diagnostics.go ---
-	std::pair<lsproto::DocumentDiagnosticResponse, gostd::Error>
-	ProvideDiagnostics(const gostd::Context& ctx, lsproto::DocumentUri uri);
 	lsp::lsproto::Slice<std::shared_ptr<lsproto::Diagnostic>>
 	toLSPDiagnostics(
 	    const gostd::Context& ctx,
@@ -1619,9 +1643,6 @@ private:
 	    const gostd::Context& ctx, int position, Node* node,
 	    compiler::SimpleProgram* program, bool isRename,
 	    bool implementations);
-	std::pair<lsproto::ReferencesResponse, gostd::Error> ProvideReferences(
-	    const gostd::Context& ctx, lsproto::ReferenceParams* params,
-	    CrossProjectOrchestrator* orchestrator);
 	std::pair<lsproto::ReferencesResponse, gostd::Error>
 	provideReferencesFromData(const gostd::Context& ctx,
 	                          lsproto::ReferenceParams* params,
@@ -1794,9 +1815,6 @@ private:
 		gostd::Context ctx, lsp::lsproto::SelectionRangeParams* params);
 
 	// === slice: ls-coreC — definition.go ===
-	lsp::lsproto::DefinitionResponse ProvideDefinition(gostd::Context ctx,
-													   lsp::lsproto::DocumentUri documentURI,
-													   lsp::lsproto::Position position);
 	lsp::lsproto::DefinitionResponse provideDefinitionWorker(
 		gostd::Context ctx, lsp::lsproto::DocumentUri documentURI,
 		lsp::lsproto::Position position);
@@ -1959,7 +1977,6 @@ private:
 														bool allowSourceFile);
 
 	// === slice: ls-coreC — hover.go ===
-	lsp::lsproto::HoverResponse ProvideHover(gostd::Context ctx, lsp::lsproto::HoverParams* params);
 
 	// === slice: lsp-server — dep decls owned by ls slices ===
 	// server.go calls the exported Provide*/Get*/Resolve methods directly, so

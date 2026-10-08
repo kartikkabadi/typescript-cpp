@@ -377,6 +377,7 @@ inline Box<T>* newBox(T original) {
 // CloneableMap — cloneablemap.go (a map whose Clone is a shallow copy).
 template <typename K, typename V>
 struct CloneableMap : std::unordered_map<K, V> {
+	using std::unordered_map<K, V>::unordered_map;
 	CloneableMap Clone() const { return *this; }
 };
 

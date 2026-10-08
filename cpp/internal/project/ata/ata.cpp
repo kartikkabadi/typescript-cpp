@@ -82,49 +82,6 @@ struct throttleGroup {
 	gostd::Error wait() { return group.wait(); }
 };
 
-// installNpmPackages — batches package names into <8000-char npm commands
-// and runs each via the throttle group.
-gostd::Error installNpmPackages(
-    gostd::Context ctx, const std::vector<std::string>& packageNames,
-    countingSemaphore* semaphore,
-    const std::function<gostd::Error(const std::vector<std::string>&)>&
-        installPackages) {
-	(void)ctx; // errgroup.WithContext(ctx) — ctx is unused by Wait.
-	throttleGroup tg{semaphore, {}};
-
-	size_t currentCommandStart = 0;
-	size_t currentCommandEnd = 0;
-	int currentCommandSize = 100;
-
-	for (const std::string& packageName : packageNames) {
-		currentCommandSize += (int)packageName.size() + 1;
-		if (currentCommandSize < 8000) {
-			currentCommandEnd++;
-		} else {
-			std::vector<std::string> packages(
-			    packageNames.begin() + currentCommandStart,
-			    packageNames.begin() + currentCommandEnd);
-			tg.go([installPackages, packages = std::move(packages)] {
-				return installPackages(packages);
-			});
-			currentCommandStart = currentCommandEnd;
-			currentCommandSize = 100 + (int)packageName.size() + 1;
-			currentCommandEnd++;
-		}
-	}
-
-	// Handle the final batch
-	if (currentCommandStart < packageNames.size()) {
-		std::vector<std::string> packages(
-		    packageNames.begin() + currentCommandStart,
-		    packageNames.begin() + currentCommandEnd);
-		tg.go([installPackages, packages = std::move(packages)] {
-			return installPackages(packages);
-		});
-	}
-
-	return tg.wait();
-}
 
 // npmConfig — package.json devDependencies only (ata.go npmConfig).
 // npmLock — package-lock.json dependencies/packages (ata.go npmLock).
@@ -188,6 +145,51 @@ std::string parseNpmConfigOrLock(
 }
 
 } // namespace
+
+// installNpmPackages — batches package names into <8000-char npm commands
+// and runs each via the throttle group.
+gostd::Error installNpmPackages(
+    gostd::Context ctx, const std::vector<std::string>& packageNames,
+    countingSemaphore* semaphore,
+    const std::function<gostd::Error(const std::vector<std::string>&)>&
+        installPackages) {
+	(void)ctx; // errgroup.WithContext(ctx) — ctx is unused by Wait.
+	throttleGroup tg{semaphore, {}};
+
+	size_t currentCommandStart = 0;
+	size_t currentCommandEnd = 0;
+	int currentCommandSize = 100;
+
+	for (const std::string& packageName : packageNames) {
+		currentCommandSize += (int)packageName.size() + 1;
+		if (currentCommandSize < 8000) {
+			currentCommandEnd++;
+		} else {
+			std::vector<std::string> packages(
+			    packageNames.begin() + currentCommandStart,
+			    packageNames.begin() + currentCommandEnd);
+			tg.go([installPackages, packages = std::move(packages)] {
+				return installPackages(packages);
+			});
+			currentCommandStart = currentCommandEnd;
+			currentCommandSize = 100 + (int)packageName.size() + 1;
+			currentCommandEnd++;
+		}
+	}
+
+	// Handle the final batch
+	if (currentCommandStart < packageNames.size()) {
+		std::vector<std::string> packages(
+		    packageNames.begin() + currentCommandStart,
+		    packageNames.begin() + currentCommandEnd);
+		tg.go([installPackages, packages = std::move(packages)] {
+			return installPackages(packages);
+		});
+	}
+
+	return tg.wait();
+}
+
 
 // === TypingsInstaller ===
 

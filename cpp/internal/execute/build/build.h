@@ -533,12 +533,15 @@ struct Orchestrator : etsc::Watcher {
 	void GenerateGraphReusingOldTasks();
 	void GenerateGraph(collections::SyncMap<tspath::Path, BuildTask*>* oldTasks);
 	// tsc -b entrypoint
-	etsc::CommandLineResult Start();
+	etsc::CommandLineResult Start(gostd::Context ctx);
 	// orchestrator.Build() entrypoint for api
-	OrchestratorResult* Build(const std::string& project);
+	OrchestratorResult* Build(gostd::Context ctx,
+	                          const std::string& project);
 	// orchestrator.BuildReferences() entrypoint for api
-	OrchestratorResult* BuildReferences(const std::string& project);
-	OrchestratorResult* start(const std::string& project, bool onlyReferences);
+	OrchestratorResult* BuildReferences(gostd::Context ctx,
+	                                    const std::string& project);
+	OrchestratorResult* start(gostd::Context ctx, const std::string& project,
+                          bool onlyReferences);
 	void recheckAllProjects(const std::string& project);
 	// orchestrator.Clean() entrypoint for api
 	OrchestratorResult* Clean(const std::string& project);
@@ -551,7 +554,7 @@ struct Orchestrator : etsc::Watcher {
 	                        collections::Set<tspath::Path>* inputs, bool dry,
 	                        std::vector<std::string>* filesToDelete,
 	                        etsc::DiagnosticReporter reportDiagnostic);
-	void Watch();
+	void Watch(gostd::Context ctx);
 	void updateWatch();
 	void resetCaches();
 	void checkTasksForEventChanges(
@@ -582,5 +585,14 @@ struct Orchestrator : etsc::Watcher {
 
 // orchestrator.go:991 NewOrchestrator.
 Orchestrator* NewOrchestrator(Options opts);
+
+// iter.Seq[tspath.Path] as it appears in this codebase (buildtask.go).
+using pathSeq = std::function<void(
+    const std::function<bool(const tspath::Path&)>&)>;
+
+// buildtask.go:625 isContentMapperSupplementalBuildInfoPath. Go
+// package-private; declared here because package-level tests share it.
+bool isContentMapperSupplementalBuildInfoPath(const tspath::Path& inputPath,
+                                              const pathSeq& roots);
 
 } // namespace tsc::execute::build

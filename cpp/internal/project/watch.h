@@ -269,7 +269,9 @@ struct WatchedFiles {
 	std::function<PatternsAndIgnored(T)> computeGlobPatterns;
 
 	std::shared_mutex mu;
-	T input;
+	// input — value-initialized (Go zero value); for pointer T the mapper
+	// nil-guards it, and uninitialized bytes would deref garbage.
+	T input{};
 	std::once_flag computeWatchersOnce;
 	std::vector<lsp::lsproto::FileSystemWatcher*> workspaceWatchers;
 	std::vector<lsp::lsproto::FileSystemWatcher*> outsideWorkspaceWatchers;

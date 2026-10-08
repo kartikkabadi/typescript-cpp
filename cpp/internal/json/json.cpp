@@ -339,6 +339,11 @@ std::string Encoder::writeIndent(int depth) {
     return s;
 }
 
+// maxNestingDepth — jsontext/state.go:53. A `{`/`[` token that would
+// push past this depth fails with errMaxDepth ("exceeded max depth").
+static constexpr size_t maxNestingDepth = 10000;
+static const char errMaxDepth[] = "exceeded max depth";
+
 std::string Encoder::writeToken(const Token& t) {
     if (stack_.empty()) {
         if (wroteTop_) {
@@ -417,6 +422,9 @@ std::string Encoder::writeToken(const Token& t) {
     }
     out_ << t.raw;
     if (t.k == '{' || t.k == '[') {
+        if (stack_.size() >= maxNestingDepth) { // state.go:308,343
+            return errMaxDepth;
+        }
         stack_.push_back({t.k == '{', true, false});
     }
     return {};

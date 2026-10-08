@@ -18,6 +18,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <execinfo.h>
 
 #include "internal/gostd/testing.h"
 #include "internal/testutil/unittests/registry.h"
@@ -31,6 +32,16 @@ void onTestAlarm(int) {
 	const char msg[] = "[timed out]\n";
 	(void)!write(STDERR_FILENO, msg, sizeof(msg) - 1);
 	_exit(1);
+}
+
+void onCrash(int sig) {
+	const char msg[] = "[crash backtrace]\n";
+	(void)!write(STDERR_FILENO, msg, sizeof(msg) - 1);
+	void* bt[64];
+	int n = backtrace(bt, 64);
+	backtrace_symbols_fd(bt, n, STDERR_FILENO);
+	signal(sig, SIG_DFL);
+	raise(sig);
 }
 
 int runOne(const tsc::testutil::unittests::UnitTestCase& tc, std::string& output) {
@@ -53,6 +64,8 @@ int runOne(const tsc::testutil::unittests::UnitTestCase& tc, std::string& output
 		dup2(pipefd[1], STDERR_FILENO);
 		close(pipefd[1]);
 		signal(SIGALRM, onTestAlarm);
+		signal(SIGABRT, onCrash);
+		signal(SIGSEGV, onCrash);
 		alarm(kTestTimeoutSeconds);
 		tsc::gostd::testing::T t;
 		int code = 0;

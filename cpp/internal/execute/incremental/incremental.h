@@ -141,6 +141,10 @@ struct DiagnosticsOrBuildInfoDiagnosticsWithFileName {
 	                                        SourceFile* file);
 };
 
+// programtosnapshot.go:410 astDiagToBuildInfoDiag — Go package-private;
+// declared here because package-level tests share it.
+buildInfoDiagnosticWithFileName* astDiagToBuildInfoDiag(Diagnostic* d);
+
 // ===========================================================================
 // referencemap.go
 // ===========================================================================

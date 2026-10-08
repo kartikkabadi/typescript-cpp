@@ -23,10 +23,10 @@ std::vector<Diagnostic*> getAllDiagnostics(
 		for (auto* d : program->GetSyntacticDiagnostics(sourceFile)) {
 			diags.push_back(d);
 		}
-		for (auto* d : program->GetSemanticDiagnostics(sourceFile)) {
+		for (auto* d : program->GetSemanticDiagnostics(ctx, sourceFile)) {
 			diags.push_back(d);
 		}
-		for (auto* d : program->GetSuggestionDiagnostics(sourceFile)) {
+		for (auto* d : program->GetSuggestionDiagnostics(ctx, sourceFile)) {
 			diags.push_back(d);
 		}
 		if (program->Options()->GetEmitDeclarations()) {

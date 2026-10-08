@@ -103,6 +103,11 @@ struct ErrorCodeError : gostd::ErrObj {
     ErrorCode code;
     explicit ErrorCodeError(ErrorCode c) : code(c) {}
     std::string Error() const override { return String(code); }
+    // errors.Is: ErrorCode is a comparable int in Go — match by value.
+    bool isEqual(const gostd::ErrObj& o) const override {
+        auto* p = dynamic_cast<const ErrorCodeError*>(&o);
+        return p != nullptr && p->code == code;
+    }
 };
 inline gostd::Error errorCodeErr(ErrorCode c) { return std::make_shared<ErrorCodeError>(c); }
 

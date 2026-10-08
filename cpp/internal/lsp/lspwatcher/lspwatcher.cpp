@@ -136,7 +136,7 @@ namespace tsc::lsp::lspwatcher {
 // Forward decls — defined below in Go source order (lspwatcher.go:382,549).
 static std::pair<std::string, bool>
 nearestExistingAncestor(const std::shared_ptr<vfs::FS>& fs, std::string dir);
-static std::string rootFromGlob(std::string pattern);
+std::string rootFromGlob(std::string pattern);
 
 // ---------------------------------------------------------------------------
 // New / NewWithFSWatcher / newWithBackend — lspwatcher.go:96-115.
@@ -617,7 +617,7 @@ std::pair<std::string, bool> watchRoot(const lsproto::FileSystemWatcher* fileSys
 // rootFromGlob — lspwatcher.go:549.
 // ---------------------------------------------------------------------------
 
-static std::string rootFromGlob(std::string pattern) {
+std::string rootFromGlob(std::string pattern) {
 	pattern = tspath::normalizeSlashes(pattern);
 	int metaIndex = -1;
 	for (int i = 0; i < (int)pattern.size(); i++) {

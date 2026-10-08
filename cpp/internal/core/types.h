@@ -362,6 +362,10 @@ struct CompilerOptions {
 	std::string OutFile;
 
 	// Internal fields
+	// TypesWasSet tracks the Go `Types []string` nil-vs-empty
+	// distinction: true once config/command-line parsing assigned
+	// `types` (even to an empty list).
+	bool TypesWasSet{};
 	std::string ConfigFilePath;
 	Tristate NoDtsResolution{};
 	std::string PathsBasePath;
@@ -618,6 +622,9 @@ struct WatchOptions {
 	Tristate SyncWatchDir{};
 	std::vector<std::string> ExcludeDir;
 	std::vector<std::string> ExcludeFiles;
+
+	// encoding/json Unmarshal over the tagged fields (api/proto.cpp).
+	std::string unmarshalJSONFrom(json::Decoder& dec);
 
 	// WatchInterval — watchoptions.go. Default 2000ms.
 	int64_t WatchInterval() const {

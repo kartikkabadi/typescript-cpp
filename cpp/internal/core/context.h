@@ -139,5 +139,47 @@ inline CheckerLifetime GetCheckerLifetime(const gostd::Context& ctx) {
     return CheckerLifetimeTemporary;
 }
 
+// gostdContextAdapter — wraps a gostd::Context as a tsc::Context (the
+// ls/compiler layer's context type) so value lookups (checker lifetime,
+// request ID, client capabilities) see the same key chain. Contexts are
+// read-only once built, so the shared_ptr needs no synchronization.
+class gostdContextAdapter final : public Context {
+public:
+    explicit gostdContextAdapter(gostd::Context c) : c_(std::move(c)) {}
+    const std::any* value(const void* key) const override {
+        return gostd::ctxValue(c_, key);
+    }
+
+private:
+    gostd::Context c_;
+};
+
+// gostdToContextPtr — carries a gostd::Context into the tsc::ContextPtr
+// used by ls entry points. Go passes the request ctx straight through;
+// our ls takes the value-only ContextPtr, so adapt.
+inline ContextPtr gostdToContextPtr(const gostd::Context& ctx) {
+    if (!ctx) {
+        return backgroundContext();
+    }
+    return std::make_shared<gostdContextAdapter>(ctx);
+}
+
+// contextPtrToGostd — translates a tsc::ContextPtr back into a
+// gostd::Context for checker-pool checkouts, preserving the values the
+// pool reads (checker lifetime, request ID).
+inline gostd::Context contextPtrToGostd(const ContextPtr& ctx) {
+    gostd::Context c = gostd::contextBackground();
+    if (!ctx) {
+        return c;
+    }
+    if (const std::any* v = ctx->value(&detail::checkerLifetimeKey)) {
+        c = gostd::contextWithValue(c, &detail::checkerLifetimeKey, *v);
+    }
+    if (const std::any* v = ctx->value(&detail::requestIDKey)) {
+        c = gostd::contextWithValue(c, &detail::requestIDKey, *v);
+    }
+    return c;
+}
+
 } // namespace tsc::core
 // === end slice: project ===

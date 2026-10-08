@@ -1887,9 +1887,17 @@ const std::vector<compilerOptionFieldInfo>& compilerOptionFieldInfos() {
 	 [](CompilerOptions* o) { o->TypeRoots.clear(); }},
 	{"Types", "types",
 	 [](const CompilerOptions* o) -> CompilerOptionsValue { return JsonStrList(o->Types); },
-	 [](CompilerOptions* o, const CompilerOptionsValue& v) { o->Types = std::get<JsonStrList>(v.v); },
-	 [](const CompilerOptions* o) { return o->Types.empty(); },
-	 [](CompilerOptions* o) { o->Types.clear(); }},
+	 [](CompilerOptions* o, const CompilerOptionsValue& v) {
+		 o->Types = std::get<JsonStrList>(v.v);
+		 o->TypesWasSet = true;
+	 },
+	 // Go IsZero on []string is a nil check: an explicitly-set empty
+	 // `types` is NOT zero.
+	 [](const CompilerOptions* o) { return !o->TypesWasSet; },
+	 [](CompilerOptions* o) {
+		 o->Types.clear();
+		 o->TypesWasSet = false;
+	 }},
 	{"UseDefineForClassFields", "useDefineForClassFields",
 	 [](const CompilerOptions* o) -> CompilerOptionsValue { return o->UseDefineForClassFields; },
 	 [](CompilerOptions* o, const CompilerOptionsValue& v) { o->UseDefineForClassFields = std::get<Tristate>(v.v); },

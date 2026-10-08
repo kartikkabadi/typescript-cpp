@@ -71,9 +71,7 @@ inline std::optional<int> atoi(std::string_view s) {
 	return neg ? static_cast<int>(-v) : static_cast<int>(v);
 }
 
-// iter.Seq[tspath.Path] as it appears in this codebase.
-using pathSeq = std::function<void(
-    const std::function<bool(const tspath::Path&)>&)>;
+} // namespace
 
 // buildtask.go:625 isContentMapperSupplementalBuildInfoPath.
 bool isContentMapperSupplementalBuildInfoPath(const tspath::Path& inputPath,
@@ -101,7 +99,6 @@ bool isContentMapperSupplementalBuildInfoPath(const tspath::Path& inputPath,
 	return result;
 }
 
-} // namespace
 
 // buildtask.go:82 getContentMapperProject.
 std::pair<contentmapper::Project*, gostd::Error>

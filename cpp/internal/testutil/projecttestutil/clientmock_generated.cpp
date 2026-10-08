@@ -91,8 +91,12 @@ gostd::Error ClientMock::PublishDiagnostics(
     lsp::lsproto::PublishDiagnosticsParams* params) {
 	{
 		std::unique_lock lk(lockPublishDiagnostics);
+		auto paramsOwner =
+		    std::make_shared<lsp::lsproto::PublishDiagnosticsParams>(
+		        *params);
 		calls.PublishDiagnostics.push_back(ClientMockPublishDiagnosticsCall{
-		    .Ctx = ctx, .Params = params});
+		    .Ctx = ctx, .Params = paramsOwner.get(),
+		    .ParamsOwner = std::move(paramsOwner)});
 	}
 	if (!PublishDiagnosticsFunc) {
 		return nullptr;

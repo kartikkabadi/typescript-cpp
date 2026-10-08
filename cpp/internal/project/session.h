@@ -91,6 +91,10 @@ struct Session : ata::TypingsInstallerHost {
 
 	SessionOptions* options = nullptr;
 	logging::Logger* logger = nullptr;
+	// Retains the owners of every borrowed pointer in SessionInit for
+	// the session's lifetime so queued background work cannot outlive
+	// them (Go relies on GC).
+	std::vector<std::shared_ptr<void>> keepAlive;
 	gostd::Context backgroundCtx;
 	std::function<tspath::Path(const std::string&)> toPath;
 	Client* client = nullptr;

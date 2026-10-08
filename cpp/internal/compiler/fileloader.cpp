@@ -126,8 +126,20 @@ LibFile* filesLoader::pathForLibFile(const std::string& name) {
 		tracing::TraceScope traceResolveLibrary(
 		    tracing, tracing::PhaseProgram, "resolveLibrary",
 		    tracing::TraceArgs{{"resolveFrom", resolveFrom}}, false);
-		auto [resolutionShared, libTrace] = resolver->ResolveModuleName(
-		    libraryName, resolveFrom, ModuleKind::CommonJS, nullptr);
+		// fileloader.go:991-996 — Go records the first resolver error
+		// via moduleResolutionErrorOnce; C++ catches the throw.
+		std::shared_ptr<module::ResolvedModule> resolutionShared;
+		std::vector<module::DiagAndArgs> libTrace;
+		try {
+			std::tie(resolutionShared, libTrace) =
+			    resolver->ResolveModuleName(
+			        libraryName, resolveFrom, ModuleKind::CommonJS,
+			        nullptr);
+		} catch (const std::exception& e) {
+			moduleResolutionErrorOnce.run([&] {
+				moduleResolutionError = gostd::newError(e.what());
+			});
+		}
 		module::ResolvedModule* resolution = resolutionShared.get();
 		if (resolution != nullptr) {
 			// raw ptr outlives resolutionShared — keep the result alive
@@ -925,15 +937,23 @@ void filesLoader::resolveImportsAndModuleAugmentations(parseTask* t) {
 
 			ResolutionMode mode = getModeForUsageLocation(
 			    file->FileName(), meta, entry, optionsForFile);
-			// fileloader.go:889-901 — Go's resolver also returns an
-			// error recorded through moduleResolutionErrorOnce; the
-			// C++ interface has no error channel, so
-			// moduleResolutionError stays empty (see the loader's
-			// field comment). The trace is captured.
-			auto [resolvedShared, trace] =
-			    resolver->ResolveModuleName(std::string(moduleName),
-			                                std::string(fileName), mode,
-			                                redirect);
+			// fileloader.go:889-901 — Go's resolver returns an error
+			// recorded through moduleResolutionErrorOnce; the C++
+			// callbackModuleResolver throws instead, so catch and
+			// record once, continuing with a nil resolution as Go
+			// does.
+			std::shared_ptr<module::ResolvedModule> resolvedShared;
+			std::vector<module::DiagAndArgs> trace;
+			try {
+				std::tie(resolvedShared, trace) =
+				    resolver->ResolveModuleName(std::string(moduleName),
+				                                std::string(fileName),
+				                                mode, redirect);
+			} catch (const std::exception& e) {
+				moduleResolutionErrorOnce.run([&] {
+					moduleResolutionError = gostd::newError(e.what());
+				});
+			}
 			module::ResolvedModule* resolvedModule =
 			    resolvedShared.get();
 			if (resolvedModule == nullptr) {

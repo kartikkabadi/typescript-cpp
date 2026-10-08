@@ -51,11 +51,11 @@ struct projectIDAdapter : autoimport::ProjectID {
 	std::string String() const override { return project::idString(id); }
 };
 
-// Go's api session passes its request ctx into the ls API. Our single-checker
-// design has no cancellation to propagate; client capabilities (the only ctx
-// value the ls code reads) are unset on this path, matching Go's defaults.
-tsc::ContextPtr toLSContext(const gostd::Context& /*ctx*/) {
-	return tsc::backgroundContext();
+// Go's api session passes its request ctx into the ls API. The adapter
+// exposes the gostd value chain (checker lifetime, request ID, client
+// capabilities) through core::Context::value for the ls/compiler layer.
+tsc::ContextPtr toLSContext(const gostd::Context& ctx) {
+	return core::gostdToContextPtr(ctx);
 }
 
 namespace {
@@ -818,7 +818,7 @@ std::pair<snapshotData*, gostd::Error> Session::retainSnapshotData(
 }
 
 gostd::Error Session::releaseSnapshot(SnapshotID handle) {
-	snapshotData* sd = nullptr;
+	std::unique_ptr<snapshotData> sd;
 	{
 		std::unique_lock lk(snapshotsMu);
 		auto it = snapshots.find(handle);
@@ -826,12 +826,14 @@ gostd::Error Session::releaseSnapshot(SnapshotID handle) {
 			return gostd::errorf("%w: snapshot %d not found",
 			                     {ErrClientError, handle});
 		}
-		sd = it->second.get();
-		sd->refCount--;
-		if (sd->refCount <= 0) {
+		it->second->refCount--;
+		if (it->second->refCount <= 0) {
+			// Go: delete(s.snapshots, handle) leaves sd GC-alive
+			// until after snapshot.Deref() — the snapshot's file
+			// machinery references sd->fileSystem. Move the entry
+			// out so it stays alive through the Deref below.
+			sd = std::move(it->second);
 			snapshots.erase(it);
-		} else {
-			sd = nullptr;
 		}
 	}
 	if (sd != nullptr) {
@@ -855,11 +857,11 @@ std::pair<checkerSetup, gostd::Error> Session::setupChecker(
 		return {checkerSetup{}, err2};
 	}
 
-	// Go: program.GetTypeChecker(core.WithCheckerLifetime(ctx,
-	// core.CheckerLifetimeAPI)) — the C++ program holds a single lazily-created
-	// checker; done() is a no-op.
-	checker::Checker* c = program->getChecker();
-	return {checkerSetup{sd, program, c, []() {}, projectHandle}, nullptr};
+	// session.go:664 — API-lifetime checkout pins handlers to the persistent
+	// checker so returned symbol/type handles stay resolvable on re-query.
+	auto [c, done] = program->GetTypeCheckerForFileExclusive(
+	    core::WithCheckerLifetime(ctx, core::CheckerLifetimeAPI), nullptr);
+	return {checkerSetup{sd, program, c, done, projectHandle}, nullptr};
 }
 
 // setupLanguageService creates a LanguageService for the given snapshot/project.
@@ -1731,6 +1733,14 @@ Session::handleBatchRequests(gostd::Context ctx,
 	for (size_t i = 0; i < params->Requests.size(); ++i) {
 		responses[i] = handleBatchRequest(ctx, params->Requests[i]);
 	}
+	Session* volatile thisCheck = this;
+	if (thisCheck == nullptr) {
+		// session.go:1076 — a nil *Session skips pagination and returns the
+		// responses as-is.
+		auto response = std::make_unique<BatchRequestsResponse>();
+		response->Responses = std::move(responses);
+		return {std::move(response), nullptr};
+	}
 	auto [page, err] = newBatchResponsePageImpl(responses);
 	if (err) {
 		return {nullptr, err};
@@ -1824,6 +1834,30 @@ BatchResponse Session::handleBatchRequest(gostd::Context ctx,
 	// Go's `defer recover` — catch all handler exceptions and report like Go's
 	// panic recovery (debug.Stack() has no portable equivalent; message only).
 	try {
+		// session.go:1155 dispatches through s.HandleRequest (which answers
+		// echo/ping before the method switch); keep isRaw visible for the
+		// source-file re-encode below.
+		if (request.Method == "ping") {
+			// HandleRequest answers "ping" without touching a field of s —
+			// it survives a nil receiver in Go, so it survives `this ==
+			// nullptr` here.
+			response.Result = json::Value("\"pong\"");
+			return response;
+		}
+		{
+			// Every other path dereferences s; on a nil receiver Go panics
+			// before reaching the handler. (The volatile read keeps the
+			// optimizer from assuming `this` is non-null.)
+			Session* volatile thisCheck = this;
+			if (thisCheck == nullptr) {
+				throw std::runtime_error(
+				    "runtime error: invalid memory address or nil pointer dereference");
+			}
+		}
+		if (request.Method == "echo") {
+			response.Result = json::Value(request.Params);
+			return response;
+		}
 		auto [rv, err] = handleRequest(ctx, request.Method, request.Params);
 		if (err) {
 			response.Error = err->Error();
@@ -2077,17 +2111,20 @@ Session::toAPISnapshotRequest(gostd::Context ctx,
 		apiRequest->CloseProjects->Add(configPath);
 	}
 
-	for (const auto& f : changes->OpenFiles) {
-		std::string fileName = f.ToAbsoluteFileName(GetCurrentDirectory());
-		tspath::Path path = toPath(fileName);
-		if (apiRequest->OpenFiles == nullptr) {
-			apiRequest->OpenFiles =
-			    new std::unordered_map<tspath::Path, std::string>();
-		}
-		if (apiRequest->OpenFiles->find(path) ==
-		    apiRequest->OpenFiles->end()) {
-			(*apiRequest->OpenFiles)[path] = fileName;
-			apiRequest->EnsureFiles[path] = fileName;
+	if (changes->OpenFiles) {
+		for (const auto& f : *changes->OpenFiles) {
+			std::string fileName =
+			    f.ToAbsoluteFileName(GetCurrentDirectory());
+			tspath::Path path = toPath(fileName);
+			if (apiRequest->OpenFiles == nullptr) {
+				apiRequest->OpenFiles =
+				    new std::unordered_map<tspath::Path, std::string>();
+			}
+			if (apiRequest->OpenFiles->find(path) ==
+			    apiRequest->OpenFiles->end()) {
+				(*apiRequest->OpenFiles)[path] = fileName;
+				apiRequest->EnsureFiles[path] = fileName;
+			}
 		}
 	}
 
@@ -2102,9 +2139,11 @@ Session::toAPISnapshotRequest(gostd::Context ctx,
 		apiRequest->CloseFiles->Add(path);
 	}
 
-	apiRequest->CreatePrograms.resize(changes->CreatePrograms.size());
-	for (size_t i = 0; i < changes->CreatePrograms.size(); ++i) {
-		auto& programParams = changes->CreatePrograms[i];
+	size_t nCreatePrograms =
+	    changes->CreatePrograms ? changes->CreatePrograms->size() : 0;
+	apiRequest->CreatePrograms.resize(nCreatePrograms);
+	for (size_t i = 0; i < nCreatePrograms; ++i) {
+		auto& programParams = (*changes->CreatePrograms)[i];
 		if (programParams == nullptr) {
 			return {nullptr,
 			        gostd::errorf("%w: createPrograms[%d] must not be null",
@@ -2513,10 +2552,10 @@ Session::createSnapshotOperationResponse(
 		return operation;
 	}
 
-	if (!request->CreatePrograms.empty()) {
+	if (request->CreatePrograms) {
 		std::vector<project::Project*> createdPrograms =
 		    snapshot->CreatedPrograms();
-		if (createdPrograms.size() != request->CreatePrograms.size()) {
+		if (createdPrograms.size() != request->CreatePrograms->size()) {
 			throw std::runtime_error(
 			    "created program result count does not match request");
 		}
@@ -2533,11 +2572,11 @@ Session::createSnapshotOperationResponse(
 		operation->CreatedPrograms = std::move(results);
 	}
 
-	if (!request->OpenFiles.empty()) {
+	if (request->OpenFiles) {
 		std::vector<std::shared_ptr<OpenedFileOperationResult>> results(
-		    request->OpenFiles.size());
-		for (size_t i = 0; i < request->OpenFiles.size(); ++i) {
-			const DocumentIdentifier& file = request->OpenFiles[i];
+		    request->OpenFiles->size());
+		for (size_t i = 0; i < request->OpenFiles->size(); ++i) {
+			const DocumentIdentifier& file = (*request->OpenFiles)[i];
 			project::Project* project =
 			    snapshot->GetDefaultProject(file.ToURI(GetCurrentDirectory()));
 			if (project == nullptr) {
@@ -2560,17 +2599,21 @@ void Session::Close() {
 		releaseLanguageServerRefs();
 		releaseSourceFileLeases();
 
-		std::vector<project::Snapshot*> snapshotsToRelease;
+		std::vector<std::unique_ptr<snapshotData>> snapshotsToRelease;
 		{
 			std::lock_guard lock(snapshotsMu);
 			snapshotsToRelease.reserve(snapshots.size());
 			for (auto& [_, sd] : snapshots) {
-				snapshotsToRelease.push_back(sd->snapshot);
+				// Go: sd stays GC-alive after clear() and the
+				// snapshot's file machinery may reference
+				// sd->fileSystem — move entries out so they
+				// outlive the Deref below.
+				snapshotsToRelease.push_back(std::move(sd));
 			}
 			snapshots.clear();
 		}
-		for (project::Snapshot* snapshot : snapshotsToRelease) {
-			snapshot->Deref();
+		for (auto& sd : snapshotsToRelease) {
+			sd->snapshot->Deref();
 		}
 
 		if (ownsSnapshotHost) {
@@ -2879,7 +2922,7 @@ std::pair<std::unique_ptr<BuildResponse>, gostd::Error> Session::handleBuild(
 		                      {params->Project})};
 	}
 	std::unique_ptr<build::OrchestratorResult> result(
-	    it->second->Build(params->Project));
+	    it->second->Build(ctx, params->Project));
 
 	auto resp = std::make_unique<BuildResponse>();
 	resp->Status = result->Result.Status;
@@ -2899,7 +2942,7 @@ Session::handleBuildReferences(gostd::Context ctx, const BuildParams* params) {
 		                      {params->Project})};
 	}
 	std::unique_ptr<build::OrchestratorResult> result(
-	    it->second->BuildReferences(params->Project));
+	    it->second->BuildReferences(ctx, params->Project));
 
 	auto resp = std::make_unique<BuildResponse>();
 	resp->Status = result->Result.Status;
@@ -6755,8 +6798,9 @@ std::pair<std::unique_ptr<CompletionInfoResponse>, gostd::Error>
 Session::handleGetCompletionsAtPosition(
     gostd::Context ctx, const GetCompletionsAtPositionParams* params) {
 	if (params->IncludeSymbol) {
-		// Go: core.WithCheckerLifetime(ctx, core.CheckerLifetimeAPI) — no
-		// C++ equivalent (single lazily-created checker); see setupChecker.
+		// session.go:4989 — pins symbol-producing completion to the
+		// persistent API checker so the returned handles stay resolvable.
+		ctx = core::WithCheckerLifetime(ctx, core::CheckerLifetimeAPI);
 	}
 	auto [sd, err] = getSnapshotData(params->Snapshot);
 	if (err) {

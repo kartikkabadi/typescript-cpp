@@ -436,6 +436,8 @@ gostd::Error Server::handleInitialized(
 		std::make_shared<contentmapper::Logger>(contentMapperLogger());
 	init.ContentMapperLogger = sessionInitContentMapperLogger.get();
 	init.ParseCache = parseCache.get();
+	init.KeepAlive = {fs, logger, sessionInitSpawner,
+	                  sessionInitContentMapperLogger, parseCache};
 	session = project::NewSession(&init);
 
 	auto [userPreferences, uerr] = RequestConfiguration(ctx);

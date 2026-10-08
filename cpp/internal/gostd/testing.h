@@ -19,6 +19,8 @@
 #pragma once
 
 #include <chrono>
+#include <cstdio>
+#include <cstdlib>
 #include <exception>
 #include <filesystem>
 #include <functional>
@@ -66,6 +68,10 @@ public:
 		T child;
 		child.name_ = std::string(name);
 		child.parent_ = this;
+		if (std::getenv("UNITTEST_VERBOSE") != nullptr) {
+			std::fprintf(stderr, "SUBTEST %s\n",
+			             child.name_.c_str());
+		}
 		try {
 			fn(&child);
 		} catch (const testGoexit&) {
@@ -73,11 +79,7 @@ public:
 		if (child.failed_) {
 			failed_ = true;
 		}
-		// Go doesn't mark the parent skipped for a skipped subtest, but
-		// the runner needs the result: propagate it for reporting.
-		if (child.skipped_) {
-			skipped_ = true;
-		}
+		// Go does not mark the parent skipped for a skipped subtest.
 		return !child.failed_;
 	}
 

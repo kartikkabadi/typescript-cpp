@@ -57,6 +57,7 @@ Session* NewSession(SessionInit* init) {
 	session->snapshotHost = snapshotHost;
 	session->options = init->Options;
 	session->logger = sessionLogger;
+	session->keepAlive = init->KeepAlive;
 	session->backgroundCtx = init->BackgroundCtx;
 	session->toPath = snapshotHost->toPath;
 	session->client = init->Client;
@@ -1427,10 +1428,28 @@ project::Snapshot* Session::updateSnapshot(
 	auto* self = this;
 	auto capturedChange = change;
 	auto timings = contentMapperTimings_;
+	// GC lifetime: the Go closure keeps both snapshots alive until the
+	// task runs; ref them so a later snapshot change can't UAF. The old
+	// snapshot may already be fully disposed (ref() would trap), so
+	// only take a ref if one is still open — a fully-disposed snapshot
+	// object stays addressable in this codebase.
+	bool oldSnapshotRef = oldSnapshot->tryRef();
+	newSnapshot->ref();
 	backgroundQueue->Enqueue(
 	    backgroundContext(),
-	    [self, oldSnapshot, newSnapshot, timings,
-	     capturedChange](const gostd::Context& ctx) {
+	    [self, oldSnapshot, newSnapshot, timings, capturedChange,
+	     oldSnapshotRef](const gostd::Context& ctx) {
+		    struct snapsGuard {
+			    project::Snapshot* oldS;
+			    project::Snapshot* newS;
+			    bool hasOldRef;
+			    ~snapsGuard() {
+				    if (hasOldRef) {
+					    oldS->Deref();
+				    }
+				    newS->Deref();
+			    }
+		    } sg{oldSnapshot, newSnapshot, oldSnapshotRef};
 		    if (self->options->LoggingEnabled) {
 			    logging::logf(self->logger, 
 			        "Adopted snapshot %d (parent %d) as "
@@ -1739,8 +1758,8 @@ gostd::Error Session::updateWatches(project::Snapshot* oldSnapshot,
 	    oldSnapshot->ConfigFileRegistry->configs,
 	    newSnapshot->ConfigFileRegistry->configs,
 	    [](configFileEntry* a, configFileEntry* b) {
-		    return a->rootFilesWatch->ID() ==
-		           b->rootFilesWatch->ID();
+		    return watchedFilesID(a->rootFilesWatch) ==
+		           watchedFilesID(b->rootFilesWatch);
 	    },
 	    [&](const tspath::Path&, configFileEntry* addedEntry) {
 		    auto errs = updateWatch<PatternsAndIgnored>(
@@ -1771,10 +1790,10 @@ gostd::Error Session::updateWatches(project::Snapshot* oldSnapshot,
 		    oldSnapshot->ConfigFileRegistry->configs.find(path);
 		if (it != oldSnapshot->ConfigFileRegistry->configs.end()) {
 			auto* oldEntry = it->second;
-			if (oldEntry->rootFilesWatch->ID() ==
-			    newEntry->rootFilesWatch->ID()) {
+			if (watchedFilesID(oldEntry->rootFilesWatch) ==
+			    watchedFilesID(newEntry->rootFilesWatch)) {
 				if (watches->IsPending(
-				        newEntry->rootFilesWatch->ID())) {
+				        watchedFilesID(newEntry->rootFilesWatch))) {
 					auto errs =
 					    updateWatch<PatternsAndIgnored>(
 					        ctx, nullptr,
@@ -1829,8 +1848,8 @@ gostd::Error Session::updateWatches(project::Snapshot* oldSnapshot,
 	    },
 	    [&](const ID&, Project* oldProject,
 	        Project* newProject) {
-		    if (oldProject->programFilesWatch->ID() !=
-		        newProject->programFilesWatch->ID()) {
+		    if (watchedFilesID(oldProject->programFilesWatch) !=
+		        watchedFilesID(newProject->programFilesWatch)) {
 			    auto errs = updateWatch(
 			        ctx, oldProject->programFilesWatch,
 			        newProject->programFilesWatch);
@@ -1838,15 +1857,15 @@ gostd::Error Session::updateWatches(project::Snapshot* oldSnapshot,
 			                  errs.end());
 		    } else {
 			    if (watches->IsPending(
-			        newProject->programFilesWatch->ID())) {
+			        watchedFilesID(newProject->programFilesWatch))) {
 				    auto errs = updateWatchNew(
 				        ctx, newProject->programFilesWatch);
 				    errors.insert(errors.end(),
 				                  errs.begin(), errs.end());
 			    }
 		    }
-		    if (oldProject->typingsWatch->ID() !=
-		        newProject->typingsWatch->ID()) {
+		    if (watchedFilesID(oldProject->typingsWatch) !=
+		        watchedFilesID(newProject->typingsWatch)) {
 			    auto errs = updateWatch(
 			        ctx, oldProject->typingsWatch,
 			        newProject->typingsWatch);
@@ -1854,23 +1873,23 @@ gostd::Error Session::updateWatches(project::Snapshot* oldSnapshot,
 			                  errs.end());
 		    } else {
 			    if (watches->IsPending(
-			        newProject->typingsWatch->ID())) {
+			        watchedFilesID(newProject->typingsWatch))) {
 				    auto errs = updateWatchNew(
 				        ctx, newProject->typingsWatch);
 				    errors.insert(errors.end(),
 				                  errs.begin(), errs.end());
 			    }
 		    }
-		    if (oldProject->contentMapperWatch->ID() !=
-		        newProject->contentMapperWatch->ID()) {
+		    if (watchedFilesID(oldProject->contentMapperWatch) !=
+		        watchedFilesID(newProject->contentMapperWatch)) {
 			    auto errs = updateWatch(
 			        ctx, oldProject->contentMapperWatch,
 			        newProject->contentMapperWatch);
 			    errors.insert(errors.end(), errs.begin(),
 			                  errs.end());
 		    } else if (watches->IsPending(
-		                   newProject->contentMapperWatch
-		                       ->ID())) {
+		                   watchedFilesID(newProject
+		                                      ->contentMapperWatch))) {
 			    auto errs = updateWatchNew(
 			        ctx, newProject->contentMapperWatch);
 			    errors.insert(errors.end(), errs.begin(),
@@ -1878,14 +1897,14 @@ gostd::Error Session::updateWatches(project::Snapshot* oldSnapshot,
 		    }
 	    });
 
-	if (oldSnapshot->autoImportsWatch->ID() !=
-	    newSnapshot->autoImportsWatch->ID()) {
+	if (watchedFilesID(oldSnapshot->autoImportsWatch) !=
+	    watchedFilesID(newSnapshot->autoImportsWatch)) {
 		auto errs = updateWatch(ctx, oldSnapshot->autoImportsWatch,
 		                        newSnapshot->autoImportsWatch);
 		errors.insert(errors.end(), errs.begin(), errs.end());
 	} else {
 		if (watches->IsPending(
-		        newSnapshot->autoImportsWatch->ID())) {
+		        watchedFilesID(newSnapshot->autoImportsWatch))) {
 			auto errs =
 			    updateWatchNew(ctx, newSnapshot->autoImportsWatch);
 			errors.insert(errors.end(), errs.begin(),
@@ -2430,9 +2449,18 @@ void Session::triggerATAForUpdatedProjects(
 		if (project->ShouldTriggerATA(newSnapshot->ID())) {
 			auto* self = this;
 			auto* project_ = project;
+			// GC lifetime: the Go closure keeps the project's owning
+			// snapshot alive; ref it so the queued task can't UAF
+			// after a newer snapshot replaces this one.
+			newSnapshot->ref();
 			backgroundQueue->Enqueue(
 			    backgroundContext(),
-			    [self, project_](const gostd::Context& ctx) {
+			    [self, project_,
+			     newSnapshot](const gostd::Context& ctx) {
+				    struct snapGuard {
+					    project::Snapshot* s;
+					    ~snapGuard() { s->Deref(); }
+				    } sg{newSnapshot};
 				    logging::LogTree* logTree = nullptr;
 				    if (self->options->LoggingEnabled) {
 					    logTree = logging::newLogTree(

@@ -43,6 +43,10 @@ struct ErrObj {
 	virtual std::string Error() const = 0;
 	// Unwrap() error / Unwrap() []error — the wrapped chain.
 	virtual std::vector<std::shared_ptr<ErrObj>> unwrap() const { return {}; }
+	// errors.Is identity: Go compares comparable error values with ==.
+	// Pointer identity by default; value-typed errors (integer codes,
+	// etc.) override to compare contents.
+	virtual bool isEqual(const ErrObj& target) const { return this == &target; }
 };
 
 using Error = std::shared_ptr<ErrObj>;
@@ -77,6 +81,18 @@ struct joinError : ErrObj {
 	std::vector<gostd::Error> unwrap() const override { return errs; }
 };
 
+// multiWrapError — fmt.Errorf with >1 %w verbs: Error() is the formatted
+// message (like wrapError), Unwrap() returns every %w operand in order
+// (Go's multi-%w produces Unwrap() []error).
+struct multiWrapError : ErrObj {
+	std::string msg;
+	std::vector<gostd::Error> errs;
+	multiWrapError(std::string m, std::vector<gostd::Error> e)
+	    : msg(std::move(m)), errs(std::move(e)) {}
+	std::string Error() const override { return msg; }
+	std::vector<gostd::Error> unwrap() const override { return errs; }
+};
+
 } // namespace detail
 
 // errors.New
@@ -98,12 +114,12 @@ inline Error joinError(std::vector<Error> errs) {
 	return std::make_shared<detail::joinError>(std::move(nonNil));
 }
 
-// errors.Is — identity equality through the unwrap chain.
+// errors.Is — value equality through the unwrap chain.
 inline bool errorIs(const Error& err, const Error& target) {
 	if (err == nullptr || target == nullptr) {
 		return false;
 	}
-	if (err == target) {
+	if (err->isEqual(*target)) {
 		return true;
 	}
 	for (const auto& u : err->unwrap()) {
@@ -282,7 +298,7 @@ inline Error errorf(std::string_view fmt, std::initializer_list<fmtArg> args) {
 	if (wrapped.size() == 1) {
 		return std::make_shared<detail::wrapError>(msg, wrapped[0]);
 	}
-	return std::make_shared<detail::joinError>(wrapped);
+	return std::make_shared<detail::multiWrapError>(msg, wrapped);
 }
 
 // ---------------------------------------------------------------------------
@@ -386,11 +402,23 @@ inline bool ctxCancelable(const Context& c) {
 
 // ctxWaitDone — block until the context (or an ancestor) is done. The own-cv
 // fast path covers the common case; the periodic re-check catches ancestor
-// cancellation before a propagating AfterFunc runs.
+// cancellation before a propagating AfterFunc runs. ctxDone locks each chain
+// node's own mutex, so it must run outside c->mu.
 inline void ctxWaitDone(const Context& c) {
-	std::unique_lock<std::mutex> lk(c->mu);
-	while (!ctxDone(c)) {
-		c->cv.wait_for(lk, std::chrono::milliseconds(25));
+	for (;;) {
+		{
+			std::unique_lock<std::mutex> lk(c->mu);
+			if (c->done) {
+				return;
+			}
+			c->cv.wait_for(lk, std::chrono::milliseconds(25));
+			if (c->done) {
+				return;
+			}
+		}
+		if (ctxDone(c)) {
+			return;
+		}
 	}
 }
 

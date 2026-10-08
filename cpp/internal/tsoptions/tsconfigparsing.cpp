@@ -909,7 +909,10 @@ std::pair<CompilerOptionsValue, std::vector<Diagnostic*>> convertToJson(
     jsonConversionNotifier* notifier) {
 	if (rootExpression == nullptr) {
 		if (returnValue) {
-			return {CompilerOptionsValue(std::monostate{}), {}};
+			// Go returns struct{}{}: non-nil, marshals as {}.
+			return {CompilerOptionsValue(
+			            JsonObjectPtr{std::make_shared<JsonObject>()}),
+			        {}};
 		}
 		return {CompilerOptionsValue(), {}};
 	}
@@ -2124,7 +2127,7 @@ ParsedCommandLine* parseJsonConfigFileContentWorker(
 
 	auto [fileNames, literalFileNamesLen] =
 	    getFileNames(basePathForFileNames);
-	std::shared_ptr<bool> compileOnSave;
+	std::shared_ptr<bool> compileOnSave = std::make_shared<bool>(false);
 	if (auto* raw = std::get_if<JsonObjectPtr>(&parsedConfig->raw.v)) {
 		auto v = (*raw)->GetOrZero("compileOnSave");
 		if (auto* b = std::get_if<bool>(&v.v)) {

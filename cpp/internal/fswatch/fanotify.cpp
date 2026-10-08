@@ -117,8 +117,6 @@
 
 namespace tsc::fswatch {
 
-namespace {
-
 constexpr uint32_t fanotifyInitFlags = FAN_CLASS_NOTIF | FAN_CLOEXEC |
     FAN_NONBLOCK | FAN_REPORT_FID | FAN_REPORT_DFID_NAME;
 
@@ -149,105 +147,26 @@ int fanotifyMark(int fd, uint32_t flags, uint64_t mask, int dirfd,
 	    ::syscall(SYS_fanotify_mark, fd, flags, mask, dirfd, pathname));
 }
 
-// fanotifyHandleKey uniquely identifies a filesystem object by its fsid and
-// file handle. Used as a map key for watch dispatch.
-struct fanotifyHandleKey {
-	std::array<int32_t, 2> fsid;
-	int32_t handleType;
-	std::string handle; // raw handle bytes as string for map comparability
-
-	bool operator==(const fanotifyHandleKey&) const = default;
-};
-
 fanotifyHandleKey makeFanotifyHandleKey(const std::array<int32_t, 2>& fsid,
                                         int32_t handleType,
                                         std::string_view handleBytes) {
 	return fanotifyHandleKey{fsid, handleType, std::string(handleBytes)};
 }
 
-struct fanotifyHandleKeyHash {
-	size_t operator()(const fanotifyHandleKey& k) const {
-		size_t h = std::hash<std::string>{}(k.handle);
-		h = h * 31 + std::hash<int32_t>{}(k.fsid[0]);
-		h = h * 31 + std::hash<int32_t>{}(k.fsid[1]);
-		h = h * 31 + std::hash<int32_t>{}(k.handleType);
-		return h;
-	}
-};
-
-// fanotifySubscription mirrors inotifySubscription for the fanotify backend.
-struct fanotifySubscription {
-	std::string path;
-	std::string watchPath;
-	std::shared_ptr<fswatch::dirWatch> dirWatch;
-	fanotifyHandleKey key;
-};
-
-// fanotifyDfidName holds parsed directory FID + name from an info record.
-struct fanotifyDfidName {
-	fanotifyHandleKey key;
-	std::string name; // child entry name, or "" for self-events on
-	                  // directories
-};
+size_t fanotifyHandleKeyHash::operator()(const fanotifyHandleKey& k) const {
+	size_t h = std::hash<std::string>{}(k.handle);
+	h = h * 31 + std::hash<int32_t>{}(k.fsid[0]);
+	h = h * 31 + std::hash<int32_t>{}(k.fsid[1]);
+	h = h * 31 + std::hash<int32_t>{}(k.handleType);
+	return h;
+}
 
 // Forward decls — definitions follow the backend.
-gostd::Error maybeWrapUnsupportedFilesystem(const gostd::Error& err);
 std::pair<std::shared_ptr<fanotifyDfidName>,
           std::shared_ptr<fanotifyDfidName>>
 parseFanotifyDfidNames(std::string_view data);
 std::shared_ptr<fanotifyDfidName>
 parseFanotifyFidRecord(std::string_view data, bool hasName);
-
-// fanotifyBackend is the fanotify-based watcher backend for Linux.
-struct fanotifyBackend : watcherBase {
-	int pipeFDs[2];
-	std::atomic<int32_t> pipeWriteFD{-1};
-	int fanotifyFD;
-	uint64_t markMask; // fanotifyMarkMaskRename or
-	                   // fanotifyMarkMaskMovedFromTo; 0 until first
-	                   // subscribe
-	bool noRename;     // when true, skip FAN_RENAME probe (for testing
-	                   // fallback path)
-
-	std::unordered_map<fanotifyHandleKey,
-	                   std::vector<fanotifySubscription*>,
-	                   fanotifyHandleKeyHash>
-	    subscriptions;
-
-	std::mutex endedMu;
-	std::condition_variable endedCv;
-	bool ended = false;
-
-	// Persistent buffers reused across handleEvents calls. Only accessed
-	// from the start thread, so no synchronization needed.
-	std::vector<char> readBuf;
-	std::unordered_set<std::shared_ptr<fswatch::dirWatch>> watchersTouched;
-
-	fanotifyBackend(bool noRename);
-	~fanotifyBackend() override;
-	gostd::Error start() override;
-	void closeFDs();
-	void signalEnded();
-	void shutdown() override;
-	gostd::Error subscribe(std::shared_ptr<fswatch::dirWatch> w) override;
-	gostd::Error markDir(std::shared_ptr<fswatch::dirWatch> w,
-	                     const std::string& path, const std::string& markPath);
-	gostd::Error handleEvents();
-	void handleOverflow(
-	    std::unordered_set<std::shared_ptr<fswatch::dirWatch>>& touched);
-	void handleRenameEvent(
-	    uint64_t mask, const fanotifyDfidName* dfidOld,
-	    const fanotifyDfidName* dfidNew,
-	    std::unordered_set<std::shared_ptr<fswatch::dirWatch>>& touched);
-	void handleParsedEvent(
-	    uint64_t mask, const fanotifyDfidName* dfid,
-	    std::unordered_set<std::shared_ptr<fswatch::dirWatch>>& touched);
-	bool handleSubscription(uint64_t mask, const fanotifyDfidName* dfid,
-	                        fanotifySubscription* sub);
-	void dropSubsForPathLocked(const std::string& path);
-	void dropSubsForPathAndDescendantsLocked(const std::string& path);
-	gostd::Error closeWatch(std::shared_ptr<fswatch::dirWatch> w) override;
-};
 
 // fanotifyAvailable probes whether fanotify_init succeeds with the flags
 // this backend needs.
@@ -969,8 +888,6 @@ fanotifyBackend::closeWatch(std::shared_ptr<fswatch::dirWatch> w) {
 	}
 	return nullptr;
 }
-
-} // namespace
 
 // Go var fanotifyWatcher + init() (watcher.go:182-186, watcher.go:193).
 watcher& fanotifyWatcher() {

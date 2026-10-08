@@ -135,6 +135,82 @@ inline void NilError(gostd::testing::T* t, const gostd::Error& err,
 	}
 }
 
+// Check — gotest.tools/v3/assert.Check: like Assert but non-fatal (Go logs
+// the failure and the test continues).
+inline void Check(gostd::testing::T* t, bool condition,
+                  std::string_view msg = "") {
+	if (!condition) {
+		if (msg.empty()) {
+			t->Error({"assertion failed"});
+		} else {
+			t->Error({std::string(msg)});
+		}
+	}
+}
+
+// DeepEqual — gotest.tools/v3/assert.DeepEqual: fails the test when
+// reflect.DeepEqual(got, expected) is false. C++ port relies on operator==
+// doing memberwise comparison (all ported structs it feeds have one).
+template <class A, class B>
+void DeepEqual(gostd::testing::T* t, const A& got, const B& expected,
+               std::string_view msg = "") {
+	bool ok;
+	if constexpr (std::is_same_v<A, std::any> &&
+	              std::is_same_v<B, std::any>) {
+		ok = detail::anyEqual(got, expected);
+	} else {
+		ok = (got == expected);
+	}
+	if (!ok) {
+		t->Fatalf("assert.DeepEqual failed%s%s", {msg.empty() ? "" : ": ",
+		                                        std::string(msg)});
+	}
+}
+
+// Error — gotest.tools/v3/assert.Error: fails when err is nil or its
+// message differs from expected.
+inline void Error(gostd::testing::T* t, const gostd::Error& err,
+                  const std::string& expected, std::string_view msg = "") {
+	if (err == nullptr) {
+		t->Fatalf("assert.Error failed: expected error %q, got nil%s%s",
+		          {expected, msg.empty() ? "" : ": ", std::string(msg)});
+		return;
+	}
+	if (err->Error() != expected) {
+		t->Fatalf("assert.Error failed: got %q, expected %q%s%s",
+		          {err->Error(), expected, msg.empty() ? "" : ": ",
+		           std::string(msg)});
+	}
+}
+
+// ErrorContains — gotest.tools/v3/assert.ErrorContains: fails when err is
+// nil or its message doesn't contain the expected substring.
+inline void ErrorContains(gostd::testing::T* t, const gostd::Error& err,
+                          const std::string& expected,
+                          std::string_view msg = "") {
+	if (err == nullptr) {
+		t->Fatalf("assert.ErrorContains failed: expected error containing "
+		          "%q, got nil%s%s",
+		          {expected, msg.empty() ? "" : ": ", std::string(msg)});
+		return;
+	}
+	if (err->Error().find(expected) == std::string::npos) {
+		t->Fatalf("assert.ErrorContains failed: %q does not contain %q%s%s",
+		          {err->Error(), expected, msg.empty() ? "" : ": ",
+		           std::string(msg)});
+	}
+}
+
+// ErrorIs — gotest.tools/v3/assert.ErrorIs: fails when errorIs(err, target)
+// is false (walks the wrapped-error chain like errors.Is).
+inline void ErrorIs(gostd::testing::T* t, const gostd::Error& err,
+                    const gostd::Error& target, std::string_view msg = "") {
+	if (!gostd::errorIs(err, target)) {
+		t->Fatalf("assert.ErrorIs failed%s%s", {msg.empty() ? "" : ": ",
+		                                      std::string(msg)});
+	}
+}
+
 }  // namespace tsc::gotest::assert
 
 namespace tsc::testutil {
