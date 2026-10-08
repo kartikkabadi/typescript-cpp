@@ -1958,6 +1958,7 @@ Node* DeclarationTransformerImpl::transformExportAssignment(
 		Node* exportAssignment =
 			factory()->newExportAssignment(nullptr, isExportEquals, nullptr,
 			                           expression);
+		emitContext()->assignSourceMapRange(exportAssignment, input);
 		preserveJsDoc(exportAssignment, input);
 		return exportAssignment;
 	}
@@ -1992,6 +1993,7 @@ Node* DeclarationTransformerImpl::transformExportAssignment(
 		// consistently
 		Node* exportAssignment = factory()->newExportAssignment(
 			nullptr, isExportEquals, nullptr, newId);
+		emitContext()->assignSourceMapRange(exportAssignment, input);
 		removeAllComments(exportAssignment);
 		return factory()->newSyntaxList({exportAssignment, classDecl});
 	} else if (isFunctionLike(unwrapped)) {
@@ -2011,6 +2013,7 @@ Node* DeclarationTransformerImpl::transformExportAssignment(
 		// consistently
 		Node* exportAssignment = factory()->newExportAssignment(
 			nullptr, isExportEquals, nullptr, newId);
+		emitContext()->assignSourceMapRange(exportAssignment, input);
 		removeAllComments(exportAssignment);
 		return factory()->newSyntaxList({exportAssignment, funcDecl});
 	}
@@ -2043,6 +2046,7 @@ Node* DeclarationTransformerImpl::transformExportAssignment(
 			factory()->newNodeList({varDecl}), NodeFlagsConst));
 	Node* exportAssignment = factory()->newExportAssignment(
 		nullptr, isExportEquals, nullptr, newId);
+	emitContext()->assignSourceMapRange(exportAssignment, input);
 	// Remove comments from the export declaration and copy them onto the
 	// synthetic _default declaration
 	preserveJsDoc(statement, input);
