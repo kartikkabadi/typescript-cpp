@@ -244,13 +244,7 @@ void Checker::markLinkedReferences(Node* location, ReferenceHint hint, Symbol* p
 					return;
 				}
 			}
-			// Computed property names on enum members are a grammar error and are never checked
-			// (checkEnumMember only checks the member initializer, not the name), so resolving
-			// identifiers in them here would report a spurious "Cannot find name" diagnostic.
 			if (computedName != nullptr) {
-				if (isEnumMember(computedName->parent)) {
-					return;
-				}
 				if (isInvalidComputedPropertyName(computedName)) {
 					return;
 				}

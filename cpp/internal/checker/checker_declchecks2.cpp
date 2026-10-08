@@ -617,6 +617,9 @@ void Checker::checkEnumMember(Node* node) {
 	if (isPrivateIdentifier(node->name())) {
 		error(node, An_enum_member_cannot_be_named_with_a_private_identifier);
 	}
+	if (isComputedPropertyName(node->name())) {
+		checkExpression(node->name()->expression());
+	}
 	if (node->initializer() != nullptr) {
 		checkExpression(node->initializer());
 	}
