@@ -2391,6 +2391,11 @@ func (p *Parser) tryParseImportClause(identifier *ast.Node, pos int, phaseModifi
 		p.parseExpected(ast.KindFromKeyword)
 		return importClause
 	}
+	// XUPSTREAM-DRIFT bea2e849: upstream has `phaseModifier == ast.KindDeferKeyword || phaseModifier == ast.KindSourceKeyword`;
+	// KindSourceKeyword doesn't exist in our vendored base (source-phase imports came via an unvendored commit).
+	if phaseModifier == ast.KindDeferKeyword {
+		return p.finishNode(p.factory.NewImportClause(phaseModifier, nil /*name*/, nil /*namedBindings*/), pos)
+	}
 	return nil
 }
 
