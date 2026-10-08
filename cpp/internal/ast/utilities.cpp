@@ -1678,6 +1678,11 @@ bool isInExpressionContext(Node* node) {
 	case Kind::ShorthandPropertyAssignment:
 		return parent->as<ShorthandPropertyAssignment>()
 		               ->ObjectAssignmentInitializer == node;
+	case Kind::FunctionExpression:
+	case Kind::ClassExpression:
+		// The name of a function or class expression is a declaration name,
+		// not an expression.
+		return parent->name() != node;
 	default:
 		return isExpressionNode(parent);
 	}
