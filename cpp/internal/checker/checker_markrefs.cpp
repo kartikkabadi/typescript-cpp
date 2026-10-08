@@ -296,7 +296,8 @@ void Checker::markLinkedReferences(Node* location, ReferenceHint hint, Symbol* p
 		if (isPropertyAccessOrQualifiedName(location)) {
 			Node* topProp = location;
 			while (isPropertyAccessOrQualifiedName(topProp)) {
-				if (isPartOfTypeNode(topProp)) {
+				// Names in an import type's qualifier (`ns.y` in `typeof import("./b").ns.y`) are exports of the imported module, not references to this file's imports
+				if (isPartOfTypeNode(topProp) || isImportTypeQualifierPart(topProp) != nullptr) {
 					return;
 				}
 				topProp = topProp->parent;
