@@ -8,6 +8,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -25,6 +26,7 @@ inline const std::string callbackFileExists = "fileExists";
 inline const std::string callbackDirectoryExists = "directoryExists";
 inline const std::string callbackGetAccessibleEntries = "getAccessibleEntries";
 inline const std::string callbackRealpath = "realpath";
+inline const std::string callbackStat = "stat";
 inline const std::string callbackWriteFile = "writeFile";
 inline const std::string callbackRemoveFile = "removeFile";
 
@@ -34,12 +36,18 @@ bool isCallbackName(std::string_view name);
 // callbackFS — callbackfs.go:17.
 class callbackFS : public vfs::FS {
 public:
-	// newCallbackFS — callbackfs.go:49. callbacks specifies which filesystem
-	// operations should be delegated to the client. Unknown names panic.
+	// newCallbackFS — callbackfs.go:70. callbacks specifies which filesystem
+	// operations should be delegated to the client. The pseudo-callbacks
+	// "realpath:identity", "stat:fakeStat", "writeFile:noop" and
+	// "removeFile:noop" set default-behavior flags instead of enabling a
+	// callback; "<name>:error" makes that operation panic unconditionally.
+	// Unknown names panic. caseSensitive overrides the base filesystem's
+	// case sensitivity when set.
 	callbackFS(std::shared_ptr<vfs::FS> base,
-	           const std::vector<std::string>& callbacks);
+	           const std::vector<std::string>& callbacks,
+	           std::optional<bool> caseSensitive);
 
-	// SetConnection — callbackfs.go:66. Must be called after the transport
+	// SetConnection — callbackfs.go:99. Must be called after the transport
 	// connection is established but before any filesystem operations that
 	// need callbacks.
 	void SetConnection(gostd::Context ctx, std::shared_ptr<ipc::Conn> conn);
@@ -63,20 +71,31 @@ public:
 private:
 	std::shared_ptr<vfs::FS> base;
 	std::unordered_set<std::string> enabledCallbacks;
+	bool realpathIdentity = false;
+	bool fakeStat = false;
+	bool writeFileNoop = false;
+	bool removeFileNoop = false;
+	std::unordered_set<std::string> errorCallbacks;
+	std::optional<bool> caseSensitive;
 
 	// conn and ctx are set after connection is established
 	std::shared_ptr<ipc::Conn> conn;
 	gostd::Context ctx;
 
-	// isEnabled — callbackfs.go:81.
+	// isEnabled — callbackfs.go:114.
 	bool isEnabled(std::string_view name) const;
-	// call — callbackfs.go:87.
+	// call — callbackfs.go:119.
 	std::pair<json::Value, gostd::Error> call(std::string_view name,
 	                                          const json::Value& arg);
+	// panicIfError — callbackfs.go:157.
+	void panicIfError(std::string_view name) const;
+	// fakeStatForPath — callbackfs.go:398.
+	std::shared_ptr<vfs::FileInfo> fakeStatForPath(const std::string& path);
 };
 
-// newCallbackFS — callbackfs.go:49.
+// newCallbackFS — callbackfs.go:70.
 std::shared_ptr<callbackFS> newCallbackFS(
-    std::shared_ptr<vfs::FS> base, const std::vector<std::string>& callbacks);
+    std::shared_ptr<vfs::FS> base, const std::vector<std::string>& callbacks,
+    std::optional<bool> caseSensitive);
 
 }  // namespace tsc::api

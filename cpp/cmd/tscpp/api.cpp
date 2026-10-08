@@ -19,6 +19,7 @@
 #include "internal/api/server.h"
 #include "internal/bundled/bundled.h"
 #include "internal/gostd/gostd.h"
+#include "internal/vfs/osvfs/osvfs.h"
 
 #include "cmd/tscpp/notify.h"
 #include "cmd/tscpp/stdio.h"
@@ -37,6 +38,7 @@ struct apiFlags {
 	std::string cwd;
 	std::string pipePath;
 	std::string callbacks;
+	bool caseSensitive = false;
 	bool async = false;
 	bool timing = false;
 	bool runExternalCode = false;
@@ -58,7 +60,9 @@ std::string apiUsage(const std::string& cwdDefault) {
 	       "  -runExternalCode\n"
 	       "    \tallow projects to execute configured external plugins\n"
 	       "  -timing\n"
-	       "    \tcollect per-request server processing time, folded into the client's timing snapshot\n";
+	       "    \tcollect per-request server processing time, folded into the client's timing snapshot\n"
+	       "  -useCaseSensitiveFileNames\n"
+	       "    \ttreat filesystem paths as case-sensitive\n";
 }
 
 bool apiFlagBoolValue(const std::string& v, bool* out) {
@@ -81,6 +85,7 @@ bool parseAPIFlags(const std::vector<std::string>& args, apiFlags* f) {
 	if (::getcwd(buf, sizeof(buf)) != nullptr) {
 		f->cwd = tspath::normalizePath(buf); // core.Must(os.Getwd())
 	}
+	f->caseSensitive = vfs::osvfs::FS()->UseCaseSensitiveFileNames();
 	const std::string usage = apiUsage(f->cwd);
 	auto fail = [&usage](const std::string& msg) {
 		std::fprintf(stderr, "%s\n%s", msg.c_str(), usage.c_str());
@@ -107,15 +112,16 @@ bool parseAPIFlags(const std::vector<std::string>& args, apiFlags* f) {
 			return false; // flag.ErrHelp
 		}
 		if (name != "cwd" && name != "pipe" && name != "callbacks" &&
-		    name != "async" && name != "timing" &&
-		    name != "runExternalCode") {
+		    name != "useCaseSensitiveFileNames" && name != "async" &&
+		    name != "timing" && name != "runExternalCode") {
 			return fail("flag provided but not defined: -" + name);
 		}
-		if (name == "async" || name == "timing" ||
-		    name == "runExternalCode") { // bool flags: =value optional
-			bool* target = name == "async"      ? &f->async
-			               : name == "timing"   ? &f->timing
-			                                : &f->runExternalCode;
+		if (name == "async" || name == "timing" || name == "runExternalCode" ||
+		    name == "useCaseSensitiveFileNames") { // bool flags: =value optional
+			bool* target = name == "async"                       ? &f->async
+			               : name == "timing"                   ? &f->timing
+			               : name == "useCaseSensitiveFileNames" ? &f->caseSensitive
+			                                                 : &f->runExternalCode;
 			if (hasValue) {
 				if (!apiFlagBoolValue(value, target)) {
 					return fail("invalid value \"" + value +
@@ -183,6 +189,7 @@ int runAPI(const std::vector<std::string>& args) {
 	    .DefaultLibraryPath = defaultLibraryPath,
 	    .PipePath = {},
 	    .Callbacks = callbacksList,
+	    .UseCaseSensitiveFileNames = flags.caseSensitive,
 	    .Async = flags.async,
 	    .CollectTiming = flags.timing,
 	    .RunExternalCode = flags.runExternalCode,

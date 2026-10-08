@@ -43,10 +43,13 @@ gostd::Error StdioServer::Run(gostd::Context ctx) {
 	std::shared_ptr<vfs::FS> fs = bundled::WrapFS(
 	    std::shared_ptr<vfs::FS>(vfs::osvfs::FS(), [](vfs::FS*) {}));
 
-	// Wrap the base FS with callbackFS if callbacks are requested
+	// Wrap the base FS when callbacks or an explicit case-sensitivity
+	// setting are requested.
 	std::shared_ptr<callbackFS> callbackFs;
-	if (!options->Callbacks.empty()) {
-		callbackFs = newCallbackFS(fs, options->Callbacks);
+	if (!options->Callbacks.empty() ||
+	    options->UseCaseSensitiveFileNames.has_value()) {
+		callbackFs = newCallbackFS(fs, options->Callbacks,
+		                           options->UseCaseSensitiveFileNames);
 		fs = callbackFs;
 	}
 
