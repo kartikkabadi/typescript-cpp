@@ -1,4 +1,4 @@
-// tests_host.cpp — port of tsc/internal/contentmapper/host_test.go.
+﻿// tests_host.cpp — port of tsc/internal/contentmapper/host_test.go.
 //
 // The Go test wires in-process mapper handlers over net.Pipe through the
 // host's JSON-RPC connection. The C++ port mirrors that with chanPipe (a
@@ -74,10 +74,16 @@ struct pipeHalf {
 		buf.append(d);
 		cv.notify_all();
 		cv.wait(lk, [&] { return buf.empty() || closed || readClosed; });
-		if (closed || readClosed) {
-			return {0, gostd::newError("io: write on closed pipe")};
+		if (buf.empty()) {
+			// Fully consumed by the reader = success, even if a close
+			// raced in after the drain (net.Pipe semantics: a write
+			// that reached the reader has already returned).
+			return {(int)d.size(), nullptr};
 		}
-		return {(int)d.size(), nullptr};
+		// Partial transfer before remote close: n + ErrClosedPipe.
+		return {(int)std::max<int64_t>(
+		            0, (int64_t)d.size() - (int64_t)buf.size()),
+		        gostd::newError("io: write on closed pipe")};
 	}
 };
 
@@ -603,7 +609,7 @@ struct fakeSpawner : cm::Spawner {
 
 	std::pair<std::shared_ptr<gostd::io::ReadWriteCloser>, gostd::Error>
 	Spawn(const std::vector<std::string>& command, const std::string& dir,
-	      gostd::io::Writer* stderr) override {
+	      gostd::io::Writer* stderr_) override {
 		spawns.fetch_add(1);
 		std::shared_ptr<ipc::Handler> h = handler;
 		if (h == nullptr) {
@@ -720,11 +726,11 @@ void TestHostLogging(T* t) {
 	fakeSpawner fs;
 	cm::SpawnerFunc spawner(
 	    [&](const std::vector<std::string>& command, const std::string& dir,
-	        gostd::io::Writer* stderr)
+	        gostd::io::Writer* stderr_)
 	        -> std::pair<std::shared_ptr<gostd::io::ReadWriteCloser>,
 	                     gostd::Error> {
-		    stderr->write("mapper diagnostic\n");
-		    return fs.Spawn(command, dir, stderr);
+		    stderr_->write("mapper diagnostic\n");
+		    return fs.Spawn(command, dir, stderr_);
 	    });
 	auto host = cm::NewHostWithOptions(t->Context(), &spawner,
 	                                   locale::Default, {.Logger = logger});
@@ -762,11 +768,11 @@ void TestHostDiscardsStderrWithoutLogging(T* t) {
 	fakeSpawner fs;
 	cm::SpawnerFunc spawner(
 	    [&](const std::vector<std::string>& command, const std::string& dir,
-	        gostd::io::Writer* stderr)
+	        gostd::io::Writer* stderr_)
 	        -> std::pair<std::shared_ptr<gostd::io::ReadWriteCloser>,
 	                     gostd::Error> {
-		    assert::Assert(t, stderr == gostd::io::discard());
-		    return fs.Spawn(command, dir, stderr);
+		    assert::Assert(t, stderr_ == gostd::io::discard());
+		    return fs.Spawn(command, dir, stderr_);
 	    });
 	auto host = cm::NewHost(t->Context(), &spawner, locale::Default);
 	auto* m = new cm::Mapper();
@@ -842,24 +848,31 @@ void TestHostClosesProcessWhenReadLoopFails(T* t) {
 	bool closed = false;
 	cm::SpawnerFunc spawner(
 	    [&](const std::vector<std::string>& command, const std::string& dir,
-	        gostd::io::Writer* stderr)
+	        gostd::io::Writer* stderr_)
 	        -> std::pair<std::shared_ptr<gostd::io::ReadWriteCloser>,
 	                     gostd::Error> {
 		    auto [client, server] = netPipe();
 		    auto srv = server;
 		    std::thread([t, srv] {
-			    auto protocol = ipc::NewJSONRPCProtocol(srv);
-			    auto [message, merr] = protocol->ReadMessage();
-			    assert::Assert(t, merr == nullptr);
-			    assert::Assert(t, message->Method ==
-			                      std::string(cm::MethodInitialize));
-			    auto perr = protocol->WriteResponse(
-			        message->Id.has_value() ? &*message->Id : nullptr,
-			        marshalInitializeResult(
-			            {cm::PositionEncodingUTF8, "mapper"}));
-			    assert::Assert(t, perr == nullptr);
-			    auto [w, werr] = srv->write("oops\n");
-			    assert::Assert(t, werr == nullptr);
+			    // testGoexit must be caught inside the goroutine: in Go,
+			    // FailNow on a non-test goroutine marks the test failed and
+			    // kills only that goroutine; an escaping testGoexit on a
+			    // detached std::thread is std::terminate (__fastfail).
+			    try {
+				    auto protocol = ipc::NewJSONRPCProtocol(srv);
+				    auto [message, merr] = protocol->ReadMessage();
+				    assert::Assert(t, merr == nullptr);
+				    assert::Assert(t, message->Method ==
+				                      std::string(cm::MethodInitialize));
+				    auto perr = protocol->WriteResponse(
+				        message->Id.has_value() ? &*message->Id : nullptr,
+				        marshalInitializeResult(
+				            {cm::PositionEncodingUTF8, "mapper"}));
+				    assert::Assert(t, perr == nullptr);
+				    auto [w, werr] = srv->write("oops\n");
+				    assert::Assert(t, werr == nullptr);
+			    } catch (const tsc::gostd::testing::testGoexit&) {
+			    }
 			    srv->close();
 		    }).detach();
 		    auto rwc = std::make_shared<closeSignalReadWriteCloser>();
@@ -895,7 +908,7 @@ void TestHostReportsInitializationTimeoutBeforeClosingProcess(T* t) {
 	t->Parallel();
 	cm::SpawnerFunc spawner(
 	    [&](const std::vector<std::string>& command, const std::string& dir,
-	        gostd::io::Writer* stderr)
+	        gostd::io::Writer* stderr_)
 	        -> std::pair<std::shared_ptr<gostd::io::ReadWriteCloser>,
 	                     gostd::Error> {
 		    auto [client, server] = netPipe();
@@ -933,7 +946,7 @@ void TestHostReportsProcessExitBeforeInitialization(T* t) {
 	t->Parallel();
 	cm::SpawnerFunc spawner(
 	    [&](const std::vector<std::string>& command, const std::string& dir,
-	        gostd::io::Writer* stderr)
+	        gostd::io::Writer* stderr_)
 	        -> std::pair<std::shared_ptr<gostd::io::ReadWriteCloser>,
 	                     gostd::Error> {
 		    auto [client, server] = netPipe();

@@ -33,7 +33,7 @@ Produces `tscpp.exe`, `fourslashrunner.exe`, `tsctestrunner.exe`,
 |---|---|---|
 | `tscpp check` vs Go `checkdump.exe` (50-file corpus) | 50/50 byte-identical | raw-byte stdout compare incl. exit codes |
 | `tsctestrunner` | 99/99 | full suite |
-| `unittestrunner` | 0/0 | no unit tests are registered (same as Linux) |
+| `unittestrunner` | **449/449 pass** (3 skip) | 452 registered tests — see section 7 |
 | `fourslashrunner` | **4130/4130 pass** (430 skip) | full suite, zero failures — see sections 2–6 |
 
 ## Build fixes (committed)
@@ -205,6 +205,64 @@ The per-test watchdog `kTestTimeoutSeconds` was raised 180 → 600:
 minutes on this box (it passes — the previous 180 s cap misreported a
 slow pass as a hang). Go's own default `-timeout 10m` is per binary;
 600 s per test child is the analogous bound.
+
+### 7. unittestrunner merge — test-file port fixes (fixed)
+
+After merging `devin/cpp-port` (which added 452 registered unit tests),
+five Windows-specific breaks surfaced — all in test-harness code the
+earlier port predated:
+
+- `stderr` is an MSVCRT macro (`#define stderr &__iob_func()[2]`) —
+  parameters named `stderr` in `tests_host.cpp`/`tests_mapper.cpp`
+  mangled into `(&__iob_func()[2])`. Renamed to `stderr_`, the
+  codebase's existing convention (`// stderr_: CRT macro dodge`).
+- `tests_bundled.cpp` — `struct stat`/`::stat` → `w32compat.h`
+  (POSIX-shaped `struct stat` + `::stat` are the compat layer's job).
+- `tests_converters.cpp` — `unistd.h`/`sys/wait.h` gated to POSIX;
+  `nodeAvailable()` uses `w32::lookPath` on Windows (PATHEXT + `;`
+  PATH split = Go's `exec.LookPath`); the node-oracle spawn uses
+  `w32::spawnvp` with pipe ends as child stdio instead of
+  fork+`execlp`.
+- `tests_mapper.cpp` (`contentmappertest.TestOutOfProcess`) —
+  fork+`execv("/proc/self/exe")` → `w32::spawnvp({w32::selfExePath()})`
+  with `SpawnStdio{stdinFd, stdoutFd}`; the helper child also needed
+  `w32::setBinaryStdio()` before `Serve` — the mapper protocol is
+  binary and CRT text mode corrupts it ("read header: io: read made
+  no progress").
+- `tests_realpath.cpp` — restored Go's `mklink` GOOS switch:
+  dirs → `cmd /c mklink /J` (junction, no privilege); files →
+  `create_symlink`, `Skipf` on `ERROR_PRIVILEGE_NOT_HELD`.
+- `tests_os.cpp` (`UseCaseSensitiveFileNames`) — restored the
+  `runtime.GOOS` switch the port dropped: asserts `!UseCaseSensitiveFileNames()`
+  on `_WIN32`.
+- `dbg_main.cpp` — pthread 64MB-stack debug runner → `CreateThread`
+  with `STACK_SIZE` reserve on `_WIN32`.
+- `unittestrunner/main.cpp` — same teardown contract as
+  fourslashrunner: `--test-child` exits via `TerminateProcess`, the
+  alarm handler too, watchdog 180→600 s.
+
+Two non-platform bugs the Windows run exposed (also latent on Linux):
+
+- **Mojibake test literals** — `tests_host.cpp` had cp1252
+  double-encoded strings: `"Ã©x"` for `"éx"` (C3 A9) and `"ðŸ˜€"` for
+  `"😀"` (F0 9F 98 80), plus `—` in comments. The position-encoding
+  tests failed because the corrupted content shifted every
+  code-point boundary. Byte-level corrected to match the Go source
+  exactly.
+- **`testGoexit` escaping a detached thread** —
+  `TestHostClosesProcessWhenReadLoopFails`'s fake-server goroutine
+  calls `assert::Assert` (→ `t->Fatal` → throws `testGoexit`). In Go,
+  `FailNow` on a non-test goroutine marks the test failed and kills
+  only that goroutine; on a detached `std::thread` the escaping throw
+  is `std::terminate` → `__fastfail` (~60% crash rate). The thread now
+  catches `testGoexit` at top level.
+
+And one semantics gap in the test harness's `net.Pipe` port
+(`pipeHalf::write`): a fully-consumed write still returned
+`ErrClosedPipe` if the peer's close landed between drain and re-lock.
+Go's `net.Pipe` returns success once the reader consumed the bytes —
+fixed (returns n=size on empty buf; partial-transfer case returns
+n + ErrClosedPipe like Go).
 
 ## Go-on-Windows behaviors verified matching
 

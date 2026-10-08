@@ -32,12 +32,18 @@
 namespace {
 
 // `go test` defaults to -timeout 10m and fails the binary on expiry.
-constexpr unsigned kTestTimeoutSeconds = 180;
+constexpr unsigned kTestTimeoutSeconds = 600;
 
 void onTestAlarm(int) {
 	const char msg[] = "[timed out]\n";
 	(void)!write(STDERR_FILENO, msg, sizeof(msg) - 1);
+#ifdef _WIN32
+	// TerminateProcess skips DLL_PROCESS_DETACH teardown that would
+	// race the test's leaked detached threads (see --test-child).
+	TerminateProcess(GetCurrentProcess(), 1);
+#else
 	_exit(1);
+#endif
 }
 
 struct RunCtx {
@@ -224,6 +230,10 @@ int main(int argc, char** argv) {
 	// mapper protocol over stdio — mapper_test.go's TestMain.
 	if (const char* helper = std::getenv("TSGO_CONTENT_MAPPER_HELPER");
 	    helper && std::string(helper) == "1") {
+#ifdef _WIN32
+		// The mapper protocol is binary — fds must not translate \r\n.
+		w32::setBinaryStdio();
+#endif
 		auto rwc = std::make_shared<stdioRwc>();
 		(void)tsc::testutil::contentmappertest::Serve(
 		    tsc::gostd::contextBackground(), rwc);
@@ -236,7 +246,14 @@ int main(int argc, char** argv) {
 		const std::string target = argv[2];
 		for (auto& tc : tsc::testutil::unittests::unitTestRegistry()) {
 			if (tc.name == target) {
-				return runTestBody(tc);
+				// TerminateProcess, not return or _exit: ExitProcess
+				// runs DLL_PROCESS_DETACH in every DLL while the
+				// test's leaked detached threads touch CRT/MSVCP
+				// internals — a racy __fastfail Go never produces
+				// (same contract as fourslashrunner's --test-child).
+				fflush(nullptr);
+				TerminateProcess(GetCurrentProcess(),
+				                 (UINT)runTestBody(tc));
 			}
 		}
 		fprintf(stderr, "unknown test %s\n", target.c_str());

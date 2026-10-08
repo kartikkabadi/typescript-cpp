@@ -62,8 +62,13 @@ void TestOS(T* t) {
 		// Just check that it works.
 		fs->UseCaseSensitiveFileNames();
 
+#ifdef _WIN32
+		// runtime.GOOS == "windows" here.
+		assert::Assert(t, !fs->UseCaseSensitiveFileNames());
+#else
 		// runtime.GOOS == "linux" here.
 		assert::Assert(t, fs->UseCaseSensitiveFileNames());
+#endif
 	});
 }
 

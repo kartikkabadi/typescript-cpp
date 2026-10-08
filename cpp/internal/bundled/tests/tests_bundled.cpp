@@ -2,8 +2,14 @@
 #include <algorithm>
 #include <memory>
 #include <string>
-#include <sys/stat.h>
 #include <vector>
+
+#ifdef _WIN32
+// w32compat provides POSIX-shaped struct stat/::stat on Windows.
+#include "internal/win32/w32compat.h"
+#else
+#include <sys/stat.h>
+#endif
 
 #include "internal/bundled/bundled.h"
 #include "internal/gostd/testing.h"

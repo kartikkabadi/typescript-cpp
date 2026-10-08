@@ -5,9 +5,13 @@
 #include <utility>
 #include <vector>
 
+#ifdef _WIN32
+#include "internal/win32/w32compat.h"
+#else
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#endif
 
 #include "internal/ast/ast.h"
 #include "internal/core/types.h"
@@ -346,6 +350,11 @@ struct jsTuple {
 
 static bool nodeAvailable() {
 	// exec.LookPath("node")
+#ifdef _WIN32
+	// PATHEXT + `;`-separated PATH, like Go's LookPath on windows.
+	auto [resolved, err] = w32::lookPath("node", {});
+	return err == 0;
+#else
 	const char* pathEnv = getenv("PATH");
 	if (pathEnv == nullptr) return false;
 	std::string path = pathEnv;
@@ -362,6 +371,7 @@ static bool nodeAvailable() {
 		pos = colon + 1;
 	}
 	return false;
+#endif
 }
 
 // runJSReference runs the Node oracle over `texts` — see the Go test for the
@@ -391,7 +401,20 @@ runJSReference(T* t, const std::vector<std::string>& texts) {
 	if (pipe(stdinPipe) != 0 || pipe(stdoutPipe) != 0) {
 		t->Fatalf("pipe failed", {});
 	}
-	pid_t pid = fork();
+	pid_t pid;
+#ifdef _WIN32
+	// fork+execlp -> spawnvp: pipe ends become the child's stdin/stdout
+	// (stderr inherited like the POSIX branch leaves it).
+	w32::SpawnStdio io;
+	io.stdinFd = stdinPipe[0];
+	io.stdoutFd = stdoutPipe[1];
+	std::vector<std::string> argv{"node", "-e", jsReferenceScript};
+	pid = w32::spawnvp(argv, io);
+	if (pid < 0) {
+		t->Fatalf("spawn failed", {});
+	}
+#else
+	pid = fork();
 	if (pid < 0) {
 		t->Fatalf("fork failed", {});
 	}
@@ -403,6 +426,7 @@ runJSReference(T* t, const std::vector<std::string>& texts) {
 		execlp("node", "node", "-e", jsReferenceScript, (char*)nullptr);
 		_exit(127);
 	}
+#endif
 	close(stdinPipe[0]);
 	close(stdoutPipe[1]);
 	size_t off = 0;

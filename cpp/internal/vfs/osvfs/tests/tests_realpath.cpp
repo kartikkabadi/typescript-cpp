@@ -1,10 +1,16 @@
 // Port of tsc/internal/vfs/osvfs/realpath_test.go + the mklink helper from
 // helpers_test.go (package-internal helpers). BenchmarkRealpath is not
 // ported (benchmarks are out of scope).
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <string>
+
+#ifdef _WIN32
+#include "internal/win32/w32compat.h"
+#else
 #include <unistd.h>
+#endif
 
 #include "internal/gostd/testing.h"
 #include "internal/testutil/testutil.h"
@@ -18,13 +24,29 @@ namespace fsns = std::filesystem;
 
 namespace {
 
-// mklink — osvfs/helpers_test.go (Linux path: plain os.Symlink; the Windows
-// junction/privilege branches do not apply).
+// mklink — osvfs/helpers_test.go. On Windows, dir links are junctions
+// (`cmd /c mklink /J`, no privilege needed); file links need symlink
+// privilege — Go skips when it's not held, we do the same.
 void mklink(T* t, const std::string& target, const std::string& link,
             bool isDir) {
 	t->Helper();
+#ifdef _WIN32
+	if (isDir) {
+		std::string cmd = "cmd /c mklink /J \"" + link + "\" \"" +
+		                  target + "\"";
+		int rc = std::system(cmd.c_str());
+		assert::Assert(t, rc == 0);
+		return;
+	}
+#endif
 	std::error_code ec;
 	fsns::create_symlink(target, link, ec);
+#ifdef _WIN32
+	if (ec && ec.value() == ERROR_PRIVILEGE_NOT_HELD) {
+		t->Skipf("file symlink support is not enabled without "
+		         "elevation or developer mode", {});
+	}
+#endif
 	assert::Assert(t, !ec);
 }
 

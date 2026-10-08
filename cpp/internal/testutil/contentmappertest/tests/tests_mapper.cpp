@@ -14,9 +14,14 @@
 #include <cerrno>
 #include <cstring>
 #include <signal.h>
+
+#ifdef _WIN32
+#include "internal/win32/w32compat.h"
+#else
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#endif
 
 #include "internal/contentmapper/contentmapper.h"
 #include "internal/core/types.h"
@@ -99,11 +104,29 @@ struct process : gostd::io::ReadWriteCloser {
 struct execSpawner : cm::Spawner {
 	std::pair<std::shared_ptr<gostd::io::ReadWriteCloser>, gostd::Error>
 	Spawn(const std::vector<std::string>& command, const std::string& dir,
-	      gostd::io::Writer* stderr) override {
+	      gostd::io::Writer* stderr_) override {
 		int inPipe[2], outPipe[2];
 		if (::pipe(inPipe) != 0 || ::pipe(outPipe) != 0) {
 			return {nullptr, gostd::newError("pipe failed")};
 		}
+#ifdef _WIN32
+		// fork+execv -> spawnvp: pipe ends become the child's stdin/stdout
+		// (stderr inherited, like the POSIX dup2(STDERR,STDERR)).
+		w32::SpawnStdio io;
+		io.stdinFd = inPipe[0];
+		io.stdoutFd = outPipe[1];
+		::setenv("TSGO_CONTENT_MAPPER_HELPER", "1", 1);
+		std::vector<std::string> argv{w32::selfExePath()};
+		pid_t pid = w32::spawnvp(argv, io);
+		::unsetenv("TSGO_CONTENT_MAPPER_HELPER");
+		::close(inPipe[0]);
+		::close(outPipe[1]);
+		if (pid < 0) {
+			::close(inPipe[1]);
+			::close(outPipe[0]);
+			return {nullptr, gostd::newError("spawn failed")};
+		}
+#else
 		pid_t pid = ::fork();
 		if (pid < 0) {
 			return {nullptr, gostd::newError("fork failed")};
@@ -126,6 +149,7 @@ struct execSpawner : cm::Spawner {
 		}
 		::close(inPipe[0]);
 		::close(outPipe[1]);
+#endif
 		auto* p = new process();
 		p->pid = pid;
 		p->stdinFd = inPipe[1];
