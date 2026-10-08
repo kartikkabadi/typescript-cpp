@@ -337,16 +337,10 @@ struct Resolver {
 	    std::string_view typeReferenceDirectiveName,
 	    std::string_view containingFile, ResolutionMode resolutionMode,
 	    const ResolvedProjectReference* redirectedReference) = 0;
-	virtual std::shared_ptr<packagejson::InfoCacheEntry>
-	GetPackageScopeForPath(const std::string& directory) = 0;
-	virtual void PackageJsonCacheEntries(
-	    const std::function<bool(
-	        const std::string&,
-	        std::shared_ptr<packagejson::InfoCacheEntry>)>& f) = 0;
-	virtual std::shared_ptr<ResolvedModule> ResolvePackageDirectory(
-	    std::string_view moduleName, std::string_view containingFile,
-	    ResolutionMode resolutionMode,
-	    const ResolvedProjectReference* redirectedReference) = 0;
+	// types.go — a5c43c4d54: the interface narrows to the resolution
+	// data; package-scope/directory helpers stay on DefaultResolver and
+	// callers go through GetResolutionData().NewResolver(host).
+	virtual std::shared_ptr<ResolutionData> GetResolutionData() = 0;
 };
 
 struct ResolverOptions {
@@ -358,15 +352,28 @@ struct ResolverOptions {
 	std::shared_ptr<packagejson::InfoCache> PackageJsonCache;
 };
 
-// DefaultResolver — resolver.go.
-class DefaultResolver : public Resolver, public caches {
+// DefaultResolver — resolver.go. a5c43c4d54: embeds *ResolutionData (as
+// shared_ptr; the option copies below are read-only views of it — Go
+// embeds the pointer, nothing mutates the fields) plus per-resolver
+// caches that used to live in the removed `caches` base.
+class DefaultResolver : public Resolver {
 public:
 	ResolutionHost* host;
+	std::shared_ptr<ResolutionData> resolutionData;
 	const CompilerOptions* compilerOptions;
 	std::string typingsLocation;
 	std::string projectName;
 	std::vector<std::string> extraExtensions;
+	std::shared_ptr<packagejson::InfoCache> packageJsonInfoCache;
 
+	moduleResolutionCache moduleResolutionCache_;
+	typeRefDirectiveResolutionCache typeRefDirectiveResolutionCache_;
+	// Cached representations for `core.CompilerOptions.paths`, keyed by
+	// the path mappings themselves (typesVersions not handled).
+	parsedPatternsCache parsedPatternsForPaths;
+
+	DefaultResolver(std::shared_ptr<ResolutionData> data,
+	                ResolutionHost* host);
 	explicit DefaultResolver(ResolverOptions opts);
 
 	// newTraceBuilder — non-null only when TraceResolution is on.
@@ -375,12 +382,18 @@ public:
 	// would interleave entries and lose args.
 	std::unique_ptr<tracer> newTraceBuilder();
 
+	// resolver.go — concrete-only helpers (not on the Resolver
+	// interface); callers reach them via
+	// GetResolutionData().NewResolver(host).
+	std::shared_ptr<ResolutionData> GetResolutionData() override {
+		return resolutionData;
+	}
 	std::shared_ptr<packagejson::InfoCacheEntry> GetPackageScopeForPath(
-	    const std::string& directory) override;
+	    const std::string& directory);
 	void PackageJsonCacheEntries(
 	    const std::function<bool(
 	        const std::string&,
-	        std::shared_ptr<packagejson::InfoCacheEntry>)>& f) override;
+	        std::shared_ptr<packagejson::InfoCacheEntry>)>& f);
 
 	std::pair<std::shared_ptr<ResolvedTypeReferenceDirective>,
 	          std::vector<DiagAndArgs>>
@@ -410,7 +423,7 @@ public:
 	std::shared_ptr<ResolvedModule> ResolvePackageDirectory(
 	    std::string_view moduleName, std::string_view containingFile,
 	    ResolutionMode resolutionMode,
-	    const ResolvedProjectReference* redirectedReference) override;
+	    const ResolvedProjectReference* redirectedReference);
 
 	std::shared_ptr<ResolvedModule> tryResolveFromTypingsLocation(
 	    const std::string& moduleName, const std::string& containingDirectory,

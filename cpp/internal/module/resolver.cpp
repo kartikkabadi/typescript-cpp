@@ -129,24 +129,45 @@ const CompilerOptions* GetCompilerOptionsWithRedirect(
 
 // --- DefaultResolver ---
 
-DefaultResolver::DefaultResolver(ResolverOptions opts)
-    : host(opts.Host),
-      compilerOptions(opts.CompilerOptions),
-      typingsLocation(std::move(opts.TypingsLocation)),
-      projectName(std::move(opts.ProjectName)),
-      extraExtensions(std::move(opts.ExtraExtensions)) {
-	if (opts.PackageJsonCache != nullptr) {
-		packageJsonInfoCache = opts.PackageJsonCache;
-	} else {
-		static_cast<caches&>(*this) = newCaches(
-		    opts.Host->GetCurrentDirectory(),
-		    opts.Host->UseCaseSensitiveFileNames(), opts.CompilerOptions);
+// cache.go:75 newResolutionData — a5c43c4d54: the options + package-json
+// cache live as long as the program's resolution data, not the resolver.
+std::shared_ptr<ResolutionData> newResolutionData(ResolverOptions opts) {
+	auto data = std::make_shared<ResolutionData>(
+	    opts.CompilerOptions, std::move(opts.TypingsLocation),
+	    std::move(opts.ProjectName), std::move(opts.ExtraExtensions),
+	    opts.PackageJsonCache);
+	if (data->packageJsonInfoCache == nullptr) {
+		data->packageJsonInfoCache =
+		    std::make_shared<packagejson::InfoCache>(
+		        opts.Host->GetCurrentDirectory(),
+		        opts.Host->UseCaseSensitiveFileNames());
 	}
+	return data;
+}
+
+DefaultResolver::DefaultResolver(std::shared_ptr<ResolutionData> data,
+                                 ResolutionHost* host_)
+    : host(host_),
+      resolutionData(std::move(data)),
+      compilerOptions(resolutionData->compilerOptions),
+      typingsLocation(resolutionData->typingsLocation),
+      projectName(resolutionData->projectName),
+      extraExtensions(resolutionData->extraExtensions),
+      packageJsonInfoCache(resolutionData->packageJsonInfoCache) {}
+
+DefaultResolver::DefaultResolver(ResolverOptions opts)
+    : DefaultResolver(newResolutionData(std::move(opts)), opts.Host) {}
+
+// resolver.go:371 — a fresh resolver over the same resolution data (new
+// per-resolver caches; the package-json cache table is shared).
+DefaultResolver* ResolutionData::NewResolver(ResolutionHost* host_) {
+	auto data = shared_from_this();
+	return new DefaultResolver(std::move(data), host_);
 }
 
 // resolver.go:167 NewResolver — the ctor above performs the field init.
 DefaultResolver* NewResolver(ResolverOptions opts) {
-	return new DefaultResolver(std::move(opts));
+	return newResolutionData(opts)->NewResolver(opts.Host);
 }
 
 std::unique_ptr<tracer> DefaultResolver::newTraceBuilder() {

@@ -177,7 +177,8 @@ void listFiles(const EmitInput& input, compiler::EmitResult* emitResult) {
 		}
 	}
 	if (tristateIsTrue(options->ExplainFiles)) {
-		input.Program->ExplainFiles(*input.Writer, input.Config->Locale());
+		input.Program->ExplainFiles(*input.Writer, input.Config->Locale(),
+		                            input.Sys->GetCurrentDirectory());
 	} else if (tristateIsTrue(options->ListFiles) || tristateIsTrue(options->ListFilesOnly)) {
 		for (auto* file : input.Program->GetSourceFiles()) {
 			*input.Writer << file->FileName() << '\n';

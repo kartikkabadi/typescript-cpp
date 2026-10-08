@@ -2152,6 +2152,7 @@ ParsedCommandLine* parseJsonConfigFileContentWorker(
 	        host->FS()->UseCaseSensitiveFileNames(),
 	    .currentDirectory = basePathForFileNames,
 	};
+	result->baseDirectory = basePathForFileNames;
 	result->literalFileNamesLen = literalFileNamesLen;
 	return result;
 }

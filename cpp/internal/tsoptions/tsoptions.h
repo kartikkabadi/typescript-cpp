@@ -688,6 +688,10 @@ struct ParsedCommandLine : module::ResolvedProjectReference,
 	std::shared_ptr<bool> CompileOnSave;
 
 	tspath::ComparePathsOptions comparePathsOptions;
+	// parsedcommandline.go:54 baseDirectory — the rooted directory
+	// file names resolved against (basePathForFileNames).
+	std::string baseDirectory;
+	std::string BaseDirectory() const { return baseDirectory; }
 
 	mutable std::once_flag wildcardDirectoriesOnce;
 	std::shared_ptr<std::unordered_map<std::string, bool>> wildcardDirectories;

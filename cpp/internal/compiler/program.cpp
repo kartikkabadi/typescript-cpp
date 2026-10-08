@@ -401,8 +401,12 @@ SimpleProgram::SimpleProgram(CompilerHost* host_,
 	// filesparser.go:565 literal).
 	finishedProcessing = true;
 	resolver_ = std::move(loader.resolverOwned);
+	// fileloader.go:235 — the resolver's ResolutionData is stored on the
+	// program (a5c43c4d54): package-scope lookups build fresh resolvers
+	// over it via newResolver().
+	resolutionData_ = loader.resolver->GetResolutionData();
 	projectReferenceFileMapper_ =
-	    std::move(loader.projectReferenceFileMapper);
+	    std::move(loader.projectReferences.mapper);
 	duplicateSourceFiles = std::move(parser.duplicateSourceFiles);
 	outputFileToProjectReferenceSource =
 	    std::move(parser.outputFileToProjectReferenceSource);
@@ -531,10 +535,23 @@ std::optional<checker::ResolvedModule> SimpleProgram::GetResolvedModule(
 }
 
 // === slice: modulespecifiers ===
+// program.go:191 newResolver — fresh DefaultResolver over the
+// program's resolution data, host wrapped to BaseDirectory and through
+// the mapper's (possibly dts-faking) resolution host.
+module::DefaultResolver* SimpleProgram::newResolver() {
+	auto crh = std::make_unique<compilerResolutionHost>();
+	crh->host = host;
+	crh->baseDirectory = BaseDirectory();
+	compilerResolutionHostArena.push_back(std::move(crh));
+	return resolutionData_->NewResolver(
+	    projectReferenceFileMapper_->resolutionHost(
+	        compilerResolutionHostArena.back().get()));
+}
+
 // program.go GetNearestAncestorDirectoryWithPackageJson.
 std::string SimpleProgram::GetNearestAncestorDirectoryWithPackageJson(
     const std::string& dirname) {
-	auto scoped = resolver_->GetPackageScopeForPath(dirname);
+	auto scoped = newResolver()->GetPackageScopeForPath(dirname);
 	if (scoped && scoped->Exists()) {
 		return scoped->PackageDirectory;
 	}
@@ -545,7 +562,7 @@ std::string SimpleProgram::GetNearestAncestorDirectoryWithPackageJson(
 std::shared_ptr<packagejson::InfoCacheEntry>
 SimpleProgram::GetPackageJsonInfo(const std::string& pkgJsonPath) {
 	auto directory = tspath::getDirectoryPath(pkgJsonPath);
-	auto scoped = resolver_->GetPackageScopeForPath(directory);
+	auto scoped = newResolver()->GetPackageScopeForPath(directory);
 	if (scoped && scoped->Exists() && scoped->PackageDirectory == directory) {
 		return scoped;
 	}
@@ -2791,7 +2808,7 @@ void SimpleProgram::PackageJsonCacheEntries(
     const std::function<bool(
         tspath::Path, const std::shared_ptr<packagejson::InfoCacheEntry>&)>&
         f) {
-	resolver_->PackageJsonCacheEntries(f);
+	resolutionData_->PackageJsonCacheEntries(f);
 }
 
 // program.go:804 GetSemanticDiagnosticsForIncremental — includes newly
@@ -2860,10 +2877,12 @@ SimpleProgram* NewProgram(const ProgramOptions& opts) {
 
 // program.go:2120 ExplainFiles.
 void SimpleProgram::ExplainFiles(std::ostream& w,
-                                 const locale::Locale& locale) {
-	auto toRelativeFileName = [this](const std::string& fileName) {
+                                 const locale::Locale& locale,
+                                 const tspath::Path& currentDirectory) {
+	auto toRelativeFileName = [this, &currentDirectory](
+	                              const std::string& fileName) {
 		return tspath::getRelativePathFromDirectory(
-		    GetCurrentDirectory(), fileName, comparePathsOptions());
+		    currentDirectory, fileName, comparePathsOptions());
 	};
 	auto localizeDiag = [&](Diagnostic* d) {
 		// ast.Diagnostic.Localize — diagnostic.go:117.
@@ -2884,7 +2903,8 @@ void SimpleProgram::ExplainFiles(std::ostream& w,
 		auto it = includeProcessor_.fileIncludeReasons.find(path);
 		if (it != includeProcessor_.fileIncludeReasons.end()) {
 			for (auto* reason : it->second) {
-				auto* diag = reason->toDiagnostic(this, true);
+				auto* diag = reason->toDiagnostic(this, true,
+				                                  currentDirectory);
 				w << "   " << localizeDiag(diag) << '\n';
 			}
 		}
@@ -3168,6 +3188,9 @@ std::tuple<SimpleProgram*, SourceFile*, bool> SimpleProgram::ReuseProgram(
 	// processedFiles fields (fileloader.go:113-145) — the Go literal
 	// copies the struct wholesale.
 	result->resolver_ = resolver_;
+	// program.go:427 — the spliced program clones the resolution data
+	// (new package-json table, shared entries).
+	result->resolutionData_ = resolutionData_->Clone();
 	result->files = files;
 	result->duplicateSourceFiles = duplicateSourceFiles;
 	result->filesByPath = filesByPath;
@@ -3304,7 +3327,8 @@ SimpleProgram::extractUnresolvedImportsFromSourceFile(SourceFile* file) {
 // resolutions' realpath bookkeeping plus a package.json dependency probe
 // (records each runtime dep's original->resolved package.json pair).
 symlinks::KnownSymlinks* SimpleProgram::GetSymlinkCache() {
-	return knownSymlinks.getValue([this]() -> symlinks::KnownSymlinks* {
+	auto* resolver = newResolver();
+	return knownSymlinks.getValue([this, resolver]() -> symlinks::KnownSymlinks* {
 		auto* knownSymlinks = symlinks::NewKnownSymlink(
 		    GetCurrentDirectory(), UseCaseSensitiveFileNames());
 
@@ -3375,7 +3399,7 @@ symlinks::KnownSymlinks* SimpleProgram::GetSymlinkCache() {
 				}
 
 				auto packageResolution =
-				    resolver_->ResolvePackageDirectory(
+				    resolver->ResolvePackageDirectory(
 				        dep, packageJsonName,
 				        ResolutionModeCommonJS, nullptr);
 				if (packageResolution != nullptr &&
@@ -3547,7 +3571,8 @@ void SimpleProgram::ForEachCheckerParallel(
 
 // program.go:2226 collectPackageNames — lazyValue[packageNamesInfo].
 SimpleProgram::packageNamesInfo* SimpleProgram::collectPackageNames() {
-	return packageNames_.getValue([this]() -> packageNamesInfo* {
+	auto* resolver = newResolver();
+	return packageNames_.getValue([this, resolver]() -> packageNamesInfo* {
 		auto* packageNames = new packageNamesInfo{};
 		for (auto* file : files) {
 			if (IsSourceFileDefaultLibrary(file->Path()) ||
@@ -3585,7 +3610,7 @@ SimpleProgram::packageNamesInfo* SimpleProgram::collectPackageNames() {
 							// 2. GetPackageScopeForPath - get name from
 							//    package.json in the package directory
 							auto packageScope =
-							    resolver_->GetPackageScopeForPath(
+							    resolver->GetPackageScopeForPath(
 							        resolvedModule->ResolvedFileName);
 							if (packageScope != nullptr &&
 							    packageScope->Exists()) {
@@ -3619,7 +3644,7 @@ SimpleProgram::packageNamesInfo* SimpleProgram::collectPackageNames() {
 							    module::ParsePackageName(imp->text());
 							if (!rest.empty()) {
 								if (auto scope =
-								        resolver_
+								        resolver
 								            ->GetPackageScopeForPath(
 								                resolvedModule
 								                    ->ResolvedFileName);

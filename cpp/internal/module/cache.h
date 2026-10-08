@@ -106,26 +106,47 @@ struct parsedPatternsCache {
 	    const void* pathMappings, std::shared_ptr<ParsedPatterns> parsed);
 };
 
-struct caches {
+// cache.go:63 — ResolutionData: the resolution-scoped data that outlives
+// an individual DefaultResolver instance (a5c43c4d54 — Program options
+// lifetimes). The module/typeref/parsedPatterns caches stay per-resolver.
+struct ResolutionData : std::enable_shared_from_this<ResolutionData> {
+	const CompilerOptions* compilerOptions{};
+	std::string typingsLocation;
+	std::string projectName;
+	std::vector<std::string> extraExtensions;
+
 	std::shared_ptr<packagejson::InfoCache> packageJsonInfoCache;
 
-	moduleResolutionCache moduleResolutionCache_;
-	typeRefDirectiveResolutionCache typeRefDirectiveResolutionCache_;
+	ResolutionData() = default;
+	ResolutionData(const CompilerOptions* compilerOptions_,
+	               std::string typingsLocation_, std::string projectName_,
+	               std::vector<std::string> extraExtensions_,
+	               std::shared_ptr<packagejson::InfoCache> cache_)
+	    : compilerOptions(compilerOptions_),
+	      typingsLocation(std::move(typingsLocation_)),
+	      projectName(std::move(projectName_)),
+	      extraExtensions(std::move(extraExtensions_)),
+	      packageJsonInfoCache(std::move(cache_)) {}
 
-	// Cached representations for `core.CompilerOptions.paths`, keyed by the
-	// path mappings themselves. This does not handle other path patterns
-	// such as `typesVersions`.
-	parsedPatternsCache parsedPatternsForPaths;
+	// Clone — Go copies the package-json cache table without copying its
+	// entries.
+	std::shared_ptr<ResolutionData> Clone() {
+		return std::make_shared<ResolutionData>(
+		    compilerOptions, typingsLocation, projectName, extraExtensions,
+		    packageJsonInfoCache->Clone());
+	}
+
+	void PackageJsonCacheEntries(
+	    const std::function<bool(
+	        const std::string&,
+	        std::shared_ptr<packagejson::InfoCacheEntry>)>& f) {
+		packageJsonInfoCache->Range(f);
+	}
+
+	// resolver.go:371 — a fresh DefaultResolver over this data (new
+	// per-resolver caches; the package-json cache table is shared).
+	class DefaultResolver* NewResolver(ResolutionHost* host);
 };
-
-inline caches newCaches(std::string_view currentDirectory,
-                        bool useCaseSensitiveFileNames,
-                        const CompilerOptions* options) {
-	caches c;
-	c.packageJsonInfoCache = std::make_shared<packagejson::InfoCache>(
-	    currentDirectory, useCaseSensitiveFileNames);
-	return c;  // move (SyncMap members are move-only)
-}
 
 inline std::string getRedirectConfigName(
     const ResolvedProjectReference* redirect) {
