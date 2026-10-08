@@ -24,8 +24,9 @@ inline constexpr ParseFlags ParseFlagsNone = 0;
 inline constexpr ParseFlags ParseFlagsYield = 1 << 0;
 inline constexpr ParseFlags ParseFlagsAwait = 1 << 1;
 inline constexpr ParseFlags ParseFlagsType = 1 << 2;
-inline constexpr ParseFlags ParseFlagsIgnoreMissingOpenBrace = 1 << 3;
-inline constexpr ParseFlags ParseFlagsJSDoc = 1 << 4;
+// Bit 3 is unused in Go's enum — keep the same gap so flag values match.
+inline constexpr ParseFlags ParseFlagsIgnoreMissingOpenBrace = 1 << 4;
+inline constexpr ParseFlags ParseFlagsJSDoc = 1 << 5;
 
 // parser.go — ParsingContext / ParsingContexts
 using ParsingContext = int32_t;
