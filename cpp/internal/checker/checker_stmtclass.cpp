@@ -993,7 +993,7 @@ std::vector<Node*> Checker::getClassOrInterfaceDeclarationsOfSymbol(Symbol* symb
 // checker.go:4501
 bool Checker::areTypeParametersIdentical(
     const std::vector<Node*>& declarations, const std::vector<Type*>& targetParameters,
-    const std::function<NodeSlice(Node*)>& getTypeParameterDeclarations) {
+    const std::function<std::vector<Node*>(Node*)>& getTypeParameterDeclarations) {
 	size_t maxTypeArgumentCount = targetParameters.size();
 	size_t minTypeArgumentCount = static_cast<size_t>(getMinTypeArgumentCount(targetParameters));
 	for (Node* declaration : declarations) {

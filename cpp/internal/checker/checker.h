@@ -2635,7 +2635,7 @@ public:
 	std::vector<Node*> getClassOrInterfaceDeclarationsOfSymbol(Symbol* symbol);
 	bool areTypeParametersIdentical(
 	    const std::vector<Node*>& declarations, const std::vector<Type*>& targetParameters,
-	    const std::function<NodeSlice(Node*)>& getTypeParameterDeclarations);
+	    const std::function<std::vector<Node*>(Node*)>& getTypeParameterDeclarations);
 	void checkBaseTypeAccessibility(Type* t, Node* node);
 	void issueMemberSpecificError(Node* node, Type* typeWithThis, Type* baseWithThis,
 	                              const DiagnosticMessage* broadDiag);
