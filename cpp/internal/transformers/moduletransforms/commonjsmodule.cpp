@@ -1676,7 +1676,7 @@ Node* CommonJSModuleTransformer::visitForStatement(ForStatement* node) {
 	Node* condition = visitor()->visitNode(node->Condition);
 	Node* incrementor = discardedValueVisitor->visitNode(node->Incrementor);
 	Node* statement = emitContext()->visitIterationBody(
-		node->Statement, topLevelNestedVisitor);
+		node->Statement, visitor());
 	return factory()->updateForStatement(node, initializer, condition,
 	                                     incrementor, statement);
 }
@@ -1687,7 +1687,7 @@ Node* CommonJSModuleTransformer::visitForInOrOfStatement(
 	Node* initializer = discardedValueVisitor->visitNode(node->Initializer);
 	Node* expression = visitor()->visitNode(node->Expression);
 	Node* statement = emitContext()->visitIterationBody(
-		node->Statement, topLevelNestedVisitor);
+		node->Statement, visitor());
 	return factory()->updateForInOrOfStatement(node, node->AwaitModifier,
 	                                           initializer, expression,
 	                                           statement);
