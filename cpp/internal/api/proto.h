@@ -84,6 +84,7 @@ inline const Method MethodRelease = "release";
 inline const Method MethodReleaseSourceFile = "releaseSourceFile";
 inline const Method MethodRetainSourceFile = "retainSourceFile";
 inline const Method MethodGetCachedSourceFile = "getCachedSourceFile";
+inline const Method MethodGetSymbolOfDeclaration = "getSymbolOfDeclaration";
 
 inline const Method MethodBatchRequests = "batchRequests";
 inline const Method MethodInitialize = "initialize";
@@ -811,6 +812,16 @@ struct RetainSourceFileResponse {
 // complete identity, independent of any snapshot or lease.
 struct GetCachedSourceFileParams {
     SourceFileDescriptor File;
+
+	std::pair<bool, std::string> unmarshalField(std::string_view n, json::Decoder& d);
+    std::string marshalJSONTo(json::Encoder& enc) const;
+    std::string unmarshalJSONFrom(json::Decoder& dec);
+};
+
+// GetSymbolOfDeclarationParams — proto.go:931.
+struct GetSymbolOfDeclarationParams {
+    SourceFileDescriptor File;
+    uint32_t Index{};
 
 	std::pair<bool, std::string> unmarshalField(std::string_view n, json::Decoder& d);
     std::string marshalJSONTo(json::Encoder& enc) const;

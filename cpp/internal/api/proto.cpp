@@ -1310,6 +1310,29 @@ std::string GetCachedSourceFileParams::marshalJSONTo(json::Encoder& enc) const {
 	return w.end();
 }
 
+// unmarshalField — GetSymbolOfDeclarationParams member decode.
+std::pair<bool, std::string> GetSymbolOfDeclarationParams::unmarshalField(std::string_view n, json::Decoder& d) {
+	if (fieldIs(n, "file")) return {true, json::unmarshalDecode(d, &File)};
+	if (fieldIs(n, "index")) return {true, json::unmarshalDecode(d, &Index)};
+	return {false, {}};
+}
+
+std::string GetSymbolOfDeclarationParams::unmarshalJSONFrom(json::Decoder& dec) {
+	return readFields(dec, [this](std::string_view n, json::Decoder& d) -> std::string {
+		auto [handled, err] = unmarshalField(n, d);
+		if (handled) return err;
+		return d.skipValue();
+	});
+}
+
+std::string GetSymbolOfDeclarationParams::marshalJSONTo(json::Encoder& enc) const {
+	objWriter w{enc};
+	w.begin();
+	w.member("file", File);
+	w.member("index", Index);
+	return w.end();
+}
+
 // unmarshalField — SymbolReference member decode.
 std::pair<bool, std::string> SymbolReference::unmarshalField(std::string_view n, json::Decoder& d) {
 	if (fieldIs(n, "kind")) return {true, json::unmarshalDecode(d, &Kind)};

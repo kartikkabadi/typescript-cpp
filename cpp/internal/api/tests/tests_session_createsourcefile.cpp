@@ -3,6 +3,7 @@
 #include <mutex>
 #include <string>
 
+#include "internal/api/encoder/encoder.h"
 #include "internal/api/proto.h"
 #include "internal/api/session.h"
 #include "internal/ast/ast.h"
@@ -228,6 +229,65 @@ void TestCreateSourceFile(T* t) {
 		assert::Assert(t, err != nullptr &&
 		                      err->Error().find(
 		                          "source file is not available") !=
+		                          std::string::npos);
+	});
+
+	t->Run("declaration symbol lookup", [session](T* t) {
+		t->Parallel();
+
+		auto [created, err] = session->createSourceFile(
+		    "/src/symbols.ts",
+		    "function present() {}\nimport {} from './missing';",
+		    CreateSourceFileOptions{});
+		assert::NilError(t, err);
+		auto createdPtr = created;
+		t->Cleanup([createdPtr] { createdPtr->Release(); });
+
+		SourceFile* sourceFile = created->SourceFile_();
+		auto* table = encoder::GetNodeIndexTable(sourceFile);
+		auto descriptor = newSourceFileDescriptor(sourceFile);
+
+		GetSymbolOfDeclarationParams presentParams;
+		presentParams.File = descriptor;
+		presentParams.Index =
+		    table->GetIndex(sourceFile->statements()[0]);
+		auto [presentR, perr] =
+		    session->handleGetSymbolOfDeclaration(&presentParams);
+		assert::NilError(t, perr);
+		assert::Assert(t, !presentR.data.empty());
+		auto [dom, derr] = json::parse(std::string_view(presentR.data));
+		assert::NilError(t, derr);
+		auto* nameNode = json::objGet(dom, "name");
+		assert::Assert(t, nameNode != nullptr);
+		auto [nameStr, serr] = json::asString(*nameNode, "string");
+		assert::NilError(t, serr);
+		assert::Assert(t, nameStr == "present");
+		auto* refNode = json::objGet(dom, "reference");
+		assert::Assert(t, refNode != nullptr);
+		auto* kindNode = json::objGet(*refNode, "kind");
+		assert::Assert(t, kindNode != nullptr);
+		auto [kind, kerr] = json::asInt32(*kindNode, "int");
+		assert::NilError(t, kerr);
+		assert::Assert(t, kind == static_cast<int32_t>(SymbolOwnerKind::File));
+
+		GetSymbolOfDeclarationParams absentParams;
+		absentParams.File = descriptor;
+		absentParams.Index =
+		    table->GetIndex(sourceFile->statements()[1]);
+		auto [absentR, aerr] =
+		    session->handleGetSymbolOfDeclaration(&absentParams);
+		assert::Assert(t, aerr != nullptr &&
+		                      aerr->Error().find("has no binder symbol") !=
+		                          std::string::npos);
+		assert::Assert(t, absentR.data.empty());
+
+		GetSymbolOfDeclarationParams oobParams;
+		oobParams.File = descriptor;
+		oobParams.Index = 0;
+		auto [_oob, oerr] =
+		    session->handleGetSymbolOfDeclaration(&oobParams);
+		assert::Assert(t, oerr != nullptr &&
+		                      oerr->Error().find("out of range") !=
 		                          std::string::npos);
 	});
 

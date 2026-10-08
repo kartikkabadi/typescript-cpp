@@ -446,6 +446,8 @@ public:
 	    std::shared_ptr<project::SourceFileLease> lease);
 	std::pair<ResultValue, gostd::Error> handleRetainSourceFile(
 	    const RetainSourceFileParams* params);
+	std::pair<ResultValue, gostd::Error> handleGetSymbolOfDeclaration(
+	    const GetSymbolOfDeclarationParams* params);
 	std::pair<ResultValue, gostd::Error> handleGetCachedSourceFile(
 	    const GetCachedSourceFileParams* params);
 	// acquireCachedSourceFile holds a reference to the exact ordinary cached

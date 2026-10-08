@@ -1165,6 +1165,9 @@ std::pair<ResultValue, gostd::Error> Session::handleRequest(
 	if (method == MethodGetCachedSourceFile) {
 		return handleGetCachedSourceFile(unmarshalParam<GetCachedSourceFileParams>(parsed));
 	}
+	if (method == MethodGetSymbolOfDeclaration) {
+		return handleGetSymbolOfDeclaration(unmarshalParam<GetSymbolOfDeclarationParams>(parsed));
+	}
 	if (method == MethodInitialize) {
 		return call([&] { return handleInitialize(ctx); });
 	}
@@ -1686,6 +1689,7 @@ static const std::unordered_map<std::string_view, unmarshallerFn> unmarshalers =
     {MethodReleaseSourceFile, &unmarshallerFor<ReleaseSourceFileParams>},
     {MethodRetainSourceFile, &unmarshallerFor<RetainSourceFileParams>},
     {MethodGetCachedSourceFile, &unmarshallerFor<GetCachedSourceFileParams>},
+    {MethodGetSymbolOfDeclaration, &unmarshallerFor<GetSymbolOfDeclarationParams>},
     {MethodInitialize, &noParams},
     {MethodCreateSnapshot, &unmarshallerFor<CreateSnapshotParams>},
     {MethodUpdateSnapshot, &unmarshallerFor<UpdateSnapshotParams>},
@@ -3639,6 +3643,37 @@ std::pair<ResultValue, gostd::Error> Session::handleGetCachedSourceFile(
 	auto lease = leaseR;
 	deferGuard _release{[lease] { lease->Release(); }};
 	return encodeSourceFileResponse(lease->SourceFile_());
+}
+
+// handleGetSymbolOfDeclaration — session.go:2121. @gen-proto-result: SymbolResponse
+std::pair<ResultValue, gostd::Error> Session::handleGetSymbolOfDeclaration(
+    const GetSymbolOfDeclarationParams* params) {
+	auto [leaseR, err] = acquireCachedSourceFile(params->File);
+	if (err) {
+		return {ResultValue{}, err};
+	}
+	auto lease = leaseR;
+	deferGuard _release{[lease] { lease->Release(); }};
+
+	auto* table = encoder::GetNodeIndexTable(lease->SourceFile_());
+	if (params->Index == 0 || params->Index >= table->Nodes.size()) {
+		return {ResultValue{},
+		        gostd::errorf("%w: declaration node index %d is out of range",
+		                      {ErrClientError, params->Index})};
+	}
+	Node* node = table->Nodes[params->Index];
+	if (node == nullptr || !isDeclaration(node)) {
+		return {ResultValue{},
+		        gostd::errorf("%w: node index %d is not a declaration",
+		                      {ErrClientError, params->Index})};
+	}
+	Symbol* symbol = node->symbol();
+	if (symbol == nullptr) {
+		return {ResultValue{},
+		        gostd::errorf("%w: declaration node index %d has no binder symbol",
+		                      {ErrClientError, params->Index})};
+	}
+	return marshalResult(*newFileSymbolResponse(symbol));
 }
 
 // acquireCachedSourceFile — session.go:2188. Holds a reference to the exact
