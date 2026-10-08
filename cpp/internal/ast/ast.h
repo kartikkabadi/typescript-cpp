@@ -36,7 +36,20 @@ namespace tsc {
 // otherwise record.
 inline bool tscEmitdumpPanicExit = false;
 
+// Fuzz builds (cpp/cmd/fuzz, compiled with -DTSC_FUZZ_UNREACHABLE_THROW):
+// a Go panic surfaces as this exception type so libFuzzer drivers can catch
+// it at the harness boundary, count it as a faithful abort, and keep going —
+// the production _Exit(2) would end the fuzz run on the first panic input.
+// Unwinding also models Go recover() sites (e.g. the lsp handler's
+// recover_) that an _Exit would make unreachable.
+struct tscUnreachableThrown {
+	const char* msg;
+};
+
 [[noreturn]] inline void tscUnreachable(const char* msg) {
+#ifdef TSC_FUZZ_UNREACHABLE_THROW
+	throw tscUnreachableThrown{msg};
+#else
 	if (tscEmitdumpPanicExit) {
 		std::fprintf(stdout, "EXIT 2\n");
 	} else {
@@ -48,6 +61,7 @@ inline bool tscEmitdumpPanicExit = false;
 	// written there must be visible here too.
 	std::fflush(nullptr);
 	std::_Exit(2);
+#endif
 }
 #define TSC_UNREACHABLE(msg) ::tsc::tscUnreachable(msg)
 #define TSC_ASSERT(cond, msg) assert(((void)(msg), (cond)))

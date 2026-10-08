@@ -11,6 +11,15 @@ namespace tsc::tsoptions {
 Diagnostic* CreateDiagnosticForNodeInSourceFile(
     SourceFile* sourceFile, Node* node, const DiagnosticMessage* message,
     std::vector<std::string> args) {
+	// Go panics on a nil *ast.Node (node.Loc.Pos()) or nil *ast.SourceFile
+	// (sourceFile.Text()) — e.g. tsconfigparsing reaches this with a nil
+	// nodeValue for duplicate/malformed "files" properties. The port's
+	// panic mechanism is tscUnreachable, so map the nil derefs there rather
+	// than letting them hit an uninstrumented SIGSEGV.
+	if (sourceFile == nullptr || node == nullptr) {
+		tscUnreachable(
+		    "CreateDiagnosticForNodeInSourceFile: nil sourceFile/node");
+	}
 	return newDiagnostic(
 	    sourceFile,
 	    TextRange{tsc::skipTrivia(sourceFile->text, node->pos()),
