@@ -50,6 +50,20 @@ SourceFileLease* SnapshotHost::AcquireSourceFile(
 	};
 }
 
+// AcquireExistingSourceFile — snapshothost.go:65.
+SourceFileLease* SnapshotHost::AcquireExistingSourceFile(
+    const ParseCacheKey& key) {
+	auto [sourceFile, ok] = parseCache->AcquireExisting(key);
+	if (!ok) {
+		return nullptr;
+	}
+	return new SourceFileLease{
+	    .cache = parseCache,
+	    .key = key,
+	    .sourceFile = sourceFile,
+	};
+}
+
 // NewSnapshotHost — snapshothost.go:64.
 SnapshotHost* NewSnapshotHost(SessionInit* init) {
 	auto currentDirectory = init->Options->CurrentDirectory;

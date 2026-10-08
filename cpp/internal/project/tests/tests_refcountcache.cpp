@@ -1,5 +1,7 @@
 // Port of tsc/internal/project/refcountcache_test.go.
+#include <future>
 #include <memory>
+#include <thread>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -953,6 +955,133 @@ void TestRefCountingCaches(T* t) {
 	});
 }
 
+void TestParseCacheAcquireExistingUsesFullKey(T* t) {
+	t->Parallel();
+
+	const std::string fileName = "/index.ts";
+	auto* fileHandle = project::newCachedFileHandle(fileName, "export {};");
+	SourceFileParseOptions parseOptions{
+	    .FileName = fileName,
+	    .Path = std::string(tsc::tspath::Path(fileName)),
+	};
+	auto key = project::newParseCacheKey(parseOptions, fileHandle->Hash(),
+	                                     tsc::ScriptKind::TS);
+	auto* cache = project::newParseCache(project::RefCountCacheOptions{});
+	auto* file = cache->Acquire(key, fileHandle);
+
+	auto [acquired, ok] = cache->AcquireExisting(key);
+	assert::Assert(t, ok);
+	assert::Assert(t, acquired == file);
+	cache->Deref(key);
+
+	std::vector<std::pair<std::string, project::ParseCacheKey>> mismatches;
+	{
+		auto m = key;
+		m.sourceFileParseOptions.FileName = "/INDEX.ts";
+		mismatches.emplace_back("file name", m);
+	}
+	{
+		auto m = key;
+		m.sourceFileParseOptions.Path = "/INDEX.ts";
+		mismatches.emplace_back("path", m);
+	}
+	{
+		auto m = key;
+		m.hash = tsc::xxh3::hash128("different");
+		mismatches.emplace_back("hash", m);
+	}
+	{
+		auto m = key;
+		m.scriptKind = tsc::ScriptKind::TSX;
+		mismatches.emplace_back("script kind", m);
+	}
+	{
+		auto m = key;
+		m.sourceFileParseOptions.ExternalModuleIndicatorOptions.JSX =
+		    tsc::JsxEmit::ReactJSX;
+		mismatches.emplace_back("jsx parse option", m);
+	}
+	{
+		auto m = key;
+		m.sourceFileParseOptions.ExternalModuleIndicatorOptions.Force = true;
+		mismatches.emplace_back("force parse option", m);
+	}
+	for (auto& entry : mismatches) {
+		auto mismatch = entry.second;
+		t->Run(entry.first, [cache, mismatch](T* t) {
+			t->Parallel();
+			auto [_v, found] = cache->AcquireExisting(mismatch);
+			assert::Assert(t, !found);
+			assert::Assert(t, !cache->Has(mismatch));
+		});
+	}
+
+	cache->Deref(key);
+	assert::Assert(t, !cache->Has(key));
+}
+
+void TestRefCountCacheAcquireExisting(T* t) {
+	t->Parallel();
+
+	int parseCount = 0;
+	auto* cache = project::newRefCountCache<std::string, int, int>(
+	    project::RefCountCacheOptions{},
+	    [&parseCount](const std::string&, const int& value) {
+		    parseCount++;
+		    return value;
+	    });
+
+	auto [value, ok] = cache->AcquireExisting("missing");
+	assert::Equal(t, value, 0);
+	assert::Assert(t, !ok);
+	assert::Equal(t, parseCount, 0);
+
+	assert::Equal(t, cache->Acquire("key", 1), 1);
+	std::tie(value, ok) = cache->AcquireExisting("key");
+	assert::Assert(t, ok);
+	assert::Equal(t, value, 1);
+	assert::Equal(t, parseCount, 1);
+
+	cache->Deref("key");
+	assert::Assert(t, cache->Has("key"));
+	cache->Deref("key");
+	assert::Assert(t, !cache->Has("key"));
+
+	std::tie(value, ok) = cache->AcquireExisting("key");
+	assert::Equal(t, value, 0);
+	assert::Assert(t, !ok);
+	assert::Equal(t, parseCount, 1);
+}
+
+void TestRefCountCacheAcquireExistingRacesFinalRelease(T* t) {
+	t->Parallel();
+
+	for (int i = 0; i < 100; i++) {
+		auto* cache = project::newRefCountCache<std::string, int*, int*>(
+		    project::RefCountCacheOptions{},
+		    [](const std::string&, int* const& value) { return value; });
+		int value = 1;
+		cache->Acquire("key", &value);
+
+		std::promise<void> start;
+		auto ready = start.get_future().share();
+		std::promise<bool> acquired;
+		auto acquiredFuture = acquired.get_future();
+		std::thread worker([&] {
+			ready.wait();
+			auto [_v, ok] = cache->AcquireExisting("key");
+			acquired.set_value(ok);
+		});
+		start.set_value();
+		cache->Deref("key");
+		if (acquiredFuture.get()) {
+			cache->Deref("key");
+		}
+		worker.join();
+		assert::Assert(t, !cache->Has("key"));
+	}
+}
+
 }  // namespace
 
 REGISTER_UNIT_TEST("project.TestContentMappedParseCacheBundleLifetime",
@@ -961,4 +1090,10 @@ REGISTER_UNIT_TEST("project.TestContentMappedParseCacheKeyReconstruction",
                    TestContentMappedParseCacheKeyReconstruction);
 REGISTER_UNIT_TEST("project.TestParseCacheBindsBeforePublishing",
                    TestParseCacheBindsBeforePublishing);
+REGISTER_UNIT_TEST("project.TestParseCacheAcquireExistingUsesFullKey",
+                   TestParseCacheAcquireExistingUsesFullKey);
+REGISTER_UNIT_TEST("project.TestRefCountCacheAcquireExisting",
+                   TestRefCountCacheAcquireExisting);
+REGISTER_UNIT_TEST("project.TestRefCountCacheAcquireExistingRacesFinalRelease",
+                   TestRefCountCacheAcquireExistingRacesFinalRelease);
 REGISTER_UNIT_TEST("project.TestRefCountingCaches", TestRefCountingCaches);

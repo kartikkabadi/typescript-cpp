@@ -36,6 +36,7 @@
 #include "internal/lsp/lsproto/lsproto.h"
 #include "internal/module/types.h"
 #include "internal/packagejson/packagejson.h"
+#include "internal/project/parsecache.h"
 #include "internal/project/project.h"
 #include "internal/scanner/scanner.h"
 #include "internal/tsoptions/tsoptions.h"
@@ -81,6 +82,8 @@ struct RequestSymlink;
 
 inline const Method MethodRelease = "release";
 inline const Method MethodReleaseSourceFile = "releaseSourceFile";
+inline const Method MethodRetainSourceFile = "retainSourceFile";
+inline const Method MethodGetCachedSourceFile = "getCachedSourceFile";
 
 inline const Method MethodBatchRequests = "batchRequests";
 inline const Method MethodInitialize = "initialize";
@@ -765,6 +768,51 @@ struct ReleaseSourceFileParams {
     std::string unmarshalJSONFrom(json::Decoder& dec);
 };
 
+// SourceFileDescriptor — proto.go:901. The complete identity of an ordinary
+// cached source file.
+struct SourceFileDescriptor {
+    std::string FileName;
+    tspath::Path Path;
+    std::string ContentHash;
+    std::string ParseOptionsKey;
+    ScriptKind ScriptKind{};
+    std::string NodeID;
+
+    bool operator==(const SourceFileDescriptor& o) const = default;
+
+    // parseCacheKey — session.go:2163. Validates the descriptor and rebuilds
+    // the parse-cache key it names.
+    std::pair<project::ParseCacheKey, gostd::Error> parseCacheKey() const;
+
+	std::pair<bool, std::string> unmarshalField(std::string_view n, json::Decoder& d);
+    std::string marshalJSONTo(json::Encoder& enc) const;
+    std::string unmarshalJSONFrom(json::Decoder& dec);
+};
+
+struct RetainSourceFileParams {
+    SourceFileDescriptor File;
+
+	std::pair<bool, std::string> unmarshalField(std::string_view n, json::Decoder& d);
+    std::string marshalJSONTo(json::Encoder& enc) const;
+    std::string unmarshalJSONFrom(json::Decoder& dec);
+};
+
+struct RetainSourceFileResponse {
+    SourceFileLeaseID Lease{};
+
+    std::string marshalJSONTo(json::Encoder& enc) const;
+};
+
+// GetCachedSourceFileParams address an ordinary cached source file by its
+// complete identity, independent of any snapshot or lease.
+struct GetCachedSourceFileParams {
+    SourceFileDescriptor File;
+
+	std::pair<bool, std::string> unmarshalField(std::string_view n, json::Decoder& d);
+    std::string marshalJSONTo(json::Encoder& enc) const;
+    std::string unmarshalJSONFrom(json::Decoder& dec);
+};
+
 struct ProfileParams {
     std::string Dir;
 
@@ -960,29 +1008,57 @@ struct GetSymbolsAtLocationsParams {
     std::string unmarshalJSONFrom(json::Decoder& dec);
 };
 
-struct SymbolResponse {
+// SymbolOwnerKind — proto.go:1129.
+enum class SymbolOwnerKind : uint32_t {
+    File = 0,
+    Snapshot = 1,
+};
+
+// SymbolOwner — proto.go:1139. Embedded in SymbolReference.
+struct SymbolOwner {
+    SymbolOwnerKind Kind{};
+    std::shared_ptr<SourceFileDescriptor> File; // omitempty
+    SnapshotID Snapshot{}; // omitzero
+    project::ID Project; // omitempty
+};
+
+// SymbolReference — proto.go:1147. Identifies a symbol and its
+// server-resolvable owner.
+struct SymbolReference : SymbolOwner {
     SymbolID Id{};
-    // Project is the project in which the symbol was first observed. It is the
-    // default project for follow-up lookups whose results can vary by project.
-    project::ID Project;
+
+	std::pair<bool, std::string> unmarshalField(std::string_view n, json::Decoder& d);
+    std::string marshalJSONTo(json::Encoder& enc) const;
+    std::string unmarshalJSONFrom(json::Decoder& dec);
+};
+
+// CompactSymbolReference — proto.go:1156. Identifies a cached symbol without
+// repeating its owning file's full descriptor: File is the owning source
+// file's node ID, or empty for a symbol owned by the response's snapshot.
+struct CompactSymbolReference {
+    SymbolID Id{};
+    std::string File; // omitempty
+
+    std::string marshalJSONTo(json::Encoder& enc) const;
+};
+
+struct SymbolResponse {
+    SymbolReference Reference;
     std::string Name;
     uint32_t Flags{};
     uint32_t CheckFlags{};
     std::vector<NodeHandle> Declarations;
     NodeHandle ValueDeclaration;
-    SymbolID Parent{}; // omitzero
-    SymbolID ExportSymbol{}; // omitzero
+    std::shared_ptr<CompactSymbolReference> Parent;
+    std::shared_ptr<CompactSymbolReference> ExportSymbol;
 
     std::string marshalJSONTo(json::Encoder& enc) const;
 };
 
-// symbolHandles — proto.go:1090.
-std::vector<SymbolID> symbolHandles(const std::vector<Symbol*>& symbols);
-
 struct GetTypeOfSymbolParams {
     SnapshotID Snapshot{};
     project::ID Project;
-    SymbolID Symbol{};
+    SymbolReference Symbol;
 
 	std::pair<bool, std::string> unmarshalField(std::string_view n, json::Decoder& d);
     std::string marshalJSONTo(json::Encoder& enc) const;
@@ -992,7 +1068,7 @@ struct GetTypeOfSymbolParams {
 struct GetTypesOfSymbolsParams {
     SnapshotID Snapshot{};
     project::ID Project;
-    std::vector<SymbolID> Symbols;
+    std::vector<SymbolReference> Symbols;
 
 	std::pair<bool, std::string> unmarshalField(std::string_view n, json::Decoder& d);
     std::string marshalJSONTo(json::Encoder& enc) const;
@@ -1059,10 +1135,10 @@ struct TypeResponse {
 
     // TypeAlias data
     std::vector<TypeID> AliasTypeArguments;
-    SymbolID AliasSymbol{}; // omitzero
+    std::shared_ptr<CompactSymbolReference> AliasSymbol; // omitempty
 
     // Symbol associated with structured types
-    SymbolID Symbol{}; // omitzero
+    std::shared_ptr<CompactSymbolReference> Symbol; // omitempty
 
     std::string marshalJSONTo(json::Encoder& enc) const;
 };
@@ -1086,8 +1162,8 @@ struct SignatureResponse {
     uint32_t Flags{};
     NodeHandle Declaration;
     std::vector<TypeID> TypeParameters;
-    std::vector<SymbolID> Parameters;
-    SymbolID ThisParameter{}; // omitzero
+    std::vector<CompactSymbolReference> Parameters;
+    std::shared_ptr<CompactSymbolReference> ThisParameter; // omitempty
     SignatureID Target{}; // omitzero
 
     std::string marshalJSONTo(json::Encoder& enc) const;
@@ -1272,9 +1348,7 @@ struct GetTypePropertyParams {
 
 // GetSymbolPropertyParams is used for all symbol sub-property endpoints.
 struct GetSymbolPropertyParams {
-    SnapshotID Snapshot{};
-    project::ID Project;
-    SymbolID Symbol{}; // `json:"objectId"`
+    SymbolReference Symbol;
 
 	std::pair<bool, std::string> unmarshalField(std::string_view n, json::Decoder& d);
     std::string marshalJSONTo(json::Encoder& enc) const;
@@ -1318,7 +1392,7 @@ struct GetContextualTypeForArgumentParams {
 struct GetTypeOfSymbolAtLocationParams {
     SnapshotID Snapshot{};
     project::ID Project;
-    SymbolID Symbol{};
+    SymbolReference Symbol;
     NodeHandle Location;
 
 	std::pair<bool, std::string> unmarshalField(std::string_view n, json::Decoder& d);
@@ -1331,7 +1405,7 @@ struct GetReferencesToSymbolInFileParams {
     SnapshotID Snapshot{};
     project::ID Project;
     DocumentIdentifier File;
-    SymbolID Symbol{};
+    SymbolReference Symbol;
 
 	std::pair<bool, std::string> unmarshalField(std::string_view n, json::Decoder& d);
     std::string marshalJSONTo(json::Encoder& enc) const;
@@ -1600,7 +1674,7 @@ inline const ImportAdderActionKind ImportAdderActionKindImportSymbol = "importSy
 
 struct ImportAdderAction {
     ImportAdderActionKind Kind;
-    SymbolID Symbol{};
+    std::shared_ptr<SymbolReference> Symbol; // omitempty
     std::optional<bool> IsValidTypeOnlyUseSite;
 
 	std::pair<bool, std::string> unmarshalField(std::string_view n, json::Decoder& d);
@@ -1764,7 +1838,7 @@ struct GetIndexInfoOfTypeParams {
 struct GetMemberInModuleExportsParams {
     SnapshotID Snapshot{};
     project::ID Project;
-    SymbolID Symbol{};
+    SymbolReference Symbol;
     std::string Name;
 
 	std::pair<bool, std::string> unmarshalField(std::string_view n, json::Decoder& d);
@@ -1787,7 +1861,7 @@ struct CheckerNodeParams {
 struct CheckerSymbolParams {
     SnapshotID Snapshot{};
     project::ID Project;
-    SymbolID Symbol{};
+    SymbolReference Symbol;
 
 	std::pair<bool, std::string> unmarshalField(std::string_view n, json::Decoder& d);
     std::string marshalJSONTo(json::Encoder& enc) const;

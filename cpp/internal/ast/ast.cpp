@@ -1140,6 +1140,33 @@ const SourceFile* getSourceFileOfNode(const Node* node) {
 	return nullptr;
 }
 
+// GetSourceFileOfSymbol — symbol.go:28. Returns the owning file of a published
+// binder symbol, or nullptr for a non-file-owned symbol, even if it borrows
+// declarations from a file. Ownership recovery walks only the first
+// declaration's AST parents.
+SourceFile* getSourceFileOfSymbol(Symbol* symbol) {
+	TSC_ASSERT(symbol != nullptr, "Expected a symbol");
+	if (symbol->flags & SymbolFlagsTransient) {
+		return nullptr;
+	}
+	if (symbol->declarations.empty()) {
+		// A class's implicit prototype has no declaration of its own.
+		TSC_ASSERT(symbol->flags & SymbolFlagsPrototype,
+		           "File-bound symbol has no declarations");
+		TSC_ASSERT(symbol->parent != nullptr &&
+		               (symbol->parent->flags & SymbolFlagsClass),
+		           "Prototype has no declaring class");
+		symbol = symbol->parent;
+		TSC_ASSERT(!(symbol->flags & SymbolFlagsTransient),
+		           "Prototype parent is not file-bound");
+		TSC_ASSERT(!symbol->declarations.empty(),
+		           "Prototype parent has no declarations");
+	}
+	SourceFile* file = getSourceFileOfNode(symbol->declarations[0]);
+	TSC_ASSERT(file != nullptr, "File-bound declaration has no source file");
+	return file;
+}
+
 const std::vector<TextPos>& SourceFile::ecmaLineMap() {
 	std::shared_lock lk(ecmaLineMapMu);
 	if (!ecmaLineMap_.empty())

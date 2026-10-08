@@ -28,6 +28,7 @@
 #include "internal/api/encoder/encoder.h"
 #include "internal/api/requestfilesystem/requestfilesystem.h"
 #include "internal/astnav/tokens.h"
+#include "internal/debug/debug.h"
 #include "internal/format/format.h"
 #include "internal/ls/autoimport/autoimport.h"
 #include "internal/ls/ls.h"
@@ -147,6 +148,187 @@ const T* unmarshalParam(std::any& parsed) {
 	return std::any_cast<std::shared_ptr<T>>(parsed).get();
 }
 
+} // namespace
+
+// sourceFileNodeID — session.go:2158. Stable for one AST and changes when an
+// equal parse-cache key is recreated, making it suitable for validating remote
+// references without another source-file identity or ownership registry.
+uint64_t sourceFileNodeID(SourceFile* sourceFile) {
+	return uint64_t(getNodeId(sourceFile->asNode()));
+}
+
+// sourceFileSymbolIndexKey — session.go:48.
+const SourceFileDataKey sourceFileSymbolIndexKey =
+    newSourceFileDataKey();
+
+// getSourceFileSymbolIndex — session.go:52.
+std::unordered_map<SymbolID, Symbol*>* getSourceFileSymbolIndex(
+    SourceFile* sourceFile) {
+	return sourceFile->GetOrComputeData<std::unordered_map<SymbolID, Symbol*>>(
+	    sourceFileSymbolIndexKey, [](SourceFile* file) {
+		    auto* index =
+		        new std::unordered_map<SymbolID, Symbol*>();
+		    index->reserve(size_t(file->SymbolCount));
+		    std::function<void(Symbol*)> addSymbol =
+		        [&](Symbol* symbol) {
+			    if (symbol == nullptr ||
+			        (symbol->flags & SymbolFlagsTransient)) {
+				    return;
+			    }
+			    debug::assert(getSourceFileOfSymbol(symbol) == file);
+			    SymbolID id = SymbolHandle(symbol);
+			    auto it = index->find(id);
+			    if (it != index->end()) {
+				    debug::assert(it->second == symbol);
+				    return;
+			    }
+			    (*index)[id] = symbol;
+			    addSymbol(symbol->parent);
+			    addSymbol(symbol->exportSymbol);
+			    for (auto* table :
+			         {&symbol->members, &symbol->exports}) {
+				    for (auto& entry : *table) {
+					    addSymbol(entry.second);
+				    }
+			    }
+		    };
+		    for (auto* node : encoder::GetNodeIndexTable(file)->Nodes) {
+			    if (node == nullptr) {
+				    continue;
+			    }
+			    addSymbol(node->symbol());
+			    addSymbol(node->localSymbol());
+			    if (auto* locals = node->locals()) {
+				    for (auto& entry : *locals) {
+					    addSymbol(entry.second);
+				    }
+			    }
+		    }
+		    for (auto& entry : file->GlobalExports) {
+			    addSymbol(entry.second);
+		    }
+		    for (auto* module : file->PatternAmbientModules) {
+			    addSymbol(module->symbol);
+		    }
+		    return index;
+	    });
+}
+
+// nodeHandleFrom — session.go:216. Index-based handle (index.kind.path).
+NodeHandle nodeHandleFrom(Node* node) {
+	SourceFile* sourceFile = getSourceFileOfNode(node);
+	encoder::NodeIndexTable* table = encoder::GetNodeIndexTable(sourceFile);
+	uint32_t idx = table->GetIndex(node);
+	return NodeHandle(std::to_string(idx) + "." +
+	                  std::to_string(static_cast<int>(node->kind)) + "." +
+	                  sourceFile->Path());
+}
+
+// symbolNodeHandleFrom — session.go:209.
+NodeHandle symbolNodeHandleFrom(Node* node, SourceFile* owner) {
+	if (owner != nullptr) {
+		debug::assert(getSourceFileOfNode(node) == owner,
+		           "File-owned symbol declaration belongs to another source file");
+	}
+	return nodeHandleFrom(node);
+}
+
+// symbolOwnerFile — session.go:203. Returns the source file that owns a
+// symbol's client identity, or nullptr when the symbol is owned by its
+// snapshot. Content-mapped outputs live in a cache that cannot yet be
+// addressed by file key, so their binder symbols remain snapshot-owned.
+SourceFile* symbolOwnerFile(Symbol* symbol) {
+	if (symbol->flags & SymbolFlagsTransient) {
+		return nullptr;
+	}
+	SourceFile* file = getSourceFileOfSymbol(symbol);
+	if (file->IsContentMapped()) {
+		return nullptr;
+	}
+	return file;
+}
+
+// newSymbolReference — session.go:256. Compact reference without registering.
+std::shared_ptr<CompactSymbolReference> newSymbolReference(
+    Symbol* symbol) {
+	if (symbol == nullptr) {
+		return nullptr;
+	}
+	auto reference = std::make_shared<CompactSymbolReference>();
+	reference->Id = SymbolHandle(symbol);
+	if (SourceFile* file = symbolOwnerFile(symbol)) {
+		reference->File = std::to_string(sourceFileNodeID(file));
+	}
+	return reference;
+}
+
+// buildSymbolResponse — session.go:247.
+std::unique_ptr<SymbolResponse> buildSymbolResponse(
+    Symbol* symbol, const SymbolReference& reference, SourceFile* owner) {
+	auto resp = std::make_unique<SymbolResponse>();
+	resp->Reference = reference;
+	resp->Name = escapeSymbolName(symbol->name);
+	resp->Flags = uint32_t(symbol->flags);
+	resp->CheckFlags = uint32_t(symbol->checkFlags);
+	resp->Parent = newSymbolReference(symbol->parent);
+	resp->ExportSymbol = newSymbolReference(symbol->exportSymbol);
+	if (owner != nullptr) {
+		// A client resolves a file-owned symbol's relationships through its
+		// own source file.
+		debug::assert(symbol->parent == nullptr ||
+		               symbolOwnerFile(symbol->parent) == owner,
+		           "File-owned symbol parent belongs to another owner");
+		debug::assert(symbol->exportSymbol == nullptr ||
+		               symbolOwnerFile(symbol->exportSymbol) == owner,
+		           "File-owned export symbol belongs to another owner");
+	}
+	if (!symbol->declarations.empty()) {
+		resp->Declarations.resize(symbol->declarations.size());
+		for (size_t i = 0; i < symbol->declarations.size(); ++i) {
+			resp->Declarations[i] =
+			    symbolNodeHandleFrom(symbol->declarations[i], owner);
+		}
+	}
+	if (symbol->valueDeclaration != nullptr) {
+		resp->ValueDeclaration =
+		    symbolNodeHandleFrom(symbol->valueDeclaration, owner);
+	}
+	return resp;
+}
+
+// newSourceFileDescriptor — session.go:2145.
+SourceFileDescriptor newSourceFileDescriptor(SourceFile* sourceFile) {
+	const SourceFileParseOptions& parseOptions = sourceFile->ParseOptions();
+	uint32_t parseOptionsKey = 0;
+	if (parseOptions.ExternalModuleIndicatorOptions.JSX == JsxEmit::ReactJSX ||
+	    parseOptions.ExternalModuleIndicatorOptions.JSX == JsxEmit::ReactJSXDev) {
+		parseOptionsKey |= 1;
+	}
+	if (parseOptions.ExternalModuleIndicatorOptions.Force) {
+		parseOptionsKey |= 2;
+	}
+	return SourceFileDescriptor{
+	    .FileName = parseOptions.FileName,
+	    .Path = parseOptions.Path,
+	    .ContentHash = encoder::SourceFileHash(sourceFile),
+	    .ParseOptionsKey = std::to_string(parseOptionsKey),
+	    .ScriptKind = sourceFile->ScriptKind,
+	    .NodeID = std::to_string(sourceFileNodeID(sourceFile)),
+	};
+}
+
+// newFileSymbolResponse — session.go:240.
+std::unique_ptr<SymbolResponse> newFileSymbolResponse(Symbol* symbol) {
+	SourceFile* file = symbolOwnerFile(symbol);
+	debug::assert(file != nullptr, "Expected a file-owned symbol");
+	SymbolReference reference;
+	reference.Id = SymbolHandle(symbol);
+	reference.Kind = SymbolOwnerKind::File;
+	reference.File =
+	    std::make_shared<SourceFileDescriptor>(newSourceFileDescriptor(file));
+	return buildSymbolResponse(symbol, reference, file);
+}
+
 // snapshotHostParseConfigHost — adapts project::SnapshotHost to
 // tsoptions::ParseConfigHost. Go's snapshotHost implements the tsconfig host
 // iface; the C++ SnapshotHost exposes an FS() instead, so parse calls go
@@ -182,8 +364,6 @@ struct snapshotHostParseConfigHost : tsoptions::ParseConfigHost {
 		        std::move(e.symlinks)};
 	}
 };
-
-} // namespace
 
 std::atomic<uint64_t> sessionIDCounter{0};
 
@@ -227,13 +407,7 @@ std::pair<project::Project*, gostd::Error> snapshotData::getProject(
 // nodeHandleFrom creates an index-based node handle (index.kind.path), building a node index table
 // for the file on-demand if needed.
 NodeHandle snapshotData::nodeHandleFrom(Node* node) {
-	SourceFile* sourceFile = getSourceFileOfNode(node);
-	const std::string& path = sourceFile->Path();
-	encoder::NodeIndexTable* table = encoder::GetNodeIndexTable(sourceFile);
-	uint32_t idx = table->GetIndex(node);
-	return NodeHandle(std::to_string(idx) + "." +
-	                  std::to_string(static_cast<int>(node->kind)) + "." +
-	                  path);
+	return ::tsc::api::nodeHandleFrom(node);
 }
 
 // getOrCreateProjectRegistry returns the registry for the given project, creating it if needed.
@@ -267,35 +441,16 @@ std::unique_ptr<SymbolResponse> snapshotData::newSymbolResponse(
 	if (symbol == nullptr) {
 		return nullptr;
 	}
-
+	if (symbolOwnerFile(symbol) != nullptr) {
+		return newFileSymbolResponse(symbol);
+	}
 	auto [id, project] = registerSymbol(symbol, canonicalProject);
-	auto resp = std::make_unique<SymbolResponse>();
-	resp->Id = id;
-	resp->Project = project;
-	resp->Name = escapeSymbolName(symbol->name);
-	resp->Flags = uint32_t(symbol->flags);
-	resp->CheckFlags = uint32_t(symbol->checkFlags);
-
-	if (!symbol->declarations.empty()) {
-		resp->Declarations.resize(symbol->declarations.size());
-		for (size_t i = 0; i < symbol->declarations.size(); ++i) {
-			resp->Declarations[i] = nodeHandleFrom(symbol->declarations[i]);
-		}
-	}
-
-	if (symbol->valueDeclaration != nullptr) {
-		resp->ValueDeclaration = nodeHandleFrom(symbol->valueDeclaration);
-	}
-
-	if (symbol->parent != nullptr) {
-		resp->Parent = SymbolHandle(symbol->parent);
-	}
-
-	if (symbol->exportSymbol != nullptr) {
-		resp->ExportSymbol = SymbolHandle(symbol->exportSymbol);
-	}
-
-	return resp;
+	SymbolReference reference;
+	reference.Id = id;
+	reference.Kind = SymbolOwnerKind::Snapshot;
+	reference.Snapshot = handle;
+	reference.Project = project;
+	return buildSymbolResponse(symbol, reference, nullptr);
 }
 
 // registerSymbol registers a symbol in the snapshot's registry and returns its handle along with
@@ -342,6 +497,10 @@ std::unique_ptr<TypeResponse> snapshotData::newTypeResponse(
 	// newTypeResponse (proto.go) reads raw fields for the common cases.
 	auto shared = api::newTypeResponse(t, registerType(projectID, t));
 	auto resp = std::make_unique<TypeResponse>(*shared);
+	resp->Symbol = newSymbolReference(t->symbol);
+	if (t->alias != nullptr) {
+		resp->AliasSymbol = newSymbolReference(t->alias->symbol);
+	}
 	if (t->objectFlags & checker::ObjectFlagsMapped) {
 		// Go: mapped.ResolveComponents(c, t) — the four getters resolve and
 		// populate the MappedType fields; register their results.
@@ -506,11 +665,14 @@ std::unique_ptr<SignatureResponse> snapshotData::newSignatureResponse(
 	}
 
 	if (!sig->parameters.empty()) {
-		resp->Parameters = symbolHandles(sig->parameters);
+		resp->Parameters.resize(sig->parameters.size());
+		for (size_t i = 0; i < sig->parameters.size(); ++i) {
+			resp->Parameters[i] = *newSymbolReference(sig->parameters[i]);
+		}
 	}
 
 	if (sig->thisParameter != nullptr) {
-		resp->ThisParameter = SymbolHandle(sig->thisParameter);
+		resp->ThisParameter = newSymbolReference(sig->thisParameter);
 	}
 
 	if (sig->target != nullptr) {
@@ -680,8 +842,41 @@ std::pair<checker::Type*, gostd::Error> checkerSetup::resolveTypeHandle(
 	return sd->resolveTypeHandle(projectID, id);
 }
 
-std::pair<Symbol*, gostd::Error> checkerSetup::resolveSymbolHandle(SymbolID id) {
-	return sd->resolveSymbolHandle(id);
+std::pair<Symbol*, gostd::Error> checkerSetup::resolveSymbolHandle(
+    const SymbolReference& ref) {
+	if (ref.Kind == SymbolOwnerKind::Snapshot) {
+		if (ref.Snapshot != snapshot || ref.File != nullptr) {
+			return {nullptr,
+			        gostd::errorf("%w: snapshot symbol reference does not match the requested checker",
+			                      {ErrClientError})};
+		}
+		return sd->resolveSymbolHandle(ref.Id);
+	}
+	if (ref.Kind == SymbolOwnerKind::File) {
+		if (ref.File == nullptr || ref.Snapshot != 0 || !ref.Project.empty()) {
+			return {nullptr,
+			        gostd::errorf("%w: invalid file symbol reference",
+			                      {ErrClientError})};
+		}
+		SourceFile* sourceFile =
+		    program->GetSourceFileByPath(ref.File->Path);
+		if (sourceFile == nullptr ||
+		    newSourceFileDescriptor(sourceFile) != *ref.File) {
+			return {nullptr,
+			        gostd::errorf("%w: source file is not part of the requested program",
+			                      {ErrClientError})};
+		}
+		Symbol* symbol = (*getSourceFileSymbolIndex(sourceFile))[ref.Id];
+		if (symbol == nullptr) {
+			return {nullptr,
+			        gostd::errorf("%w: symbol handle %d not found in source file",
+			                      {ErrClientError, ref.Id})};
+		}
+		return {symbol, nullptr};
+	}
+	return {nullptr,
+	        gostd::errorf("%w: invalid symbol reference kind %d",
+	                      {ErrClientError, int64_t(ref.Kind)})};
 }
 
 std::pair<checker::Signature*, gostd::Error>
@@ -862,7 +1057,8 @@ std::pair<checkerSetup, gostd::Error> Session::setupChecker(
 	// checker so returned symbol/type handles stay resolvable on re-query.
 	auto [c, done] = program->GetTypeCheckerForFileExclusive(
 	    core::WithCheckerLifetime(ctx, core::CheckerLifetimeAPI), nullptr);
-	return {checkerSetup{sd, program, c, done, projectHandle}, nullptr};
+	return {checkerSetup{sd, snapshot, program, c, done, projectHandle},
+	        nullptr};
 }
 
 // setupLanguageService creates a LanguageService for the given snapshot/project.
@@ -962,6 +1158,12 @@ std::pair<ResultValue, gostd::Error> Session::handleRequest(
 	}
 	if (method == MethodReleaseSourceFile) {
 		return handleReleaseSourceFile(unmarshalParam<ReleaseSourceFileParams>(parsed));
+	}
+	if (method == MethodRetainSourceFile) {
+		return handleRetainSourceFile(unmarshalParam<RetainSourceFileParams>(parsed));
+	}
+	if (method == MethodGetCachedSourceFile) {
+		return handleGetCachedSourceFile(unmarshalParam<GetCachedSourceFileParams>(parsed));
 	}
 	if (method == MethodInitialize) {
 		return call([&] { return handleInitialize(ctx); });
@@ -1482,6 +1684,8 @@ static const std::unordered_map<std::string_view, unmarshallerFn> unmarshalers =
     {MethodBatchRequests, &unmarshallerFor<BatchRequestsParams>},
     {MethodRelease, &unmarshallerFor<ReleaseParams>},
     {MethodReleaseSourceFile, &unmarshallerFor<ReleaseSourceFileParams>},
+    {MethodRetainSourceFile, &unmarshallerFor<RetainSourceFileParams>},
+    {MethodGetCachedSourceFile, &unmarshallerFor<GetCachedSourceFileParams>},
     {MethodInitialize, &noParams},
     {MethodCreateSnapshot, &unmarshallerFor<CreateSnapshotParams>},
     {MethodUpdateSnapshot, &unmarshallerFor<UpdateSnapshotParams>},
@@ -1899,6 +2103,7 @@ BatchResponse Session::handleBatchRequest(gostd::Context ctx,
 bool isSourceFileResponseMethod(Method method) {
 	return method == MethodCreateSourceFile ||
 	       method == MethodCreateSourceFileFromFile || method == MethodGetSourceFile ||
+	       method == MethodGetCachedSourceFile ||
 	       method == MethodGetConfigSourceFile || method == MethodTypeToTypeNode ||
 	       method == MethodSignatureToSignatureDeclaration;
 }
@@ -2400,6 +2605,7 @@ void Session::registerSnapshot(project::Snapshot* snapshot,
 		it->second->refCount++;
 	} else {
 		auto sd = std::make_unique<snapshotData>();
+		sd->handle = handle;
 		sd->snapshot = snapshot;
 		sd->fileSystem = fileSystem;
 		sd->refCount = 1;
@@ -3322,12 +3528,9 @@ std::pair<ResultValue, gostd::Error> Session::encodeLeasedSourceFile(
 		return {ResultValue{},
 		        gostd::errorf("failed to encode source file: %w", {err})};
 	}
-	SourceFileLeaseID id = ++nextSourceFileLeaseID;
+	encoder::SetSourceFileID(data, sourceFileNodeID(lease->SourceFile_()));
+	SourceFileLeaseID id = registerSourceFileLease(lease);
 	encoder::SetSourceFileLease(data, uint64_t(id));
-	{
-		std::lock_guard lock(sourceFileLeasesMu);
-		sourceFileLeases[id] = lease;
-	}
 	if (useBinaryResponses) {
 		return {ResultValue{true, std::string(reinterpret_cast<const char*>(
 		                              data.data()),
@@ -3366,6 +3569,178 @@ std::pair<ResultValue, gostd::Error> Session::handleReleaseSourceFile(
 	}
 	lease->Release();
 	return marshalResult(true);
+}
+
+// handleRetainSourceFile — session.go:2144.
+std::pair<ResultValue, gostd::Error> Session::handleRetainSourceFile(
+    const RetainSourceFileParams* params) {
+	auto [lease, err] = acquireCachedSourceFile(params->File);
+	if (err) {
+		return {ResultValue{}, err};
+	}
+	RetainSourceFileResponse resp;
+	resp.Lease = registerSourceFileLease(lease);
+	return marshalResult(resp);
+}
+
+// handleGetCachedSourceFile — session.go:2155. @gen-proto-result: SourceFileResponse
+std::pair<ResultValue, gostd::Error> Session::handleGetCachedSourceFile(
+    const GetCachedSourceFileParams* params) {
+	auto [leaseR, err] = acquireCachedSourceFile(params->File);
+	if (err) {
+		return {ResultValue{}, err};
+	}
+	auto lease = leaseR;
+	deferGuard _release{[lease] { lease->Release(); }};
+	return encodeSourceFileResponse(lease->SourceFile_());
+}
+
+// acquireCachedSourceFile — session.go:2188. Holds a reference to the exact
+// ordinary cached AST identified by a descriptor. It never parses; the caller
+// must release the returned lease.
+std::pair<std::shared_ptr<project::SourceFileLease>, gostd::Error>
+Session::acquireCachedSourceFile(const SourceFileDescriptor& descriptor) {
+	auto [key, err] = descriptor.parseCacheKey();
+	if (err) {
+		return {nullptr,
+		        gostd::errorf("%w: invalid source file descriptor: %w",
+		                      {ErrClientError, err})};
+	}
+	auto* lease = snapshotHost->AcquireExistingSourceFile(key);
+	if (lease == nullptr) {
+		return {nullptr,
+		        gostd::errorf("%w: source file is not available",
+		                      {ErrClientError})};
+	}
+	// The parse-cache key addresses a live ordinary file, but an equal key can identify a new
+	// AST after the original entry is evicted. The node ID verifies that this is the exact AST
+	// observed by the client; it is not used to address or retain the file.
+	if (!(newSourceFileDescriptor(lease->SourceFile_()) == descriptor)) {
+		lease->Release();
+		return {nullptr,
+		        gostd::errorf("%w: source file descriptor no longer identifies the cached source file",
+		                      {ErrClientError})};
+	}
+	return {std::shared_ptr<project::SourceFileLease>(
+	            lease, [](project::SourceFileLease*) {}),
+	        nullptr};
+}
+
+// registerSourceFileLease — session.go:2207.
+SourceFileLeaseID Session::registerSourceFileLease(
+    std::shared_ptr<project::SourceFileLease> lease) {
+	SourceFileLeaseID id =
+	    SourceFileLeaseID(nextSourceFileLeaseID.fetch_add(1) + 1);
+	std::lock_guard lock(sourceFileLeasesMu);
+	sourceFileLeases[id] = std::move(lease);
+	return id;
+}
+
+// SourceFileDescriptor::parseCacheKey — session.go:2241.
+std::pair<project::ParseCacheKey, gostd::Error>
+SourceFileDescriptor::parseCacheKey() const {
+	if (ContentHash.size() != 32) {
+		return {project::ParseCacheKey{},
+		        gostd::newError(
+		            "content hash must contain 32 hexadecimal digits")};
+	}
+	auto parseHex = [](const std::string& v, uint64_t& out) -> gostd::Error {
+		try {
+			out = std::stoull(v, nullptr, 16);
+			return nullptr;
+		} catch (...) {
+			return gostd::errorf("invalid content hash: %s", {v});
+		}
+	};
+	uint64_t hi = 0, lo = 0;
+	if (auto e = parseHex(ContentHash.substr(0, 16), hi)) {
+		return {project::ParseCacheKey{}, e};
+	}
+	if (auto e = parseHex(ContentHash.substr(16), lo)) {
+		return {project::ParseCacheKey{}, e};
+	}
+	unsigned long parseOptionsKey = 0;
+	try {
+		parseOptionsKey = std::stoul(ParseOptionsKey);
+	} catch (...) {
+	}
+	if (parseOptionsKey & ~3u) {
+		return {project::ParseCacheKey{},
+		        gostd::errorf("invalid parse options key %s",
+		                      {ParseOptionsKey})};
+	}
+	if (!isValidCreateSourceFileScriptKind(ScriptKind)) {
+		return {project::ParseCacheKey{},
+		        gostd::errorf("invalid script kind %d",
+		                      {static_cast<int>(ScriptKind)})};
+	}
+	SourceFileParseOptions options;
+	options.FileName = FileName;
+	options.Path = Path;
+	options.ExternalModuleIndicatorOptions.JSX =
+	    (parseOptionsKey & 1) ? JsxEmit::ReactJSX : JsxEmit::None;
+	options.ExternalModuleIndicatorOptions.Force = (parseOptionsKey & 2) != 0;
+	return {project::newParseCacheKey(options, xxh3::Uint128{hi, lo},
+	                                ScriptKind),
+	        nullptr};
+}
+
+// resolveSymbolReference — session.go:404. Resolves a symbol without a semantic
+// context. A file reference holds the exact cached AST until the returned release
+// function is called; a snapshot reference also returns the snapshot and
+// canonical project that own the symbol.
+std::tuple<Symbol*, snapshotData*, project::ID, std::function<void()>,
+           gostd::Error>
+Session::resolveSymbolReference(const SymbolReference& ref) {
+	auto noRelease = []() {};
+	switch (ref.Kind) {
+	case SymbolOwnerKind::File:
+		if (ref.File == nullptr || ref.Snapshot != 0 ||
+		    !ref.Project.empty()) {
+			return {nullptr, nullptr, project::ID{}, noRelease,
+			        gostd::errorf("%w: invalid file symbol reference",
+			                      {ErrClientError})};
+		}
+		{
+			auto [leaseR, err] = acquireCachedSourceFile(*ref.File);
+			if (err) {
+				return {nullptr, nullptr, project::ID{}, noRelease, err};
+			}
+			auto lease = leaseR;
+			auto* index = getSourceFileSymbolIndex(lease->SourceFile_());
+			auto* symbol = (*index)[ref.Id];
+			if (symbol == nullptr) {
+				lease->Release();
+				return {nullptr, nullptr, project::ID{}, noRelease,
+				        gostd::errorf("%w: symbol %d not found in source file",
+				                      {ErrClientError, ref.Id})};
+			}
+			return {symbol, nullptr, project::ID{},
+			        [lease]() { lease->Release(); }, nullptr};
+		}
+	case SymbolOwnerKind::Snapshot:
+		if (ref.File != nullptr || ref.Snapshot == 0 ||
+		    ref.Project.empty()) {
+			return {nullptr, nullptr, project::ID{}, noRelease,
+			        gostd::errorf("%w: invalid snapshot symbol reference",
+			                      {ErrClientError})};
+		}
+		{
+			auto [sd, err] = getSnapshotData(ref.Snapshot);
+			if (err) {
+				return {nullptr, nullptr, project::ID{}, noRelease, err};
+			}
+			auto [symbol, err2] = sd->resolveSymbolHandle(ref.Id);
+			if (err2) {
+				return {nullptr, nullptr, project::ID{}, noRelease, err2};
+			}
+			return {symbol, sd, ref.Project, noRelease, nullptr};
+		}
+	default:
+		return {nullptr, nullptr, project::ID{}, noRelease,
+		        gostd::errorf("%w: invalid symbol reference kind %d",
+		                      {ErrClientError, static_cast<int>(ref.Kind)})};
+	}
 }
 
 // releaseSourceFileLeases — session.go:1914.
@@ -3563,6 +3938,7 @@ std::pair<ResultValue, gostd::Error> Session::encodeSourceFileResponse(
 		return {ResultValue{},
 		        gostd::errorf("failed to encode source file: %w", {err})};
 	}
+	encoder::SetSourceFileID(data, sourceFileNodeID(sourceFile));
 
 	if (useBinaryResponses) {
 		return {ResultValue{true, std::string(reinterpret_cast<const char*>(
@@ -4755,21 +5131,21 @@ std::pair<std::unique_ptr<SymbolResponse>, gostd::Error>
 Session::resolveSymbolPropertyOfSymbol(
     const GetSymbolPropertyParams* params,
     const std::function<Symbol*(Symbol*)>& getter) {
-	auto [sd, err] = getSnapshotData(params->Snapshot);
+	auto [symbol, sd, projectID, release, err] =
+	    resolveSymbolReference(params->Symbol);
 	if (err) {
 		return {nullptr, err};
 	}
-
-	auto [symbol, err2] = sd->resolveSymbolHandle(params->Symbol);
-	if (err2) {
-		return {nullptr, err2};
-	}
+	deferGuard _release{release};
 
 	auto* result = getter(symbol);
 	if (result == nullptr) {
 		return {nullptr, nullptr};
 	}
-	return {sd->newSymbolResponse(result, params->Project), nullptr};
+	if (sd == nullptr) {
+		return {newFileSymbolResponse(result), nullptr};
+	}
+	return {sd->newSymbolResponse(result, projectID), nullptr};
 }
 
 // resolveSymbolTablePropertyOfSymbol resolves a symbol property of type `SymbolTable` and returns an array of symbol responses.
@@ -4779,15 +5155,12 @@ std::pair<std::vector<std::unique_ptr<SymbolResponse>>, gostd::Error>
 Session::resolveSymbolTablePropertyOfSymbol(
     gostd::Context ctx, const GetSymbolPropertyParams* params,
     const std::function<const SymbolTable*(Symbol*)>& getter) {
-	auto [sd, err] = getSnapshotData(params->Snapshot);
+	auto [symbol, sd, projectID, release, err] =
+	    resolveSymbolReference(params->Symbol);
 	if (err) {
 		return {std::vector<std::unique_ptr<SymbolResponse>>{}, err};
 	}
-
-	auto [symbol, err2] = sd->resolveSymbolHandle(params->Symbol);
-	if (err2) {
-		return {std::vector<std::unique_ptr<SymbolResponse>>{}, err2};
-	}
+	deferGuard _release{release};
 
 	auto* symbolTable = getter(symbol);
 	if (symbolTable == nullptr || symbolTable->empty()) {
@@ -4796,24 +5169,64 @@ Session::resolveSymbolTablePropertyOfSymbol(
 	if (symbolTable->size() == 1) {
 		for (auto& entry : *symbolTable) {
 			std::vector<std::unique_ptr<SymbolResponse>> single;
-			single.push_back(
-			    sd->newSymbolResponse(entry.second, params->Project));
+			if (sd == nullptr) {
+				single.push_back(newFileSymbolResponse(entry.second));
+			} else {
+				single.push_back(
+				    sd->newSymbolResponse(entry.second, projectID));
+			}
 			return {std::move(single), nullptr};
 		}
 	}
-
-	// More than one symbol, need a checker to sort
-	auto [setup, err3] = setupChecker(ctx, params->Snapshot, params->Project);
-	if (err3) {
-		return {std::vector<std::unique_ptr<SymbolResponse>>{}, err3};
-	}
-	deferGuard _done{setup.done};
 
 	std::vector<Symbol*> symbols;
 	symbols.reserve(symbolTable->size());
 	for (auto& entry : *symbolTable) {
 		symbols.push_back(entry.second);
 	}
+	if (sd == nullptr) {
+		// Binder tables of a file-owned symbol only contain symbols from the same file, so they
+		// can be ordered by declaration position without a checker.
+		auto* file = getSourceFileOfSymbol(symbol);
+		std::sort(symbols.begin(), symbols.end(),
+		          [file](Symbol* left, Symbol* right) {
+			          debug::assert(getSourceFileOfSymbol(left) == file);
+			          debug::assert(getSourceFileOfSymbol(right) == file);
+			          bool leftHasDeclaration = !left->declarations.empty();
+			          bool rightHasDeclaration =
+			              !right->declarations.empty();
+			          if (leftHasDeclaration != rightHasDeclaration) {
+				          return leftHasDeclaration;
+			          }
+			          if (leftHasDeclaration) {
+				          if (left->declarations[0]->pos() !=
+				              right->declarations[0]->pos()) {
+					          return left->declarations[0]->pos() <
+					                 right->declarations[0]->pos();
+				          }
+			          }
+			          if (left->name != right->name) {
+				          return left->name < right->name;
+			          }
+			          return getSymbolId(left) < getSymbolId(right);
+		          });
+		std::vector<std::unique_ptr<SymbolResponse>> results(
+		    symbols.size());
+		for (size_t i = 0; i < symbols.size(); i++) {
+			results[i] = newFileSymbolResponse(symbols[i]);
+		}
+		return {std::move(results), nullptr};
+	}
+
+	// Tables of snapshot-owned symbols may contain symbols from several files, so they use the
+	// checker's ordering.
+	auto [setup, err3] =
+	    setupChecker(ctx, params->Symbol.Snapshot, params->Symbol.Project);
+	if (err3) {
+		return {std::vector<std::unique_ptr<SymbolResponse>>{}, err3};
+	}
+	deferGuard _done{setup.done};
+
 	auto* checker = setup.checker;
 	std::sort(symbols.begin(), symbols.end(),
 	          [checker](Symbol* a, Symbol* b) {
@@ -5703,19 +6116,19 @@ Session::handleGetWellKnownSymbols(gostd::Context ctx,
 	}
 	deferGuard _done{setup.done};
 
+	auto* unknownSymbol = setup.checker->GetUnknownSymbol();
+	auto* undefinedSymbol = setup.checker->GetUndefinedSymbol();
+	auto* argumentsSymbol = setup.checker->GetArgumentsSymbol();
+	debug::assert(unknownSymbol->flags & SymbolFlagsTransient);
+	debug::assert(undefinedSymbol->flags & SymbolFlagsTransient);
+	debug::assert(argumentsSymbol->flags & SymbolFlagsTransient);
 	auto resp = std::make_unique<WellKnownSymbolsResponse>();
 	resp->Unknown =
-	    setup.sd->registerSymbol(setup.checker->GetUnknownSymbol(),
-	                             setup.projectID)
-	        .first;
+	    setup.sd->registerSymbol(unknownSymbol, setup.projectID).first;
 	resp->Undefined =
-	    setup.sd->registerSymbol(setup.checker->GetUndefinedSymbol(),
-	                             setup.projectID)
-	        .first;
+	    setup.sd->registerSymbol(undefinedSymbol, setup.projectID).first;
 	resp->Arguments =
-	    setup.sd->registerSymbol(setup.checker->GetArgumentsSymbol(),
-	                             setup.projectID)
-	        .first;
+	    setup.sd->registerSymbol(argumentsSymbol, setup.projectID).first;
 	return {std::move(resp), nullptr};
 }
 
@@ -6637,13 +7050,18 @@ Session::handleGetImportAdderEdits(
 	for (size_t i = 0; i < params->Actions.size(); i++) {
 		const auto& action = params->Actions[i];
 		if (action.Kind == ImportAdderActionKindImportSymbol) {
-			if (action.Symbol == 0) {
+			if (action.Symbol == nullptr) {
 				return {std::vector<std::unique_ptr<TextEdit>>{},
 				        gostd::errorf(
 				            "%w: import adder action %d missing symbol",
 				            {ErrClientError, i})};
 			}
-			auto [symbol, e] = sd->resolveSymbolHandle(action.Symbol);
+			auto [symbol, e] = checkerSetup{
+			    .sd = sd,
+			    .snapshot = params->Snapshot,
+			    .program = program,
+			    .projectID = params->Project,
+			}.resolveSymbolHandle(*action.Symbol);
 			if (e) {
 				return {std::vector<std::unique_ptr<TextEdit>>{}, e};
 			}

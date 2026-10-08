@@ -82,6 +82,7 @@ struct ResultValue {
 // Multiple clients may hold references to the same snapshot via ref counting;
 // the registries are cleaned up when refCount reaches zero.
 struct snapshotData {
+	SnapshotID handle{};
 	project::Snapshot* snapshot = nullptr;
 	std::shared_ptr<vfs::FS> fileSystem;
 	int refCount = 0;
@@ -187,6 +188,7 @@ struct batchResponsePage {
 // checkerSetup holds the common context needed by handlers that require a type checker.
 struct checkerSetup {
 	snapshotData* sd = nullptr;
+	SnapshotID snapshot{};
 	compiler::SimpleProgram* program = nullptr;
 	checker::Checker* checker = nullptr;
 	std::function<void()> done;
@@ -198,7 +200,8 @@ struct checkerSetup {
 	std::unique_ptr<IndexInfoResponse> newIndexInfoResponse(
 	    checker::IndexInfo* info);
 	std::pair<checker::Type*, gostd::Error> resolveTypeHandle(TypeID id);
-	std::pair<Symbol*, gostd::Error> resolveSymbolHandle(SymbolID id);
+	std::pair<Symbol*, gostd::Error> resolveSymbolHandle(
+	    const SymbolReference& ref);
 	std::pair<checker::Signature*, gostd::Error> resolveSignatureHandle(
 	    SignatureID id);
 	// resolveLocation resolves an optional location, given either as a node handle or as a
@@ -438,6 +441,23 @@ public:
 	    ScriptKind scriptKind);
 	std::pair<ResultValue, gostd::Error> encodeLeasedSourceFile(
 	    std::shared_ptr<project::SourceFileLease> lease);
+	std::pair<ResultValue, gostd::Error> handleRetainSourceFile(
+	    const RetainSourceFileParams* params);
+	std::pair<ResultValue, gostd::Error> handleGetCachedSourceFile(
+	    const GetCachedSourceFileParams* params);
+	// acquireCachedSourceFile holds a reference to the exact ordinary cached
+	// AST identified by a descriptor. It never parses; the caller must
+	// release the returned lease.
+	std::pair<std::shared_ptr<project::SourceFileLease>, gostd::Error>
+	acquireCachedSourceFile(const SourceFileDescriptor& descriptor);
+	SourceFileLeaseID registerSourceFileLease(
+	    std::shared_ptr<project::SourceFileLease> lease);
+	// resolveSymbolReference resolves a symbol without a semantic context.
+	// A file reference holds the exact cached AST until release() runs; a
+	// snapshot reference also returns the snapshot and canonical project.
+	std::tuple<Symbol*, snapshotData*, project::ID, std::function<void()>,
+	           gostd::Error>
+	resolveSymbolReference(const SymbolReference& ref);
 	std::pair<ResultValue, gostd::Error> handleReleaseSourceFile(
 	    const ReleaseSourceFileParams* params);
 	void releaseSourceFileLeases();
@@ -920,6 +940,19 @@ std::shared_ptr<Session> NewStandaloneSession(project::SessionInit* init,
 SnapshotID snapshotHandle(project::Snapshot* snapshot);
 bool isSourceFileResponseMethod(Method method);
 bool isValidCreateSourceFileScriptKind(ScriptKind scriptKind);
+
+// Internal helpers (session.go package-level funcs) — shared with unit tests.
+uint64_t sourceFileNodeID(SourceFile* sourceFile);
+std::unordered_map<SymbolID, Symbol*>* getSourceFileSymbolIndex(
+    SourceFile* sourceFile);
+NodeHandle nodeHandleFrom(Node* node);
+NodeHandle symbolNodeHandleFrom(Node* node, SourceFile* owner);
+SourceFile* symbolOwnerFile(Symbol* symbol);
+std::shared_ptr<CompactSymbolReference> newSymbolReference(Symbol* symbol);
+std::unique_ptr<SymbolResponse> buildSymbolResponse(
+    Symbol* symbol, const SymbolReference& reference);
+SourceFileDescriptor newSourceFileDescriptor(SourceFile* sourceFile);
+std::unique_ptr<SymbolResponse> newFileSymbolResponse(Symbol* symbol);
 std::pair<std::unique_ptr<TranspileOutputResponse>, gostd::Error>
 transpileOutput(gostd::Context ctx, const std::string& input,
                 const TranspileOptions& options, bool declaration);

@@ -97,7 +97,7 @@ void TestCompletionSymbolTypeIsResolvable(T* t) {
 		    t->Context(), new GetTypeOfSymbolParams{
 		                      .Snapshot = snapshotResp->Snapshot,
 		                      .Project = proj->Id,
-		                      .Symbol = entry->Symbol->Id});
+		                      .Symbol = entry->Symbol->Reference});
 		assert::NilError(t, err4);
 		assert::Assert(t, typeResp != nullptr,
 		               "type of completion symbol " + entry->Name +

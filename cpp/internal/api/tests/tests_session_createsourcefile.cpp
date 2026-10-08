@@ -9,6 +9,7 @@
 #include "internal/core/types.h"
 #include "internal/gostd/gostd.h"
 #include "internal/gostd/testing.h"
+#include "internal/json/json.h"
 #include "internal/lsp/lsproto/lsproto.h"
 #include "internal/project/project.h"
 #include "internal/testutil/projecttestutil/projecttestutil.h"
@@ -164,6 +165,119 @@ void TestCreateSourceFile(T* t) {
 		rp.Lease = secondLease;
 		auto [_r3, err5] = session->handleReleaseSourceFile(&rp);
 		assert::NilError(t, err5);
+	});
+
+	t->Run("retain by descriptor", [session](T* t) {
+		t->Parallel();
+
+		const std::string fileName = "/src/retained.ts";
+		const std::string sourceText = "export const retained = true;";
+		auto [created, err] = session->createSourceFile(
+		    fileName, sourceText, CreateSourceFileOptions{});
+		assert::NilError(t, err);
+		auto* sourceFile = created->SourceFile_();
+		auto descriptor = newSourceFileDescriptor(sourceFile);
+
+		RetainSourceFileParams params;
+		params.File = descriptor;
+		auto [result, rerr] = session->handleRetainSourceFile(&params);
+		assert::NilError(t, rerr);
+		std::unordered_map<std::string, int64_t> retainResp;
+		assert::Assert(
+		    t, json::unmarshal(std::string_view(result.data), &retainResp)
+		           .empty());
+		SourceFileLeaseID lease{uint64_t(retainResp["lease"])};
+		assert::Assert(t, lease != SourceFileLeaseID{0});
+		{
+			std::lock_guard<std::mutex> lk(session->sourceFileLeasesMu);
+			auto* retainedSourceFile =
+			    session->sourceFileLeases[lease]->SourceFile_();
+			assert::Assert(t, retainedSourceFile == sourceFile);
+		}
+
+		created->Release();
+		auto [key, kerr] = descriptor.parseCacheKey();
+		assert::NilError(t, kerr);
+		auto* acquired = session->snapshotHost->AcquireExistingSourceFile(key);
+		assert::Assert(t, acquired != nullptr);
+		acquired->Release();
+
+		ReleaseSourceFileParams rp;
+		rp.Lease = lease;
+		auto [_r, relerr] = session->handleReleaseSourceFile(&rp);
+		assert::NilError(t, relerr);
+		assert::Assert(
+		    t, session->snapshotHost->AcquireExistingSourceFile(key) ==
+		           nullptr);
+	});
+
+	t->Run("retain cache miss", [session](T* t) {
+		t->Parallel();
+
+		SourceFileDescriptor descriptor{
+		    .FileName = "/src/missing.ts",
+		    .Path = "/src/missing.ts",
+		    .ContentHash = "00000000000000000000000000000000",
+		    .ParseOptionsKey = "0",
+		    .ScriptKind = ScriptKind::TS,
+		    .NodeID = "1",
+		};
+		RetainSourceFileParams params;
+		params.File = descriptor;
+		auto [_r, err] = session->handleRetainSourceFile(&params);
+		assert::Assert(t, err != nullptr &&
+		                      err->Error().find(
+		                          "source file is not available") !=
+		                          std::string::npos);
+	});
+
+	t->Run("rejects stale node ID", [session](T* t) {
+		t->Parallel();
+
+		auto [created, err] = session->createSourceFile(
+		    "/src/stale.ts", "export {};", CreateSourceFileOptions{});
+		assert::NilError(t, err);
+		auto createdPtr = created;
+		t->Cleanup([createdPtr] { createdPtr->Release(); });
+		auto descriptor = newSourceFileDescriptor(created->SourceFile_());
+		descriptor.NodeID = "0";
+
+		RetainSourceFileParams params;
+		params.File = descriptor;
+		auto [_r, rerr] = session->handleRetainSourceFile(&params);
+		assert::Assert(t, rerr != nullptr &&
+		                      rerr->Error().find("cached source file") !=
+		                          std::string::npos);
+	});
+
+	t->Run("rejects an evicted file after equal-key recreation",
+	       [session](T* t) {
+		t->Parallel();
+
+		const std::string fileName = "/src/recreated.ts";
+		const std::string sourceText = "export {};";
+		auto [first, err] = session->createSourceFile(
+		    fileName, sourceText, CreateSourceFileOptions{});
+		assert::NilError(t, err);
+		auto staleDescriptor =
+		    newSourceFileDescriptor(first->SourceFile_());
+		first->Release();
+
+		auto [second, err2] = session->createSourceFile(
+		    fileName, sourceText, CreateSourceFileOptions{});
+		assert::NilError(t, err2);
+		auto secondPtr = second;
+		t->Cleanup([secondPtr] { secondPtr->Release(); });
+		assert::Assert(
+		    t, newSourceFileDescriptor(second->SourceFile_()).NodeID !=
+		           staleDescriptor.NodeID);
+
+		RetainSourceFileParams params;
+		params.File = staleDescriptor;
+		auto [_r, rerr] = session->handleRetainSourceFile(&params);
+		assert::Assert(t, rerr != nullptr &&
+		                      rerr->Error().find("cached source file") !=
+		                          std::string::npos);
 	});
 
 	t->Run("unknown extension defaults to TypeScript", [session](T* t) {

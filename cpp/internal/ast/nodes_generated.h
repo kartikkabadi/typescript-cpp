@@ -1211,6 +1211,10 @@ struct SourceFile : Node {
 
 	bool IsBound() const { return isBound.load(); }
 
+	// IsContentMapped — ast.go:2573. Reports whether this file was produced
+	// by a content mapper.
+	bool IsContentMapped() const { return contentMapperInfo != nullptr; }
+
 	void BindOnce(const std::function<void()>& bind) {
 		bindOnce.run([&] {
 			bind();

@@ -789,6 +789,7 @@ inline bool rangeIsSynthesized(const TextRange& loc) {
 	return positionIsSynthesized(loc.pos()) || positionIsSynthesized(loc.end());
 }
 const SourceFile* getSourceFileOfNode(const Node* node);
+SourceFile* getSourceFileOfSymbol(Symbol* symbol);
 inline SourceFile* getSourceFileOfNode(Node* node) {
 	return const_cast<SourceFile*>(
 		getSourceFileOfNode(static_cast<const Node*>(node)));

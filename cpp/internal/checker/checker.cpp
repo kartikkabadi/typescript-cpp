@@ -2721,7 +2721,7 @@ void Checker::addDeclarationToLateBoundSymbol(Symbol* symbol, Node* member, Symb
 			symbol->declarations.end());
 		symbol->declarations.push_back(member);
 		SymbolFlags oldFlags = symbol->flags;
-		symbol->flags = SymbolFlagsNone;
+		symbol->flags = SymbolFlagsTransient;
 		for (Node* d : symbol->declarations) {
 			symbol->flags |= d->symbol()->flags;
 		}
