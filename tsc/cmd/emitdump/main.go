@@ -36,11 +36,10 @@ func main() {
 		os.Exit(2)
 	}
 	fs := bundled.WrapFS(osvfs.FS())
-	host := compiler.NewCompilerHost(
-		tspath.NormalizePath(cwd), fs, bundled.LibPath(), nil, nil, nil)
+	host := compiler.NewCompilerHost(fs, bundled.LibPath(), nil, nil, nil)
 
 	// `tsc <args>` — the same command line the real CLI sees (emit enabled).
-	parsed := tsoptions.ParseCommandLine(os.Args[1:], host)
+	parsed := tsoptions.ParseCommandLine(os.Args[1:], fs, tspath.RootedDirectoryPathFromAbsolute(cwd))
 	if len(parsed.Errors) > 0 {
 		for _, e := range parsed.Errors {
 			fmt.Printf("C %d\n", e.Code())
@@ -69,8 +68,8 @@ func main() {
 	}
 	var written []writtenFile
 	emitResult := program.Emit(ctx, compiler.EmitOptions{
-		WriteFile: func(fileName string, text string, data *compiler.WriteFileData) error {
-			written = append(written, writtenFile{fileName, text})
+		WriteFile: func(fileName tspath.RootedFilePath, text string, data *compiler.WriteFileData) error {
+			written = append(written, writtenFile{string(fileName), text})
 			return nil
 		},
 	})
@@ -94,8 +93,8 @@ func main() {
 	names := make([]string, 0, len(byFile))
 	files := map[string]*ast.SourceFile{}
 	for f := range byFile {
-		names = append(names, f.FileName())
-		files[f.FileName()] = f
+		names = append(names, string(f.FileName()))
+		files[string(f.FileName())] = f
 	}
 	sort.Strings(names)
 	for _, name := range names {

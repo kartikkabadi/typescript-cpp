@@ -13,6 +13,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/internal/core"
 	"github.com/microsoft/TypeScript/tsc/internal/parser"
 	"github.com/microsoft/TypeScript/tsc/internal/tspath"
+	"github.com/microsoft/TypeScript/tsc/internal/vfs/osvfs"
 )
 
 func dumpNode(n *ast.Node, out *strings.Builder) {
@@ -33,9 +34,10 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
-	scriptKind := core.EnsureScriptKindFromFileName(os.Args[1])
+	fileName := tspath.ToRootedFilePath(os.Args[1], tspath.RootedDirectoryPathFromAbsolute("/"))
+	scriptKind := core.EnsureScriptKindFromFileName(fileName)
 	file := parser.ParseSourceFile(
-		ast.SourceFileParseOptions{FileName: os.Args[1], Path: tspath.Path(os.Args[1])},
+		ast.SourceFileParseOptions{FileName: fileName, PathKey: osvfs.FS().CaseSensitivity().PathKey(tspath.RootedPath(fileName))},
 		string(src), scriptKind)
 	var out strings.Builder
 	dumpNode(file.AsNode(), &out)
