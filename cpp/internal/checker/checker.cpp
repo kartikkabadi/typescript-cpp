@@ -6643,8 +6643,13 @@ SourceFile* Checker::getExternalModuleFileFromDeclaration(Node* declaration) {
 		importAttributesType =
 		    getTypeFromImportAttributes(getImportAttributes(declaration));
 	}
+	// This is only used by emit and type printing, after checking has
+	// already reported any resolution errors for this specifier. Resolve
+	// with ignoreErrors so that these queries don't add new diagnostics
+	// (e.g. an implicit-any-module suggestion) as a side effect.
 	Symbol* moduleSymbol = resolveExternalModuleNameWorker(
-	    specifier, specifier /*moduleNotFoundError*/, nullptr, false, false,
+	    specifier, specifier, nullptr /*moduleNotFoundError*/,
+	    true /*ignoreErrors*/, false /*isForAugmentation*/,
 	    importAttributesType);  // TODO: GH#18217
 	if (moduleSymbol == nullptr) {
 		return nullptr;

@@ -606,12 +606,12 @@ CompilationResult* compileFilesWithHost(compiler::CompilerHost* host,
 	for (auto* d : preProgram->GetSemanticDiagnostics(nullptr))
 		preErrors.push_back(d);
 	for (auto* d : preProgram->GetGlobalDiagnostics()) preErrors.push_back(d);
-	if (preProgram->Options()->GetEmitDeclarations()) {
-		for (auto* d : preProgram->GetDeclarationDiagnostics(nullptr))
-			preErrors.push_back(d);
-	}
 	if (harnessOptions->CaptureSuggestions) {
 		for (auto* d : preProgram->GetSuggestionDiagnostics(nullptr))
+			preErrors.push_back(d);
+	}
+	if (preProgram->Options()->GetEmitDeclarations()) {
+		for (auto* d : preProgram->GetDeclarationDiagnostics(nullptr))
 			preErrors.push_back(d);
 	}
 	preErrors = compiler::sortAndDeduplicateDiagnostics(std::move(preErrors));
