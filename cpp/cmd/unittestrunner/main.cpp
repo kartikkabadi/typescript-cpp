@@ -174,7 +174,13 @@ int main(int argc, char** argv) {
 		}
 	}
 
-	std::regex re(runFilter.empty() ? ".*" : runFilter);
+	std::regex re;
+	try {
+		re = std::regex(runFilter.empty() ? ".*" : runFilter);
+	} catch (const std::regex_error& e) {
+		fprintf(stderr, "invalid -run regex: %s\n", e.what());
+		return 2;
+	}
 	int total = 0, passed = 0;
 	for (auto& tc : tsc::testutil::unittests::unitTestRegistry()) {
 		std::string name = tc.name;

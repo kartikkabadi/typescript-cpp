@@ -26,8 +26,9 @@ std::vector<UnitTestCase>& unitTestRegistry();
 }  // namespace tsc::testutil::unittests
 
 // Two-level indirection so __LINE__ expands before token pasting.
-#define _UT_CAT2(a, b) a##b
-#define _UT_CAT(a, b) _UT_CAT2(a, b)
+// (No leading underscores: reserved to the implementation at file scope.)
+#define TSCPP_UT_CAT2(a, b) a##b
+#define TSCPP_UT_CAT(a, b) TSCPP_UT_CAT2(a, b)
 #define REGISTER_UNIT_TEST(name, fn)                                                     \
-	static bool _UT_CAT(_utreg_, __LINE__) =                                           \
+	static bool TSCPP_UT_CAT(tscpp_utreg_, __LINE__) =                                   \
 	    (tsc::testutil::unittests::unitTestRegistry().push_back({name, fn}), true)
