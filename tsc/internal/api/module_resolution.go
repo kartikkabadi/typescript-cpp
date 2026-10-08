@@ -198,7 +198,8 @@ func staticModuleResolutionToResolvedModule(staticResolution *StaticModuleResolu
 		return nil
 	}
 	result := &module.ResolvedModule{
-		ResolvedFileName: tspath.GetNormalizedAbsolutePath(staticResolution.ResolvedFileName.ToAbsoluteFileName(currentDirectory), currentDirectory),
+		ResolvedFileName:   tspath.GetNormalizedAbsolutePath(staticResolution.ResolvedFileName.ToAbsoluteFileName(currentDirectory), currentDirectory),
+		IsCustomResolution: true,
 	}
 	if staticResolution.OriginalPath != nil {
 		result.OriginalPath = tspath.GetNormalizedAbsolutePath(staticResolution.OriginalPath.ToAbsoluteFileName(currentDirectory), currentDirectory)

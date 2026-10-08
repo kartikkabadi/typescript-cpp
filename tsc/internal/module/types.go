@@ -100,6 +100,7 @@ type ResolvedModule struct {
 	ResolvedUsingExtraExtensions bool
 	PackageId                    PackageId
 	IsExternalLibraryImport      bool
+	IsCustomResolution           bool
 	AlternateResult              string
 }
 
