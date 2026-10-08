@@ -562,8 +562,6 @@ bool getImportNeedsImportDefaultHelper(ImportDeclaration* node) {
 	return !getImportNeedsImportStarHelper(node) &&
 	       (isDefaultImport(node->asNode()) ||
 	        (node->ImportClause != nullptr &&
-	         isNamedImports(
-		         node->ImportClause->as<ImportClause>()->NamedBindings) &&
 	         containsDefaultReference(
 		         node->ImportClause->as<ImportClause>()->NamedBindings)));
 }

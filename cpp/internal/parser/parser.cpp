@@ -2784,6 +2784,11 @@ Node* Parser::tryParseImportClause(Node* identifier, int pos,
 		parseExpected(Kind::FromKeyword);
 		return importClause;
 	}
+	// XUPSTREAM-DRIFT bea2e849: upstream checks KindDeferKeyword || KindSourceKeyword;
+	// KindSourceKeyword doesn't exist in our vendored base.
+	if (phaseModifier == Kind::DeferKeyword) {
+		return finishNode(factory.newImportClause(phaseModifier, nullptr, nullptr), pos);
+	}
 	return nullptr;
 }
 

@@ -198,6 +198,7 @@ bool isPlainJSError(int32_t code) {
 	        ->code,
 	    A_default_export_must_be_at_the_top_level_of_a_file_or_module_declaration
 	        ->code,
+	    A_deferred_import_must_specify_a_namespace_binding->code,
 	    A_definite_assignment_assertion_is_not_permitted_in_this_context->code,
 	    A_destructuring_declaration_must_have_an_initializer->code,
 	    A_get_accessor_cannot_have_parameters->code,

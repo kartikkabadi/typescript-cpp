@@ -2411,7 +2411,10 @@ bool Checker::checkGrammarImportClause(ImportClause* node) {
 		if (node->name != nullptr) {
 			return grammarErrorOnNode(node->asNode(), Default_imports_are_not_allowed_in_a_deferred_import);
 		}
-		if (node->NamedBindings != nullptr && node->NamedBindings->kind == Kind::NamedImports) {
+		if (node->NamedBindings == nullptr) {
+			return grammarErrorOnNode(node->asNode(), A_deferred_import_must_specify_a_namespace_binding);
+		}
+		if (node->NamedBindings->kind == Kind::NamedImports) {
 			return grammarErrorOnNode(node->asNode(), Named_imports_are_not_allowed_in_a_deferred_import);
 		}
 		if (moduleKind != ModuleKind::ESNext && moduleKind != ModuleKind::Preserve) {
