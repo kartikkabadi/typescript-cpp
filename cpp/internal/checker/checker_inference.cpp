@@ -429,16 +429,7 @@ void Checker::inferFromTypes(InferenceState* n, Type* source, Type* target) {
 		if (!source->alias->typeArguments.empty() || !target->alias->typeArguments.empty()) {
 			// Source and target are types originating in the same generic type alias declaration.
 			// Simply infer from source type arguments to target type arguments, with defaults applied.
-			std::vector<Type*> params =
-				typeAliasLinks.Get(source->alias->symbol)->typeParameters;
-			int minParams = getMinTypeArgumentCount(params);
-			bool nodeIsInJsFile = isInJSFile(source->alias->symbol->valueDeclaration);
-			std::vector<Type*> sourceTypes = fillMissingTypeArguments(
-				source->alias->typeArguments, params, minParams, nodeIsInJsFile);
-			std::vector<Type*> targetTypes = fillMissingTypeArguments(
-				target->alias->typeArguments, params, minParams, nodeIsInJsFile);
-			inferFromTypeArguments(n, sourceTypes, targetTypes,
-								   getAliasVariances(source->alias->symbol));
+			invokeOnce(n, source, target, &Checker::inferFromAliasTypeArguments);
 		}
 		// And if there weren't any type arguments, there's no reason to run inference as the types must be the same.
 		return;
@@ -605,8 +596,7 @@ void Checker::inferFromTypes(InferenceState* n, Type* source, Type* target) {
 		!(source->AsTypeReference()->node != nullptr &&
 		  target->AsTypeReference()->node != nullptr)) {
 		// If source and target are references to the same generic type, infer from type arguments
-		inferFromTypeArguments(n, getTypeArguments(source), getTypeArguments(target),
-							   getVariances(source->AsTypeReference()->target));
+		invokeOnce(n, source, target, &Checker::inferFromReferenceTypeArguments);
 	} else if ((source->flags & TypeFlagsIndex) != 0 &&
 			   (target->flags & TypeFlagsIndex) != 0) {
 		inferFromContravariantTypes(n, source->AsIndexType()->target,
@@ -668,7 +658,31 @@ void Checker::inferFromTypes(InferenceState* n, Type* source, Type* target) {
 	}
 }
 
-// inferFromTypeArguments — inference.go:284
+// inferFromAliasTypeArguments — inference.go:280
+void Checker::inferFromAliasTypeArguments(InferenceState* n, Type* source,
+										Type* target) {
+	// Source and target are types originating in the same generic type alias declaration.
+	// Simply infer from source type arguments to target type arguments, with defaults applied.
+	std::vector<Type*> params =
+		typeAliasLinks.Get(source->alias->symbol)->typeParameters;
+	int minParams = getMinTypeArgumentCount(params);
+	bool nodeIsInJsFile = isInJSFile(source->alias->symbol->valueDeclaration);
+	std::vector<Type*> sourceTypes = fillMissingTypeArguments(
+		source->alias->typeArguments, params, minParams, nodeIsInJsFile);
+	std::vector<Type*> targetTypes = fillMissingTypeArguments(
+		target->alias->typeArguments, params, minParams, nodeIsInJsFile);
+	inferFromTypeArguments(n, sourceTypes, targetTypes,
+						   getAliasVariances(source->alias->symbol));
+}
+
+// inferFromReferenceTypeArguments — inference.go:293
+void Checker::inferFromReferenceTypeArguments(InferenceState* n, Type* source,
+											  Type* target) {
+	inferFromTypeArguments(n, getTypeArguments(source), getTypeArguments(target),
+						   getVariances(source->AsTypeReference()->target));
+}
+
+// inferFromTypeArguments — inference.go:297
 void Checker::inferFromTypeArguments(InferenceState* n,
 									 const std::vector<Type*>& sourceTypes,
 									 const std::vector<Type*>& targetTypes,
@@ -737,7 +751,8 @@ void Checker::inferFromContravariantTypesIfStrictFunctionTypes(InferenceState* n
 // invokeOnce — inference.go:335
 void Checker::invokeOnce(InferenceState* n, Type* source, Type* target,
 						 void (Checker::*action)(InferenceState*, Type*, Type*)) {
-	InferenceKey key{source->id, target->id};
+	InferenceKey key{source->id, target->id, n->priority, n->contravariant,
+					 n->bivariant};
 	if (auto it = n->visited.find(key); it != n->visited.end()) {
 		n->inferencePriority = std::min(n->inferencePriority, it->second);
 		return;
@@ -1200,8 +1215,7 @@ void Checker::inferFromObjectTypes(InferenceState* n, Type* source, Type* target
 		(source->Target() == target->Target() ||
 		 (isArrayType(source) && isArrayType(target)))) {
 		// If source and target are references to the same generic type, infer from type arguments
-		inferFromTypeArguments(n, getTypeArguments(source), getTypeArguments(target),
-							   getVariances(source->Target()));
+		inferFromReferenceTypeArguments(n, source, target);
 		return;
 	}
 	if (isGenericMappedType(source) && isGenericMappedType(target)) {

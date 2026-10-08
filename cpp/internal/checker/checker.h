@@ -721,14 +721,21 @@ inline constexpr ExpandingFlags ExpandingFlagsBoth = ExpandingFlagsSource | Expa
 // InferenceKey / InferenceState (free-list pooled) — inference.go:11-30
 
 struct InferenceKey {
-	TypeId s{};
-	TypeId t{};
+	TypeId source{};
+	TypeId target{};
+	InferencePriority priority{};
+	bool contravariant{};
+	bool bivariant{};
 	bool operator==(const InferenceKey&) const = default;
 };
 
 struct InferenceKeyHash {
 	size_t operator()(const InferenceKey& k) const noexcept {
-		return (static_cast<size_t>(k.s) << 32) | static_cast<size_t>(k.t);
+		return (static_cast<size_t>(k.source) << 32) |
+		       static_cast<size_t>(k.target) ^
+		       ((static_cast<size_t>(k.priority) << 3) |
+		        (static_cast<size_t>(k.contravariant) << 1) |
+		        static_cast<size_t>(k.bivariant));
 	}
 };
 
@@ -3806,6 +3813,8 @@ public:
 	InferenceState* getInferenceState();
 	void putInferenceState(InferenceState* n);
 	void inferFromTypes(InferenceState* n, Type* source, Type* target);
+	void inferFromAliasTypeArguments(InferenceState* n, Type* source, Type* target);
+	void inferFromReferenceTypeArguments(InferenceState* n, Type* source, Type* target);
 	void inferFromTypeArguments(InferenceState* n, const std::vector<Type*>& sourceTypes,
 								const std::vector<Type*>& targetTypes,
 								const std::vector<VarianceFlags>& variances);
