@@ -2536,7 +2536,8 @@ bool Checker::checkGrammarImportAttributesType(TypeLiteralNode* attributes) {
 		}
 
 		Node* typeNode = propertySignature->Type;
-		if (!isStringLiteralLikeType(typeNode)) {
+		if (!isLiteralTypeNode(typeNode) ||
+		    !isStringLiteral(typeNode->as<LiteralTypeNode>()->Literal)) {
 			return grammarErrorOnNode(typeNode, An_import_attributes_property_must_have_a_string_literal_type_annotation);
 		}
 	}
