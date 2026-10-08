@@ -271,8 +271,18 @@ osReadDir(const std::string& path) {
 #else
 	std::vector<char> buf(8192);
 	std::vector<osDirEntry> entries;
+	long basep = 0; // getdirentries lseek-position out-param
 	for (;;) {
+#ifdef __APPLE__
+		// darwin readdirent = getdirentries(2); records are struct dirent.
+		// libc getdirentries is a link trap with 64-bit inodes — Go calls
+		// the raw syscall (unix.ReadDirent → SYS_getdirentries64; legacy
+		// SYS_getdirentries returns garbage records on modern kernels).
+		long n = ::syscall(SYS_getdirentries64, fd, buf.data(),
+		                   buf.size(), &basep);
+#else
 		long n = ::syscall(SYS_getdents64, fd, buf.data(), buf.size());
+#endif
 		if (n < 0) {
 			return {{}, osPathError("readdirent", path, errno)};
 		}
@@ -281,17 +291,34 @@ osReadDir(const std::string& path) {
 		}
 		size_t offset = 0;
 		while (offset < static_cast<size_t>(n)) {
+#ifdef __APPLE__
+			auto* d = reinterpret_cast<const darwinDirent*>(buf.data() +
+			                                                offset);
+#else
 			auto* d = reinterpret_cast<const linuxDirent64*>(buf.data() +
 			                                                 offset);
+#endif
 			uint16_t reclen = d->d_reclen;
 			if (reclen == 0 || offset + reclen > static_cast<size_t>(n)) {
 				break;
 			}
 			offset += reclen;
+#ifdef __APPLE__
+			// Go's readdir skips zero-inode entries on non-linux
+			// platforms (UFS may leave them for deleted files).
+			if (d->d_fileno == 0) {
+				continue;
+			}
+#else
 			// Linux keeps zero-inode entries (old XFS/FUSE may report
 			// valid files with ino 0); Go's readdir skips them only on
 			// non-linux/non-wasip1 platforms.
+#endif
+#ifdef __APPLE__
+			size_t nameOff = offsetof(darwinDirent, d_name);
+#else
 			size_t nameOff = offsetof(linuxDirent64, d_name);
+#endif
 			std::string_view nameBytes(buf.data() + nameOff +
 			                               (offset - reclen),
 			                           reclen - nameOff);

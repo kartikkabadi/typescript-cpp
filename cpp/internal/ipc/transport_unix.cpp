@@ -62,11 +62,17 @@ gostd::Error closeFd(int fd) {
 }
 
 // setCloexec — Go's syscall.ForkLock'd CLOEXEC on every descriptor.
+// On darwin it also installs SO_NOSIGPIPE, matching Go's net package
+// (darwin has no MSG_NOSIGNAL flag).
 void setCloexec(int fd) {
 	int flags = ::fcntl(fd, F_GETFD);
 	if (flags >= 0) {
 		(void)::fcntl(fd, F_SETFD, flags | FD_CLOEXEC);
 	}
+#ifdef __APPLE__
+	int one = 1;
+	(void)::setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof one);
+#endif
 }
 
 } // namespace
@@ -129,8 +135,16 @@ public:
 	std::pair<int, gostd::Error> write(std::string_view b) override {
 		size_t sent = 0;
 		while (sent < b.size()) {
+			// MSG_NOSIGNAL doesn't exist on darwin: use flags=0 plus
+			// SO_NOSIGPIPE set on the socket (same as Go's net package).
+			constexpr int noSignal =
+#ifdef __APPLE__
+			    0;
+#else
+			    MSG_NOSIGNAL;
+#endif
 			ssize_t n = ::send(fd, b.data() + sent, b.size() - sent,
-			                   MSG_NOSIGNAL);
+			                   noSignal);
 			if (n > 0) {
 				sent += static_cast<size_t>(n);
 				continue;

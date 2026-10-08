@@ -447,7 +447,9 @@ add_library(tsc STATIC
 	internal/fswatch/debounce.cpp
 	internal/fswatch/event.cpp
 	internal/fswatch/fanotify.cpp
+	internal/fswatch/fsevents_darwin.cpp
 	internal/fswatch/inotify.cpp
+	internal/fswatch/kqueue_darwin.cpp
 	internal/fswatch/pathcompare.cpp
 	internal/fswatch/util.cpp
 	internal/fswatch/walkdir.cpp
@@ -524,6 +526,12 @@ if(WIN32)
 	target_link_libraries(tsc PUBLIC dbghelp)
 else()
 	target_link_libraries(tsc PUBLIC z)
+endif()
+if(APPLE)
+	# FSEvents + CFString path folding live in CoreServices/CoreFoundation;
+	# libdispatch comes from libSystem.
+	target_link_libraries(tsc PUBLIC "-framework CoreServices"
+	                         "-framework CoreFoundation")
 endif()
 
 add_executable(tscpp cmd/tscpp/main.cpp cmd/tscpp/sys.cpp cmd/tscpp/lsp.cpp cmd/tscpp/api.cpp

@@ -51,7 +51,8 @@ struct controlledClock {
 		std::lock_guard<std::mutex> lock(mu);
 		nestedEmitCalls++;
 		if (nestedEmitInProgress) {
-			now += gostd::second();
+			now += std::chrono::duration_cast<
+			    std::chrono::system_clock::duration>(gostd::second());
 		}
 		nestedEmitInProgress = !nestedEmitInProgress;
 		return now;
@@ -69,7 +70,8 @@ struct fileClock : vfstest::Clock {
 
 	vfs::TimePoint Now() override {
 		std::lock_guard<std::mutex> lock(mu);
-		now += gostd::second();
+		now += std::chrono::duration_cast<
+		    std::chrono::system_clock::duration>(gostd::second());
 		return now;
 	}
 	vfs::Duration SinceStart() override { return vfs::Duration(0); }

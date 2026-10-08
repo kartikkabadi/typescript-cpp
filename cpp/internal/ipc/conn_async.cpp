@@ -25,6 +25,9 @@
 #else
 #include <execinfo.h>
 #endif
+#ifdef __APPLE__
+#include <dlfcn.h> // dladdr
+#endif
 
 namespace tsc::ipc {
 
@@ -59,8 +62,25 @@ std::string debugStack() {
 	return out;
 #else
 	int n = ::backtrace(frames, 64);
-	char** syms = ::backtrace_symbols(frames, n);
 	std::string out;
+#ifdef __APPLE__
+	// backtrace_symbols would malloc its result in the system zone while
+	// our free resolves to mimalloc — dladdr gives borrowed pointers to
+	// the same symbol names, so nothing crosses the zone boundary.
+	for (int i = 0; i < n; i++) {
+		Dl_info info{};
+		char b[32];
+		std::snprintf(b, sizeof b, "%p", frames[i]);
+		out += b;
+		if (::dladdr(frames[i], &info) != 0 &&
+		    info.dli_sname != nullptr) {
+			out += ' ';
+			out += info.dli_sname;
+		}
+		out += '\n';
+	}
+#else
+	char** syms = ::backtrace_symbols(frames, n);
 	if (syms != nullptr) {
 		for (int i = 0; i < n; i++) {
 			out += syms[i];
@@ -68,6 +88,7 @@ std::string debugStack() {
 		}
 		std::free(syms);
 	}
+#endif
 	return out;
 #endif
 }

@@ -40,8 +40,10 @@ std::shared_ptr<WatchOption> WithRecursive() {
 // --- package watchers — watcher.go:187-251 -----------------------------------
 
 // Package-level watcher instances. Platform init() functions set the factory.
-// (inotifyWatcher / fanotifyWatcher are defined in inotify.cpp/fanotify.cpp;
-// these three have no factory on Linux → never Available.)
+// (inotifyWatcher / fanotifyWatcher are defined in inotify.cpp/fanotify.cpp on
+// Linux, fseventsWatcher / kqueueWatcher in fsevents_darwin.cpp/
+// kqueue_darwin.cpp on macOS; the rest have no factory → never Available.)
+#ifndef __APPLE__
 watcher& fseventsWatcher() {
 	static watcher w{"fsevents"};
 	return w;
@@ -50,6 +52,7 @@ watcher& kqueueWatcher() {
 	static watcher w{"kqueue"};
 	return w;
 }
+#endif
 #ifndef _WIN32
 // windows.cpp provides the ReadDirectoryChangesW-backed definition on
 // Windows (its factory is registered there, like Go's init()).
@@ -58,10 +61,10 @@ watcher& windowsWatcher() {
 	return w;
 }
 #endif
-#ifdef _WIN32
-// No inotify/fanotify on Windows: define the package watchers with no
+#ifndef __linux__
+// No inotify/fanotify off Linux: define the package watchers with no
 // factory (Available() == false) so AllWatchers/Default/Inotify keep their
-// Go shape — on GOOS=windows their init()s never register factories.
+// Go shape — on other GOOSes their init()s never register factories.
 watcher& inotifyWatcher() {
 	static watcher w{"inotify"};
 	return w;
@@ -105,6 +108,8 @@ Watcher* Default() {
 	// parity with watcher.go.
 #ifdef _WIN32
 	constexpr std::string_view goos = "windows";
+#elif defined(__APPLE__)
+	constexpr std::string_view goos = "darwin";
 #else
 	constexpr std::string_view goos = "linux";
 #endif

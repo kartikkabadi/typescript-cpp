@@ -4,8 +4,13 @@
 // watcherBase/dirWatchError internals.
 
 #include <atomic>
+#include <fstream>
 #include <set>
 #include <thread>
+
+#ifdef __APPLE__
+#include <mach/mach.h>
+#endif
 
 #include "internal/fswatch/tests/util.h"
 
@@ -1321,9 +1326,25 @@ void TestSubscribeCloseThenReSubscribe(T* t) {
 REGISTER_UNIT_TEST("fswatch.TestSubscribeCloseThenReSubscribe",
                    TestSubscribeCloseThenReSubscribe);
 
-// runtime.NumGoroutine analogue: count threads from /proc/self/status.
-// Debounce/backend workers in the C++ port are real threads.
+// runtime.NumGoroutine analogue: count threads. Linux reads
+// /proc/self/status; darwin counts task_threads (Mach). Debounce/backend
+// workers in the C++ port are real threads.
 inline int numWorkerThreads() {
+#ifdef __APPLE__
+	thread_act_array_t threads = nullptr;
+	mach_msg_type_number_t count = 0;
+	if (::task_threads(mach_task_self(), &threads, &count) !=
+	    KERN_SUCCESS) {
+		return -1;
+	}
+	for (mach_msg_type_number_t i = 0; i < count; i++) {
+		::mach_port_deallocate(mach_task_self(), threads[i]);
+	}
+	::vm_deallocate(mach_task_self(),
+	                reinterpret_cast<vm_address_t>(threads),
+	                count * sizeof(thread_act_t));
+	return static_cast<int>(count);
+#else
 	std::ifstream in("/proc/self/status");
 	std::string line;
 	while (std::getline(in, line)) {
@@ -1331,6 +1352,7 @@ inline int numWorkerThreads() {
 			return std::atoi(line.c_str() + 8);
 	}
 	return -1;
+#endif
 }
 
 void TestSubscribeNoGoroutineLeak(T* t) {
@@ -1729,11 +1751,20 @@ REGISTER_UNIT_TEST("fswatch.TestRenameDirOutOfTreeNoStaleEvents",
 void TestDefaultBackendMatchesPlatform(T* t) {
 	t->Parallel();
 	auto* d = Default();
-	// runtime.GOOS == "linux":
+	// runtime.GOOS switch (watcher_test.go:2348):
+#if defined(_WIN32)
+	constexpr const char* goos = "windows";
+	std::string wantName = "windows";
+#elif defined(__APPLE__)
+	constexpr const char* goos = "darwin";
+	std::string wantName = "fsevents";
+#else
+	constexpr const char* goos = "linux";
 	std::string wantName =
 	    Fanotify()->available() ? "fanotify" : "inotify";
+#endif
 	if (!d->available()) {
-		t->Fatalf("Default() should be available on linux", {});
+		t->Fatalf("Default() should be available on %s", {goos});
 	}
 	if (d->name() != wantName) {
 		t->Fatalf("Default().Name() = %q, want %q", {d->name(), wantName});

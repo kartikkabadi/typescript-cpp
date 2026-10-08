@@ -10,6 +10,8 @@
 
 #if defined(__GLIBC__)
 #include <malloc.h>
+#elif defined(__APPLE__)
+#include <malloc/malloc.h>
 #endif
 
 #include "internal/core/utilities.h"
@@ -23,6 +25,9 @@
 
 #if defined(__linux__)
 #include <sys/sysinfo.h>
+#elif defined(__APPLE__)
+#include <mach/mach.h>
+#include <sys/sysctl.h>
 #endif
 
 namespace tsc::project {
@@ -708,6 +713,19 @@ void Session::sendPerformanceTelemetry(const gostd::Context& ctx) {
 		    static_cast<double>(mi.uordblks);
 		measurements->HeapObjectCount =
 		    static_cast<double>(mi.hblks);
+	}
+#elif defined(__APPLE__)
+	{
+		// malloc_statistics(3): size_in_use ≈ uordblks,
+		// blocks_in_use ≈ hblks.
+		malloc_statistics_t ms;
+		malloc_zone_statistics(malloc_default_zone(), &ms);
+		measurements->MemoryUsedBytes =
+		    static_cast<double>(ms.size_in_use);
+		measurements->HeapLiveBytes =
+		    static_cast<double>(ms.size_in_use);
+		measurements->HeapObjectCount =
+		    static_cast<double>(ms.blocks_in_use);
 	}
 #endif
 	measurements->GoMaxProcs =

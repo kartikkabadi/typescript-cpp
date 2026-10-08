@@ -1,6 +1,8 @@
 // Port of the Go `regexp` surface needed by testrunner — see regexp.h.
 #include "internal/gostd/regexp.h"
 
+#include <algorithm> // std::all_of (not transitively included by libc++)
+
 namespace tsc::gostd::regexp {
 
 Regexp::Regexp(std::string_view pattern) {

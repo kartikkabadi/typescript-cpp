@@ -123,8 +123,19 @@ gostd::Error iterateDir(walkState* st, int fd, const std::string& dirname,
 std::pair<std::vector<unixDirent>, gostd::Error>
 readDirEntries(int fd, std::vector<char>& buf) {
 	std::vector<unixDirent> entries;
+	long basep = 0; // getdirentries needs an lseek-position out-param
 	for (;;) {
+#ifdef __APPLE__
+		// walkdir_dirent_darwin.go — getdirentries yields struct dirent.
+		// The libc wrapper is a link trap with 64-bit inodes; Go reaches
+		// the raw syscall (unix.ReadDirent → SYS_getdirentries64 — the
+		// legacy SYS_getdirentries returns garbage records on modern
+		// kernels).
+		long n = ::syscall(SYS_getdirentries64, fd, buf.data(),
+		                   buf.size(), &basep);
+#else
 		long n = ::syscall(SYS_getdents64, fd, buf.data(), buf.size());
+#endif
 		if (n < 0) {
 			return {{}, errnoError(errno)};
 		}
@@ -134,13 +145,23 @@ readDirEntries(int fd, std::vector<char>& buf) {
 		size_t dataLen = static_cast<size_t>(n);
 		size_t off = 0;
 		while (dataLen - off > 0) {
-			auto* d = reinterpret_cast<const linuxDirent64*>(buf.data() + off);
+#ifdef __APPLE__
+			auto* d =
+			    reinterpret_cast<const darwinDirent*>(buf.data() + off);
+#else
+			auto* d =
+			    reinterpret_cast<const linuxDirent64*>(buf.data() + off);
+#endif
 			uint16_t reclen = reclenOf(d);
 			if (reclen == 0 || reclen > dataLen - off) {
 				break;
 			}
 			if (inoOf(d) != 0) {
+#ifdef __APPLE__
+				constexpr size_t nameOff = offsetof(darwinDirent, d_name);
+#else
 				constexpr size_t nameOff = offsetof(linuxDirent64, d_name);
+#endif
 				std::string_view nameBytes(buf.data() + off + nameOff,
 				                           reclen - nameOff);
 				size_t nul = nameBytes.find('\0');

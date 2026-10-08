@@ -187,9 +187,20 @@ spawnProcess(const std::vector<std::string>& command, const std::string& dir,
 	// so the first child never sees EOF. Windows: CreatePipe handles are
 	// non-inheritable by default (CLOEXEC semantics) and w32::spawnvp only
 	// marks the selected stdio handles inheritable in the child.
-#ifdef _WIN32
-	if (::pipe(stdinPipe) != 0 || ::pipe(stdoutPipe) != 0 ||
-	    ::pipe(stderrPipe) != 0) {
+#if defined(_WIN32) || defined(__APPLE__)
+	// Windows: CreatePipe handles are non-inheritable (CLOEXEC
+	// semantics). darwin has no pipe2: pipe() + FD_CLOEXEC via fcntl —
+	// the same CLOEXEC contract Go's os/exec relies on.
+	auto pipeCloexec = [](int fds[2]) {
+		if (::pipe(fds) != 0) {
+			return -1;
+		}
+		::fcntl(fds[0], F_SETFD, ::fcntl(fds[0], F_GETFD) | FD_CLOEXEC);
+		::fcntl(fds[1], F_SETFD, ::fcntl(fds[1], F_GETFD) | FD_CLOEXEC);
+		return 0;
+	};
+	if (pipeCloexec(stdinPipe) != 0 || pipeCloexec(stdoutPipe) != 0 ||
+	    pipeCloexec(stderrPipe) != 0) {
 #else
 	if (::pipe2(stdinPipe, O_CLOEXEC) != 0 ||
 	    ::pipe2(stdoutPipe, O_CLOEXEC) != 0 ||
