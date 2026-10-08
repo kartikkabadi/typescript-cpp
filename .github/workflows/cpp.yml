@@ -35,7 +35,7 @@ jobs:
           CXX: clang++
         run: |
           cmake -B cpp/build -S cpp -G Ninja -DCMAKE_BUILD_TYPE=Release
-          cmake --build cpp/build -j "$(nproc)" --target tscpp fourslashrunner
+          cmake --build cpp/build -j "$(nproc)" --target tscpp fourslashrunner tsctestrunner unittestrunner
 
       - name: Build Go conformance oracles
         working-directory: tsc
@@ -85,3 +85,8 @@ jobs:
 
       - name: Fourslash smoke
         run: cpp/build/fourslashrunner -run 'TestFormatting|TestQuickInfo' 2>&1 | tail -5
+
+      - name: Unit + tsctests
+        run: |
+          cpp/build/unittestrunner
+          cpp/build/tsctestrunner 2>&1 | tail -3

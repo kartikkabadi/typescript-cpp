@@ -129,13 +129,19 @@ consecutive.
 (`grow_heap`); ~30% of perf samples were kernel mm-lock/page-fault paths.
 
 **Fix.** Vendored mimalloc 2.1.7 (`cpp/third_party/mimalloc/`, src+include+
-LICENSE), built as `tsc_mimalloc` static lib from `src/static.c` (the unity TU
-that already contains `alloc-override.c`). `MI_MALLOC_OVERRIDE` interposes the
-C malloc family inside the binary; `cmd/malloc_override.cpp` adds
-`<mimalloc-new-delete.h>` for global `operator new`/`delete`. `project()` now
-declares `C` so `static.c` compiles as C11. `TSCPP_MIMALLOC=ON` (default)
-prepends the lib before `libtsc.a` on `tscpp`/`tsctestrunner` link lines.
-Works unchanged under the fork-per-test runners and clang-15 RelWithDebInfo.
+LICENSE), built as `tsc_mimalloc` **object** lib from `src/static.c` (the unity
+TU that already contains `alloc-override.c`). It must be OBJECT, not STATIC:
+as an archive, GNU ld's single-pass scan under clang-18's ThinLTO plugin drops
+`static.c.o` and direct `malloc()` calls inside `libtsc.a` silently bind to
+glibc — the interposition only works if the objects are always linked, and
+force-linking them exposed `alloc-override.c`'s own Itanium-mangled operator
+new/delete definitions, so `cmd/malloc_override.cpp` is now compiled on MSVC
+only (where the C TU emits nothing). `MI_MALLOC_OVERRIDE` (POSIX only — the
+vendored file `#error`s on non-DLL Windows) interposes the C malloc family
+inside the binary. `project()` declares `C` so `static.c` compiles as C11.
+`TSCPP_MIMALLOC=ON` (default) adds `$<TARGET_OBJECTS:tsc_mimalloc>` to every
+executable. Works unchanged under the fork-per-test runners and clang-15
+RelWithDebInfo.
 
 **Verified.** mprotect 21,635 → **22**; emit ~1.16–1.42×, noEmit ~1.18–1.44×,
 decl ~1.16–1.25× (VM noise ±20%); decl-emit RSS **323 MB** (glibc: 321 MB) —

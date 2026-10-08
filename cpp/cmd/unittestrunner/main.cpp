@@ -83,8 +83,10 @@ int runOne(const tsc::testutil::unittests::UnitTestCase& tc, std::string& output
 			}
 			// Skip sentinel is 3, not 2: tscUnreachable exits the child with
 			// code 2 (Go panic contract), which must report as FAIL.
-			if (t.Skipped()) rc->code = 3;
-			else if (t.Failed()) rc->code = 1;
+			// Failed before Skipped: go test reports `--- FAIL` for a test
+			// that called Errorf then Skip — a skip can't mask a failure.
+			if (t.Failed()) rc->code = 1;
+			else if (t.Skipped()) rc->code = 3;
 			return nullptr;
 		};
 		RunCtx ctx{&tc, 0};

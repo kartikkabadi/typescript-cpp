@@ -19,8 +19,12 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 # mimalloc drop-in allocator (vendored third_party/mimalloc, v2.1.7).
 # static.c compiles the whole allocator as one TU; alloc-override.c
-# interposes the C malloc family; malloc_override.cpp interposes C++
-# operator new/delete. Static link puts our symbols ahead of libc's.
+# (under MI_MALLOC_OVERRIDE) interposes the C malloc family and, on
+# Itanium-ABI compilers, the C++ operator new/delete family under
+# mangled names; malloc_override.cpp supplies them on MSVC instead.
+# Built as an OBJECT library so the interposers are force-linked into
+# every executable — an archive member under GNU ld's single-pass scan
+# would be dropped (and malloc() calls would silently bind to glibc).
 option(TSCPP_MIMALLOC "Route all heap allocation through mimalloc" ON)
 if(TSCPP_MIMALLOC)
 	# OBJECT library, not STATIC: an interposition library must be linked
