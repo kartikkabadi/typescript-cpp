@@ -129,15 +129,16 @@ std::string trimSuffix(std::string_view s, std::string_view suffix) {
 	return std::string{s};
 }
 
+} // namespace
+
 // specifiers.go:252 — containsIgnoredPath. Local helper that duplicates
-// tspath.ContainsIgnoredPath for performance.
+// tspath.ContainsIgnoredPath for performance. Declared in types.h so the
+// ported unit test (which calls it by name like the Go test) can reach it.
 bool containsIgnoredPath(const std::string& s) {
 	return s.find("/node_modules/.") != std::string::npos ||
 	       s.find("/.git") != std::string::npos ||
 	       s.find(".#") != std::string::npos;
 }
-
-} // namespace
 
 // specifiers.go:107 — ambientModuleInfo
 struct ambientModuleInfo {

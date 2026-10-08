@@ -27,8 +27,9 @@ struct Pattern {
 		if (starIndex == -1) {
 			return "";
 		}
-		return std::string(
-			candidate.substr(starIndex, candidate.size() - text.size() + starIndex + 1));
+		// candidate[starIndex : len(candidate)-len(text)+starIndex+1]
+		return std::string(candidate.substr(
+		    starIndex, candidate.size() - text.size() + 1));
 	}
 };
 

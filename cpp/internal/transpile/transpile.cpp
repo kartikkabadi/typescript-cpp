@@ -52,73 +52,7 @@ interface Symbol {
     readonly [Symbol.toStringTag]: string;
 })TS";
 
-// --- fs.go: transpileFS ---
-// transpileFS implements the vfs.FS operations the transpiler needs; the
-// rest panic like Go's nil-embedded vfs.FS.
-class transpileFS : public vfs::FS {
-public:
-	std::unordered_map<std::string, std::string> files;
-
-	bool UseCaseSensitiveFileNames() override { return true; }
-
-	bool FileExists(const std::string& path) override {
-		auto it = files.find(path);
-		if (it == files.end()) {
-			tscUnreachable(
-			    ("unexpected file existence check for \"" + path + "\"")
-			        .c_str());
-		}
-		return true;
-	}
-
-	std::pair<std::string, bool> ReadFile(const std::string& path) override {
-		auto it = files.find(path);
-		if (it == files.end()) {
-			tscUnreachable(
-			    ("unexpected file read for \"" + path + "\"").c_str());
-		}
-		return {it->second, true};
-	}
-
-	bool DirectoryExists(const std::string& path) override {
-		tscUnreachable(
-		    ("unexpected directory existence check for \"" + path + "\"")
-		        .c_str());
-	}
-
-	std::string Realpath(const std::string& path) override {
-		tscUnreachable(
-		    ("unexpected realpath request for \"" + path + "\"").c_str());
-	}
-
-	vfs::Error WriteFile(const std::string& path,
-	                     const std::string& data) override {
-		tscUnreachable(("unexpected file write for \"" + path + "\"").c_str());
-	}
-
-	vfs::Error AppendFile(const std::string& path,
-	                      const std::string& data) override {
-		tscUnreachable(("unexpected file append for \"" + path + "\"").c_str());
-	}
-
-	vfs::Error Remove(const std::string& path) override {
-		tscUnreachable(("unexpected file remove for \"" + path + "\"").c_str());
-	}
-
-	vfs::Error Chtimes(const std::string& path, vfs::TimePoint aTime,
-	                   vfs::TimePoint mTime) override {
-		tscUnreachable(("unexpected chtimes for \"" + path + "\"").c_str());
-	}
-
-	vfs::Entries GetAccessibleEntries(const std::string& path) override {
-		tscUnreachable(
-		    ("unexpected directory read for \"" + path + "\"").c_str());
-	}
-
-	std::shared_ptr<vfs::FileInfo> Stat(const std::string& path) override {
-		tscUnreachable(("unexpected stat for \"" + path + "\"").c_str());
-	}
-};
+// transpileFS moved to transpile.h (fs.go) so the package-internal unit test can construct it.
 
 // transpileWorker — transpile.go:118. (Go context.Context param dropped.)
 static Output* transpileWorker(const std::string& input,

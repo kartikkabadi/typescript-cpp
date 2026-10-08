@@ -627,6 +627,12 @@ std::vector<StringComparer> getComparers(const UserPreferences& preferences) {
 
 } // namespace
 
+// test access (utilities_test.go) — the Go test is in-package and calls the
+// unexported comparer factory directly.
+StringComparer TestGetOrganizeImportsPresetStringComparer(OrganizeImportsSort sort) {
+	return getOrganizeImportsPresetStringComparer(sort);
+}
+
 // FilterImportDeclarations — organizeimports.go:17
 std::vector<Node*> FilterImportDeclarations(const std::vector<Node*>& statements) {
 	return filter(statements, [](Node* stmt) {

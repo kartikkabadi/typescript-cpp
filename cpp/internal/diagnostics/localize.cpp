@@ -82,7 +82,9 @@ const std::unordered_map<Key, std::string>* getLocalizedMessages(
 	                          const std::unordered_map<Key, std::string>*>
 	    cache;
 
-	const std::string cacheKey = loc.tag.str;
+	// Go caches on language.Tag (the parsed ID fields); tag.str is empty for
+	// compact parsed forms, so key on the canonical String() instead.
+	const std::string cacheKey = loc.tag.String();
 	{
 		std::lock_guard<std::mutex> lock(cacheMutex);
 		if (auto it = cache.find(cacheKey); it != cache.end()) {

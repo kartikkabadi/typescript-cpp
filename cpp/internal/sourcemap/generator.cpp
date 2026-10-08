@@ -183,17 +183,17 @@ SourceIndex Generator::AddSource(std::string_view fileName) {
 }
 
 // SetSourceContent — generator.go:101
-int Generator::SetSourceContent(SourceIndex sourceIndex,
+gostd::Error Generator::SetSourceContent(SourceIndex sourceIndex,
                                 std::string_view content) {
 	if (sourceIndex < 0 ||
 	    sourceIndex >= static_cast<SourceIndex>(sources.size())) {
-		return 1; // errors.New("sourceIndex is out of range")
+		return gostd::newError("sourceIndex is out of range");
 	}
 	while (sourcesContent.size() <= static_cast<size_t>(sourceIndex)) {
 		sourcesContent.emplace_back(std::nullopt);
 	}
 	sourcesContent[static_cast<size_t>(sourceIndex)] = std::string(content);
-	return 0;
+	return nullptr;
 }
 
 // AddName — generator.go:113
@@ -364,87 +364,87 @@ void Generator::addMapping(int generatedLine, UTF16Offset generatedCharacter,
 }
 
 // AddGeneratedMapping — generator.go:261
-int Generator::AddGeneratedMapping(int generatedLine,
+gostd::Error Generator::AddGeneratedMapping(int generatedLine,
                                    UTF16Offset generatedCharacter) {
 	if (generatedLine < pendingGeneratedLine) {
-		return 1; // errors.New("generatedLine cannot backtrack")
+		return gostd::newError("generatedLine cannot backtrack");
 	}
 	if (generatedCharacter < 0) {
-		return 1; // errors.New("generatedCharacter cannot be negative")
+		return gostd::newError("generatedCharacter cannot be negative");
 	}
 	addMapping(generatedLine, generatedCharacter, sourceIndexNotSet,
 	           /*sourceLine*/ notSet, /*sourceCharacter*/ notSetUTF16,
 	           nameIndexNotSet);
 	hasPendingSource = false;
 	hasPendingName = false;
-	return 0;
+	return nullptr;
 }
 
 // AddSourceMapping — generator.go:275
-int Generator::AddSourceMapping(int generatedLine,
+gostd::Error Generator::AddSourceMapping(int generatedLine,
                                 UTF16Offset generatedCharacter,
                                 SourceIndex sourceIndex, int sourceLine,
                                 UTF16Offset sourceCharacter) {
 	if (generatedLine < pendingGeneratedLine) {
-		return 1; // errors.New("generatedLine cannot backtrack")
+		return gostd::newError("generatedLine cannot backtrack");
 	}
 	if (generatedCharacter < 0) {
-		return 1; // errors.New("generatedCharacter cannot be negative")
+		return gostd::newError("generatedCharacter cannot be negative");
 	}
 	if (sourceIndex < 0 ||
 	    sourceIndex >= static_cast<SourceIndex>(sources.size())) {
-		return 1; // errors.New("sourceIndex is out of range")
+		return gostd::newError("sourceIndex is out of range");
 	}
 	if (sourceLine < 0) {
-		return 1; // errors.New("sourceLine cannot be negative")
+		return gostd::newError("sourceLine cannot be negative");
 	}
 	if (sourceCharacter < 0) {
-		return 1; // errors.New("sourceCharacter cannot be negative")
+		return gostd::newError("sourceCharacter cannot be negative");
 	}
 	if (hasPending &&
 	    !isNewGeneratedPosition(generatedLine, generatedCharacter) &&
 	    !hasPendingSource) {
-		return 0;
+		return nullptr;
 	}
 	addMapping(generatedLine, generatedCharacter, sourceIndex, sourceLine,
 	           sourceCharacter, nameIndexNotSet);
-	return 0;
+	return nullptr;
 }
 
 // AddNamedSourceMapping — generator.go:299
-int Generator::AddNamedSourceMapping(int generatedLine,
+gostd::Error Generator::AddNamedSourceMapping(int generatedLine,
                                      UTF16Offset generatedCharacter,
                                      SourceIndex sourceIndex, int sourceLine,
                                      UTF16Offset sourceCharacter,
                                      NameIndex nameIndex) {
 	if (generatedLine < pendingGeneratedLine) {
-		return 1; // errors.New("generatedLine cannot backtrack")
+		return gostd::newError("generatedLine cannot backtrack");
 	}
 	if (generatedCharacter < 0) {
-		return 1; // errors.New("generatedCharacter cannot be negative")
+		return gostd::newError("generatedCharacter cannot be negative");
 	}
 	if (sourceIndex < 0 ||
 	    sourceIndex >= static_cast<SourceIndex>(sources.size())) {
-		return 1; // errors.New("sourceIndex is out of range")
+		return gostd::newError("sourceIndex is out of range");
 	}
 	if (sourceLine < 0) {
-		return 1; // errors.New("sourceLine cannot be negative")
+		return gostd::newError("sourceLine cannot be negative");
 	}
 	if (sourceCharacter < 0) {
-		return 1; // errors.New("sourceCharacter cannot be negative")
+		return gostd::newError("sourceCharacter cannot be negative");
 	}
 	if (nameIndex < 0 ||
 	    nameIndex >= static_cast<NameIndex>(names.size())) {
-		return 1; // errors.New("nameIndex is out of range")
+		return gostd::newError("nameIndex is out of range");
 	}
 	if (hasPending &&
 	    !isNewGeneratedPosition(generatedLine, generatedCharacter) &&
 	    !hasPendingSource) {
-		return 0;
+		return nullptr;
 	}
 	addMapping(generatedLine, generatedCharacter, sourceIndex, sourceLine,
 	           sourceCharacter, nameIndex);
-	return 0;
+	return nullptr;
 }
 
 // RawSourceMap — generator.go:326

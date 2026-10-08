@@ -1492,6 +1492,11 @@ public:
 
 private:
 	friend struct sourceDefResolver;
+	// LSTestAccess models Go same-package test access: `&LanguageService{...}`
+	// field literals (no host-derived wiring) and unexported methods. Defined
+	// in cpp/internal/ls/tests/.
+	LanguageService() = default;
+	friend struct LSTestAccess;
 	autoimport::ProjectID* projectID_;
 	ls::Host* host;
 	lsutil::UserPreferences activeConfig;

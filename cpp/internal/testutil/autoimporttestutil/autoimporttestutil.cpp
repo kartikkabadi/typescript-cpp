@@ -550,7 +550,7 @@ SetupMonorepoLifecycleSession(gostd::testing::T* t,
 	auto setupPair = projecttestutil::Setup(builder->Files());
 	auto session = setupPair.first;
 	auto sessionUtils = setupPair.second;
-	t->Cleanup([session] { session->Close(); });
+	t->Cleanup([session, sessionUtils] { session->Close(); session->WaitForBackgroundTasks(); });
 
 	// Build root node_modules handle by looking at the project record for
 	// the workspace root (created as side effect of
@@ -587,7 +587,7 @@ std::shared_ptr<Fixture> SetupLifecycleSession(
 	auto setupPair = projecttestutil::Setup(builder->Files());
 	auto session = setupPair.first;
 	auto sessionUtils = setupPair.second;
-	t->Cleanup([session] { session->Close(); });
+	t->Cleanup([session, sessionUtils] { session->Close(); session->WaitForBackgroundTasks(); });
 	auto fixture = std::make_shared<Fixture>();
 	fixture->session = session;
 	fixture->utils = sessionUtils;

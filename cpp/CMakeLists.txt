@@ -476,3 +476,8 @@ list(FILTER UNIT_TEST_SOURCES EXCLUDE REGEX "internal/fourslash/")
 add_executable(unittestrunner cmd/unittestrunner/main.cpp
 	internal/testutil/unittests/registry.cpp ${UNIT_TEST_SOURCES})
 target_link_libraries(unittestrunner PRIVATE ${tsc_alloc_lib} tsc)
+# In-process single-test runner for debugging under gdb.
+
+add_executable(utdbg cmd/unittestrunner/dbg_main.cpp
+	internal/testutil/unittests/registry.cpp ${UNIT_TEST_SOURCES})
+target_link_libraries(utdbg PRIVATE ${tsc_alloc_lib} tsc)

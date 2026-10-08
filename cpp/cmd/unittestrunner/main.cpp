@@ -14,12 +14,15 @@
 #include <string>
 #include <vector>
 
+#include <pthread.h>
 #include <signal.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include "internal/gostd/gostd.h"
 #include "internal/gostd/testing.h"
+#include "internal/testutil/contentmappertest/contentmappertest.h"
 #include "internal/testutil/unittests/registry.h"
 
 namespace {
@@ -54,20 +57,50 @@ int runOne(const tsc::testutil::unittests::UnitTestCase& tc, std::string& output
 		close(pipefd[1]);
 		signal(SIGALRM, onTestAlarm);
 		alarm(kTestTimeoutSeconds);
-		tsc::gostd::testing::T t;
-		int code = 0;
-		try {
-			t.Run(tc.name, tc.fn);
-		} catch (const std::exception& e) {
-			t.Errorf("uncaught exception: %s", {e.what()});
-		} catch (...) {
-			t.Errorf("uncaught non-std::exception", {});
+		// Tests run on a 64MB-stack thread (same convention as
+		// tscpp's parse workers): Go tests rely on goroutine stacks
+		// that grow dynamically, and deeply nested inputs (e.g.
+		// TestSelectionRangeDepthIsLimited's 12k parens) need more
+		// than the default 8MB main-thread stack.
+		struct RunCtx {
+			const tsc::testutil::unittests::UnitTestCase* tc;
+			int code = 0;
+		};
+		auto runTest = [](void* arg) -> void* {
+			auto* rc = static_cast<RunCtx*>(arg);
+			tsc::gostd::testing::T t;
+			// Invoke the test fn on the runner's T directly (not via
+			// t.Run): a t.Skip() in the test body must mark the top-level
+			// test skipped, while a skip inside a t.Run subtest must not
+			// — Go reports `--- SKIP: TestX/child`, `--- PASS: TestX`.
+			try {
+				rc->tc->fn(&t);
+			} catch (const tsc::gostd::testing::testGoexit&) {
+			} catch (const std::exception& e) {
+				t.Errorf("uncaught exception: %s", {e.what()});
+			} catch (...) {
+				t.Errorf("uncaught non-std::exception", {});
+			}
+			// Skip sentinel is 3, not 2: tscUnreachable exits the child with
+			// code 2 (Go panic contract), which must report as FAIL.
+			if (t.Skipped()) rc->code = 3;
+			else if (t.Failed()) rc->code = 1;
+			return nullptr;
+		};
+		RunCtx ctx{&tc, 0};
+		pthread_attr_t attr;
+		pthread_attr_init(&attr);
+		pthread_attr_setstacksize(&attr, size_t{64} << 20);
+		pthread_t thread;
+		if (pthread_create(&thread, &attr, runTest, &ctx) != 0) {
+			runTest(&ctx);
+		} else {
+			pthread_join(thread, nullptr);
 		}
-		if (t.Skipped()) code = 2;
-		else if (t.Failed()) code = 1;
+		pthread_attr_destroy(&attr);
 		fflush(stdout);
 		fflush(stderr);
-		_exit(code);
+		_exit(ctx.code);
 	}
 	close(pipefd[1]);
 	char buf[4096];
@@ -89,7 +122,43 @@ int runOne(const tsc::testutil::unittests::UnitTestCase& tc, std::string& output
 
 }  // namespace
 
+// stdio adapts the process's stdin/stdout to a ReadWriteCloser for the
+// content-mapper server (mapper_test.go's TestMain helper mode).
+struct stdioRwc : tsc::gostd::io::ReadWriteCloser {
+	std::pair<int, tsc::gostd::Error> read(std::span<char> buf) override {
+		ssize_t n = ::read(STDIN_FILENO, buf.data(), buf.size());
+		if (n < 0) return {0, tsc::gostd::newError("read stdin failed")};
+		return {(int)n, nullptr};
+	}
+	std::pair<int, tsc::gostd::Error> write(std::string_view data) override {
+		size_t off = 0;
+		while (off < data.size()) {
+			ssize_t n = ::write(STDOUT_FILENO, data.data() + off,
+			                    data.size() - off);
+			if (n < 0) {
+				return {(int)off,
+				        tsc::gostd::newError("write stdout failed")};
+			}
+			off += (size_t)n;
+		}
+		return {(int)off, nullptr};
+	}
+	tsc::gostd::Error close() override { return nullptr; }
+};
+
 int main(int argc, char** argv) {
+	// TSGO_CONTENT_MAPPER_HELPER, when set, makes the test binary act as the
+	// mapper subprocess instead of running tests. This lets the
+	// out-of-process test spawn a real subprocess (itself) that speaks the
+	// mapper protocol over stdio — mapper_test.go's TestMain.
+	if (const char* helper = std::getenv("TSGO_CONTENT_MAPPER_HELPER");
+	    helper && std::string(helper) == "1") {
+		auto rwc = std::make_shared<stdioRwc>();
+		(void)tsc::testutil::contentmappertest::Serve(
+		    tsc::gostd::contextBackground(), rwc);
+		return 0;
+	}
+
 	std::string runFilter;
 	for (int i = 1; i < argc; ++i) {
 		std::string arg = argv[i];
@@ -116,7 +185,7 @@ int main(int argc, char** argv) {
 		if (code == 0) {
 			++passed;
 			printf("PASS %s\n", name.c_str());
-		} else if (code == 2) {
+		} else if (code == 3) {
 			--total;  // SKIP: like go test, don't count toward N/M pass.
 			std::string reason;
 			{

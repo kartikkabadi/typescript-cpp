@@ -247,8 +247,9 @@ struct subFS final : StatFS, ReadDirFS, ReadFileFS, SubFS {
 		if (!validPath(name)) {
 			return {"", makePathError(op, name, ErrInvalid)};
 		}
-		// path.Join(dir, name): name is a ValidPath, dir is clean.
-		return {dir == "." ? name : dir + "/" + name, Error{}};
+		// path.Join(dir, name): name is a ValidPath, dir is clean —
+		// but Join still cleans ("foo/." -> "foo").
+		return {dir == "." ? name : pathJoin({dir, name}), Error{}};
 	}
 
 	// fixErr translates PathErrors back to the sub-FS's name space.

@@ -372,6 +372,7 @@ inline std::string_view removeByteOrderMark(std::string_view text) {
 // ==== js_case.go: JS casing (Unicode 15.1.0, ICU root-locale semantics) ====
 
 #include "internal/stringutil/js_case_generated.h"
+#include "internal/stringutil/unicode_lower.h"
 
 namespace tsc::stringutil {
 
@@ -590,7 +591,7 @@ inline char32_t toLowerRune(char32_t r) {
 			}
 		}
 	}
-	return r;
+	return unicodeToLower(r);
 }
 
 // toUpperRune — Go's unicode.ToUpper: simple uppercase mapping.
@@ -605,7 +606,7 @@ inline char32_t toUpperRune(char32_t r) {
 			}
 		}
 	}
-	return r;
+	return unicodeToUpper(r);
 }
 
 // simpleFold — Go's unicode.SimpleFold: the next rune in the case-folding

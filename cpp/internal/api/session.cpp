@@ -6539,7 +6539,7 @@ Session::handleGetImportAdderEdits(
 	auto* pid = autoimport::InternProjectID(projectID);
 	if (auto* registry = workingSnapshot->AutoImportRegistry();
 	    registry == nullptr ||
-	    !registry->IsPreparedForImportingFile(sourceFile->FileName(),
+	    !autoimport::IsPreparedForImportingFile(registry, sourceFile->FileName(),
 	                                          pid, userPreferences)) {
 		auto* preparedSnapshot = snapshotHost->CloneSnapshotWithAutoImports(
 		    ctx, workingSnapshot,

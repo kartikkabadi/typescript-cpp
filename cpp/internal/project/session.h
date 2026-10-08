@@ -182,8 +182,8 @@ struct Session : ata::TypingsInstallerHost {
 	// WatchedFiles are using each glob.
 	watchRegistry* watches = nullptr;
 
-	// Interned project IDs live on snapshotHost->projectIDCache so the
-	// clone hosts built during snapshot clones produce the same
+	// Interned project IDs come from ls::autoimport::InternProjectID
+	// so the clone hosts built during snapshot clones produce the same
 	// ProjectID* the session hands to LanguageServices.
 
 	// globalDiagPublishPending is set to true when a global

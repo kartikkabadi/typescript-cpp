@@ -656,8 +656,11 @@ struct BigUint {
 	}
 
 	static BigUint fromDigits(std::string_view digits, unsigned base) {
+		// Go big.Int.SetString(s, 0) accepts '_' digit separators.
 		BigUint r;
 		for (char c : digits) {
+			if (c == '_')
+				continue;
 			uint32_t v = c <= '9' ? static_cast<uint32_t>(c - '0')
 			                    : static_cast<uint32_t>((c <= 'F' ? c - 'A' : c - 'a') + 10);
 			r.addMul(base, v);

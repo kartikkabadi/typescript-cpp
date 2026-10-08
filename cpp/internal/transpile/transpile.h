@@ -5,7 +5,9 @@
 #include <string>
 #include <vector>
 
+#include <unordered_map>
 #include "internal/core/types.h"
+#include "internal/vfs/vfs.h"
 
 namespace tsc {
 struct Diagnostic;
@@ -55,5 +57,71 @@ Output* TranspileModule(const std::string& input, const Options& options);
 // TranspileDeclaration — transpile.go:115. Creates a declaration (.d.ts)
 // file from a single file of source text.
 Output* TranspileDeclaration(const std::string& input, const Options& options);
+
+// --- fs.go: transpileFS ---
+// transpileFS implements the vfs.FS operations the transpiler needs; the
+// rest panic like Go's nil-embedded vfs.FS.
+struct transpileFS : vfs::FS {
+public:
+	std::unordered_map<std::string, std::string> files;
+
+	bool UseCaseSensitiveFileNames() override { return true; }
+
+	bool FileExists(const std::string& path) override {
+		auto it = files.find(path);
+		if (it == files.end()) {
+			throw std::string("unexpected file existence check for \"" +
+			                  path + "\"");
+		}
+		return true;
+	}
+
+	std::pair<std::string, bool> ReadFile(const std::string& path) override {
+		auto it = files.find(path);
+		if (it == files.end()) {
+			throw std::string("unexpected file read for \"" + path +
+			                  "\"");
+		}
+		return {it->second, true};
+	}
+
+	bool DirectoryExists(const std::string& path) override {
+		throw std::string("unexpected directory existence check for \"" +
+		                  path + "\"");
+	}
+
+	std::string Realpath(const std::string& path) override {
+		throw std::string("unexpected realpath request for \"" + path +
+		                  "\"");
+	}
+
+	vfs::Error WriteFile(const std::string& path,
+	                     const std::string& data) override {
+		throw std::string("unexpected file write for \"" + path + "\"");
+	}
+
+	vfs::Error AppendFile(const std::string& path,
+	                      const std::string& data) override {
+		throw std::string("unexpected file append for \"" + path + "\"");
+	}
+
+	vfs::Error Remove(const std::string& path) override {
+		throw std::string("unexpected file remove for \"" + path + "\"");
+	}
+
+	vfs::Error Chtimes(const std::string& path, vfs::TimePoint aTime,
+	                   vfs::TimePoint mTime) override {
+		throw std::string("unexpected chtimes for \"" + path + "\"");
+	}
+
+	vfs::Entries GetAccessibleEntries(const std::string& path) override {
+		throw std::string("unexpected directory read for \"" + path +
+		                  "\"");
+	}
+
+	std::shared_ptr<vfs::FileInfo> Stat(const std::string& path) override {
+		throw std::string("unexpected stat for \"" + path + "\"");
+	}
+};
 
 } // namespace tsc::transpile

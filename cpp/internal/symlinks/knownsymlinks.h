@@ -45,10 +45,12 @@ class KnownSymlinks {
 	collections::SyncMap<tspath::Path,
 	                     std::shared_ptr<collections::SyncSet<std::string>>>
 	    filesByRealpath;
+public:
+	// Go unexported fields; see note above.
 	std::string cwd;
 	bool useCaseSensitiveFileNames = false;
 
-public:
+
 	KnownSymlinks(std::string currentDirectory,
 	              bool useCaseSensitiveFileNames_)
 	    : cwd(std::move(currentDirectory)),
@@ -177,7 +179,10 @@ public:
 		}
 	}
 
-private:
+	// === package-internal surface (knownsymlinks_test.go is
+	// `package symlinks`, not symlinks_test; Go unexported members are
+	// test-visible, so they stay public here).
+
 	// guessDirectorySymlink — knownsymlinks.go:114. Returns (resolved,
 	// original) directory pair.
 	std::pair<std::string, std::string>

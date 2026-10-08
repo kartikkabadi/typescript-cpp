@@ -6898,7 +6898,27 @@ inline Node* deepCloneNode(NodeFactory& f, const Node* node,
 		}
 		case Kind::SourceFile:
 		{
-			return nullptr;
+			// Go deepclone.go: VisitEachChild on a SourceFile visits Statements +
+			// EndOfFileToken and rebuilds via updateSourceFile (falling back to
+			// SourceFile.Clone when nothing changed).
+			auto* n = static_cast<const SourceFile*>(node);
+			auto* stmts = deepCloneNodeList(f, n->Statements, syntheticLocation);
+			auto* eof = deepCloneNode(f, n->EndOfFileToken, syntheticLocation);
+			Node* c;
+			if (stmts != n->Statements || eof != n->EndOfFileToken) {
+				c = f.updateSourceFile(const_cast<SourceFile*>(n), stmts, eof);
+			} else {
+				auto* updated = f.newSourceFile(
+					n->parseOptions, n->text,
+					const_cast<NodeList*>(n->Statements),
+					const_cast<Node*>(n->EndOfFileToken));
+				updated->as<SourceFile>()->copyFrom(
+					const_cast<SourceFile*>(n));
+				c = cloneNode(updated, const_cast<Node*>(node), f.hooks);
+			}
+			if (syntheticLocation) c->loc = TextRange{-1, -1};
+			if (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));
+			return c;
 		}
 		case Kind::SpreadAssignment:
 		{

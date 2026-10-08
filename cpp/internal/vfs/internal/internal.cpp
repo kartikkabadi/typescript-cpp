@@ -2,6 +2,7 @@
 #include "internal/vfs/internal/internal.h"
 
 #include <cstdint>
+#include <string>
 #include <string_view>
 
 #include "internal/ast/ast.h" // TSC_UNREACHABLE
@@ -16,7 +17,8 @@ std::pair<std::string, bool> decodeBytes(const std::string& s);
 int rootLength(const std::string& p) {
 	int l = tspath::getEncodedRootLength(p);
 	if (l == 0) {
-		TSC_UNREACHABLE(("vfs: path \"" + p + "\" is not absolute").c_str());
+		throw std::string{"vfs: path \"" + std::string{p} +
+		                  "\" is not absolute"};
 	} else if (l < 0) {
 		return ~l;
 	}

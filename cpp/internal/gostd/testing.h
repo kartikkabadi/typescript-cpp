@@ -73,11 +73,8 @@ public:
 		if (child.failed_) {
 			failed_ = true;
 		}
-		// Go doesn't mark the parent skipped for a skipped subtest, but
-		// the runner needs the result: propagate it for reporting.
-		if (child.skipped_) {
-			skipped_ = true;
-		}
+		// Go doesn't mark the parent skipped for a skipped subtest:
+		// `go test` reports `--- SKIP: TestX/child` but `--- PASS: TestX`.
 		return !child.failed_;
 	}
 
@@ -135,24 +132,24 @@ public:
 	}
 	void Error(std::initializer_list<fmtArg> args) {
 		failed_ = true;
-		std::cerr << detail::joinArgs(args) << '\n';
+		std::cerr << name_ << ": " << detail::joinArgs(args) << '\n';
 	}
 	void Errorf(std::string_view format, std::initializer_list<fmtArg> args) {
 		failed_ = true;
-		std::cerr << sprintf(format, args) << '\n';
+		std::cerr << name_ << ": " << sprintf(format, args) << '\n';
 	}
 
 	// Fatal is equivalent to Log + FailNow: marks the test failed and
 	// unwinds like runtime.Goexit.
 	[[noreturn]] void Fatal(std::initializer_list<fmtArg> args) {
 		failed_ = true;
-		std::cerr << detail::joinArgs(args) << '\n';
+		std::cerr << name_ << ": " << detail::joinArgs(args) << '\n';
 		throw testGoexit{};
 	}
 	[[noreturn]] void Fatalf(std::string_view format,
 	                         std::initializer_list<fmtArg> args) {
 		failed_ = true;
-		std::cerr << sprintf(format, args) << '\n';
+		std::cerr << name_ << ": " << sprintf(format, args) << '\n';
 		throw testGoexit{};
 	}
 	[[noreturn]] void FailNow() {

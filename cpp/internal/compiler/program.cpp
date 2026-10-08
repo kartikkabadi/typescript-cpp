@@ -924,8 +924,51 @@ SimpleProgram::getBindAndCheckDiagnosticsWithChecker(
 			    Unused_ts_expect_error_directive));
 		}
 	}
-	// applyContentMapperDiagnosticDirectives — content mappers not in scope;
-	// files have no DiagnosticDirectives in this mode.
+	filtered = applyContentMapperDiagnosticDirectives(sourceFile,
+	                                                std::move(filtered));
+	return filtered;
+}
+
+// program.go:1543 applyContentMapperDiagnosticDirectives
+std::vector<Diagnostic*>
+SimpleProgram::applyContentMapperDiagnosticDirectives(
+    SourceFile* sourceFile, std::vector<Diagnostic*> diags) {
+	const auto* directives = sourceFile->DiagnosticDirectives();
+	if (directives == nullptr || directives->empty()) {
+		return diags;
+	}
+	std::vector<bool> used(directives->size());
+	auto markUsed = [&](Diagnostic* diag) -> bool {
+		if (diag->File() != sourceFile || !diag->Source().empty()) {
+			return false;
+		}
+		for (size_t i = 0; i < directives->size(); i++) {
+			const auto& directive = (*directives)[i];
+			if (diag->Pos() >= directive.VirtualRange.pos() &&
+			    diag->Pos() < directive.VirtualRange.end()) {
+				used[i] = true;
+				return true;
+			}
+		}
+		return false;
+	};
+	std::vector<Diagnostic*> filtered;
+	filtered.reserve(diags.size());
+	for (auto* diag : diags) {
+		if (!markUsed(diag)) {
+			filtered.push_back(diag);
+		}
+	}
+	for (size_t i = 0; i < directives->size(); i++) {
+		const auto& directive = (*directives)[i];
+		if (directive.Policy == MappedDiagnosticDirectivePolicy::Expect &&
+		    !used[i]) {
+			filtered.push_back(newExternalDiagnostic(
+			    sourceFile, directive.OriginalRange, directive.Source,
+			    DiagnosticCategory::Error, directive.UnusedCode,
+			    directive.UnusedMessageText));
+		}
+	}
 	return filtered;
 }
 
@@ -1931,7 +1974,10 @@ void SimpleProgram::verifyCompilerOptions() {
 		}
 		for (auto* file : files) {
 			tspath::Path rootPath = file->Path();
-			// CanonicalSourceFile — no content mappers → file itself.
+			if (auto* canonical = file->CanonicalSourceFile();
+			    canonical != nullptr) {
+				rootPath = canonical->Path();
+			}
 			if (sourceFileMayBeEmitted(file, this, false, false) &&
 			    !rootPaths.count(rootPath)) {
 				includeProcessor_.addProcessingDiagnostic(

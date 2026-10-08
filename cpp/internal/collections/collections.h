@@ -10,6 +10,8 @@
 #include <utility>
 #include <vector>
 
+#include "internal/json/json.h"
+
 namespace tsc::collections {
 
 // OrderedMap — insertion-ordered map mirroring
@@ -104,7 +106,77 @@ struct OrderedMap {
 	}
 
 	OrderedMap Clone() const { return *this; }
+
+	// Clear — ordered_map.go:183: removes all entries; the allocated
+	// capacity is kept for reuse (Go clear() semantics).
+	void Clear() { keys.clear(); mp.clear(); }
+
+	// unmarshalJSONFrom — ordered_map.go:263: json.UnmarshalerFrom.
+	// "null" is a no-op by the unmarshaler convention; non-objects
+	// error like Go.
+	std::string unmarshalJSONFrom(tsc::json::Decoder& dec) {
+		auto [token, err] = dec.readToken();
+		if (!err.empty()) return err;
+		if (token.kind() == 'n') {
+			return {};
+		}
+		if (token.kind() != '{') {
+			return "cannot unmarshal non-object JSON value into Map";
+		}
+		while (dec.peekKind() != '}') {
+			K key{};
+			V value{};
+			if (auto e = tsc::json::unmarshalDecode(dec, &key);
+			    !e.empty()) {
+				return e;
+			}
+			if (auto e = tsc::json::unmarshalDecode(dec, &value);
+			    !e.empty()) {
+				return e;
+			}
+			Set(key, std::move(value));
+		}
+		auto [endTok, endErr] = dec.readToken();
+		return endErr;
+	}
 };
+
+// NewOrderedMapWithSizeHint — ordered_map.go:34.
+template <typename K, typename V>
+inline OrderedMap<K, V>* newOrderedMapWithSizeHint(size_t hint) {
+	return new OrderedMap<K, V>{hint};
+}
+
+// OrderedSet — ordered_set.go: an insertion-ordered set built on
+// OrderedMap[T, struct{}].
+template <typename T>
+struct OrderedSet {
+private:
+	OrderedMap<T, bool> m;
+
+public:
+	OrderedSet() = default;
+	explicit OrderedSet(size_t hint) : m(hint) {}
+
+	void Add(const T& value) { m.Set(value, false); }
+	bool Has(const T& value) const { return m.Has(value); }
+	// Delete — returns true when the value was present.
+	bool Delete(const T& value) { return m.Delete(value).second; }
+	// Values — insertion order (Go returns an iterator over m.Keys()).
+	const std::vector<T>& Values() const { return m.Keys(); }
+	void Clear() { m.Clear(); }
+	size_t Size() const { return m.Size(); }
+	OrderedSet Clone() const { return OrderedSet{m}; }
+
+private:
+	explicit OrderedSet(OrderedMap<T, bool> mm) : m(std::move(mm)) {}
+};
+
+// NewOrderedSetWithSizeHint — ordered_set.go:11.
+template <typename T>
+inline OrderedSet<T>* newOrderedSetWithSizeHint(size_t hint) {
+	return new OrderedSet<T>{hint};
+}
 
 // SyncMap — mutex-guarded map mirroring tsc/internal/collections/sync_map.go.
 // LoadOrStore keeps the first stored value for a key (Go semantics).

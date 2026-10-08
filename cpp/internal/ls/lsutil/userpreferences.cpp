@@ -762,6 +762,90 @@ UserPreferences withConfig(UserPreferences p, const JsonObject& config) {
 
 } // namespace
 
+// --- test access (userpreferences_test.go) ---
+// The Go tests live in-package and call unexported helpers directly; these
+// wrappers give the C++ test ports the same access without widening the
+// product API surface.
+
+// TestWithConfig — UserPreferences{}.withConfig(config).
+UserPreferences TestWithConfig(UserPreferences p, const JsonObject& config) {
+	return withConfig(std::move(p), config);
+}
+
+static bool sameJsonAny(const JsonAny& a, const JsonAny& b) {
+	if (a.kind != b.kind) return false;
+	switch (a.kind) {
+	case JsonAny::K::Nil: return true;
+	case JsonAny::K::Bool: return a.b == b.b;
+	case JsonAny::K::Int: return a.i == b.i;
+	case JsonAny::K::Float: return a.f == b.f;
+	case JsonAny::K::String: return a.s == b.s;
+	case JsonAny::K::Array:
+		if (a.arr.size() != b.arr.size()) return false;
+		for (size_t i = 0; i < a.arr.size(); i++) {
+			if (!sameJsonAny(a.arr[i], b.arr[i])) return false;
+		}
+		return true;
+	case JsonAny::K::Object:
+		if (a.obj.size() != b.obj.size()) return false;
+		for (auto& [k, v] : a.obj) {
+			auto it = b.obj.find(k);
+			if (it == b.obj.end() || !sameJsonAny(v, it->second)) return false;
+		}
+		return true;
+	}
+	return false;
+}
+
+// AllFieldsNonZeroUserPreferences — fillNonZeroValues (userpreferences_test.go).
+// Go fills every exported field with a non-zero value via reflection; here each
+// fieldInfo's apply is driven with candidate JSON values until the field's
+// serialized value differs from its zero-field baseline.
+UserPreferences AllFieldsNonZeroUserPreferences() {
+	UserPreferences p;
+	UserPreferences zero;
+	std::vector<JsonAny> candidates;
+	candidates.emplace_back(true);
+	candidates.emplace_back(1);
+	candidates.emplace_back(1.5);
+	static const char* strings[] = {
+	    "test", "auto", "single", "double", "braces", "none", "all",
+	    "literals", "insert", "remove", "ignore", "shortest", "relative",
+	    "non-relative", "project-relative", "minimal", "index", "js",
+	    "always", "prompt", "never", "on", "off", "default", "first",
+	    "last", "natural", "ordinal", "caseSensitive", "caseInsensitive",
+	    "unicode", "lower", "upper", "inline", ".", "..", "en", "normal",
+	    "verbose", "classic", "node", "preserve", "es2015", "esnext",
+	    "commonjs", "system", "amd", "umd",
+	};
+	for (const char* s : strings) candidates.emplace_back(s);
+	candidates.emplace_back(std::vector<JsonAny>{JsonAny("test")});
+	candidates.emplace_back(JsonObject{{"test", JsonAny("test")}});
+
+	std::vector<std::string> unfilled;
+	for (const fieldInfo& info : fieldInfoCache()) {
+		JsonAny baseline = info.serialize(zero);
+		bool filled = false;
+		for (const JsonAny& candidate : candidates) {
+			info.apply(&p, candidate);
+			if (!sameJsonAny(info.serialize(p), baseline)) {
+				filled = true;
+				break;
+			}
+		}
+		if (!filled) unfilled.emplace_back(info.rawName);
+	}
+	if (!unfilled.empty()) {
+		std::string names;
+		for (auto& n : unfilled) names += " " + n;
+		fprintf(stderr,
+		        "AllFieldsNonZeroUserPreferences: no candidate filled "
+		        "field(s):%s\n",
+		        names.c_str());
+	}
+	return p;
+}
+
 // NewDefaultUserPreferences — userpreferences.go:16
 UserPreferences NewDefaultUserPreferences() {
 	UserPreferences p;
