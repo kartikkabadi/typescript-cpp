@@ -985,9 +985,11 @@ Node* classFieldsTransformer::visitMethodOrAccessorDeclaration(Node* node) {
 	}
 
 	// leave invalid code untransformed
-	privateIdentifierInfo* info = accessPrivateIdentifier(node->name());
+	privateIdentifierInfo* info =
+	    getPrivateIdentifier(getPrivateIdentifierEnvironment(), node->name());
 	debugAssert(info != nullptr, "Undeclared private name for property declaration.");
-	if (!info->isValid) {
+	if (info->kind == printer::PrivateIdentifierKind::Untransformed ||
+	    !info->isValid) {
 		return node;
 	}
 
@@ -1196,11 +1198,13 @@ Node* classFieldsTransformer::transformAutoAccessor(PropertyDeclaration* node) {
 Node* classFieldsTransformer::transformPrivateFieldInitializer(PropertyDeclaration* node) {
 	if (shouldTransformClassElementToWeakMap(node->asNode())) {
 		// If we are transforming private elements into WeakMap/WeakSet, we should elide the node.
-		privateIdentifierInfo* info = accessPrivateIdentifier(node->name);
+		privateIdentifierInfo* info = getPrivateIdentifier(
+		    getPrivateIdentifierEnvironment(), node->name);
 		debugAssert(info != nullptr, "Undeclared private name for property declaration.");
 
 		// Leave invalid code untransformed
-		if (!info->isValid) {
+		if (info->kind == printer::PrivateIdentifierKind::Untransformed ||
+		    !info->isValid) {
 			return node->asNode();
 		}
 
