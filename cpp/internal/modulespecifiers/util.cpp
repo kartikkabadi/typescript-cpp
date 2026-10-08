@@ -213,6 +213,42 @@ static std::shared_ptr<std::regex> stringToRegex(std::string pattern) {
 		rxFlags |= std::regex_constants::icase;
 	}
 
+	// Go compiles with RE2, which rejects backreferences and look-around
+	// that ECMAScript accepts; a failed Go compile is cached as nil and
+	// the pattern is skipped. Mirror that here so patterns Go can never
+	// execute (including backrefs, whose matching is NP-complete in a
+	// backtracking engine) are skipped identically. Outside a character
+	// class `\1`–`\9` is a backref; inside one it is an octal escape,
+	// which RE2 accepts, so class membership is tracked.
+	bool re2Unsupported = false;
+	bool inCharClass = false;
+	for (size_t i = 0; i < pattern.size() && !re2Unsupported; i++) {
+		char c = pattern[i];
+		if (c == '\\') {
+			if (i + 1 < pattern.size() && !inCharClass &&
+			    pattern[i + 1] >= '1' && pattern[i + 1] <= '9') {
+				re2Unsupported = true;
+			}
+			i++;  // consume the escaped char (a `\\` pair can't hide a backref)
+		} else if (c == '[') {
+			inCharClass = true;
+		} else if (c == ']') {
+			inCharClass = false;
+		} else if (!inCharClass && c == '(' && i + 2 < pattern.size() &&
+		           pattern[i + 1] == '?') {
+			char g = pattern[i + 2];
+			if (g == '=' || g == '!' ||
+			    (g == '<' && i + 3 < pattern.size() &&
+			     (pattern[i + 3] == '=' || pattern[i + 3] == '!'))) {
+				re2Unsupported = true;
+			}
+		}
+	}
+	if (re2Unsupported) {
+		regexPatternCache[key] = nullptr;
+		return nullptr;
+	}
+
 	try {
 		auto compiled = std::make_shared<std::regex>(pattern, rxFlags);
 		regexPatternCache[key] = compiled;
