@@ -338,6 +338,7 @@ add_library(tsc STATIC
 	internal/testrunner/testrunner_deps.cpp
 	internal/testrunner/transpile_runner.cpp
 	internal/testrunner/compiler_runner.cpp
+	internal/testrunner/compiler_test_filter.cpp
 	# === slice: testutil ===
 	internal/patience/patience.cpp
 	internal/testutil/harnessutil/harnessutil.cpp
