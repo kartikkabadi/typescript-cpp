@@ -26,15 +26,14 @@ type ReferencedFilePair struct {
 }
 
 type OutputPaths interface {
-	DeclarationFilePath() string
-	JsFilePath() string
+	DeclarationFilePath() tspath.RootedFilePath
+	JsFilePath() tspath.RootedFilePath
 }
 
 // Used to be passed in the TransformationContext, which is now just an EmitContext
 type DeclarationEmitHost interface {
 	modulespecifiers.ModuleSpecifierGenerationHost
-	GetCurrentDirectory() string
-	UseCaseSensitiveFileNames() bool
+	CaseSensitivity() tspath.CaseSensitivity
 	GetSourceFileFromReference(origin *ast.SourceFile, ref *ast.FileReference) *ast.SourceFile
 
 	GetOutputPathsFor(file *ast.SourceFile, forceDtsPaths bool) OutputPaths
@@ -65,8 +64,7 @@ type DeclarationTransformer struct {
 	tracker             *SymbolTrackerImpl
 	state               *SymbolTrackerSharedState
 	resolver            printer.EmitResolver
-	declarationFilePath string
-	declarationMapPath  string
+	declarationFilePath tspath.RootedFilePath
 
 	needsDeclare                     bool
 	needsScopeFixMarker              bool
@@ -98,7 +96,7 @@ type DeclarationTransformer struct {
 }
 
 // TODO: Convert to transformers.TransformerFactory signature to allow more automatic composition with other transforms
-func NewDeclarationTransformer(host DeclarationEmitHost, resolver printer.EmitResolver, compilerOptions *core.CompilerOptions, declarationFilePath string, declarationMapPath string) *DeclarationTransformer {
+func NewDeclarationTransformer(host DeclarationEmitHost, resolver printer.EmitResolver, compilerOptions *core.CompilerOptions, declarationFilePath tspath.RootedFilePath) *DeclarationTransformer {
 	if resolver == nil || resolver.EmitContext() == nil {
 		panic("DeclarationTransformer requires an EmitResolver with an EmitContext")
 	}
@@ -114,7 +112,6 @@ func NewDeclarationTransformer(host DeclarationEmitHost, resolver printer.EmitRe
 		state:               state,
 		resolver:            resolver,
 		declarationFilePath: declarationFilePath,
-		declarationMapPath:  declarationMapPath,
 	}
 	tx.state.reportExpandoFunctionErrors = func(node *ast.Node) {
 		if !tx.state.isolatedDeclarations {
@@ -372,12 +369,11 @@ func (tx *DeclarationTransformer) transformSourceFile(node *ast.SourceFile) *ast
 			combinedStatements = withMarker
 		}
 	}
-	outputFilePath := tspath.GetDirectoryPath(tspath.NormalizeSlashes(tx.declarationFilePath))
 	result := tx.Factory().UpdateSourceFile(node, combinedStatements, node.EndOfFileToken)
 	result.AsSourceFile().LibReferenceDirectives = tx.getLibReferences()
 	result.AsSourceFile().TypeReferenceDirectives = tx.getTypeReferences()
 	result.AsSourceFile().IsDeclarationFile = true
-	result.AsSourceFile().ReferencedFiles = tx.getReferencedFiles(outputFilePath)
+	result.AsSourceFile().ReferencedFiles = tx.getReferencedFiles(tx.declarationFilePath.Directory())
 	return result.AsNode()
 }
 
@@ -463,7 +459,7 @@ func (tx *DeclarationTransformer) transformAndReplaceLatePaintedStatements(state
 	return tx.Factory().NewNodeList(results)
 }
 
-func (tx *DeclarationTransformer) getReferencedFiles(outputFilePath string) (results []*ast.FileReference) {
+func (tx *DeclarationTransformer) getReferencedFiles(outputFilePath tspath.RootedDirectoryPath) (results []*ast.FileReference) {
 	// Handle path rewrites for triple slash ref comments
 	for _, pair := range tx.rawReferencedFiles {
 		sourceFile := pair.file
@@ -478,34 +474,31 @@ func (tx *DeclarationTransformer) getReferencedFiles(outputFilePath string) (res
 			continue
 		}
 
-		var declFileName string
+		var declFileName tspath.RootedFilePath
 		if file.IsDeclarationFile {
 			declFileName = file.FileName()
 		} else {
 			paths := tx.host.GetOutputPathsFor(file, true)
 			// Try to use output path for referenced file, or output js path if that doesn't exist, or the input path if all else fails
 			declFileName = paths.DeclarationFilePath()
-			if len(declFileName) == 0 {
+			if declFileName == "" {
 				declFileName = paths.JsFilePath()
 			}
-			if len(declFileName) == 0 {
+			if declFileName == "" {
 				declFileName = file.FileName()
 			}
 		}
 		// Should only be missing if the source file is missing a fileName (at which point we can't name a reference to it anyway)
 		// TODO: Shouldn't this be a crash or assert instead of a silent continue?
-		if len(declFileName) == 0 {
+		if declFileName == "" {
 			continue
 		}
 
 		fileName := tspath.GetRelativePathToDirectoryOrUrl(
-			outputFilePath,
-			declFileName,
-			false, // TODO: Probably unsafe to assume this isn't a URL, but that's what strada does
-			tspath.ComparePathsOptions{
-				CurrentDirectory:          tx.host.GetCurrentDirectory(),
-				UseCaseSensitiveFileNames: tx.host.UseCaseSensitiveFileNames(),
-			},
+			outputFilePath.AsString(),
+			declFileName.AsString(),
+			false,
+			tx.host.CaseSensitivity(),
 		)
 
 		results = append(results, &ast.FileReference{
