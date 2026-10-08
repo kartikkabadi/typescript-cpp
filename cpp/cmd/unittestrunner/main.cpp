@@ -54,7 +54,10 @@ struct RunCtx {
 
 void* runTestImpl(void* arg) {
 	auto* rc = static_cast<RunCtx*>(arg);
-	tsc::gostd::testing::T t;
+	// The top-level T carries the registered test name (Go populates
+	// t.name for TestX itself) — tests like the stackSanitizer baselines
+	// read it via t->Name().
+	tsc::gostd::testing::T t{rc->tc->name};
 	// Invoke the test fn on the runner's T directly (not via t.Run): a
 	// t.Skip() in the test body must mark the top-level test skipped,
 	// while a skip inside a t.Run subtest must not — Go reports

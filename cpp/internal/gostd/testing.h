@@ -52,6 +52,12 @@ inline std::string joinArgs(std::initializer_list<fmtArg> args) {
 
 class T {
 public:
+	T() = default;
+	// T(name) — the test framework constructs the top-level T with the
+	// registered test name (Go populates t.name for TestX itself);
+	// subtests get their name_ via Run instead.
+	explicit T(std::string_view name) : name_(name) {}
+
 	virtual ~T() {
 		// Go runs Cleanup functions when the test function returns,
 		// LIFO. A test T lives exactly as long as its test function
