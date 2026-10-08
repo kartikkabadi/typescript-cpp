@@ -4624,8 +4624,59 @@ Symbol* NodeBuilderImpl::getParentSymbolOfTypeParameter(
 	return ch->getSymbolOfNode(host);
 }
 
-// typeReferenceToTypeNode (nodebuilderimpl.go:2984).
-Node* NodeBuilderImpl::typeReferenceToTypeNode(Type* t) {
+// ---------------------------------------------------------------------------
+// keyBuilder/getTypeListKey — same content-keyed hash as the other checker
+// TUs (checker.go). Used for CompositeTypeCacheIdentity.inferTypeParameters.
+namespace {
+struct keyBuilder {
+	std::string buf;
+	void writeUint64(uint64_t v) {
+		char b[8];
+		std::memcpy(b, &v, 8);
+		buf.append(b, 8);
+	}
+	void writeInt(int v) { writeUint64(static_cast<uint64_t>(v)); }
+	void writeType(Type* t) {
+		uint32_t id = static_cast<uint32_t>(t->id);
+		char b[4];
+		std::memcpy(b, &id, 4);
+		buf.append(b, 4);
+	}
+	void writeTypes(const std::vector<Type*>& types) {
+		writeInt(static_cast<int>(types.size()));
+		for (Type* t : types) {
+			writeType(t);
+		}
+	}
+	CacheKey hash() {
+		CacheKey key;
+		uint64_t v = 0;
+		int shift = 0;
+		for (char c : buf) {
+			v |= static_cast<uint64_t>(static_cast<uint8_t>(c)) << (shift * 8);
+			if (++shift == 8) {
+				key.w.push_back(v);
+				v = 0;
+				shift = 0;
+			}
+		}
+		if (shift != 0) {
+			key.w.push_back(v);
+		}
+		key.w.push_back(buf.size());
+		return key;
+	}
+};
+
+CacheKey getTypeListKey(const std::vector<Type*>& types) {
+	keyBuilder b;
+	b.writeTypes(types);
+	return b.hash();
+}
+}  // namespace
+
+// arrayOrTupleTypeToNode (nodebuilderimpl.go:3088).
+Node* NodeBuilderImpl::arrayOrTupleTypeToNode(Type* t) {
 	std::vector<Type*> typeArguments = ch->getTypeArguments(t);
 	if (t->Target() == ch->globalArrayType ||
 	    t->Target() == ch->globalReadonlyArrayType) {
@@ -4645,7 +4696,9 @@ Node* NodeBuilderImpl::typeReferenceToTypeNode(Type* t) {
 		} else {
 			return f->newTypeOperatorNode(Kind::ReadonlyKeyword, arrayType);
 		}
-	} else if ((t->Target()->objectFlags & ObjectFlagsTuple) != 0) {
+	} else {
+		TSC_ASSERT((t->Target()->objectFlags & ObjectFlagsTuple) != 0,
+		           "expected array or tuple type");
 		bool same = true;
 		std::vector<Type*> newArgs(typeArguments.begin(),
 		                           typeArguments.end());
@@ -4749,7 +4802,13 @@ Node* NodeBuilderImpl::typeReferenceToTypeNode(Type* t) {
 		ctx->encounteredError = true;
 		return nullptr;
 		// TODO: GH#18217
-	} else if ((ctx->flags &
+	}
+}
+
+// typeReferenceToTypeNode (nodebuilderimpl.go:3160).
+Node* NodeBuilderImpl::typeReferenceToTypeNode(Type* t) {
+	std::vector<Type*> typeArguments = ch->getTypeArguments(t);
+	if ((ctx->flags &
 	            nodebuilder::FlagsWriteClassExpressionAsTypeLiteral) != 0 &&
 	           t->symbol->valueDeclaration != nullptr &&
 	           isClassLike(t->symbol->valueDeclaration) &&
@@ -4891,12 +4950,27 @@ Node* NodeBuilderImpl::visitAndTransformType(
 	}
 
 	TypeId typeId = t->id;
+	bool isArrayOrTuple = ch->isArrayOrTupleType(t);
+	if (isArrayOrTuple) {
+		// Deferred and regular references share a cycle identity.
+		typeId = ch->createTypeReference(t->Target(),
+		                                 ch->getTypeArguments(t))
+		             ->id;
+	}
+	if (ctx->visitedTypes.count(typeId)) {
+		return createCyclicStructurePlaceholder();
+	}
+
 	bool isConstructorObject =
 	    (t->objectFlags & ObjectFlagsAnonymous) != 0 &&
 	    t->symbol != nullptr &&
 	    (t->symbol->flags & SymbolFlagsClass) != 0;
 	std::optional<CompositeSymbolIdentity> id;
-	if ((t->objectFlags & ObjectFlagsReference) != 0 &&
+	if (isArrayOrTuple) {
+		// Do not bound finite container nesting by the shared Array
+		// symbol or tuple origin.
+		id = std::nullopt;
+	} else if ((t->objectFlags & ObjectFlagsReference) != 0 &&
 	    t->AsTypeReference()->node != nullptr) {
 		id = CompositeSymbolIdentity{
 			false, 0, getNodeId(t->AsTypeReference()->node)};
@@ -4912,7 +4986,11 @@ Node* NodeBuilderImpl::visitAndTransformType(
 	// tracking symbols instead of types allows us to catch circular
 	// references to instantiations of the same anonymous type
 
-	CompositeTypeCacheIdentity key{typeId, ctx->flags, ctx->internalFlags};
+	CompositeTypeCacheIdentity key{typeId, ctx->flags, ctx->internalFlags,
+	                               {}};
+	if (!ctx->inferTypeParameters.empty()) {
+		key.inferTypeParameters = getTypeListKey(ctx->inferTypeParameters);
+	}
 	// Don't rely on type cache if we're expanding a type, because we need to
 	// compute `canIncreaseExpansionDepth`.
 	bool canUseCache = ctx->maxExpansionDepth < 0;
@@ -5251,7 +5329,10 @@ Node* NodeBuilderImpl::typeToTypeNode(Type* t) {
 			ctx->depth--;
 			return result;
 		}
-		if (t->AsTypeReference()->node != nullptr) {
+		if (ch->isArrayOrTupleType(t)) {
+			return visitAndTransformType(
+				t, &NodeBuilderImpl::arrayOrTupleTypeToNode);
+		} else if (t->AsTypeReference()->node != nullptr) {
 			return visitAndTransformType(
 				t, &NodeBuilderImpl::typeReferenceToTypeNode);
 		} else {

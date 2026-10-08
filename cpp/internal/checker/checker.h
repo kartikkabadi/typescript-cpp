@@ -4826,6 +4826,9 @@ struct CompositeTypeCacheIdentity {
 	TypeId typeId = 0;
 	nodebuilder::Flags flags = 0;
 	nodebuilder::InternalFlags internalFlags = 0;
+	// nodebuilderimpl.go — distinguishes entries keyed under different
+	// in-flight inference contexts (empty when none).
+	CacheKey inferTypeParameters;
 	bool operator==(const CompositeTypeCacheIdentity&) const = default;
 };
 
@@ -4833,7 +4836,8 @@ struct CompositeTypeCacheIdentityHash {
 	size_t operator()(const CompositeTypeCacheIdentity& k) const {
 		size_t h = static_cast<size_t>(k.typeId);
 		h = h * 0x9E3779B97F4A7C15ull ^ static_cast<size_t>(k.flags);
-		return h * 0x9E3779B97F4A7C15ull ^ static_cast<size_t>(k.internalFlags);
+		h = h * 0x9E3779B97F4A7C15ull ^ static_cast<size_t>(k.internalFlags);
+		return h * 0x9E3779B97F4A7C15ull ^ CacheKeyHash{}(k.inferTypeParameters);
 	}
 };
 
@@ -5242,6 +5246,7 @@ struct NodeBuilderImpl {
 	Node* typeToTypeNodeOrCircularityElision(Type* t);
 	Node* conditionalTypeToTypeNode(Type* _t);
 	Symbol* getParentSymbolOfTypeParameter(Type* typeParameter);
+	Node* arrayOrTupleTypeToNode(Type* t);
 	Node* typeReferenceToTypeNode(Type* t);
 	Node* visitAndTransformType(Type* t,
 	                            Node* (NodeBuilderImpl::*transform)(Type*));
