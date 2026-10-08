@@ -1593,6 +1593,9 @@ Node* CommonJSModuleTransformer::visitTopLevelNestedWithStatement(
 	Node* expression = visitor()->visitNode(node->Expression);
 	Node* statement =
 		topLevelNestedVisitor->visitEmbeddedStatement(node->Statement);
+	if (statement == nullptr) {
+		statement = factory()->newEmptyStatement();
+	}
 	return factory()->updateWithStatement(node, expression, statement);
 }
 
