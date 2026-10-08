@@ -1866,7 +1866,7 @@ std::vector<SymbolAndEntries*> LanguageService::getReferencedSymbolsForNode(
 		        resolvedRef->file->Symbol);
 		    moduleSymbol != nullptr) {
 			return getReferencedSymbolsForModule(
-			    ctx, program, moduleSymbol,
+			    checker, program, moduleSymbol,
 			    /*excludeImportTypeOfExportEquals*/ false, sourceFiles,
 			    &sourceFilesSet);
 		}
@@ -1928,7 +1928,7 @@ std::vector<SymbolAndEntries*> LanguageService::getReferencedSymbolsForNode(
 			return {};
 		}
 		return getReferencedSymbolsForModule(
-		    ctx, program, symbol->parent,
+		    checker, program, symbol->parent,
 		    /*excludeImportTypeOfExportEquals*/ false, sourceFiles,
 		    &sourceFilesSet);
 	}
@@ -2041,7 +2041,7 @@ LanguageService::getReferencedSymbolsForModuleIfDeclaredBySourceFile(
 	// If exportEquals != nil, we're about to add references to `import("mod")`
 	// anyway, so don't double-count them.
 	auto moduleReferences = getReferencedSymbolsForModule(
-	    ctx, program, symbol, exportEquals != nullptr, sourceFiles,
+	    checker, program, symbol, exportEquals != nullptr, sourceFiles,
 	    sourceFilesSet);
 	if (exportEquals == nullptr || !(exportEquals->flags & SymbolFlagsAlias) ||
 	    !sourceFilesSet->Has(moduleSourceFileName)) {
@@ -2511,14 +2511,11 @@ Symbol* getMergedAliasedSymbolOfNamespaceExportDeclaration(
 // getReferencedSymbolsForModule — findallreferences.go:1735.
 std::vector<SymbolAndEntries*>
 LanguageService::getReferencedSymbolsForModule(
-    const gostd::Context& ctx, compiler::SimpleProgram* program,
+    checker::Checker* checker, compiler::SimpleProgram* program,
     Symbol* symbol, bool excludeImportTypeOfExportEquals,
     const std::vector<SourceFile*>& sourceFiles,
     collections::Set<std::string>* sourceFilesSet) {
 	debug::assert(symbol->valueDeclaration != nullptr, "");
-
-	auto [checker, done] = program->GetTypeCheckerForFileExclusive(nullptr);
-	doneGuard doneGuard_{done};
 
 	auto moduleRefs =
 	    findModuleReferences(program, sourceFiles, symbol, checker);

@@ -1231,4 +1231,27 @@ Profile/*atomTarget*/Card;
 }
 REGISTER_FOURSLASH_TEST(TestContentMapperTypeDefinition, TestContentMapperTypeDefinition);
 
+// contentMapperInlayHints_test.go
+// The mapper emits the script verbatim followed by a synthesized render
+// function; the script and four template identifiers map to five disjoint
+// virtual ranges. Each range must release its checker before processing the
+// next range.
+static void TestContentMapperInlayHintsReleaseEachRange(gostd::testing::T* t) {
+	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
+		t->Parallel();
+		auto __fsp = newContentMapperFourslash(t, R"TS(// @Filename: /app.vue
+<script>
+const value = () => 1;
+</script>
+{{value}}
+{{value}}
+{{value}}
+{{value}}
+)TS", std::string(testutil::contentmappertest::ComponentMapper), {".vue"}); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
+		f->GoToFile(t, "/app.vue");
+		f->VerifyBaselineInlayHints(t, nullptr, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayVariableTypeHints = Tristate::True}}));
+	});
+}
+REGISTER_FOURSLASH_TEST(TestContentMapperInlayHintsReleaseEachRange, TestContentMapperInlayHintsReleaseEachRange);
+
 } // namespace

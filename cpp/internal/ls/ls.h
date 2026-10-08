@@ -1721,7 +1721,7 @@ private:
 	    const std::vector<SourceFile*>& sourceFiles, checker::Checker* checker,
 	    refOptions options, collections::Set<std::string>* sourceFilesSet);
 	std::vector<SymbolAndEntries*> getReferencedSymbolsForModule(
-	    const gostd::Context& ctx, compiler::SimpleProgram* program,
+	    checker::Checker* checker, compiler::SimpleProgram* program,
 	    Symbol* symbol, bool excludeImportTypeOfExportEquals,
 	    const std::vector<SourceFile*>& sourceFiles,
 	    collections::Set<std::string>* sourceFilesSet);

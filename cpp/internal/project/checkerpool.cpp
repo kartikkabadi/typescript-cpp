@@ -96,25 +96,28 @@ checkerPool::GetChecker(const gostd::Context& ctx,
 	}
 }
 
-// tryReacquireForRequest — checkerpool.go:157. Checks whether the
-// request already has an associated checker; either returns it
-// directly (still held) or reacquires it by claiming a semaphore
-// slot. The caller must proceed with normal acquisition when this
-// returns ok=false — in that case a slot has already been claimed.
-// Must NOT be called with p.mu held.
+// tryReacquireForRequest — checkerpool.go:145. Claims a semaphore
+// slot, then checks whether the request has an idle associated
+// checker. If the association is in the wrong category (diagnostics
+// index for a query request), it is deleted and normal acquisition
+// proceeds.
+//
+// Request affinity is only a preference for an idle checker, not
+// permission to reuse a held checker: concurrent acquisitions can
+// share the same request ID. The caller must proceed with normal
+// acquisition when this returns ok=false — in that case a slot has
+// already been claimed. Must NOT be called with p.mu held.
 std::tuple<checker::Checker*, std::function<void()>, bool>
 checkerPool::tryReacquireForRequest(const std::string& requestID,
                                     semaphore& sem, bool isDiag) {
+	sem.acquire();
 	if (requestID.empty()) {
-		sem.acquire();
 		return {nullptr, nullptr, false};
 	}
 
-	mu.lock();
+	std::lock_guard<std::mutex> lock(mu);
 	auto it = requestAssociations.find(requestID);
 	if (it == requestAssociations.end()) {
-		mu.unlock();
-		sem.acquire();
 		return {nullptr, nullptr, false};
 	}
 	int index = it->second;
@@ -123,50 +126,20 @@ checkerPool::tryReacquireForRequest(const std::string& requestID,
 	// category. Index 0 is diagnostics; indices 1+ are queries.
 	if ((isDiag && index != 0) || (!isDiag && index == 0)) {
 		requestAssociations.erase(it);
-		mu.unlock();
-		sem.acquire();
 		return {nullptr, nullptr, false};
 	}
 
 	checker::Checker* c = checkers[index].get();
 	if (c == nullptr) {
 		requestAssociations.erase(it);
-		mu.unlock();
-		sem.acquire();
 		return {nullptr, nullptr, false};
 	}
 
-	const std::string& held = heldBy[index];
-	if (held == requestID) {
-		// Same request, checker still held — return without
-		// claiming a slot.
-		mu.unlock();
-		return {c, [] { noop(); }, true};
+	if (heldBy[index].empty()) {
+		heldBy[index] = requestID;
+		return {c, createRelease(requestID, index, c), true};
 	}
 
-	if (held.empty()) {
-		// Same request reacquiring after release — need a
-		// semaphore slot.
-		mu.unlock();
-		sem.acquire();
-		mu.lock();
-		// Re-check: checker may have been disposed while waiting
-		// for the slot.
-		if (checkers[index].get() == c && heldBy[index].empty()) {
-			heldBy[index] = requestID;
-			mu.unlock();
-			return {c, createRelease(requestID, index, c), true};
-		}
-		mu.unlock();
-		// Checker was replaced/disposed while waiting for the
-		// slot. The slot is still claimed; the caller uses it
-		// for normal acquisition.
-		return {nullptr, nullptr, false};
-	}
-
-	// Checker held by another request — claim a slot normally.
-	mu.unlock();
-	sem.acquire();
 	return {nullptr, nullptr, false};
 }
 

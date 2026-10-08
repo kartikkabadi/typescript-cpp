@@ -286,6 +286,9 @@ getCodeActionsToFixClassIncorrectlyImplementsInterface(
 std::pair<CombinedCodeActions*, gostd::Error>
 getAllCodeActionsToFixClassIncorrectlyImplementsInterface(
     const gostd::Context& ctx, CodeFixContext* fixContext) {
+	auto allDiags = getAllDiagnostics(ctx, fixContext->Program,
+	                                  fixContext->SourceFile);
+
 	auto [typeChecker, done] =
 	    fixContext->Program->GetTypeCheckerForFileExclusive(
 	        fixContext->SourceFile);
@@ -304,8 +307,7 @@ getAllCodeActionsToFixClassIncorrectlyImplementsInterface(
 
 	collections::Set<Node*> seenClassDeclarations;
 
-	for (auto* diag : getAllDiagnostics(ctx, fixContext->Program,
-	                                  fixContext->SourceFile)) {
+	for (auto* diag : allDiags) {
 		if (isFixableDiagnostic(
 		        diag, fixClassIncorrectlyImplementsInterfaceErrorCodes)) {
 			auto* classDeclaration =

@@ -146,7 +146,4 @@ checkerPool* newCheckerPool(const CheckerPoolOptions& opts,
                             compiler::SimpleProgram* program,
                             std::function<void(std::string)> log);
 
-// noop — checkerpool.go:533.
-inline void noop() {}
-
 } // namespace tsc::project

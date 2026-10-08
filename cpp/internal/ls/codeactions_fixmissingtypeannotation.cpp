@@ -206,6 +206,9 @@ getIsolatedDeclarationsCodeActions(const gostd::Context& ctx,
 std::pair<CombinedCodeActions*, gostd::Error>
 getAllIsolatedDeclarationsCodeActions(const gostd::Context& ctx,
                                       CodeFixContext* fixContext) {
+	auto allDiags = getAllDiagnostics(ctx, fixContext->Program,
+	                                  fixContext->SourceFile);
+
 	auto [ch, done] = fixContext->Program->GetTypeCheckerForFileExclusive(
 	    fixContext->SourceFile);
 	doneGuard doneGuard_{done};
@@ -226,8 +229,6 @@ getAllIsolatedDeclarationsCodeActions(const gostd::Context& ctx,
 	    .typePrintMode = typePrintModeFull,
 	};
 
-	auto allDiags = getAllDiagnostics(ctx, fixContext->Program,
-	                                  fixContext->SourceFile);
 	for (auto* diag : allDiags) {
 		if (isFixableDiagnostic(diag, isolatedDeclarationsFixErrorCodes)) {
 			auto span =
