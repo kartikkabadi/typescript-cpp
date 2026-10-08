@@ -35,20 +35,6 @@ ParseCommandLineWorkerDiagnostics& CompilerOptionsDidYouMeanDiagnostics() {
 	return *d;
 }
 
-ParseCommandLineWorkerDiagnostics& watchOptionsDidYouMeanDiagnostics() {
-	static auto d = [] {
-		auto d = std::make_unique<ParseCommandLineWorkerDiagnostics>();
-		d->didYouMean.OptionDeclarations = &OptionsForWatch();
-		d->didYouMean.UnknownOptionDiagnostic =
-		    Unknown_watch_option_0;
-		d->didYouMean.UnknownDidYouMeanDiagnostic =
-		    Unknown_watch_option_0_Did_you_mean_1;
-		d->OptionTypeMismatchDiagnostic =
-		    Watch_option_0_requires_a_value_of_type_1;
-		return d;
-	}();
-	return *d;
-}
 
 ParseCommandLineWorkerDiagnostics& buildOptionsDidYouMeanDiagnostics() {
 	static auto d = [] {

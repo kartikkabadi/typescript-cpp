@@ -191,7 +191,6 @@ bool compilerOptionsEqual(const tsc::CompilerOptions& a,
 // TestCommandLineParser — parsed baseline shape (commandlineparser_test.go:318).
 struct TestCommandLineParserBaseline {
 	tsc::CompilerOptions options;
-	tsc::WatchOptions watchoptions;
 	std::string fileNames, errors;
 };
 
@@ -207,9 +206,6 @@ TestCommandLineParserBaseline parseExistingCompilerBaseline(
 
 	TestCommandLineParserBaseline out;
 	nilErrorStr(t, json::unmarshal(compilerOptions, &out.options));
-	if (watchFound && !watchOptions.empty()) {
-		nilErrorStr(t, json::unmarshal(watchOptions, &out.watchoptions));
-	}
 	out.fileNames = fileNames;
 	out.errors = errors;
 	return out;
@@ -234,7 +230,6 @@ std::string formatNewBaseline(
 struct TestCommandLineParserBuildBaseline {
 	tsc::BuildOptions options;
 	tsc::CompilerOptions compilerOptions;
-	tsc::WatchOptions watchoptions;
 	std::string projects, errors;
 };
 
@@ -250,9 +245,6 @@ TestCommandLineParserBuildBaseline parseExistingCompilerBaselineBuild(
 	TestCommandLineParserBuildBaseline out;
 	nilErrorStr(t, json::unmarshal(buildOptions, &out.options));
 	nilErrorStr(t, json::unmarshal(buildOptions, &out.compilerOptions));
-	if (watchFound && !watchOptions.empty()) {
-		nilErrorStr(t, json::unmarshal(watchOptions, &out.watchoptions));
-	}
 	out.projects = projects;
 	out.errors = errors;
 	return out;
@@ -312,10 +304,6 @@ struct commandLineSubScenario {
 			                         newParsedCompilerOptions),
 			    "assert.DeepEqual failed: CompilerOptions");
 
-			tsc::WatchOptions newParsedWatchOptions{};
-			nilErrorStr(t,
-			            json::unmarshal(o, &newParsedWatchOptions));
-
 			std::string newBaselineErrors = formatDiagnostics(parsed->Errors);
 
 			baseline::Run(
@@ -374,10 +362,6 @@ struct commandLineSubScenario {
 				                                    newParsedCompilerOptions),
 				               "assert.DeepEqual failed: CompilerOptions");
 			}
-
-			tsc::WatchOptions newParsedWatchOptions{};
-			nilErrorStr(t,
-			            json::unmarshal(o.first, &newParsedWatchOptions));
 
 			std::string newBaselineErrors = formatDiagnostics(parsed->Errors);
 
@@ -505,23 +489,6 @@ void TestCommandLineParseResult(T* t) {
 	     {"--tsBuildInfoFile", "build.tsbuildinfo", "0.ts"}},
 	    {"allows tsconfig only option to be set to null",
 	     {"--composite", "null", "-tsBuildInfoFile", "null", "0.ts"}},
-	    // ****** Watch Options ******
-	    {"parse --watchFile", {"--watchFile", "UseFsEvents", "0.ts"}},
-	    {"parse --watchDirectory",
-	     {"--watchDirectory", "FixedPollingInterval", "0.ts"}},
-	    {"parse --fallbackPolling",
-	     {"--fallbackPolling", "PriorityInterval", "0.ts"}},
-	    {"parse --synchronousWatchDirectory",
-	     {"--synchronousWatchDirectory", "0.ts"}},
-	    {"errors on missing argument to --fallbackPolling",
-	     {"0.ts", "--fallbackPolling"}},
-	    {"parse --excludeDirectories", {"--excludeDirectories", "**/temp", "0.ts"}},
-	    {"errors on invalid excludeDirectories",
-	     {"--excludeDirectories", "**/../*", "0.ts"}},
-	    {"parse --excludeFiles",
-	     {"--excludeFiles", "**/temp/*.ts", "0.ts"}},
-	    {"errors on invalid excludeFiles",
-	     {"--excludeFiles", "**/../*", "0.ts"}},
 	};
 
 	for (const auto& testCase : parseCommandLineSubScenarios) {
@@ -739,18 +706,6 @@ void TestParseBuildCommandLine(T* t) {
 	     {"--clean", "--verbose"}},
 	    {"--clean and --watch together is invalid", {"--clean", "--watch"}},
 	    {"--watch and --dry together is invalid", {"--watch", "--dry"}},
-	    {"parse --watchFile", {"--watchFile", "UseFsEvents", "--verbose"}},
-	    {"parse --watchDirectory",
-	     {"--watchDirectory", "FixedPollingInterval", "--verbose"}},
-	    {"parse --fallbackPolling",
-	     {"--fallbackPolling", "PriorityInterval", "--verbose"}},
-	    {"parse --synchronousWatchDirectory",
-	     {"--synchronousWatchDirectory", "--verbose"}},
-	    {"errors on missing argument", {"--verbose", "--fallbackPolling"}},
-	    {"errors on invalid excludeDirectories",
-	     {"--excludeDirectories", "**/../*"}},
-	    {"parse --excludeFiles", {"--excludeFiles", "**/temp/*.ts"}},
-	    {"errors on invalid excludeFiles", {"--excludeFiles", "**/../*"}},
 	};
 
 	for (const auto& testCase : parseCommandLineSubScenarios) {
@@ -775,6 +730,33 @@ void TestParseBuildCommandLine(T* t) {
 	}
 }
 
+// TestRemovedWatchOptions — commandlineparser_test.go:78.
+void TestRemovedWatchOptions(T* t) {
+	auto host = tsoptionstest::NewVFSParseConfigHost({}, "/project", true);
+	for (const std::string& option :
+	     {"watchInterval", "watchFile", "watchDirectory", "fallbackPolling",
+	      "synchronousWatchDirectory", "excludeDirectories", "excludeFiles"}) {
+		t->Run(option, [&](T* t) {
+			std::vector<std::string> args{"--watch", "--" + option};
+			auto* parsed = tsoptions::ParseCommandLine(args, host.get());
+			assert::Assert(t, parsed->CompilerOptions()->Watch ==
+			                    tsc::Tristate::True);
+			assert::Equal(t, parsed->Errors.size(), size_t(1));
+			auto* build =
+			    tsoptions::ParseBuildCommandLine(args, host.get());
+			assert::Assert(t, build->CompilerOptions->Watch ==
+			                    tsc::Tristate::True);
+			assert::Equal(t, build->Errors.size(), size_t(1));
+			baseline::Run(
+			    t, option + ".js",
+			    formatDiagnostics(parsed->Errors) +
+			        formatDiagnostics(build->Errors),
+			    baseline::Options{
+			        .Subfolder = "tsoptions/removedWatchOptions"});
+		});
+	}
+}
+
 // TestAffectsBuildInfo — commandlineparser_test.go:585.
 void TestAffectsBuildInfo(T* t) {
 	t->Run(
@@ -793,6 +775,8 @@ void TestAffectsBuildInfo(T* t) {
 
 REGISTER_UNIT_TEST("tsoptions.TestCommandLineParseResult",
                    TestCommandLineParseResult);
+REGISTER_UNIT_TEST("tsoptions.TestRemovedWatchOptions",
+                   TestRemovedWatchOptions);
 REGISTER_UNIT_TEST("tsoptions.TestResponseFileDoesNotPanic",
                    TestResponseFileDoesNotPanic);
 REGISTER_UNIT_TEST("tsoptions.TestResponseFileParsing",

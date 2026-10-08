@@ -2137,8 +2137,7 @@ ParsedCommandLine* parseJsonConfigFileContentWorker(
 	auto* result = new ParsedCommandLine{};
 	result->ParsedConfig = new ParsedOptions{
 	    .CompilerOptions = parsedConfig->options,
-	    .WatchOptions = nullptr,
-	    .TypeAcquisition = parsedConfig->typeAcquisition,
+		    .TypeAcquisition = parsedConfig->typeAcquisition,
 	    .FileNames = fileNames,
 	    .ProjectReferences = getProjectReferences(basePathForFileNames),
 	    .ContentMappers = contentMappers,

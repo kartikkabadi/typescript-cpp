@@ -251,6 +251,11 @@ struct PluginImport {
 };
 
 struct CompilerOptions {
+	// Equals — options_generated.go:305. Field-by-field comparison; C++ has no
+	// nil-vs-empty distinction so slices compare by contents (same as
+	// compilerOptionsDeepEqual).
+	bool Equals(const CompilerOptions* other) const;
+
 	Tristate AllowJs{};
 	Tristate AllowArbitraryExtensions{};
 	Tristate AllowImportingTsExtensions{};
@@ -612,28 +617,6 @@ enum class PollingKind : int32_t {
 	PriorityInterval = 2,
 	DynamicPriority = 3,
 	FixedChunkSize = 4,
-};
-
-struct WatchOptions {
-	int* Interval{};
-	WatchFileKind FileKind{};
-	WatchDirectoryKind DirectoryKind{};
-	PollingKind FallbackPolling{};
-	Tristate SyncWatchDir{};
-	std::vector<std::string> ExcludeDir;
-	std::vector<std::string> ExcludeFiles;
-
-	// encoding/json Unmarshal over the tagged fields (api/proto.cpp).
-	std::string unmarshalJSONFrom(json::Decoder& dec);
-
-	// WatchInterval — watchoptions.go. Default 2000ms.
-	int64_t WatchInterval() const {
-		int64_t watchInterval = 2000;
-		if (Interval != nullptr) {
-			watchInterval = *Interval;
-		}
-		return watchInterval;
-	}
 };
 
 // typeacquisition.go

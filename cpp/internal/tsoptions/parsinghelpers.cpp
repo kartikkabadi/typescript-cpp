@@ -227,17 +227,6 @@ const DiagnosticMessage* compilerOptionsParser::UnknownDidYouMeanDiagnostic()
     const {
 	return extraKeyDidYouMeanDiagnostics("compilerOptions");
 }
-std::vector<Diagnostic*> watchOptionsParser::ParseOption(
-    std::string_view key, const CompilerOptionsValue& value) {
-	return ParseWatchOptions(key, value, WatchOptions);
-}
-const DiagnosticMessage* watchOptionsParser::UnknownOptionDiagnostic() const {
-	return extraKeyDiagnostics("watchOptions");
-}
-const DiagnosticMessage* watchOptionsParser::UnknownDidYouMeanDiagnostic()
-    const {
-	return extraKeyDidYouMeanDiagnostics("watchOptions");
-}
 std::vector<Diagnostic*> typeAcquisitionParser::ParseOption(
     std::string_view key, const CompilerOptionsValue& value) {
 	return ParseTypeAcquisition(key, value, TypeAcquisition);
@@ -581,39 +570,6 @@ bool parseCompilerOptions(std::string_view key,
 		return false;
 	}
 	return true;
-}
-// ParseWatchOptions — parsinghelpers.go:577.
-std::vector<Diagnostic*> ParseWatchOptions(
-    std::string_view key, const CompilerOptionsValue& value,
-    ::tsc::WatchOptions* allOptions) {
-	if (allOptions == nullptr) {
-		return {};
-	}
-	if (key == "watchInterval") {
-		allOptions->Interval = parseNumber(value);
-	} else if (key == "watchFile") {
-		if (!value.isNil()) {
-			allOptions->FileKind =
-			    static_cast<WatchFileKind>(value.asInt());
-		}
-	} else if (key == "watchDirectory") {
-		if (!value.isNil()) {
-			allOptions->DirectoryKind =
-			    static_cast<WatchDirectoryKind>(value.asInt());
-		}
-	} else if (key == "fallbackPolling") {
-		if (!value.isNil()) {
-			allOptions->FallbackPolling =
-			    static_cast<PollingKind>(value.asInt());
-		}
-	} else if (key == "synchronousWatchDirectory") {
-		allOptions->SyncWatchDir = ParseTristate(value);
-	} else if (key == "excludeDirectories") {
-		allOptions->ExcludeDir = ParseStringArray(value);
-	} else if (key == "excludeFiles") {
-		allOptions->ExcludeFiles = ParseStringArray(value);
-	}
-	return {};
 }
 
 // ParseTypeAcquisition — parsinghelpers.go:606.

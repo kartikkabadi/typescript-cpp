@@ -308,7 +308,7 @@ void TestBuildWatchStopsWhenContextIsCancelled(T* t) {
 	std::thread([ctx, sysPtr, resultCh] {
 		resultCh->post(execute::CommandLine(
 		    ctx, sysPtr,
-		    {"--build", "--watch", "--watchInterval", "60000"},
+		    {"--build", "--watch"},
 		    sysPtr));
 	}).detach();
 

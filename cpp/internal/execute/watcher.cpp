@@ -38,110 +38,6 @@ struct wmLockGuard {
 	wmLockGuard& operator=(const wmLockGuard&) = delete;
 };
 
-// --- reflect.DeepEqual helpers for ParsedOptions (watcher.go:663) ---
-
-// watchOptionsEqual — reflect.DeepEqual on *WatchOptions.
-bool watchOptionsEqual(const WatchOptions* a, const WatchOptions* b) {
-	if (a == b) {
-		return true;
-	}
-	if (a == nullptr || b == nullptr) {
-		return false;
-	}
-	return intPtrEqual(a->Interval, b->Interval) &&
-	       a->FileKind == b->FileKind &&
-	       a->DirectoryKind == b->DirectoryKind &&
-	       a->FallbackPolling == b->FallbackPolling &&
-	       a->SyncWatchDir == b->SyncWatchDir &&
-	       a->ExcludeDir == b->ExcludeDir &&
-	       a->ExcludeFiles == b->ExcludeFiles;
-}
-
-// projectReferencesEqual — DeepEqual on []ProjectReference.
-bool projectReferencesEqual(const std::vector<ProjectReference*>& a,
-                            const std::vector<ProjectReference*>& b) {
-	if (a.size() != b.size()) {
-		return false;
-	}
-	for (size_t i = 0; i < a.size(); i++) {
-		if ((a[i] == nullptr) != (b[i] == nullptr)) {
-			return false;
-		}
-		if (a[i] != nullptr &&
-		    (a[i]->Path != b[i]->Path ||
-		     a[i]->OriginalPath != b[i]->OriginalPath ||
-		     a[i]->Circular != b[i]->Circular)) {
-			return false;
-		}
-	}
-	return true;
-}
-
-// mapperManifestEqual — DeepEqual on contentmapper.Manifest.
-bool mapperManifestEqual(const contentmapper::Manifest& a,
-                         const contentmapper::Manifest& b) {
-	return a.Name == b.Name && a.Version == b.Version && a.Exec == b.Exec &&
-	       a.CompilerOptions == b.CompilerOptions &&
-	       a.DynamicConfig == b.DynamicConfig;
-}
-
-// typeAcquisitionEqual — DeepEqual on *TypeAcquisition (nil-safe).
-bool typeAcquisitionEqual(const TypeAcquisition* a,
-                          const TypeAcquisition* b) {
-	if (a == nullptr || b == nullptr) {
-		return a == b;
-	}
-	return a->Equals(b);
-}
-
-// contentMappersEqual — DeepEqual on []contentmapper.Mapper.
-bool contentMappersEqual(
-    const std::vector<contentmapper::Mapper*>& a,
-    const std::vector<contentmapper::Mapper*>& b) {
-	if (a.size() != b.size()) {
-		return false;
-	}
-	for (size_t i = 0; i < a.size(); i++) {
-		if ((a[i] == nullptr) != (b[i] == nullptr)) {
-			return false;
-		}
-		if (a[i] == nullptr) {
-			continue;
-		}
-		const auto& am = a[i];
-		const auto& bm = b[i];
-		if (am->Definition.Package != bm->Definition.Package ||
-		    am->Definition.Extensions != bm->Definition.Extensions ||
-		    am->Definition.Options != bm->Definition.Options ||
-		    am->PackageDirectory != bm->PackageDirectory ||
-		    am->ContributionID != bm->ContributionID ||
-		    !mapperManifestEqual(am->Manifest, bm->Manifest)) {
-			return false;
-		}
-	}
-	return true;
-}
-
-// parsedOptionsDeepEqual — reflect.DeepEqual on *tsoptions.ParsedOptions
-// (watcher.go:663). Note: TypeAcquisition has its own Equals covering the
-// same fields.
-bool parsedOptionsDeepEqual(const tsoptions::ParsedOptions* a,
-                            const tsoptions::ParsedOptions* b) {
-	if (a == b) {
-		return true;
-	}
-	if (a == nullptr || b == nullptr) {
-		return false;
-	}
-	return compilerOptionsDeepEqual(a->CompilerOptions, b->CompilerOptions) &&
-	       watchOptionsEqual(a->WatchOptions, b->WatchOptions) &&
-	       typeAcquisitionEqual(a->TypeAcquisition, b->TypeAcquisition) &&
-	       a->FileNames == b->FileNames &&
-	       projectReferencesEqual(a->ProjectReferences,
-	                              b->ProjectReferences) &&
-	       contentMappersEqual(a->ContentMappers, b->ContentMappers);
-}
-
 }  // namespace
 
 // watchCompilerHost.GetSourceFile — watcher.go:36.
@@ -878,8 +774,8 @@ bool Watcher::recheckTsConfig(bool force) {
 	for (auto& f : configParseResult->ExtendedSourceFiles()) {
 		configFilePaths.push_back(f);
 	}
-	if (!parsedOptionsDeepEqual(config->ParsedConfig,
-	                            configParseResult->ParsedConfig)) {
+	if (!config->ParsedConfig->Equals(
+	        configParseResult->ParsedConfig)) {
 		configModified = true;
 	}
 	replaceContentMapperProject(configParseResult);

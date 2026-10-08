@@ -240,22 +240,6 @@ std::string TypeAcquisition::marshalJSONTo(json::Encoder& enc) const {
 	return w.end();
 }
 
-// WatchOptions — watchoptions.go tagged fields.
-std::string WatchOptions::unmarshalJSONFrom(json::Decoder& dec) {
-	return api::readFields(dec, [this](std::string_view n, json::Decoder& d) -> std::string {
-		if (api::fieldIs(n, "watchInterval")) return json::unmarshalDecode(d, &Interval);
-		if (api::fieldIs(n, "watchFile")) return json::unmarshalDecode(d, &FileKind);
-		if (api::fieldIs(n, "watchDirectory")) return json::unmarshalDecode(d, &DirectoryKind);
-		if (api::fieldIs(n, "fallbackPolling")) return json::unmarshalDecode(d, &FallbackPolling);
-		if (api::fieldIs(n, "synchronousWatchDirectory"))
-			return json::unmarshalDecode(d, &SyncWatchDir);
-		if (api::fieldIs(n, "excludeDirectories"))
-			return json::unmarshalDecode(d, &ExcludeDir);
-		if (api::fieldIs(n, "excludeFiles"))
-			return json::unmarshalDecode(d, &ExcludeFiles);
-		return d.skipValue();
-	});
-}
 
 }  // namespace tsc
 
@@ -3973,53 +3957,6 @@ json::Value literalValueToJSON(const checker::LiteralValue& value) {
 // nextBuildOrchestratorId — proto.go:49.
 static std::atomic<uint64_t> nextBuildOrchestratorId;
 
-// isWatchOptionKey — the only option names whose enum maps produce
-// core.WatchFileKind/WatchDirectoryKind/PollingKind values
-// (commandlineoption.go's commandLineOptionEnumMap). See toProtocolJSONValue.
-static bool isWatchOptionKey(std::string_view key) {
-	return key == "watchFile" || key == "watchDirectory" ||
-	       key == "fallbackPolling";
-}
-
-// toProtocolJSONValue — proto.go:1011. Go type-switches on the value's dynamic
-// type: the three watch enums become int(value)-1 (the wire enums are 0-based
-// while core's are 1-based), OrderedMap/[]any are deep-copied recursively, and
-// everything else passes through.
-//
-// In C++ every enum kind and plain int shares the CompilerOptionsValue int64
-// arm, so the dynamic enum type is unrecoverable from the value alone. The
-// kind is instead recovered from the key: those three enum types can only be
-// produced under "watchFile"/"watchDirectory"/"fallbackPolling" — the only
-// options whose EnumMap() yields them — so converting int64 leaves under those
-// keys (and inside arrays nested under them) covers exactly the Go cases.
-static tsoptions::CompilerOptionsValue toProtocolJSONValue(
-    const tsoptions::CompilerOptionsValue& value, bool watchOptionKey) {
-	if (watchOptionKey) {
-		if (const auto* i = value.get<int64_t>()) {
-			return tsoptions::CompilerOptionsValue(*i - 1);
-		}
-	}
-	if (const auto* object = value.get<tsoptions::JsonObjectPtr>()) {
-		tsoptions::JsonObjectPtr result = std::make_shared<tsoptions::JsonObject>(
-		    *object != nullptr ? (*object)->Size() : 0);
-		if (*object != nullptr) {
-			for (const auto& key : (*object)->Keys()) {
-				result->Set(key, toProtocolJSONValue(
-				                     *(*object)->Get(key).first,
-				                     isWatchOptionKey(key)));
-			}
-		}
-		return tsoptions::CompilerOptionsValue(std::move(result));
-	}
-	if (const auto* array = value.get<tsoptions::JsonArray>()) {
-		tsoptions::JsonArray result(array->size());
-		for (size_t i = 0; i < array->size(); ++i) {
-			result[i] = toProtocolJSONValue((*array)[i], watchOptionKey);
-		}
-		return tsoptions::CompilerOptionsValue(std::move(result));
-	}
-	return value;
-}
 
 // NewBuildOrchestratorID — proto.go:51.
 BuildOrchestratorID NewBuildOrchestratorID() {
@@ -4109,7 +4046,7 @@ std::shared_ptr<ConfigFileResponse> NewConfigFileResponse(
 	// `raw,omitempty`: Go's nil `any` omits the member; only marshal non-nil Raw.
 	if (!parsedCommandLine->Raw.isNil()) {
 		resp->Raw = json::Value(
-		    tsoptions::jsonMarshal(toProtocolJSONValue(parsedCommandLine->Raw, false)));
+		    tsoptions::jsonMarshal(parsedCommandLine->Raw));
 	}
 	resp->Errors = std::move(errors);
 	return resp;

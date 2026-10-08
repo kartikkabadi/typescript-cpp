@@ -119,9 +119,6 @@ const std::unordered_map<std::string, const JsonObject*>& commandLineOptionEnumM
 			{"moduleDetection", &moduleDetectionOptionMap()},
 			{"jsx", &jsxOptionMap()},
 			{"newLine", &newLineOptionMap()},
-			{"watchFile", &watchFileEnumMap()},
-			{"watchDirectory", &watchDirectoryEnumMap()},
-			{"fallbackPolling", &fallbackEnumMap()},
 		};
 	}();
 	return table;

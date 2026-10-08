@@ -1763,8 +1763,7 @@ ProjectCollectionBuilder::updateOrCreateSyntheticProject(
 	    [&](Project* p) {
 		    return p->CommandLine->FileNames() !=
 		               newCommandLine->FileNames() ||
-		           !compilerOptionsDeepEqual(
-		               p->CommandLine->CompilerOptions(),
+		           !p->CommandLine->CompilerOptions()->Equals(
 		               compilerOptions) ||
 		           !projectReferencesEqual(
 		               p->CommandLine->ProjectReferences(),
@@ -1867,8 +1866,7 @@ bool ProjectCollectionBuilder::updateOrCreateInferredProject(
 	    [&](Project* p) {
 		    return p->CommandLine->FileNames() !=
 		               newCommandLine->FileNames() ||
-		           !compilerOptionsDeepEqual(
-		               p->CommandLine->CompilerOptions(),
+		           !p->CommandLine->CompilerOptions()->Equals(
 		               compilerOptions) ||
 		           !projectReferencesEqual(
 		               p->CommandLine->ProjectReferences(),

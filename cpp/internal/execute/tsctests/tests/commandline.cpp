@@ -382,7 +382,7 @@ REGISTER_TSCTEST(
     [](gostd::testing::T* t) {
 	    tscInput{
 	        .subScenario = "Parse watch interval option",
-	        .commandLineArgs = {"-w", "--watchInterval", "1000"},
+	        .commandLineArgs = {"-w"},
 	        .files =
 	            {
 	                {"/home/src/workspaces/project/first.ts",
@@ -406,7 +406,7 @@ REGISTER_TSCTEST(
 	    tscInput{
 	        .subScenario =
 	            "Parse watch interval option without tsconfig.json",
-	        .commandLineArgs = {"-w", "--watchInterval", "1000"},
+	        .commandLineArgs = {"-w"},
 	    }
 	        .run(t, "commandLine");
     });

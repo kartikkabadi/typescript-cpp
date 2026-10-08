@@ -302,16 +302,6 @@ void printAllHelp(
 	    options, true, nullptr, &afterCompilerOptions);
 	output.insert(output.end(), allOut.begin(), allOut.end());
 
-	// WATCH OPTIONS section
-	std::string beforeWatchOptions = msgLocalize(
-	    locale,
-	    
-	        Including_watch_w_will_start_watching_the_current_project_for_the_file_changes_Once_set_you_can_config_watch_mode_with_Colon);
-	auto watchOut = generateSectionOptionsOutput(
-	    sys, locale, msgLocalize(locale, WATCH_OPTIONS),
-	    tsoptions::OptionsForWatch(), false, &beforeWatchOptions, nullptr);
-	output.insert(output.end(), watchOut.begin(), watchOut.end());
-
 	// BUILD OPTIONS section
 	std::string beforeBuildOptions = msgLocalize(
 	    locale,

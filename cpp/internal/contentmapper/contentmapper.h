@@ -83,6 +83,10 @@ struct Mapper {
 	// project content mappers.
 	std::string ContributionID; // `json:"-"`
 
+	// Equals — contentmapper.go:99. Compares the complete mapper
+	// configuration, not just its advertised identity.
+	bool Equals(const Mapper* other) const;
+
 	// DiagnosticName returns the best available user-facing name, including
 	// when manifest resolution failed — contentmapper.go:67.
 	std::string DiagnosticName() const;

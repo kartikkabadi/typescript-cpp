@@ -273,7 +273,6 @@ add_library(tsc STATIC
 	internal/tsoptions/declsbuild.cpp
 	internal/tsoptions/declscompiler.cpp
 	internal/tsoptions/declstypeacquisition.cpp
-	internal/tsoptions/declswatch.cpp
 	internal/tsoptions/diagnostics.cpp
 	internal/tsoptions/enummaps.cpp
 	internal/tsoptions/errors.cpp

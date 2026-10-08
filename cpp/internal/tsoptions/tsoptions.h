@@ -516,7 +516,6 @@ const CommandLineOption& TscBuildOption();
 const std::vector<const CommandLineOption*>& OptionsForBuild();
 const std::vector<const CommandLineOption*>& BuildOpts();
 // declswatch.go
-const std::vector<const CommandLineOption*>& OptionsForWatch();
 // declstypeacquisition.go
 const CommandLineOption& typeAcquisitionDeclaration();
 const std::vector<const CommandLineOption*>& typeAcquisitionDecls();
@@ -535,9 +534,6 @@ const JsonObject& moduleOptionMap();
 const JsonObject& moduleDetectionOptionMap();
 const JsonObject& jsxOptionMap();
 const JsonObject& newLineOptionMap();
-const JsonObject& watchFileEnumMap();
-const JsonObject& watchDirectoryEnumMap();
-const JsonObject& fallbackEnumMap();
 // TargetToLibMap — enummaps.go:232 (table lives above as targetToLibMap).
 inline const std::unordered_map<ScriptTarget, std::string_view>& TargetToLibMap() {
 	return targetToLibMap;
@@ -564,7 +560,6 @@ struct NameMap {
 
 const NameMap& CompilerNameMap();
 const NameMap& BuildNameMap();
-const NameMap& WatchNameMap();
 // GetNameMapFromList — namemap.go:15.
 std::shared_ptr<NameMap> GetNameMapFromList(
     const std::vector<const CommandLineOption*>& optDecls);
@@ -599,7 +594,6 @@ std::unique_ptr<ParseCommandLineWorkerDiagnostics>
 getParseCommandLineWorkerDiagnostics(
     const std::vector<const CommandLineOption*>& decls);
 ParseCommandLineWorkerDiagnostics& CompilerOptionsDidYouMeanDiagnostics();
-ParseCommandLineWorkerDiagnostics& watchOptionsDidYouMeanDiagnostics();
 ParseCommandLineWorkerDiagnostics& buildOptionsDidYouMeanDiagnostics();
 
 // ---------------------------------------------------------------------------
@@ -620,8 +614,10 @@ ParseCommandLineWorkerDiagnostics& buildOptionsDidYouMeanDiagnostics();
 // `contentmapper::` below resolves to it.
 
 struct ParsedOptions {
+	// Equals — parsedoptions.go (replaces reflect.DeepEqual on *ParsedOptions).
+	bool Equals(const ParsedOptions* other) const;
+
 	CompilerOptions* CompilerOptions = nullptr;
-	::tsc::WatchOptions* WatchOptions = nullptr;
 	TypeAcquisition* TypeAcquisition = nullptr;
 
 	std::vector<std::string> FileNames;
@@ -813,7 +809,6 @@ ParsedCommandLine* NewParsedCommandLine(
 struct ParsedBuildCommandLine {
 	BuildOptions* BuildOptions = nullptr;
 	tsc::CompilerOptions* CompilerOptions = nullptr;
-	::tsc::WatchOptions* WatchOptions = nullptr;
 	std::vector<std::string> Projects;
 	std::vector<Diagnostic*> Errors;
 	CompilerOptionsValue Raw;
@@ -960,14 +955,6 @@ struct compilerOptionsParser : optionParser {
 	tsc::CompilerOptions* CompilerOptions = nullptr;
 	explicit compilerOptionsParser(tsc::CompilerOptions* o)
 	    : CompilerOptions(o) {}
-	std::vector<Diagnostic*> ParseOption(
-	    std::string_view key, const CompilerOptionsValue& value) override;
-	const DiagnosticMessage* UnknownOptionDiagnostic() const override;
-	const DiagnosticMessage* UnknownDidYouMeanDiagnostic() const override;
-};
-struct watchOptionsParser : optionParser {
-	::tsc::WatchOptions* WatchOptions = nullptr;
-	explicit watchOptionsParser(::tsc::WatchOptions* o) : WatchOptions(o) {}
 	std::vector<Diagnostic*> ParseOption(
 	    std::string_view key, const CompilerOptionsValue& value) override;
 	const DiagnosticMessage* UnknownOptionDiagnostic() const override;
@@ -1235,9 +1222,6 @@ std::vector<Diagnostic*> ParseCompilerOptions(
 bool parseCompilerOptions(std::string_view key,
                           const CompilerOptionsValue& value,
                           CompilerOptions* allOptions);
-std::vector<Diagnostic*> ParseWatchOptions(
-    std::string_view key, const CompilerOptionsValue& value,
-    ::tsc::WatchOptions* allOptions);
 std::vector<Diagnostic*> ParseTypeAcquisition(
     std::string_view key, const CompilerOptionsValue& value,
     TypeAcquisition* allOptions);
