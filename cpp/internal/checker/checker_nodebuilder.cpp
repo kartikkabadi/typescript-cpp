@@ -3603,6 +3603,12 @@ Node* NodeBuilderImpl::serializeTypeForDeclaration(Node* declaration,
 // shouldUsePlaceholderForProperty (nodebuilderimpl.go:2381).
 bool NodeBuilderImpl::shouldUsePlaceholderForProperty(
 	Symbol* propertySymbol) {
+	// Reverse mapped type placeholders are for display, not
+	// declaration emit.
+	if ((ctx->flags &
+	     nodebuilder::FlagsAllowAnonymousIdentifier) == 0) {
+		return false;
+	}
 	// Use placeholders for reverse mapped types we've either
 	// (1) already descended into, or
 	// (2) are nested reverse mappings within a mapping over a non-anonymous
@@ -4108,13 +4114,16 @@ NodeList* NodeBuilderImpl::createTypeNodesFromResolvedType(
 			signature, Kind::ConstructSignature, nullptr));
 	}
 	for (IndexInfo* info : resolvedType->indexInfos) {
+		Node* typeNode = nullptr;
+		if ((resolvedType->type_.objectFlags &
+		     ObjectFlagsReverseMapped) != 0 &&
+		    (ctx->flags &
+		     nodebuilder::FlagsAllowAnonymousIdentifier) != 0) {
+			typeNode = createElidedInformationPlaceholder();
+		}
 		std::vector<Node*> decls =
 		    indexInfoToObjectComputedNamesOrSignatureDeclaration(
-			    info,
-			    (resolvedType->type_.objectFlags &
-			     ObjectFlagsReverseMapped) != 0
-			        ? createElidedInformationPlaceholder()
-			        : nullptr);
+			    info, typeNode);
 		typeElements.insert(typeElements.end(), decls.begin(),
 		                    decls.end());
 	}
@@ -4465,8 +4474,17 @@ Node* NodeBuilderImpl::createAnonymousTypeNodeEx(Type* t,
 			return visitAndTransformType(
 				t, &NodeBuilderImpl::createTypeNodeFromObjectType);
 		}
+	} else if ((t->objectFlags & ObjectFlagsReverseMapped) != 0 &&
+	           (ctx->flags &
+	            nodebuilder::FlagsAllowAnonymousIdentifier) == 0) {
+		if (ctx->visitedTypes.count(typeId)) {
+			return createCyclicStructurePlaceholder();
+		}
+		return visitAndTransformType(
+			t, &NodeBuilderImpl::createTypeNodeFromObjectType);
 	} else {
-		// Anonymous types without a symbol are never circular.
+		// Reverse mapped types use property and index signature
+		// placeholders for display.
 		return createTypeNodeFromObjectType(t);
 	}
 }
@@ -4918,6 +4936,27 @@ Node* NodeBuilderImpl::visitAndTransformType(
 			ctx->approximateLength += cachedResult->addedLength;
 			return deepCloneNode(*f, cachedResult->node);
 		}
+	}
+
+	if ((t->objectFlags & ObjectFlagsReverseMapped) != 0) {
+		// Growing type arguments can prevent a reverse mapped type
+		// from repeating. Bound expansion by its mapped declaration
+		// as well as its type identity.
+		CompositeSymbolIdentity origin{
+		    false, 0,
+		    getNodeId(t->AsReverseMappedType()
+		                  ->mappedType->AsMappedType()
+		                  ->declaration)};
+		int originDepth = ctx->symbolDepth[origin];
+		if (originDepth >= 100) {
+			ctx->truncating = true;
+			return createElidedInformationPlaceholder();
+		}
+		ctx->symbolDepth[origin] = originDepth + 1;
+		auto restoreOriginDepth = scopeExit(
+		    [this, origin, originDepth] {
+			    ctx->symbolDepth[origin] = originDepth;
+		    });
 	}
 
 	int depth = 0;
