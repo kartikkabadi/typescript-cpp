@@ -4864,6 +4864,10 @@ Node* NodeBuilderImpl::typeReferenceToTypeNode(Type* t) {
 // visitAndTransformType (nodebuilderimpl.go:3200).
 Node* NodeBuilderImpl::visitAndTransformType(
 	Type* t, Node* (NodeBuilderImpl::*transform)(Type*)) {
+	if (checkTruncationLength()) {
+		return createElidedInformationPlaceholder();
+	}
+
 	TypeId typeId = t->id;
 	bool isConstructorObject =
 	    (t->objectFlags & ObjectFlagsAnonymous) != 0 &&
