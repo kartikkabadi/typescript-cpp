@@ -893,11 +893,8 @@ std::unordered_map<std::string, bool> Orchestrator::computeDesiredWatches() {
 		for (auto& fileName : task->resolved->FileNames()) {
 			auto absPath = tspath::getNormalizedAbsolutePath(
 			    fileName, opts.Sys->GetCurrentDirectory());
-			auto dir = tspath::getDirectoryPath(absPath);
-			if (!desiredDirs->Covered(dir) &&
-			    watchmanager::CanWatchDirectory(dir)) {
-				desiredDirs->Set(dir, false);
-			}
+			addProgramFileWatchDir(desiredDirs,
+			                       tspath::getDirectoryPath(absPath));
 		}
 		for (auto* mapper : task->resolved->ContentMappers()) {
 			if (mapper->PackageDirectory.empty() ||
@@ -950,11 +947,8 @@ std::unordered_map<std::string, bool> Orchestrator::computeDesiredWatches() {
 				if (roots.Has(fp)) {
 					continue;
 				}
-				auto dir = tspath::getDirectoryPath(absPath);
-				if (!desiredDirs->Covered(dir) &&
-				    watchmanager::CanWatchDirectory(dir)) {
-					desiredDirs->Set(dir, false);
-				}
+				addProgramFileWatchDir(desiredDirs,
+				                       tspath::getDirectoryPath(absPath));
 			}
 			bi->buildInfo->GetPackageJsons(
 			    buildInfoDir, [&](const std::string& packageJson) {

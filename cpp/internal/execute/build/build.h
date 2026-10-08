@@ -565,6 +565,14 @@ struct Orchestrator : etsc::Watcher {
 	    const std::unordered_map<tspath::Path, fswatch::EventKind>&
 	        changedPaths);
 	std::unordered_map<std::string, bool> computeDesiredWatches();
+	// orchestrator.go:781 addProgramFileWatchDir — program-file dirs are
+	// watched at any depth (unlike addWatchDir's CanWatchDirectory guard).
+	void addProgramFileWatchDir(watchmanager::DirWatchSet* desiredDirs,
+	                            const std::string& dir) {
+		if (!desiredDirs->Covered(dir)) {
+			desiredDirs->Set(dir, false);
+		}
+	}
 	void addWatchDir(watchmanager::DirWatchSet* desiredDirs,
 	                 const std::string& dir);
 	void addPackageJsonWatchDirs(watchmanager::DirWatchSet* desiredDirs,

@@ -357,9 +357,24 @@ std::unordered_map<std::string, bool> Watcher::computeDesiredWatches(
 	for (auto& [dir, recursive] : resolvedDirs) {
 		coverage.Set(dir, recursive);
 	}
+	auto* programFiles = &program->GetProgram()->FilesByPath();
+	auto caseSensitive = sys->fs()->UseCaseSensitiveFileNames();
+	collections::Set<tspath::Path> rootFiles;
+	for (auto& fileName : config->FileNames()) {
+		rootFiles.Add(tspath::toPath(fileName, cwd, caseSensitive));
+	}
 	for (auto& filePath : seenFilePaths) {
 		auto dir = tspath::getDirectoryPath(filePath);
-		if (!coverage.Covered(dir) &&
+		if (coverage.Covered(dir)) {
+			continue;
+		}
+		// Seen files mix program files with lookup locations. Only lookups
+		// keep the depth check, so an imported file outside the tsconfig
+		// directory (say /shared next to /app) is still watched. A root
+		// file is not in the program while it is missing, but its
+		// directory stays watched so that recreating it rebuilds.
+		auto p = tspath::toPath(filePath, cwd, caseSensitive);
+		if (programFiles->count(p) != 0 || rootFiles.Has(p) ||
 		    watchmanager::CanWatchDirectory(dir)) {
 			coverage.Set(dir, false);
 		}

@@ -200,6 +200,14 @@ std::unordered_map<std::string, bool> WatchManager::ResolveDesiredDirs(
 	std::unordered_map<std::string, bool> resolved;
 	resolved.reserve(desiredDirs.size());
 	for (auto& [dir, recursive] : desiredDirs) {
+		// Only directories on disk can be watched. The embedded libs
+		// (bundled:///libs) exist in the FS but not on disk.
+		if (!tspath::isRootedDiskPath(dir)) {
+			if (DebugLog != nullptr) {
+				*DebugLog << "[watch] not a disk path: " << dir << '\n';
+			}
+			continue;
+		}
 		std::string watchDir = dir;
 		bool watchRecursive = recursive;
 		for (; !dirExists(watchDir);) {
@@ -210,7 +218,13 @@ std::unordered_map<std::string, bool> WatchManager::ResolveDesiredDirs(
 			watchDir = parent;
 			watchRecursive = false;  // ancestor fallbacks are always non-recursive
 		}
-		if (!dirExists(watchDir) || !CanWatchDirectory(watchDir)) {
+		// CanWatchDirectory only guards against falling back to an ancestor
+		// that is too generic to watch (/, /home, ...). A directory that
+		// exists and was asked for is watched at any depth, otherwise a
+		// project that lives near the filesystem root (say /app or
+		// /srv/app) would never be watched.
+		if (!dirExists(watchDir) ||
+		    (watchDir != dir && !CanWatchDirectory(watchDir))) {
 			if (DebugLog != nullptr) {
 				*DebugLog << "[watch] no watchable ancestor for " << dir
 				          << '\n';
