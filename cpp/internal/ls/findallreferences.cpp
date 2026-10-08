@@ -915,7 +915,7 @@ nonLocalDefinition* LanguageService::getNonLocalDefinition(
 	}
 
 	compiler::SimpleProgram* program = GetProgram();
-	auto [checker, done] = program->GetTypeCheckerForFileExclusive(nullptr);
+	auto [checker, done] = program->GetTypeCheckerForFileExclusive(ctx, nullptr);
 	doneGuard doneGuard_{done};
 	checker::EmitResolver* emitResolver = checker->GetEmitResolver();
 	for (auto* d : entry->definition->symbol->declarations) {
@@ -1495,7 +1495,7 @@ LanguageService::getDefinitionKindAndDisplayParts(
     const gostd::Context& ctx, Symbol* symbol, Node* originalNode,
     bool vsCapability) {
 	compiler::SimpleProgram* program = GetProgram();
-	auto [c, done] = program->GetTypeCheckerForFileExclusive(nullptr);
+	auto [c, done] = program->GetTypeCheckerForFileExclusive(ctx, nullptr);
 	doneGuard doneGuard_{done};
 
 	SemanticMeaning meaning = getIntersectingMeaningFromDeclarations(
@@ -1852,7 +1852,7 @@ std::vector<SymbolAndEntries*> LanguageService::getReferencedSymbolsForNode(
 		                           getSourceFileOfNode(node));
 	}
 
-	auto [checker, done] = program->GetTypeCheckerForFileExclusive(nullptr);
+	auto [checker, done] = program->GetTypeCheckerForFileExclusive(ctx, nullptr);
 	doneGuard doneGuard_{done};
 
 	if (node->kind == Kind::SourceFile) {
@@ -2517,7 +2517,7 @@ LanguageService::getReferencedSymbolsForModule(
     collections::Set<std::string>* sourceFilesSet) {
 	debug::assert(symbol->valueDeclaration != nullptr, "");
 
-	auto [checker, done] = program->GetTypeCheckerForFileExclusive(nullptr);
+	auto [checker, done] = program->GetTypeCheckerForFileExclusive(ctx, nullptr);
 	doneGuard doneGuard_{done};
 
 	auto moduleRefs =

@@ -481,8 +481,11 @@ inline std::function<bool()> contextAfterFunc(const Context& c,
 
 // context.WithCancel — child cancels when the parent finishes, inheriting
 // the parent's Err (Go's propagateCancel passes parent.Err() through).
+// Value lookup also delegates to the parent (Go's cancelCtx.Value forwards
+// to c.Context), so the ctx is linked into the parent chain.
 inline std::pair<Context, CancelFunc> contextWithCancel(const Context& parent) {
 	auto c = std::make_shared<ContextImpl>();
+	c->parent = parent;
 	c->cancelable = true;
 	std::weak_ptr<ContextImpl> w = c;
 	contextAfterFunc(parent, [w, parent] {
@@ -500,6 +503,8 @@ inline std::pair<Context, CancelFunc> contextWithCancel(const Context& parent) {
 inline std::pair<Context, std::function<void(const Error&)>>
 contextWithCancelCause(const Context& parent) {
 	auto c = std::make_shared<ContextImpl>();
+	c->parent = parent;
+	c->cancelable = true;
 	std::weak_ptr<ContextImpl> w = c;
 	contextAfterFunc(parent, [w, parent] {
 		if (auto s = w.lock()) {
