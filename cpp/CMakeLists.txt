@@ -32,14 +32,21 @@ if(TSCPP_MIMALLOC)
 	# under GNU ld). Object files are always linked, on every linker.
 	add_library(tsc_mimalloc OBJECT third_party/mimalloc/src/static.c)
 	if(MSVC)
-		# On MSVC the C TU's __MSC_VER branch emits no new/delete overrides;
-		# they must come from a C++ TU. On GNUC/clang the C TU already emits
-		# them under their Itanium-mangled names — compiling the .cpp too is
-		# a duplicate-symbol error once the objects are force-linked.
+		# On Windows the whole of alloc-override.c is compiled out (its
+		# overrides live behind `MI_MALLOC_OVERRIDE && !_WIN32`), so the
+		# C++ operator new/delete family must come from a C++ TU. On
+		# GNUC/clang the C TU already emits them under their Itanium-mangled
+		# names — compiling the .cpp too is a duplicate-symbol error once
+		# the objects are force-linked.
 		target_sources(tsc_mimalloc PRIVATE cmd/malloc_override.cpp)
 	endif()
 	target_include_directories(tsc_mimalloc PUBLIC third_party/mimalloc/include)
-	target_compile_definitions(tsc_mimalloc PRIVATE MI_MALLOC_OVERRIDE)
+	if(NOT WIN32)
+		# MI_MALLOC_OVERRIDE on Windows hits a hard #error in
+		# alloc-override.c: malloc interposition is only supported there
+		# when building mimalloc as a DLL.
+		target_compile_definitions(tsc_mimalloc PRIVATE MI_MALLOC_OVERRIDE)
+	endif()
 	set_target_properties(tsc_mimalloc PROPERTIES C_STANDARD 11)
 	set(tsc_alloc_objects $<TARGET_OBJECTS:tsc_mimalloc>)
 else()
