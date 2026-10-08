@@ -173,6 +173,7 @@ Node* getTypeAnnotationNode(Node* node) {
 	case Kind::RestType:
 	case Kind::TemplateLiteralTypeSpan:
 	case Kind::JSDocTypeExpression:
+	case Kind::JSDocParameterTag:
 	case Kind::JSDocPropertyTag:
 	case Kind::JSDocNullableType:
 	case Kind::JSDocNonNullableType:
