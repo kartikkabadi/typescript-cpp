@@ -53,6 +53,25 @@ struct failingModuleResolutionConn final : ipc::Conn {
 	}
 };
 
+// callbackTestConn — session_module_resolution_test.go (defined upstream in
+// callbackfs_test.go, not yet vendored; kept here with the Go port).
+struct callbackTestConn final : ipc::Conn {
+	std::unordered_map<std::string, json::Value> responses;
+
+	gostd::Error Run(gostd::Context ctx) override { return nullptr; }
+
+	std::pair<json::Value, gostd::Error> Call(
+	    gostd::Context ctx, std::string_view method,
+	    const json::Value& params) override {
+		return {responses[std::string(method)], nullptr};
+	}
+
+	gostd::Error Notify(gostd::Context ctx, std::string_view method,
+	                    const json::Value& params) override {
+		return nullptr;
+	}
+};
+
 std::shared_ptr<ModuleResolutionEntry> mkStaticResolutionEntry(
     const std::string& moduleName, const std::string& directory,
     const ModuleKind* mode, const std::string& fileName) {
@@ -287,6 +306,77 @@ void TestCreateProgramUsesStaticModuleResolutions(T* t) {
 }
 REGISTER_UNIT_TEST("api.TestCreateProgramUsesStaticModuleResolutions",
                    TestCreateProgramUsesStaticModuleResolutions);
+
+void TestCustomModuleResolutionsSkipUnsafeRewriteDiagnostic(T* t) {
+	t->Parallel();
+
+	const std::string root = "/home/projects/p/src/a.ts";
+	const std::string staticTarget = "/home/projects/p/src/b.ts";
+	const std::string callbackTarget = "/home/projects/p/src/c.ts";
+	auto [projectSession, utils] = projecttestutil::Setup(
+	    projecttestutil::FileMap{
+	        {root, "import { b } from \"./b.ts\"; import { c } from \"./c.ts\"; export const a = b + c;"},
+	        {staticTarget, "export const b = 1;"},
+	        {callbackTarget, "export const c = 2;"},
+	    });
+	projectCloser pc{projectSession};
+	auto session = NewLSPSession(projectSession, nullptr);
+	sessionCloser c{session};
+	auto conn = std::make_shared<callbackTestConn>();
+	conn->responses["resolveModuleName/1"] =
+	    json::Value("{\"resolvedFileName\":\"" + callbackTarget + "\"}");
+	session->conn = conn;
+	auto compilerOptions = [] {
+		return tsc::CompilerOptions{
+		    .NoLib = Tristate::True,
+		    .Module = ModuleKind::NodeNext,
+		    .ModuleResolution = ModuleResolutionKind::NodeNext,
+		    .RewriteRelativeImportExtensions = Tristate::True,
+		    .OutDir = "/home/projects/p/out",
+		};
+	};
+	CreateModuleResolverParams resolverParams{
+	    .CompilerOptions = compilerOptions(),
+	    .ModuleResolutions =
+	        std::make_shared<ModuleResolutionSpec>(ModuleResolutionSpec{
+	            .Fallback = ModuleResolutionFallbackResolve,
+	            .Entries = {mkStaticResolutionEntry("./b.ts", "", nullptr,
+	                                                staticTarget)},
+	        }),
+	    .ResolveModuleNameCallback = "resolveModuleName/1",
+	};
+	auto [resolver, err] =
+	    session->handleCreateModuleResolver(&resolverParams);
+	assert::NilError(t, err);
+
+	CreateSnapshotParams params;
+	params.CreatePrograms.emplace().push_back(
+	    std::make_shared<CreateSnapshotProgramParams>(
+	        CreateSnapshotProgramParams{
+	            .RootFiles = {DocumentIdentifier{.FileName = root},
+	                          DocumentIdentifier{.FileName = staticTarget},
+	                          DocumentIdentifier{.FileName = callbackTarget}},
+	            .CompilerOptions = compilerOptions(),
+	            .Options = std::make_shared<CreateProgramOptions>(
+	                CreateProgramOptions{.ModuleResolver = resolver}),
+	        }));
+	auto [response, err2] =
+	    session->handleCreateSnapshot(gostd::contextBackground(), &params);
+	assert::NilError(t, err2);
+	GetDiagnosticsParams diagParams{
+	    .Snapshot = response->Snapshot,
+	    .Project = (*response->Operation->CreatedPrograms)[0].AsID(),
+	    .Files = {DocumentIdentifier{.FileName = root}},
+	};
+	auto [diagnostics, err3] = session->handleGetSemanticDiagnostics(
+	    gostd::contextBackground(), &diagParams);
+	assert::NilError(t, err3);
+	assert::Assert(t, diagnostics.empty(),
+	               "handleGetSemanticDiagnostics reported diagnostics");
+}
+REGISTER_UNIT_TEST(
+    "api.TestCustomModuleResolutionsSkipUnsafeRewriteDiagnostic",
+    TestCustomModuleResolutionsSkipUnsafeRewriteDiagnostic);
 
 void TestStaticModuleResolutionPreservesStaticIdentity(T* t) {
 	t->Parallel();

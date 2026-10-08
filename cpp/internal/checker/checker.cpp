@@ -6865,7 +6865,7 @@ Symbol* Checker::resolveExternalModule(
 			      {moduleReference, resolvedModule.resolvedFileName});
 		}
 
-		if (errorNode != nullptr) {
+		if (errorNode != nullptr && !resolvedModule.isCustomResolution) {
 			if (resolvedModule.resolvedUsingTsExtension &&
 			    tspath::isDeclarationFileName(moduleReference)) {
 				if (findAncestor(location, isEmittableImport) != nullptr) {

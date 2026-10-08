@@ -133,6 +133,7 @@ struct ResolvedModule {
 	bool ResolvedUsingExtraExtensions = false;
 	PackageId PackageId;
 	bool IsExternalLibraryImport = false;
+	bool IsCustomResolution = false;
 	std::string AlternateResult;
 
 	bool IsResolved() const { return !ResolvedFileName.empty(); }

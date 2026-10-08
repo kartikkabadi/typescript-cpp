@@ -349,6 +349,7 @@ staticModuleResolutionToResolvedModule(
 	result->ResolvedFileName = tspath::getNormalizedAbsolutePath(
 	    staticResolution->ResolvedFileName->ToAbsoluteFileName(currentDirectory),
 	    currentDirectory);
+	result->IsCustomResolution = true;
 	if (staticResolution->OriginalPath) {
 		result->OriginalPath = tspath::getNormalizedAbsolutePath(
 		    staticResolution->OriginalPath->ToAbsoluteFileName(

@@ -353,6 +353,24 @@ func TestModuleResolutionCallbackErrorRejectsLanguageServerUpdate(t *testing.T) 
 	assert.Equal(t, len(projectSession.Snapshot().ProjectCollection.SyntheticProjects()), 0)
 }
 
+// callbackTestConn is defined in callbackfs_test.go upstream; that file is not
+// yet vendored, so the definition lives here for now.
+type callbackTestConn struct {
+	responses map[string]json.Value
+}
+
+func (c *callbackTestConn) Run(context.Context) error {
+	return nil
+}
+
+func (c *callbackTestConn) Call(_ context.Context, method string, _ any) (json.Value, error) {
+	return c.responses[method], nil
+}
+
+func (c *callbackTestConn) Notify(context.Context, string, any) error {
+	return nil
+}
+
 func staticResolutionEntry(moduleName string, directory string, mode *core.ModuleKind, fileName string) *ModuleResolutionEntry {
 	entry := &ModuleResolutionEntry{
 		ModuleName: moduleName,

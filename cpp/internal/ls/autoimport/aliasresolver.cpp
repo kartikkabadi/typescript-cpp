@@ -15,6 +15,7 @@ checker::ResolvedModule toCheckerResolvedModule(
 	out.resolvedFileName = rm.ResolvedFileName;
 	out.resolvedUsingTsExtension = rm.ResolvedUsingTsExtension;
 	out.isExternalLibraryImport = rm.IsExternalLibraryImport;
+	out.isCustomResolution = rm.IsCustomResolution;
 	out.extension = rm.Extension;
 	out.alternateResult = rm.AlternateResult;
 	out.packageId = checker::PackageId{rm.PackageId.Name};

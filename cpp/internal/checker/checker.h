@@ -1038,6 +1038,7 @@ struct ResolvedModule {
 	std::string resolvedFileName{};
 	bool resolvedUsingTsExtension{};
 	bool isExternalLibraryImport{};
+	bool isCustomResolution{};
 	std::string extension{};
 	std::string alternateResult{};
 	PackageId packageId{};
