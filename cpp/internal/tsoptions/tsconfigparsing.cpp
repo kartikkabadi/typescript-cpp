@@ -2271,6 +2271,9 @@ StringLiteral* GetTsConfigPropArrayElementValue(
 Diagnostic* CreateDiagnosticAtReferenceSyntax(
     ParsedCommandLine* config, int index, const DiagnosticMessage* message,
     std::vector<std::string> args) {
+	if (config->ConfigFile == nullptr) {
+		return nullptr;
+	}
 	return ForEachTsConfigPropArray<Diagnostic>(
 	    config->ConfigFile->SourceFile, "references",
 	    [&](PropertyAssignment* property) -> Diagnostic* {

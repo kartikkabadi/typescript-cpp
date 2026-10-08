@@ -446,5 +446,64 @@ void TestUpdateSnapshotEnsuresSyntheticProgram(T* t) {
 REGISTER_UNIT_TEST("api.TestUpdateSnapshotEnsuresSyntheticProgram",
                    TestUpdateSnapshotEnsuresSyntheticProgram);
 
+void TestCreateProgramReportsNonCompositeProjectReference(T* t) {
+	t->Parallel();
+
+	const std::string root = "/home/projects/p/src/index.ts";
+	const std::string referenced = "/home/projects/p/lib/tsconfig.json";
+	auto [projectSession, utils] = projecttestutil::Setup(
+	    projecttestutil::FileMap{
+	        {root, "export const x = 1;"},
+	        {referenced, "{ \"compilerOptions\": { \"strict\": true } }"},
+	        {"/home/projects/p/lib/a.ts", "export const a = 1;"},
+	    });
+	struct pclose {
+		project::Session* s;
+		~pclose() { s->Close(); }
+	} pc{projectSession};
+	auto session = NewLSPSession(projectSession, nullptr);
+	struct closer {
+		std::shared_ptr<Session> s;
+		~closer() { s->Close(); }
+	} c{session};
+
+	CreateSnapshotParams params;
+	params.CreatePrograms.emplace().push_back(
+	    std::make_shared<CreateSnapshotProgramParams>(
+	        CreateSnapshotProgramParams{
+	            .RootFiles = {DocumentIdentifier{.FileName = root}},
+	            .CompilerOptions =
+	                tsc::CompilerOptions{.NoLib = Tristate::True},
+	            .Options = std::make_shared<CreateProgramOptions>(
+	                CreateProgramOptions{
+	                    .ProjectReferences =
+	                        {std::make_shared<tsc::ProjectReference>(
+	                            tsc::ProjectReference{
+	                                .Path = referenced,
+	                                .OriginalPath = "../lib",
+	                            })},
+	                }),
+	        }));
+	auto [response, err] = session->handleCreateSnapshot(
+	    gostd::contextBackground(), &params);
+	assert::NilError(t, err);
+	auto projectID = (*response->Operation->CreatedPrograms)[0].AsID();
+	auto [diagnostics, err2] = session->handleGetProgramDiagnostics(
+	    gostd::contextBackground(),
+	    &GetProjectDiagnosticsParams{
+	        .Snapshot = response->Snapshot,
+	        .Project = projectID,
+	    });
+	assert::NilError(t, err2);
+	std::vector<int32_t> codes;
+	codes.reserve(diagnostics.size());
+	for (const auto& diagnostic : diagnostics) {
+		codes.push_back(diagnostic->Code);
+	}
+	assert::DeepEqual(t, codes, std::vector<int32_t>{6306});
+}
+REGISTER_UNIT_TEST("api.TestCreateProgramReportsNonCompositeProjectReference",
+                   TestCreateProgramReportsNonCompositeProjectReference);
+
 }  // namespace
 }  // namespace tsc::api
