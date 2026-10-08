@@ -104,18 +104,24 @@ public:
 			return std::make_shared<dirWatchErrorObj>(errReadChanges, w);
 		}
 		w->state = sub;
-		auto weak = std::weak_ptr<windowsSubscription>(sub);
-		std::thread([weak] {
-			if (auto s = weak.lock()) s->run();
-		}).detach();
+		// The Go goroutine captures the subscription and keeps it alive;
+		// capture the shared_ptr directly — a weak capture can lose the
+		// race with closeWatch's state reset, skipping run() forever and
+		// deadlocking closeWatch's doneFlag wait.
+		std::thread([sub] { sub->run(); }).detach();
 		return nullptr;
 	}
 
 	gostd::Error closeWatch(std::shared_ptr<dirWatch> w) override {
-		windowsSubscription* sub = nullptr;
+		// Keep a strong ref past the state reset: the run() goroutine in
+		// Go holds the subscription alive via its receiver, but here the
+		// run thread's weak.lock() may not have fired yet (or already
+		// released) — without this the reset frees `sub` while we still
+		// use it below.
+		std::shared_ptr<windowsSubscription> sub;
 		if (auto* p = std::any_cast<std::shared_ptr<windowsSubscription>>(
 		        &w->state)) {
-			sub = p->get();
+			sub = *p;
 		}
 		w->state.reset();
 		if (sub == nullptr) {

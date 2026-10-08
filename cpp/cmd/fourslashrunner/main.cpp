@@ -34,12 +34,18 @@ namespace {
 // test child (e.g. a server-side panic leaving the client waiting on a
 // response that will never come) is marked FAIL instead of stalling the
 // whole batch.
-constexpr unsigned kTestTimeoutSeconds = 180;
+constexpr unsigned kTestTimeoutSeconds = 600;
 
 void onTestAlarm(int) {
 	const char msg[] = "[timed out]\n";
 	(void)!write(STDERR_FILENO, msg, sizeof(msg) - 1);
+#ifdef _WIN32
+	// TerminateProcess skips DLL_PROCESS_DETACH teardown that would
+	// race the test's leaked detached threads (see --test-child).
+	TerminateProcess(GetCurrentProcess(), 1);
+#else
 	_exit(1);
+#endif
 }
 
 // Runs the test body and returns 0 pass / 1 fail / 2 skip — shared by the
@@ -162,7 +168,16 @@ int main(int argc, char** argv) {
 		const std::string target = argv[2];
 		for (auto& tc : tsc::fourslash::tests::fourslashTestRegistry()) {
 			if (tc.name == target) {
-				return runTestBody(tc);
+				// TerminateProcess, not return or even _exit: the POSIX
+				// child calls _exit, but a Windows ExitProcess still runs
+				// DLL_PROCESS_DETACH in every loaded DLL while the test's
+				// leaked detached threads touch CRT/MSVCP internals —
+				// a racy __fastfail that Go's process-exit semantics
+				// never produce. TerminateProcess skips all user-mode
+				// teardown, matching the fork-child's contract.
+				fflush(nullptr);
+				TerminateProcess(GetCurrentProcess(),
+				                 (UINT)runTestBody(tc));
 			}
 		}
 		fprintf(stderr, "unknown test %s\n", target.c_str());

@@ -529,10 +529,16 @@ struct progressReporter {
 		lsproto::WorkDoneProgressBeginOrReportOrEnd value) = 0;
 };
 
-// serverProgressReporter — progress.go:34.
+// serverProgressReporter — progress.go:34. Holds the Server weakly: the
+// progress goroutine (which keeps the reporter alive) must not keep the
+// Server alive — Server->projectProgress->reporter->Server would be a
+// leak cycle. In Go, teardown drops progress events via the done()
+// channel; here an expired weak_ptr is the same signal: every method
+// becomes a no-op once the Server is gone.
 struct serverProgressReporter : progressReporter {
-	Server* server;
-	explicit serverProgressReporter(Server* s) : server(s) {}
+	std::weak_ptr<Server> server;
+	explicit serverProgressReporter(std::weak_ptr<Server> s)
+	    : server(std::move(s)) {}
 	gostd::Context done() override;
 	std::string localize(const DiagnosticMessage* msg,
 	                     const std::vector<gostd::fmtArg>& args) override;
@@ -547,7 +553,8 @@ struct serverProgressReporter : progressReporter {
 // processes start/finish events, maintains a ref-counted map of active
 // operations, and sends progress messages in order. The indicator is not
 // shown until progressDelay has elapsed since the first start event.
-class projectLoadingProgress {
+class projectLoadingProgress
+    : public std::enable_shared_from_this<projectLoadingProgress> {
 	// ch — progress.go:72: a chan of capacity 64, plus the delay timer's
 	// pending-fire flag, all under one mutex.
 	struct chanState {
@@ -568,6 +575,11 @@ class projectLoadingProgress {
 public:
 	projectLoadingProgress(std::shared_ptr<progressReporter> reporter,
 	                       gostd::Duration delay);
+
+	// startRun — `go p.run()`: spawn the persistent event loop. Called by
+	// the factory after make_shared so the thread can hold a shared_ptr
+	// (Go's GC keeps p alive for the goroutine's lifetime).
+	void startRun();
 
 	// start — progress.go:90.
 	void start(const DiagnosticMessage* message,

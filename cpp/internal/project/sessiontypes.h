@@ -147,6 +147,14 @@ struct SessionInit {
 	Client* Client = nullptr;
 	logging::Logger* Logger = nullptr;
 	ata::NpmExecutor* NpmExecutor = nullptr;
+	// Lifetime pins for the raw Client/NpmExecutor above: Go's GC keeps
+	// the server object alive as long as any session goroutine (its
+	// backgroundQueue workers) can reach it; a detached std::thread
+	// calling client->PublishDiagnostics() or npmExecutor->NpmInstall()
+	// after server teardown would otherwise touch freed memory. The
+	// session keeps these refs for its whole lifetime.
+	std::shared_ptr<tsc::project::Client> ClientRef;
+	std::shared_ptr<ata::NpmExecutor> NpmExecutorRef;
 	// Spawner launches content mapper processes; nil when the host
 	// cannot spawn processes.
 	contentmapper::Spawner* Spawner = nullptr;

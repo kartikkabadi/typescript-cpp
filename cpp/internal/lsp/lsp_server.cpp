@@ -982,38 +982,46 @@ gostd::Error Server::Run(gostd::Context ctx) {
 	backgroundCtx = gctx;
 
 	struct errgroup {
-		std::mutex mu;
-		std::condition_variable cv;
-		gostd::Error firstErr;
-		int pending = 0;
+		// Shared state — Go's GC keeps the group alive as long as any
+		// goroutine can reach it. A detached worker's last act
+		// (cancel()/notify) can run after wait() has already returned,
+		// so the state must outlive the stack frame that owns `g`.
+		struct shared {
+			std::mutex mu;
+			std::condition_variable cv;
+			gostd::Error firstErr;
+			int pending = 0;
+		};
+		std::shared_ptr<shared> st = std::make_shared<shared>();
 		std::function<void()> cancel;
 		void go(std::function<gostd::Error()> f) {
 			{
-				std::lock_guard<std::mutex> lk(mu);
-				pending++;
+				std::lock_guard<std::mutex> lk(st->mu);
+				st->pending++;
 			}
-			std::thread([this, f = std::move(f)] {
+			std::thread([st = st, cancel = cancel,
+			            f = std::move(f)] {
 				auto err = f();
 				{
-					std::unique_lock<std::mutex> lk(mu);
-					if (err != nullptr && firstErr == nullptr) {
-						firstErr = err;
+					std::unique_lock<std::mutex> lk(st->mu);
+					if (err != nullptr && st->firstErr == nullptr) {
+						st->firstErr = err;
 					}
-					bool done = --pending == 0;
+					bool done = --st->pending == 0;
 					lk.unlock();
-					if (err != nullptr) {
+					if (err != nullptr && cancel != nullptr) {
 						cancel();
 					}
 					if (done) {
-						cv.notify_all();
+						st->cv.notify_all();
 					}
 				}
 			}).detach();
 		}
 		gostd::Error wait() {
-			std::unique_lock<std::mutex> lk(mu);
-			cv.wait(lk, [&] { return pending == 0; });
-			return firstErr;
+			std::unique_lock<std::mutex> lk(st->mu);
+			st->cv.wait(lk, [&] { return st->pending == 0; });
+			return st->firstErr;
 		}
 	};
 	errgroup g;
@@ -1048,8 +1056,11 @@ gostd::Error Server::Run(gostd::Context ctx) {
 		}
 		return rl->err;
 	});
-	std::thread([s, gctx, rl] {
-		auto err = s->readLoop(gctx);
+	// This read thread is not tracked by the errgroup (stdin reads can't
+	// be cancelled) and can outlive Run(). In Go the leaked goroutine
+	// keeps the Server alive; hold a shared_ptr here for the same.
+	std::thread([self = s->shared_from_this(), gctx, rl] {
+		auto err = self->readLoop(gctx);
 		{
 			std::lock_guard<std::mutex> lk(rl->mu);
 			rl->err = err;
@@ -1238,15 +1249,22 @@ gostd::Error Server::dispatchLoop(gostd::Context ctx) {
 			removeRequest();
 		} else if (doAsyncWork != nullptr) {
 			// Captures req/cancel/lspExit by value: the detached goroutine
-			// outlives this iteration's stack frame.
+			// outlives this iteration's stack frame. It must also outlive
+			// the Server: Go's GC keeps everything the goroutine touches
+			// alive, but a detached std::thread holding only `this` UAFs
+			// once the last shared_ptr<Server> drops (the send path,
+			// pendingClientRequestsMu, s->session, and every `s` captured
+			// inside doAsyncWork). Hold a shared_ptr for the thread's
+			// duration so teardown can't free the Server mid-work.
 			auto req2 = req;
 			auto cancel2 = cancel;
 			auto lspExit2 = lspExit;
-			std::thread([this, doAsyncWork = std::move(doAsyncWork), req2,
+			std::thread([self = shared_from_this(),
+			             doAsyncWork = std::move(doAsyncWork), req2,
 			             cancel2, lspExit2]() mutable {
 				auto handleError = [&](const gostd::Error& err) {
 					if (gostd::errorIs(err, gostd::errCanceled)) {
-						if (auto serr = sendError(
+						if (auto serr = self->sendError(
 						        req2->ID,
 						        lsproto::errorCodeErr(
 						            lsproto::ErrorCodeRequestCancelled));
@@ -1256,7 +1274,7 @@ gostd::Error Server::dispatchLoop(gostd::Context ctx) {
 					} else if (gostd::errorIs(err, gostd::io::errEOF)) {
 						lspExit2(nullptr);
 					} else {
-						if (auto serr = sendError(req2->ID, err);
+						if (auto serr = self->sendError(req2->ID, err);
 						    serr != nullptr) {
 							lspExit2(serr);
 						}
@@ -1269,8 +1287,8 @@ gostd::Error Server::dispatchLoop(gostd::Context ctx) {
 							~deferCancel() { (*f)(); }
 						} guard{&cancel2};
 						std::lock_guard<std::mutex> lk(
-							pendingClientRequestsMu);
-						pendingClientRequests.erase(*req2->ID);
+							self->pendingClientRequestsMu);
+						self->pendingClientRequests.erase(*req2->ID);
 					}
 				};
 				if (auto lsError = doAsyncWork(); lsError != nullptr) {

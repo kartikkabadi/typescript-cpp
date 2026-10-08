@@ -269,7 +269,9 @@ struct WatchedFiles {
 	std::function<PatternsAndIgnored(T)> computeGlobPatterns;
 
 	std::shared_mutex mu;
-	T input;
+	// Go zero-value semantics: a freshly-created WatchedFiles has
+	// input == T{} (nil for pointer types) until Clone replaces it.
+	T input{};
 	std::once_flag computeWatchersOnce;
 	std::vector<lsp::lsproto::FileSystemWatcher*> workspaceWatchers;
 	std::vector<lsp::lsproto::FileSystemWatcher*> outsideWorkspaceWatchers;

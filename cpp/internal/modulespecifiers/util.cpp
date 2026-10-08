@@ -92,6 +92,14 @@ static std::unordered_map<regexPatternCacheKey, std::shared_ptr<std::regex>,
     regexPatternCache;
 
 // util.go:59 — stringToRegex (defined below; declared for IsExcludedByRegex)
+// noinline (Windows): when clang inlines this into IsExcludedByRegex at -O3,
+// the regex-ctor call site lands in a terminate-scoped EH state rather than
+// inside the inlined try — a bad pattern then std::terminate()s the process
+// instead of hitting the catch below (Go just treats it as a failed
+// compile). Keeping it out-of-line preserves correct EH attribution.
+#if defined(_WIN32)
+__declspec(noinline)
+#endif
 static std::shared_ptr<std::regex> stringToRegex(std::string pattern);
 // util.go:183 — extensionFromPath (defined below)
 static std::string extensionFromPath(std::string_view path);
@@ -119,6 +127,12 @@ bool PathIsBareSpecifier(std::string_view path) {
 	return !tspath::pathIsAbsolute(path) && !tspath::pathIsRelative(path);
 }
 
+// MSVC's std::regex is not safe for concurrent searches on a shared object
+// (its compiled NFA evaluation mutates per-search state without locks) —
+// Go's regexp.Regexp is explicitly safe for concurrent use. Serialize the
+// searches so shared cached patterns behave like Go's.
+static std::mutex regexSearchMu;
+
 // util.go:46 — IsExcludedByRegex
 bool IsExcludedByRegex(const std::string& moduleSpecifier,
                        const std::vector<std::string>& excludes) {
@@ -127,7 +141,14 @@ bool IsExcludedByRegex(const std::string& moduleSpecifier,
 		if (re == nullptr) {
 			continue;
 		}
-		if (std::regex_search(moduleSpecifier, *re)) {
+		bool matched;
+		try {
+			std::lock_guard<std::mutex> searchLock(regexSearchMu);
+			matched = std::regex_search(moduleSpecifier, *re);
+		} catch (const std::regex_error&) {
+			matched = false;
+		}
+		if (matched) {
 			return true;
 		}
 	}

@@ -197,26 +197,33 @@ struct requestErrors {
 // waitGroup — sync.WaitGroup: go() spawns a detached thread, wait() blocks
 // until the count reaches zero.
 struct waitGroup {
-	std::mutex mu;
-	std::condition_variable cv;
-	int count = 0;
+	// Shared state — Go's GC keeps the WaitGroup alive for as long as any
+	// spawned goroutine can touch it. A detached worker's final
+	// decrement/notify can run after wait() returned and the group owner
+	// was destroyed, so the state must be heap-shared.
+	struct shared {
+		std::mutex mu;
+		std::condition_variable cv;
+		int count = 0;
+	};
+	std::shared_ptr<shared> st = std::make_shared<shared>();
 
 	void go(std::function<void()> f) {
 		{
-			std::lock_guard<std::mutex> lk(mu);
-			++count;
+			std::lock_guard<std::mutex> lk(st->mu);
+			++st->count;
 		}
-		std::thread([this, f = std::move(f)] {
+		std::thread([st = st, f = std::move(f)] {
 			f();
-			std::unique_lock<std::mutex> lk(mu);
-			--count;
+			std::unique_lock<std::mutex> lk(st->mu);
+			--st->count;
 			lk.unlock();
-			cv.notify_all();
+			st->cv.notify_all();
 		}).detach();
 	}
 	void wait() {
-		std::unique_lock<std::mutex> lk(mu);
-		cv.wait(lk, [this] { return count == 0; });
+		std::unique_lock<std::mutex> lk(st->mu);
+		st->cv.wait(lk, [st = st] { return st->count == 0; });
 	}
 };
 

@@ -61,6 +61,8 @@ Session* NewSession(SessionInit* init) {
 	session->toPath = snapshotHost->toPath;
 	session->client = init->Client;
 	session->npmExecutor = init->NpmExecutor;
+	session->clientRef = init->ClientRef;
+	session->npmExecutorRef = init->NpmExecutorRef;
 	session->fs = newOverlayFS(
 	    snapshotHost->fs,
 	    std::unordered_map<tspath::Path, Overlay*>{},
@@ -351,7 +353,12 @@ void Session::DidChangeWatchedFiles(
 				} else {
 					snapshotMu.lock_shared();
 					auto* snapshot = this->snapshot;
+					snapshot->ref();
 					snapshotMu.unlock_shared();
+					struct derefGuard {
+						project::Snapshot* s;
+						~derefGuard() { s->Deref(); }
+					} dg{snapshot};
 					if (snapshot->fs->cacheDirectories.count(
 					        pathStr) ||
 					    snapshot->hasOverlayWithin(
@@ -666,7 +673,12 @@ void Session::sendPerformanceTelemetry(const gostd::Context& ctx) {
 	}
 	snapshotMu.lock_shared();
 	auto* snapshot = this->snapshot;
+	snapshot->ref();
 	snapshotMu.unlock_shared();
+	struct derefGuard {
+		project::Snapshot* s;
+		~derefGuard() { s->Deref(); }
+	} dg{snapshot};
 
 	auto* measurements =
 	    new lsp::lsproto::PerformanceStatsTelemetryMeasurements();
@@ -1404,6 +1416,15 @@ project::Snapshot* Session::updateSnapshot(
 	if (callerRef) {
 		newSnapshot->ref();
 	}
+	// The post-update background task enqueued below dereferences
+	// both snapshots (updateWatches, publishProgramDiagnostics,
+	// warmAutoImportCache, ...). Hand it a ref on each BEFORE the
+	// session drops its own ref — Go's GC keeps them alive for the
+	// goroutine's duration, but here a later updateSnapshot could
+	// otherwise free either snapshot while the task still walks its
+	// projects/programs.
+	oldSnapshot->ref();
+	newSnapshot->ref();
 	contentmapper::Timings contentMapperTimings_;
 	if (newSnapshot != oldSnapshot) {
 		// Release the session's reference to the old snapshot. The
@@ -1427,10 +1448,18 @@ project::Snapshot* Session::updateSnapshot(
 	auto* self = this;
 	auto capturedChange = change;
 	auto timings = contentMapperTimings_;
-	backgroundQueue->Enqueue(
-	    backgroundContext(),
-	    [self, oldSnapshot, newSnapshot, timings,
-	     capturedChange](const gostd::Context& ctx) {
+	if (!backgroundQueue->Enqueue(
+	        backgroundContext(),
+	        [self, oldSnapshot, newSnapshot, timings,
+	         capturedChange](const gostd::Context& ctx) {
+		    struct derefGuard {
+			    project::Snapshot* a;
+			    project::Snapshot* b;
+			    ~derefGuard() {
+				    a->Deref();
+				    b->Deref();
+			    }
+		    } dg{oldSnapshot, newSnapshot};
 		    if (self->options->LoggingEnabled) {
 			    logging::logf(self->logger, 
 			        "Adopted snapshot %d (parent %d) as "
@@ -1465,7 +1494,11 @@ project::Snapshot* Session::updateSnapshot(
 		        oldSnapshot, newSnapshot);
 		    self->warmAutoImportCache(ctx, capturedChange,
 		                              oldSnapshot, newSnapshot);
-	    });
+	    })) {
+		// Dropped (queue closed / context cancelled): unwind the refs.
+		oldSnapshot->Deref();
+		newSnapshot->Deref();
+	}
 
 	return newSnapshot;
 }
@@ -1739,8 +1772,8 @@ gostd::Error Session::updateWatches(project::Snapshot* oldSnapshot,
 	    oldSnapshot->ConfigFileRegistry->configs,
 	    newSnapshot->ConfigFileRegistry->configs,
 	    [](configFileEntry* a, configFileEntry* b) {
-		    return a->rootFilesWatch->ID() ==
-		           b->rootFilesWatch->ID();
+		    return watchedFilesID(a->rootFilesWatch) ==
+		           watchedFilesID(b->rootFilesWatch);
 	    },
 	    [&](const tspath::Path&, configFileEntry* addedEntry) {
 		    auto errs = updateWatch<PatternsAndIgnored>(
@@ -1771,10 +1804,10 @@ gostd::Error Session::updateWatches(project::Snapshot* oldSnapshot,
 		    oldSnapshot->ConfigFileRegistry->configs.find(path);
 		if (it != oldSnapshot->ConfigFileRegistry->configs.end()) {
 			auto* oldEntry = it->second;
-			if (oldEntry->rootFilesWatch->ID() ==
-			    newEntry->rootFilesWatch->ID()) {
+			if (watchedFilesID(oldEntry->rootFilesWatch) ==
+			    watchedFilesID(newEntry->rootFilesWatch)) {
 				if (watches->IsPending(
-				        newEntry->rootFilesWatch->ID())) {
+				        watchedFilesID(newEntry->rootFilesWatch))) {
 					auto errs =
 					    updateWatch<PatternsAndIgnored>(
 					        ctx, nullptr,
@@ -1845,8 +1878,8 @@ gostd::Error Session::updateWatches(project::Snapshot* oldSnapshot,
 				                  errs.begin(), errs.end());
 			    }
 		    }
-		    if (oldProject->typingsWatch->ID() !=
-		        newProject->typingsWatch->ID()) {
+		    if (watchedFilesID(oldProject->typingsWatch) !=
+		        watchedFilesID(newProject->typingsWatch)) {
 			    auto errs = updateWatch(
 			        ctx, oldProject->typingsWatch,
 			        newProject->typingsWatch);
@@ -1854,7 +1887,7 @@ gostd::Error Session::updateWatches(project::Snapshot* oldSnapshot,
 			                  errs.end());
 		    } else {
 			    if (watches->IsPending(
-			        newProject->typingsWatch->ID())) {
+			        watchedFilesID(newProject->typingsWatch))) {
 				    auto errs = updateWatchNew(
 				        ctx, newProject->typingsWatch);
 				    errors.insert(errors.end(),
@@ -1878,14 +1911,14 @@ gostd::Error Session::updateWatches(project::Snapshot* oldSnapshot,
 		    }
 	    });
 
-	if (oldSnapshot->autoImportsWatch->ID() !=
-	    newSnapshot->autoImportsWatch->ID()) {
+	if (watchedFilesID(oldSnapshot->autoImportsWatch) !=
+	    watchedFilesID(newSnapshot->autoImportsWatch)) {
 		auto errs = updateWatch(ctx, oldSnapshot->autoImportsWatch,
 		                        newSnapshot->autoImportsWatch);
 		errors.insert(errors.end(), errs.begin(), errs.end());
 	} else {
 		if (watches->IsPending(
-		        newSnapshot->autoImportsWatch->ID())) {
+		        watchedFilesID(newSnapshot->autoImportsWatch))) {
 			auto errs =
 			    updateWatchNew(ctx, newSnapshot->autoImportsWatch);
 			errors.insert(errors.end(), errs.begin(),
@@ -2430,9 +2463,18 @@ void Session::triggerATAForUpdatedProjects(
 		if (project->ShouldTriggerATA(newSnapshot->ID())) {
 			auto* self = this;
 			auto* project_ = project;
-			backgroundQueue->Enqueue(
-			    backgroundContext(),
-			    [self, project_](const gostd::Context& ctx) {
+			// Projects are owned by their snapshot — hold a ref so
+			// the project can't be freed out from under the worker
+			// (Go's GC does the same for the goroutine's captures).
+			newSnapshot->ref();
+			if (!backgroundQueue->Enqueue(
+			        backgroundContext(),
+			        [self, project_,
+			         newSnapshot](const gostd::Context& ctx) {
+				    struct derefGuard {
+					    project::Snapshot* s;
+					    ~derefGuard() { s->Deref(); }
+				    } dg{newSnapshot};
 				    logging::LogTree* logTree = nullptr;
 				    if (self->options->LoggingEnabled) {
 					    logTree = logging::newLogTree(
@@ -2514,7 +2556,10 @@ void Session::triggerATAForUpdatedProjects(
 						    self->ScheduleDiagnosticsRefresh();
 					    }
 				    }
-			    });
+			    })) {
+				// Dropped — unwind the snapshot ref.
+				newSnapshot->Deref();
+			}
 		}
 	}
 }

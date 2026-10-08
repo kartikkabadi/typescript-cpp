@@ -26,18 +26,21 @@ public:
 	Queue(const Queue&) = delete;
 	Queue& operator=(const Queue&) = delete;
 
-	void Enqueue(const gostd::Context& ctx,
+	// Enqueue returns false when the task was dropped (queue closed or
+	// the context already cancelled) so callers can unwind any resources
+	// they captured for it.
+	bool Enqueue(const gostd::Context& ctx,
 	             const std::function<void(gostd::Context)>& fn) {
 		{
 			std::shared_lock<std::shared_mutex> lk(mu);
 			if (closed) {
-				return;
+				return false;
 			}
 		}
 
 		// Don't start new tasks if context is already cancelled
 		if (gostd::ctxErr(ctx) != nullptr) {
-			return;
+			return false;
 		}
 
 		// wg.Go — spawn a detached thread.
@@ -56,6 +59,7 @@ public:
 				wgCv.notify_all();
 			}
 		}).detach();
+		return true;
 	}
 
 	// Wait waits for all active tasks to complete.

@@ -9,23 +9,38 @@ namespace tsc::lsp {
 
 // done — progress.go:38.
 gostd::Context serverProgressReporter::done() {
-	return server->backgroundCtx;
+	if (auto s = server.lock()) {
+		return s->backgroundCtx;
+	}
+	// Server already torn down: behave as shut down (permanently
+	// cancelled context) so the run loop exits instead of hanging.
+	auto [c, cancel] = gostd::contextWithCancel(gostd::contextBackground());
+	cancel();
+	return c;
 }
 
 // localize — progress.go:42.
 std::string serverProgressReporter::localize(
 	const DiagnosticMessage* msg,
 	const std::vector<gostd::fmtArg>& args) {
+	auto s = server.lock();
+	if (s == nullptr) {
+		return {};
+	}
 	// msg.Localize(locale, args...) = Localize(locale, m, "", StringifyArgs)
-	return tsc::localize(server->locale, msg, "",
+	return tsc::localize(s->locale, msg, "",
 	                     detail::stringifyArgs(args));
 }
 
 // createWorkDoneProgress — progress.go:46.
 void serverProgressReporter::createWorkDoneProgress(const std::string& token) {
+	auto s = server.lock();
+	if (s == nullptr) {
+		return;
+	}
 	auto params = std::make_shared<lsproto::WorkDoneProgressCreateParams>();
 	params->Token.String = detail::goNew(token);
-	(void)server->sendClientRequestFireAndForget(
+	(void)s->sendClientRequestFireAndForget(
 		lsproto::WindowWorkDoneProgressCreateInfo, params);
 }
 
@@ -33,30 +48,41 @@ void serverProgressReporter::createWorkDoneProgress(const std::string& token) {
 void serverProgressReporter::sendProgress(
 	const std::string& token,
 	lsproto::WorkDoneProgressBeginOrReportOrEnd value) {
+	auto s = server.lock();
+	if (s == nullptr) {
+		return;
+	}
 	auto params = std::make_shared<lsproto::ProgressParams>();
 	params->Token.String = detail::goNew(token);
 	params->Value = std::move(value);
-	(void)server->sendNotification(lsproto::ProgressInfo, params);
+	(void)s->sendNotification(lsproto::ProgressInfo, params);
 }
 
 // newProjectLoadingProgress — progress.go:76.
 std::shared_ptr<projectLoadingProgress>
 newProjectLoadingProgress(Server* server, gostd::Duration delay) {
 	return newProjectLoadingProgressFromReporter(
-		std::make_shared<serverProgressReporter>(server), delay);
+		std::make_shared<serverProgressReporter>(
+			server->shared_from_this()),
+		delay);
 }
 
 // newProjectLoadingProgressFromReporter — progress.go:80.
 std::shared_ptr<projectLoadingProgress> newProjectLoadingProgressFromReporter(
 	std::shared_ptr<progressReporter> reporter, gostd::Duration delay) {
-	return std::make_shared<projectLoadingProgress>(std::move(reporter),
-	                                                delay); // go p.run()
+	auto p = std::make_shared<projectLoadingProgress>(std::move(reporter),
+	                                                delay);
+	p->startRun(); // go p.run()
+	return p;
 }
 
 projectLoadingProgress::projectLoadingProgress(
 	std::shared_ptr<progressReporter> reporter, gostd::Duration delay)
-    : reporter(std::move(reporter)), delay(delay) {
-	std::thread([this] { run(); }).detach();
+    : reporter(std::move(reporter)), delay(delay) {}
+
+void projectLoadingProgress::startRun() {
+	// Hold self for the goroutine's lifetime — Go's GC does the same.
+	std::thread([self = shared_from_this()] { self->run(); }).detach();
 }
 
 // enqueue — the `p.ch <- ev` select arm shared by start/finish
