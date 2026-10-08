@@ -62,6 +62,21 @@ inline bool isObjectBindingOrAssignmentElement(Node* node) {
 	}
 }
 
+// ast.IsObjectLiteralElement — ast.go helpers (file-local copy)
+inline bool isObjectLiteralElement(Node* element) {
+	switch (element->kind) {
+	case Kind::PropertyAssignment:
+	case Kind::ShorthandPropertyAssignment:
+	case Kind::SpreadAssignment:
+	case Kind::MethodDeclaration:
+	case Kind::GetAccessor:
+	case Kind::SetAccessor:
+		return true;
+	default:
+		return false;
+	}
+}
+
 // ast.IsArrayBindingOrAssignmentElement — utilities.go:3381
 inline bool isArrayBindingOrAssignmentElement(Node* node) {
 	switch (node->kind) {
@@ -3712,7 +3727,7 @@ Node* classFieldsTransformer::visitAssignmentRestProperty(Node* node) {
 }
 
 Node* classFieldsTransformer::visitObjectAssignmentElement(Node* node) {
-	debugAssert(node != nullptr && isObjectBindingOrAssignmentElement(node));
+	debugAssert(node != nullptr && isObjectLiteralElement(node));
 	if (isSpreadAssignment(node)) {
 		return visitAssignmentRestProperty(node);
 	}

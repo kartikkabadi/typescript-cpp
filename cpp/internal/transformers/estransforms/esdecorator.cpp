@@ -80,6 +80,20 @@ bool isObjectBindingOrAssignmentElement(Node* node) {
 }
 
 // ast.utilities.go:150 — IsArrayBindingOrAssignmentElement.
+bool isObjectLiteralElement(Node* element) {
+	switch (element->kind) {
+	case Kind::PropertyAssignment:
+	case Kind::ShorthandPropertyAssignment:
+	case Kind::SpreadAssignment:
+	case Kind::MethodDeclaration:
+	case Kind::GetAccessor:
+	case Kind::SetAccessor:
+		return true;
+	default:
+		return false;
+	}
+}
+
 bool isArrayBindingOrAssignmentElement(Node* node) {
 	switch (node->kind) {
 	case Kind::BindingElement:
@@ -2894,7 +2908,7 @@ Node* esDecoratorTransformer::visitAssignmentRestElement(Node* node) {
 
 // visitArrayAssignmentElement — esdecorator.go:2200
 Node* esDecoratorTransformer::visitArrayAssignmentElement(Node* node) {
-	debugAssert_(isArrayBindingOrAssignmentElement(node));
+	debugAssert_(node != nullptr && isExpression(node));
 	if (isSpreadElement(node)) {
 		return visitAssignmentRestElement(node);
 	}
@@ -2976,7 +2990,7 @@ Node* esDecoratorTransformer::visitAssignmentRestProperty(Node* node) {
 
 // visitObjectAssignmentElement — esdecorator.go:2263
 Node* esDecoratorTransformer::visitObjectAssignmentElement(Node* node) {
-	debugAssert_(isObjectBindingOrAssignmentElement(node));
+	debugAssert_(node != nullptr && isObjectLiteralElement(node));
 	if (isSpreadAssignment(node)) {
 		return visitAssignmentRestProperty(node);
 	}
