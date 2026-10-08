@@ -258,9 +258,20 @@ struct pathComparer {
 	                                            const std::string& to) const;
 };
 
-// canonicalize_other.go — non-Darwin platforms.
+// canonicalize_other.go / fsevents_darwin_ffi.go:195 — native path
+// folding is only available on Darwin.
+#ifdef __APPLE__
+inline constexpr bool nativePathFolding = true;
+#else
 inline constexpr bool nativePathFolding = false;
+#endif
 inline constexpr bool NativePathComparisonAvailable = nativePathFolding;
+
+#ifdef __APPLE__
+// canonicalize_darwin.go — UTF-8 NFC normalization used by watch keys
+// and incoming FSEvents paths on darwin (ASCII fast path).
+std::string normalizeNFC(std::string_view s);
+#endif
 
 [[noreturn]] void foldNativePathPanic();
 std::string foldNativePath(std::string_view path);
@@ -390,6 +401,14 @@ bool equalFold(std::string_view a, std::string_view b);
 using walkFn = std::function<gostd::Error(const std::string& path, bool isDir)>;
 
 #ifndef _WIN32
+#ifdef __APPLE__
+// walkdir_dirent_darwin.go — getdirentries returns plain struct dirent
+// records (d_fileno is the inode number).
+#include <dirent.h>
+using darwinDirent = struct dirent;
+inline uint16_t reclenOf(const darwinDirent* d) { return d->d_reclen; }
+inline uint64_t inoOf(const darwinDirent* d) { return d->d_fileno; }
+#else
 // linux_dirent64 — the getdents64 record layout (glibc has no userspace
 // declaration). reclenOf/inoOf (walkdir_dirent_linux.go) access it.
 struct linuxDirent64 {
@@ -401,6 +420,7 @@ struct linuxDirent64 {
 };
 inline uint16_t reclenOf(const linuxDirent64* d) { return d->d_reclen; }
 inline uint64_t inoOf(const linuxDirent64* d) { return d->d_ino; }
+#endif
 #endif // !_WIN32
 
 // walkDir walks dir, optionally recursively, invoking fn for each entry.
@@ -927,13 +947,22 @@ struct fanotifyBackend : watcherBase {
 
 // fanotifyAvailable probes whether fanotify_init succeeds with the flags
 // this backend needs.
+#ifndef __linux__
+// fanotify is a Linux-only API (fanotify.cpp compiles only there, like
+// Go's //go:build linux). Tests reference the probe on every platform.
+inline bool fanotifyAvailable() { return false; }
+inline fanotifyBackend* newFanotifyBackend(bool) { return nullptr; }
+#else
 bool fanotifyAvailable();
+#endif
 
 // newFanotifyBackend creates a fanotify backend. If noRename is true, the
 // backend skips the FAN_RENAME probe and forces the FAN_MOVED_FROM/
 // FAN_MOVED_TO fallback path; this is only used by the fanotify-no-rename
 // test watcher to exercise the fallback path on kernels that natively
 // support FAN_RENAME.
+#ifdef __linux__
 fanotifyBackend* newFanotifyBackend(bool noRename);
+#endif
 
 } // namespace tsc::fswatch

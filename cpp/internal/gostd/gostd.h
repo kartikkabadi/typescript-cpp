@@ -169,6 +169,15 @@ struct fmtArg {
 	fmtArg(unsigned short v) : text(std::to_string(v)), num(v), isInt(true) {}
 	fmtArg(int64_t v) : text(std::to_string(v)), num((long long)v), isInt(true) {}
 	fmtArg(uint64_t v) : text(std::to_string(v)), num((long long)v), isInt(true) {}
+#ifdef __APPLE__
+	// Darwin LP64: long/unsigned long are 64-bit but distinct from
+	// int64_t/uint64_t (which are long long). Without these overloads,
+	// size_t/ssize_t args are ambiguous between the two int64 ctors.
+	// (On Linux uint64_t IS unsigned long, so this is unnecessary.)
+	fmtArg(long v) : text(std::to_string(v)), num((long long)v), isInt(true) {}
+	fmtArg(unsigned long v)
+	    : text(std::to_string(v)), num((long long)v), isInt(true) {}
+#endif
 	fmtArg(double v) : text(std::to_string(v)) {}
 	fmtArg(bool v) : text(v ? "true" : "false") {}
 	fmtArg(char c) : text(1, c) {}
@@ -483,6 +492,9 @@ inline std::function<bool()> contextAfterFunc(const Context& c,
 // the parent's Err (Go's propagateCancel passes parent.Err() through).
 inline std::pair<Context, CancelFunc> contextWithCancel(const Context& parent) {
 	auto c = std::make_shared<ContextImpl>();
+	// Link the parent so Value() lookups see parent values (request ID,
+	// lifetime, locale, ...) — Go's cancelCtx delegates Value to its parent.
+	c->parent = parent;
 	c->cancelable = true;
 	std::weak_ptr<ContextImpl> w = c;
 	contextAfterFunc(parent, [w, parent] {
@@ -500,6 +512,7 @@ inline std::pair<Context, CancelFunc> contextWithCancel(const Context& parent) {
 inline std::pair<Context, std::function<void(const Error&)>>
 contextWithCancelCause(const Context& parent) {
 	auto c = std::make_shared<ContextImpl>();
+	c->parent = parent;
 	std::weak_ptr<ContextImpl> w = c;
 	contextAfterFunc(parent, [w, parent] {
 		if (auto s = w.lock()) {

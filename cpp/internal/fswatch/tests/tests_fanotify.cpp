@@ -1,4 +1,7 @@
 // Port of fanotify_linux_test.go — Linux fanotify backend internals.
+// The Go file is `//go:build linux`; mirror that.
+
+#ifdef __linux__
 
 #include <fcntl.h>
 #include <sys/statfs.h>
@@ -223,3 +226,5 @@ REGISTER_UNIT_TEST(
 
 } // namespace
 } // namespace tsc::fswatch
+
+#endif // __linux__

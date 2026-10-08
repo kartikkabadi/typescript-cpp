@@ -85,7 +85,6 @@ checkerPool::GetChecker(const gostd::Context& ctx,
 	if (!gostd::ctxCancelable(ctx)) {
 		requestID = "";
 	}
-
 	switch (lifetime) {
 	case core::CheckerLifetime::Diagnostics:
 		return getDiagnosticsChecker(ctx, requestID);

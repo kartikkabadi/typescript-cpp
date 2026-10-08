@@ -19,7 +19,11 @@ inline std::chrono::system_clock::time_point fileClockToSys(
 	    std::chrono::duration_cast<std::chrono::system_clock::duration>(
 	        tp.time_since_epoch()) - std::chrono::seconds{11644473600});
 #else
-	return std::chrono::file_clock::to_sys(tp);
+	// libc++ (macOS) uses __int128 as file_clock's rep; the returned
+	// sys_time needs an explicit duration_cast to system_clock's
+	// long-long representation.
+	return std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+	    std::chrono::file_clock::to_sys(tp));
 #endif
 }
 
@@ -30,7 +34,9 @@ inline std::filesystem::file_time_type fileClockFromSys(
 	    std::chrono::duration_cast<std::filesystem::file_time_type::duration>(
 	        tp.time_since_epoch()) + std::chrono::seconds{11644473600});
 #else
-	return std::chrono::file_clock::from_sys(tp);
+	return std::chrono::time_point_cast<
+	    std::filesystem::file_time_type::duration>(
+	    std::chrono::file_clock::from_sys(tp));
 #endif
 }
 

@@ -23,6 +23,9 @@
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
+#ifdef __APPLE__
+#include <mach-o/dyld.h> // _NSGetExecutablePath
+#endif
 #endif
 
 #include "internal/core/version.h"
@@ -174,7 +177,11 @@ struct osFileInfo final : FileInfo {
 	int64_t Size() const override { return static_cast<int64_t>(st.st_size); }
 	FileMode Mode() const override { return modeFromStat(st.st_mode); }
 	TimePoint ModTime() const override {
+#ifdef __APPLE__
+		return fromTimespec(st.st_mtimespec);
+#else
 		return fromTimespec(st.st_mtim);
+#endif
 	}
 	bool IsDir() const override { return S_ISDIR(st.st_mode); }
 	std::any Sys() const override { return st; }
@@ -538,6 +545,21 @@ static std::pair<std::string, int> nativepathRealpath(
     const std::string& path) {
 	return ::realpath(path);
 }
+#elif defined(__APPLE__)
+// nativepathRealpath — nativepath/realpath_other.go (!linux && !windows):
+// plain filepath.EvalSymlinks, i.e. realpath(3). There is no O_PATH on
+// darwin, and no /proc/self/fd to resolve it through.
+// NB: pass our own buffer — realpath(3) with a NULL buffer mallocs in
+// the system zone while our free resolves to mimalloc (two-level
+// namespace), so freeing it ourselves would crash.
+static std::pair<std::string, int> nativepathRealpath(
+    const std::string& path) {
+	char resolved[PATH_MAX];
+	if (::realpath(path.c_str(), resolved) == nullptr) {
+		return {"", errno};
+	}
+	return {std::string{resolved}, 0};
+}
 #else
 // nativepathRealpath — nativepath/realpath_linux.go: O_PATH + /proc/self/fd
 // trick, with EvalSymlinks-style fallback when procfs is absent.
@@ -642,6 +664,22 @@ static std::pair<std::string, Error> filepathAbs(const std::string& path) {
 // executable — os.Executable on Windows: GetModuleFileName(NULL).
 static std::pair<std::string, Error> executable() {
 	return {w32::selfExePath(), Error{}};
+}
+#elif defined(__APPLE__)
+// executable — os.Executable on darwin: _NSGetExecutablePath(3)
+// (os/executable_darwin.go). Caller-buffers realpath to canonicalize,
+// matching the Linux path below.
+static std::pair<std::string, Error> executable() {
+	char buf[PATH_MAX];
+	uint32_t size = sizeof buf;
+	if (_NSGetExecutablePath(buf, &size) != 0) {
+		return {"", errnoError(ENAMETOOLONG)};
+	}
+	char resolved[PATH_MAX];
+	if (::realpath(buf, resolved) == nullptr) {
+		return {"", errnoError(errno)};
+	}
+	return {std::string{resolved}, Error{}};
 }
 #else
 // executable — os.Executable on Linux: readlink("/proc/self/exe") minus a

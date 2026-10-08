@@ -164,8 +164,9 @@ void TestAsyncConnRunWaitsForHandlers(T* t) {
 	// Channels are heap-pinned: Go's chan is GC-owned, so a detached sender
 	// may finish send()'s notify after the test frame is gone.
 	auto runDone = std::make_shared<chan_<gostd::Error>>();
-	std::thread([runDone, conn, t] {
-		runDone->send(conn->Run(t->Context()));
+	auto ctx = t->Context();
+	std::thread([runDone, conn, ctx] {
+		runDone->send(conn->Run(ctx));
 	}).detach();
 
 	handler->started.recv();
@@ -195,8 +196,9 @@ void TestAsyncConnRunCancelsHandlersOnEOF(T* t) {
 	// Channels are heap-pinned: Go's chan is GC-owned, so a detached sender
 	// may finish send()'s notify after the test frame is gone.
 	auto runDone = std::make_shared<chan_<gostd::Error>>();
-	std::thread([runDone, conn, t] {
-		runDone->send(conn->Run(t->Context()));
+	auto ctx = t->Context();
+	std::thread([runDone, conn, ctx] {
+		runDone->send(conn->Run(ctx));
 	}).detach();
 
 	auto [err, ok] = runDone->recv(1000);
@@ -269,8 +271,9 @@ void TestAsyncConnCallReturnsWhenPeerCloses(T* t) {
 	// Channels are heap-pinned: Go's chan is GC-owned, so a detached sender
 	// may finish send()'s notify after the test frame is gone.
 	auto runDone = std::make_shared<chan_<gostd::Error>>();
-	std::thread([runDone, conn, t] {
-		runDone->send(conn->Run(t->Context()));
+	auto ctx = t->Context();
+	std::thread([runDone, conn, ctx] {
+		runDone->send(conn->Run(ctx));
 	}).detach();
 
 	auto callDone = std::make_shared<chan_<gostd::Error>>();
@@ -312,8 +315,9 @@ void TestAsyncConnCallAfterReadLoopFailureReturnsImmediately(T* t) {
 	// Channels are heap-pinned: Go's chan is GC-owned, so a detached sender
 	// may finish send()'s notify after the test frame is gone.
 	auto runDone = std::make_shared<chan_<gostd::Error>>();
-	std::thread([runDone, conn, t] {
-		runDone->send(conn->Run(t->Context()));
+	auto runCtx = t->Context();
+	std::thread([runDone, conn, runCtx] {
+		runDone->send(conn->Run(runCtx));
 	}).detach();
 
 	auto [_, werr] = server->write("oops\n");
@@ -453,18 +457,21 @@ void TestAsyncConnRunWaitsForRequestAfterPeerCloses(T* t) {
 	auto client = np.first;
 	auto server = np.second;
 	t->Cleanup([server] { server->close(); });
-	auto* handler = new blockingHandler();
+	// shared_ptr: the cleanup below must keep the handler alive past conn's
+	// destruction — Go's GC does this implicitly; a raw pointer here left
+	// handler->release.mu_ destroyed when the cleanup ran.
+	auto handler = std::make_shared<blockingHandler>();
 	// Go defer: `select { case <-handler.release: return; default:
 	// close(handler.release) }` — close() is idempotent here, so closing
 	// unconditionally is equivalent.
 	t->Cleanup([handler] { handler->release.close(); });
-	auto conn =
-	    NewAsyncConn(server, std::shared_ptr<Handler>(handler));
+	auto conn = NewAsyncConn(server, std::shared_ptr<Handler>(handler));
 	// Channels are heap-pinned: Go's chan is GC-owned, so a detached sender
 	// may finish send()'s notify after the test frame is gone.
 	auto runDone = std::make_shared<chan_<gostd::Error>>();
-	std::thread([runDone, conn, t] {
-		runDone->send(conn->Run(t->Context()));
+	auto ctx = t->Context();
+	std::thread([runDone, conn, ctx] {
+		runDone->send(conn->Run(ctx));
 	}).detach();
 
 	auto clientProtocol = NewJSONRPCProtocol(client);

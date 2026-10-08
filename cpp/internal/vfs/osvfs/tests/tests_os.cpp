@@ -65,10 +65,12 @@ void TestOS(T* t) {
 #ifdef _WIN32
 		// runtime.GOOS == "windows" here.
 		assert::Assert(t, !fs->UseCaseSensitiveFileNames());
-#else
+#elif defined(__linux__)
 		// runtime.GOOS == "linux" here.
 		assert::Assert(t, fs->UseCaseSensitiveFileNames());
 #endif
+		// runtime.GOOS == "darwin" hits no switch case: the default macOS
+		// filesystem is case-insensitive, so there is nothing to assert.
 	});
 }
 

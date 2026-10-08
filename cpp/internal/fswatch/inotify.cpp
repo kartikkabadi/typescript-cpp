@@ -59,7 +59,7 @@
 //   Write a byte to pipe[1] → poll sees POLLIN on pipe[0] → loop exits →
 //   deferred closeFDs closes inotify fd, pipe fds, and signals endedSignal.
 
-#ifndef _WIN32
+#ifdef __linux__
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE // pipe2
 #endif
@@ -511,4 +511,4 @@ watcher& inotifyWatcher() {
 
 } // namespace tsc::fswatch
 
-#endif // !_WIN32
+#endif // __linux__

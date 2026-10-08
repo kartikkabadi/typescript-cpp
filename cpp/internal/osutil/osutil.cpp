@@ -16,6 +16,14 @@
 #ifdef _WIN32
 #include "internal/win32/w32compat.h"
 #include <shellapi.h>
+#elif defined(__APPLE__)
+// darwin has no /proc: os.Args comes from the kernel-provided argv
+// (Go's runtime reads it off the startup frame; crt_externs exposes the
+// same pointer), os.Executable from _NSGetExecutablePath(3).
+#include <crt_externs.h>
+#include <mach-o/dyld.h> // _NSGetExecutablePath
+#include <limits.h>
+#include <unistd.h>
 #else
 #include <fstream>
 #include <unistd.h>
@@ -40,6 +48,17 @@ std::vector<std::string> args() {
 		out.push_back(w32::narrow(argv[i]));
 	}
 	LocalFree(argv);
+	return out;
+#elif defined(__APPLE__)
+	// os.Args — the real argv, as Go's runtime sees it.
+	std::vector<std::string> out;
+	int argc = *_NSGetArgc();
+	char** argv = *_NSGetArgv();
+	if (argv != nullptr) {
+		for (int i = 0; i < argc; i++) {
+			out.emplace_back(argv[i]);
+		}
+	}
 	return out;
 #else
 	// os.Args — read argv[0..argc) from /proc/self/cmdline.
@@ -74,6 +93,20 @@ std::pair<std::string, std::error_code> executable() {
 		                            std::generic_category())};
 	}
 	return {p, std::error_code{}};
+#elif defined(__APPLE__)
+	// os.Executable — kernel-recorded path of the running image,
+	// canonicalized (Go resolves the returned path too).
+	char pathbuf[PATH_MAX];
+	uint32_t size = sizeof pathbuf;
+	if (_NSGetExecutablePath(pathbuf, &size) != 0) {
+		return {"", std::error_code(ENAMETOOLONG,
+		                            std::generic_category())};
+	}
+	char resolved[PATH_MAX];
+	if (::realpath(pathbuf, resolved) == nullptr) {
+		return {"", std::error_code(errno, std::generic_category())};
+	}
+	return {resolved, std::error_code{}};
 #else
 	// os.Executable — kernel-provided absolute path of the running binary.
 	std::vector<char> buf(256);

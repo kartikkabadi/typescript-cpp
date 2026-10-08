@@ -6,7 +6,11 @@
 #include "internal/pprof/pprof.h"
 #include "internal/tspath/tspath.h"
 
+#if defined(__GLIBC__)
 #include <malloc.h>
+#elif defined(__APPLE__)
+#include <malloc/malloc.h>
+#endif
 
 namespace tsc::execute::tsc {
 
@@ -35,6 +39,12 @@ static memStats readMemStats() {
 #if defined(__GLIBC__)
 	struct mallinfo2 mi = mallinfo2();
 	s.Alloc = static_cast<uint64_t>(mi.uordblks);
+#elif defined(__APPLE__)
+	// malloc_statistics(3): size_in_use is the closest analog of
+	// mallinfo2's uordblks (bytes currently in use by the default zone).
+	malloc_statistics_t ms;
+	malloc_zone_statistics(malloc_default_zone(), &ms);
+	s.Alloc = static_cast<uint64_t>(ms.size_in_use);
 #endif
 	return s;
 }

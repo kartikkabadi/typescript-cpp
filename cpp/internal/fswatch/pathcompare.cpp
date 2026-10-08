@@ -8,8 +8,148 @@
 #include <algorithm>
 #include <cstring>
 
+#ifdef __APPLE__
+#include <CoreFoundation/CoreFoundation.h>
+#include <unistd.h>
+#endif
+
 namespace tsc::fswatch {
 
+#ifdef __APPLE__
+// --- canonicalize_darwin.go + fsevents_darwin_ffi.go -------------------------
+// (build tag: darwin — CFString provides NFC and case folding)
+
+namespace {
+
+// isASCII — fsevents_darwin_ffi.go.
+bool isASCII(std::string_view s) {
+	for (char c : s) {
+		if (static_cast<unsigned char>(c) >= 0x80) {
+			return false;
+		}
+	}
+	return true;
+}
+
+// cfStringToUTF8 — fsevents_darwin_ffi.go's cfStringToGo.
+std::string cfStringToUTF8(CFStringRef cf) {
+	if (cf == nullptr) {
+		return "";
+	}
+	CFIndex len = CFStringGetLength(cf);
+	CFIndex used = 0;
+	CFStringGetBytes(cf, CFRangeMake(0, len), kCFStringEncodingUTF8, '?',
+	                 false, nullptr, 0, &used);
+	std::string out(static_cast<size_t>(used), '\0');
+	CFStringGetBytes(cf, CFRangeMake(0, len), kCFStringEncodingUTF8, '?',
+	                 false, reinterpret_cast<UInt8*>(out.data()),
+	                 static_cast<CFIndex>(out.size()), &used);
+	out.resize(static_cast<size_t>(used));
+	return out;
+}
+
+CFStringRef cfStringCreateUTF8(std::string_view s) {
+	std::string cstr{s};
+	return CFStringCreateWithCString(nullptr, cstr.c_str(),
+	                                 kCFStringEncodingUTF8);
+}
+
+} // namespace
+
+// normalizeNFC — fsevents_darwin_ffi.go:319. Returns s in Unicode NFC.
+// ASCII inputs are returned unchanged. If any step fails (invalid UTF-8
+// from a corrupt path), the original string is returned so the caller
+// still sees *something* rather than nothing.
+std::string normalizeNFC(std::string_view s) {
+	if (isASCII(s)) {
+		return std::string{s};
+	}
+	CFStringRef src = cfStringCreateUTF8(s);
+	if (src == nullptr) {
+		return std::string{s};
+	}
+	CFMutableStringRef mut = CFStringCreateMutableCopy(nullptr, 0, src);
+	CFRelease(src);
+	if (mut == nullptr) {
+		return std::string{s};
+	}
+	CFStringNormalize(mut, kCFStringNormalizationFormC);
+	std::string normalized = cfStringToUTF8(mut);
+	CFRelease(mut);
+	if (normalized.empty()) {
+		return std::string{s};
+	}
+	return normalized;
+}
+
+// foldNativePath — fsevents_darwin_ffi.go:200. A comparison form, never a
+// displayed or opened path. Case folding expands sharp s and ligatures
+// without making diacritics, dotless i, circled letters, or character
+// widths interchangeable.
+std::string foldNativePath(std::string_view s) {
+	if (isASCII(s)) {
+		std::string out;
+		stringutil::toLowerASCII(s, out);
+		return out;
+	}
+	if (!validUtf8(s) || s.find('\0') != std::string_view::npos) {
+		return "";
+	}
+	CFStringRef src = cfStringCreateUTF8(s);
+	if (src == nullptr) {
+		TSC_UNREACHABLE(
+		    "fswatch: cannot create CFString for path folding");
+	}
+	CFMutableStringRef mut = CFStringCreateMutableCopy(nullptr, 0, src);
+	CFRelease(src);
+	if (mut == nullptr) {
+		TSC_UNREACHABLE(
+		    "fswatch: cannot copy CFString for path folding");
+	}
+	// Normalize before folding as well: a decomposed capital I with
+	// dot must have the same comparison form as precomposed dotted
+	// capital I.
+	CFStringNormalize(mut, kCFStringNormalizationFormC);
+	CFStringFold(mut, kCFCompareCaseInsensitive, nullptr);
+	CFStringNormalize(mut, kCFStringNormalizationFormC);
+	std::string folded = cfStringToUTF8(mut);
+	CFRelease(mut);
+	if (folded.empty()) {
+		TSC_UNREACHABLE("fswatch: cannot extract folded CFString");
+	}
+	return folded;
+}
+
+// canonicalizePath — canonicalize_darwin.go:15.
+std::string canonicalizePath(const std::string& p) { return normalizeNFC(p); }
+
+// watcher.pathComparer — canonicalize_darwin.go:17-24.
+std::pair<fswatch::pathComparer, gostd::Error>
+watcher::pathComparer(const std::string& dir) const {
+	if (watcherName != "fsevents" && watcherName != "kqueue") {
+		return {fswatch::pathComparer{}, nullptr};
+	}
+	auto [c, err] = PathComparerForPath(dir);
+	return {c.comparer, err};
+}
+
+// PathComparerForPath — canonicalize_darwin.go:27-36. Queries an existing
+// path's volume rather than assuming every mounted volume is
+// case-insensitive.
+std::pair<PathComparer, gostd::Error>
+PathComparerForPath(const std::string& path) {
+	constexpr int pcCaseSensitive = _PC_CASE_SENSITIVE; // 11
+	long sensitive = ::pathconf(path.c_str(), pcCaseSensitive);
+	if (sensitive < 0) {
+		return {PathComparer{},
+		        osPathError("pathconf", path, errno)};
+	}
+	PathComparer c;
+	c.comparer.ignoreCase = (sensitive == 0);
+	return {c, nullptr};
+}
+
+#else
 // --- canonicalize_other.go ---------------------------------------------------
 // (build tag: !(darwin && (amd64 || arm64)) — the Linux variant)
 
@@ -39,6 +179,7 @@ std::pair<PathComparer, gostd::Error>
 PathComparerForPath(const std::string& path) {
 	return {PathComparer{}, nullptr};
 }
+#endif
 
 // --- pathcompare.go:14-51 ----------------------------------------------------
 

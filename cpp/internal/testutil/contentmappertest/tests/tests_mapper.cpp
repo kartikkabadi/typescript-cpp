@@ -22,6 +22,10 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #endif
+#ifdef __APPLE__
+#include <crt_externs.h>
+#include <mach-o/dyld.h> // _NSGetExecutablePath
+#endif
 
 #include "internal/contentmapper/contentmapper.h"
 #include "internal/core/types.h"
@@ -139,10 +143,16 @@ struct execSpawner : cm::Spawner {
 			::close(outPipe[0]); ::close(outPipe[1]);
 			::setenv("TSGO_CONTENT_MAPPER_HELPER", "1", 1);
 			char selfPath[4096];
+#ifdef __APPLE__
+			uint32_t sz = sizeof selfPath;
+			if (_NSGetExecutablePath(selfPath, &sz) != 0)
+				_exit(127);
+#else
 			ssize_t n = ::readlink("/proc/self/exe", selfPath,
 			                       sizeof(selfPath) - 1);
 			if (n <= 0) _exit(127);
 			selfPath[n] = '\0';
+#endif
 			char* args[] = {selfPath, nullptr};
 			::execv(selfPath, args);
 			_exit(127);
