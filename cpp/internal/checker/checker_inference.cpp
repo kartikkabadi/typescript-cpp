@@ -2115,8 +2115,12 @@ Type* Checker::getInferredType(InferenceContext* n, size_t index) {
 		Type* constraint = getConstraintOfTypeParameter(inference->typeParameter);
 		if (constraint != nullptr) {
 			Type* instantiatedConstraint = instantiateType(constraint, n->nonFixingMapper);
+			// A pure return type inference is still filtered in a recursive
+			// call resolution, whose result can become the type of the
+			// enclosing declaration.
 			if (inferredType != nullptr &&
-				(n->flags & InferenceFlagsNoConstraintChecks) == 0) {
+				((n->flags & InferenceFlagsNoConstraintChecks) == 0 ||
+				 inference->priority == InferencePriorityReturnType)) {
 				Type* constraintWithThis = getTypeWithThisArgument(
 					instantiatedConstraint, inferredType, false);
 				if (n->compareTypes(inferredType, constraintWithThis, false) ==
