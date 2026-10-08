@@ -916,6 +916,22 @@ bool Checker::isAccessible(accessibleSymbolChainContext ctx,
 	if (symbol == getMergedSymbol(symbolFromSymbolTable)) {
 		likeSymbols = true;
 	}
+	if (!likeSymbols && resolvedAliasSymbol != nullptr &&
+	    (resolvedAliasSymbol->flags & SymbolFlagsAlias) != 0) {
+		// Follow the alias chain in case a merged alias points back at the
+		// symbol through an intermediate alias (symbolaccessibility.go).
+		std::unordered_set<Symbol*> seenAliases;
+		while ((resolvedAliasSymbol->flags & SymbolFlagsAlias) != 0 &&
+		       seenAliases.count(resolvedAliasSymbol) == 0) {
+			seenAliases.insert(resolvedAliasSymbol);
+			resolvedAliasSymbol =
+			    getMergedSymbol(resolveAlias(resolvedAliasSymbol));
+			if (symbol == resolvedAliasSymbol) {
+				likeSymbols = true;
+				break;
+			}
+		}
+	}
 	if (!likeSymbols) {
 		return false;
 	}
