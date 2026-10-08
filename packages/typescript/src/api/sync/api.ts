@@ -1604,7 +1604,7 @@ export class Snapshot {
     }
 
     [globalThis.Symbol.dispose](): void {
-        void this.dispose();
+        this.dispose();
     }
     get dispose(): {
         (): void;
@@ -2747,7 +2747,7 @@ export class Program<Id extends ProjectId = ProjectId> implements FormatDiagnost
     }
 
     [globalThis.Symbol.dispose](): void {
-        void this.dispose();
+        this.dispose();
     }
 
     get dispose(): {
@@ -3718,7 +3718,7 @@ export class BuildOrchestrator {
     }
 
     [globalThis.Symbol.dispose](): void {
-        void this.dispose();
+        this.dispose();
     }
     get dispose(): {
         (): void;

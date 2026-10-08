@@ -996,8 +996,8 @@ export class Snapshot {
         return this.projectMap.get(data.id);
     }
 
-    [globalThis.Symbol.dispose](): void {
-        void this.dispose();
+    [globalThis.Symbol.asyncDispose](): Promise<void> { // @sync: [globalThis.Symbol.dispose](): void {
+        return this.dispose(); // @sync: this.dispose();
     }
     dispose(): Promise<void> {
         return this.disposePromise ??= this.disposeWorker();
@@ -1593,8 +1593,8 @@ export class Program<Id extends ProjectId = ProjectId> implements FormatDiagnost
         this.ownedSnapshot = snapshot;
     }
 
-    [globalThis.Symbol.dispose](): void {
-        void this.dispose();
+    [globalThis.Symbol.asyncDispose](): Promise<void> { // @sync: [globalThis.Symbol.dispose](): void {
+        return this.dispose(); // @sync: this.dispose();
     }
 
     dispose(): Promise<void> {
@@ -2021,8 +2021,8 @@ export class BuildOrchestrator {
         this.onDispose = onDispose;
     }
 
-    [globalThis.Symbol.dispose](): void {
-        void this.dispose();
+    [globalThis.Symbol.asyncDispose](): Promise<void> { // @sync: [globalThis.Symbol.dispose](): void {
+        return this.dispose(); // @sync: this.dispose();
     }
     dispose(): Promise<void> {
         return this.disposePromise ??= this.disposeWorker();

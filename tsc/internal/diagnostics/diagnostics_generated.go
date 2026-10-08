@@ -3892,6 +3892,32 @@ var The_invalid_diagnostic_directive_is_in_supplemental_output_0_returned_by_the
 
 var Diagnostic_directive_0_returned_by_the_content_mapper_has_an_invalid_unusedExpectDirectiveIndex = &Message{code: 18110, category: CategoryMessage, key: "Diagnostic_directive_0_returned_by_the_content_mapper_has_an_invalid_unusedExpectDirectiveIndex_18110", text: "Diagnostic directive {0} returned by the content mapper has an invalid 'unusedExpectDirectiveIndex'."}
 
+<<<<<<< ours
+||||||| base
+var A_source_phase_import_must_specify_a_local_binding = &Message{code: 18111, category: CategoryError, key: "A_source_phase_import_must_specify_a_local_binding_18111", text: "A source phase import must specify a local binding."}
+
+var Named_and_namespace_imports_are_not_allowed_in_a_source_phase_import = &Message{code: 18112, category: CategoryError, key: "Named_and_namespace_imports_are_not_allowed_in_a_source_phase_import_18112", text: "Named and namespace imports are not allowed in a source phase import."}
+
+var Source_phase_imports_are_only_supported_when_the_module_option_is_set_to_esnext_nodenext_or_preserve = &Message{code: 18113, category: CategoryError, key: "Source_phase_imports_are_only_supported_when_the_module_option_is_set_to_esnext_nodenext_or_preserve_18113", text: "Source phase imports are only supported when the '--module' option is set to 'esnext', 'nodenext', or 'preserve'."}
+
+var Optional_chaining_cannot_be_used_with_import_source = &Message{code: 18114, category: CategoryError, key: "Optional_chaining_cannot_be_used_with_import_source_18114", text: "Optional chaining cannot be used with 'import.source'."}
+
+var Source_phase_imports_are_not_allowed_on_statements_that_compile_to_CommonJS_require_calls = &Message{code: 18115, category: CategoryError, key: "Source_phase_imports_are_not_allowed_on_statements_that_compile_to_CommonJS_require_calls_18115", text: "Source phase imports are not allowed on statements that compile to CommonJS 'require' calls."}
+
+=======
+var A_source_phase_import_must_specify_a_local_binding = &Message{code: 18111, category: CategoryError, key: "A_source_phase_import_must_specify_a_local_binding_18111", text: "A source phase import must specify a local binding."}
+
+var Named_and_namespace_imports_are_not_allowed_in_a_source_phase_import = &Message{code: 18112, category: CategoryError, key: "Named_and_namespace_imports_are_not_allowed_in_a_source_phase_import_18112", text: "Named and namespace imports are not allowed in a source phase import."}
+
+var Source_phase_imports_are_only_supported_when_the_module_option_is_set_to_esnext_nodenext_or_preserve = &Message{code: 18113, category: CategoryError, key: "Source_phase_imports_are_only_supported_when_the_module_option_is_set_to_esnext_nodenext_or_preserve_18113", text: "Source phase imports are only supported when the '--module' option is set to 'esnext', 'nodenext', or 'preserve'."}
+
+var Optional_chaining_cannot_be_used_with_import_source = &Message{code: 18114, category: CategoryError, key: "Optional_chaining_cannot_be_used_with_import_source_18114", text: "Optional chaining cannot be used with 'import.source'."}
+
+var Source_phase_imports_are_not_allowed_on_statements_that_compile_to_CommonJS_require_calls = &Message{code: 18115, category: CategoryError, key: "Source_phase_imports_are_not_allowed_on_statements_that_compile_to_CommonJS_require_calls_18115", text: "Source phase imports are not allowed on statements that compile to CommonJS 'require' calls."}
+
+var This_initializer_has_a_Symbol_asyncDispose_method_Did_you_mean_to_use_await_using = &Message{code: 18116, category: CategoryError, key: "This_initializer_has_a_Symbol_asyncDispose_method_Did_you_mean_to_use_await_using_18116", text: "This initializer has a '[Symbol.asyncDispose]()' method. Did you mean to use 'await using'?"}
+
+>>>>>>> theirs
 var X_nodenext_if_module_is_nodenext_node16_if_module_is_node16_or_node18_otherwise_bundler = &Message{code: 69010, category: CategoryMessage, key: "nodenext_if_module_is_nodenext_node16_if_module_is_node16_or_node18_otherwise_bundler_69010", text: "`nodenext` if `module` is `nodenext`; `node16` if `module` is `node16` or `node18`; otherwise, `bundler`."}
 
 var File_is_a_CommonJS_module_it_may_be_converted_to_an_ES_module = &Message{code: 80001, category: CategorySuggestion, key: "File_is_a_CommonJS_module_it_may_be_converted_to_an_ES_module_80001", text: "File is a CommonJS module; it may be converted to an ES module."}
@@ -6378,6 +6404,21 @@ var allMessages = [...]**Message{
 	&The_content_mapper_returned_diagnostic_directives_with_overlapping_virtual_ranges,
 	&The_invalid_diagnostic_directive_is_in_supplemental_output_0_returned_by_the_content_mapper,
 	&Diagnostic_directive_0_returned_by_the_content_mapper_has_an_invalid_unusedExpectDirectiveIndex,
+<<<<<<< ours
+||||||| base
+	&A_source_phase_import_must_specify_a_local_binding,
+	&Named_and_namespace_imports_are_not_allowed_in_a_source_phase_import,
+	&Source_phase_imports_are_only_supported_when_the_module_option_is_set_to_esnext_nodenext_or_preserve,
+	&Optional_chaining_cannot_be_used_with_import_source,
+	&Source_phase_imports_are_not_allowed_on_statements_that_compile_to_CommonJS_require_calls,
+=======
+	&A_source_phase_import_must_specify_a_local_binding,
+	&Named_and_namespace_imports_are_not_allowed_in_a_source_phase_import,
+	&Source_phase_imports_are_only_supported_when_the_module_option_is_set_to_esnext_nodenext_or_preserve,
+	&Optional_chaining_cannot_be_used_with_import_source,
+	&Source_phase_imports_are_not_allowed_on_statements_that_compile_to_CommonJS_require_calls,
+	&This_initializer_has_a_Symbol_asyncDispose_method_Did_you_mean_to_use_await_using,
+>>>>>>> theirs
 	&X_nodenext_if_module_is_nodenext_node16_if_module_is_node16_or_node18_otherwise_bundler,
 	&File_is_a_CommonJS_module_it_may_be_converted_to_an_ES_module,
 	&This_constructor_function_may_be_converted_to_a_class_declaration,
