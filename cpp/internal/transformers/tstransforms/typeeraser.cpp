@@ -432,6 +432,16 @@ struct TypeEraserTransformer : Transformer {
 			}
 			Node* name = n->name;
 			Node* namedBindings = visitor()->visitNode(n->NamedBindings);
+			// Empty {} due to type-only import erasure can be skipped if
+			// there is also a default import
+			if (name != nullptr && namedBindings != nullptr &&
+			    isNamedImports(namedBindings) &&
+			    namedBindings->as<NamedImports>()->Elements->nodes.empty() &&
+			    !n->NamedBindings->as<NamedImports>()->Elements->nodes.empty()) {
+				// the default binding keeps the import; a source-written {}
+				// is left as is
+				namedBindings = nullptr;
+			}
 			if (name == nullptr && namedBindings == nullptr) {
 				// all import bindings were elided
 				return nullptr;
