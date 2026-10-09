@@ -378,11 +378,11 @@ REGISTER_TSCTEST(
     });
 
 REGISTER_TSCTEST(
-    "TestTscCommandline::Parse watch interval option",
+    "TestTscCommandline::Reject removed watch interval option",
     [](gostd::testing::T* t) {
 	    tscInput{
-	        .subScenario = "Parse watch interval option",
-	        .commandLineArgs = {"-w"},
+	        .subScenario = "Reject removed watch interval option",
+	        .commandLineArgs = {"-w", "--watchInterval", "1000"},
 	        .files =
 	            {
 	                {"/home/src/workspaces/project/first.ts",
@@ -401,12 +401,13 @@ REGISTER_TSCTEST(
     });
 
 REGISTER_TSCTEST(
-    "TestTscCommandline::Parse watch interval option without tsconfig.json",
+    "TestTscCommandline::Reject removed watch interval option without "
+    "tsconfig.json",
     [](gostd::testing::T* t) {
 	    tscInput{
-	        .subScenario =
-	            "Parse watch interval option without tsconfig.json",
-	        .commandLineArgs = {"-w"},
+	        .subScenario = "Reject removed watch interval option without "
+	                       "tsconfig.json",
+	        .commandLineArgs = {"-w", "--watchInterval", "1000"},
 	    }
 	        .run(t, "commandLine");
     });
