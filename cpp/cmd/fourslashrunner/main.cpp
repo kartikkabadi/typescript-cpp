@@ -48,7 +48,7 @@ void onTestAlarm(int) {
 #endif
 }
 
-// Runs the test body and returns 0 pass / 1 fail / 2 skip — shared by the
+// Runs the test body and returns 0 pass / 1 fail / 3 skip — shared by the
 // forked child (POSIX) and the --test-child respawn (Windows).
 int runTestBody(const tsc::fourslash::tests::FourslashTestCase& tc) {
 	signal(SIGALRM, onTestAlarm);
