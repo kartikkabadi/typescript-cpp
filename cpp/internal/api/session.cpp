@@ -2178,7 +2178,9 @@ Session::handleSaveHeapProfile(gostd::Context, const ProfileParams* params) {
 std::pair<std::unique_ptr<InitializeResponse>, gostd::Error>
 Session::handleInitialize(gostd::Context) {
 	auto resp = std::make_unique<InitializeResponse>();
-	resp->UseCaseSensitiveFileNames = useCaseSensitiveFileNames();
+	resp->CaseSensitivity = useCaseSensitiveFileNames()
+	                          ? tspath::CaseSensitivity::CaseSensitive()
+	                          : tspath::CaseSensitivity::CaseInsensitive();
 	resp->CurrentDirectory = GetCurrentDirectory();
 	return {std::move(resp), nullptr};
 }

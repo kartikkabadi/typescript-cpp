@@ -676,21 +676,43 @@ std::pair<bool, std::string> DocumentIdentifier::unmarshalField(std::string_view
 }
 
 std::string DocumentIdentifier::unmarshalJSONFrom(json::Decoder& dec) {
+	*this = DocumentIdentifier{};
 	auto [tok, err] = dec.readToken();
 	if (!err.empty()) return err;
 	switch (tok.kind()) {
 	case '"':
+		if (tok.string().empty()) {
+			return "DocumentIdentifier: file name must not be empty";
+		}
 		FileName = tok.string();
 		return {};
 	case '{': {
-		// Read the object fields
+		bool foundURI = false;
 		while (dec.peekKind() != '}') {
 			auto [key, e] = dec.readToken();
 			if (!e.empty()) return e;
-			bool isURI = key.string() == "uri";
-			auto [val, e2] = dec.readToken();
-			if (!e2.empty()) return e2;
-			if (isURI) URI = lsproto::DocumentUri(val.string());
+			if (key.kind() != '"') {
+				return std::string(
+				    "DocumentIdentifier: expected object field name, got ") +
+				       std::to_string((int)key.kind());
+			}
+			if (key.string() == "uri") {
+				if (foundURI) {
+					return std::string(
+					    "DocumentIdentifier: duplicate field \"uri\"");
+				}
+				auto [val, e2] = dec.readToken();
+				if (!e2.empty()) return e2;
+				if (val.kind() != '"' || val.string().empty()) {
+					return std::string(
+					    "DocumentIdentifier: uri must be a non-empty "
+					    "string");
+				}
+				URI = lsproto::DocumentUri(val.string());
+				foundURI = true;
+			} else if (auto e3 = dec.skipValue(); !e3.empty()) {
+				return e3;
+			}
 		}
 		// Consume the closing brace
 		if (auto [t, e] = dec.readToken(); !e.empty()) return e;
@@ -2530,7 +2552,7 @@ std::string DiagnosticResponse::unmarshalJSONFrom(json::Decoder& dec) {
 std::string InitializeResponse::marshalJSONTo(json::Encoder& enc) const {
 	objWriter w{enc};
 	w.begin();
-	w.member("useCaseSensitiveFileNames", UseCaseSensitiveFileNames);
+	w.member("caseSensitivity", CaseSensitivity.value);
 	w.member("currentDirectory", CurrentDirectory);
 	return w.end();
 }

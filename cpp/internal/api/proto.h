@@ -41,6 +41,7 @@
 #include "internal/scanner/scanner.h"
 #include "internal/tsoptions/tsoptions.h"
 #include "internal/tspath/tspath.h"
+#include "internal/tspath/typed_paths.h"
 
 namespace tsc::api {
 
@@ -284,8 +285,8 @@ inline const Method MethodSaveHeapProfile = "saveHeapProfile";
 
 // InitializeResponse is returned by the initialize method.
 struct InitializeResponse {
-    // UseCaseSensitiveFileNames indicates whether the host file system is case-sensitive.
-    bool UseCaseSensitiveFileNames{};
+    // CaseSensitivity determines how the host file system compares paths.
+    tspath::CaseSensitivity CaseSensitivity{};
     // CurrentDirectory is the server's current working directory.
     std::string CurrentDirectory;
 

@@ -18,7 +18,7 @@ namespace {
 [[maybe_unused]] std::string_view asSv(const PathKey& p) { return p; }
 
 [[noreturn]] void panicInvalidComponent() {
-	TSC_UNREACHABLE("invalid path component");
+	throw std::string{"invalid path component"};
 }
 
 }  // namespace
@@ -280,19 +280,19 @@ std::string ensureRootedPathRootSeparator(std::string_view path) {
 RootedPath toRootedPath(std::string_view path,
                         RootedDirectoryPath currentDirectory) {
 	if (path.empty()) {
-		TSC_UNREACHABLE("path must not be empty");
+		throw std::string{"path must not be empty"};
 	}
 	if (hasRootedURLSuffix(path)) {
-		TSC_UNREACHABLE("path must not contain a URL query or fragment");
+		throw std::string{"path must not contain a URL query or fragment"};
 	}
 	if (getEncodedRootLength(path) == 0 && hasURLRoot(currentDirectory) &&
 	    path.find_first_of("?#") != std::string_view::npos) {
-		TSC_UNREACHABLE("relative URL path must not contain a query or fragment");
+		throw std::string{"relative URL path must not contain a query or fragment"};
 	}
 	auto normalized = getNormalizedAbsolutePathFromDirectory(path, currentDirectory);
 	if (getEncodedRootLength(normalized) == 0 ||
 	    hasRootedURLSuffix(normalized)) {
-		TSC_UNREACHABLE("path must be rooted");
+		throw std::string{"path must be rooted"};
 	}
 	return RootedPath(ensureRootedPathRootSeparator(normalized));
 }
@@ -309,7 +309,7 @@ std::pair<RootedPath, bool> tryRootedPathFromAbsolute(std::string_view path) {
 RootedPath rootedPathFromAbsolute(std::string_view path) {
 	auto [result, ok] = tryRootedPathFromAbsolute(path);
 	if (!ok) {
-		TSC_UNREACHABLE("path must be absolute");
+		throw std::string{"path must be absolute"};
 	}
 	return result;
 }
@@ -337,7 +337,7 @@ std::pair<RootedPath, bool> tryRootedPathFromNormalized(
 RootedPath rootedPathFromNormalized(std::string_view path) {
 	auto [result, ok] = tryRootedPathFromNormalized(path);
 	if (!ok) {
-		TSC_UNREACHABLE(("path must be rooted and normalized: " + std::string(path)).c_str());
+		throw std::string{"path must be rooted and normalized: "} + std::string(path);
 	}
 	return result;
 }
@@ -447,7 +447,7 @@ RootedDirectoryPath RootedFilePath::DirectoryBefore(int index) const {
 	auto path = asSv(*this);
 	if (index < getRootLength(path) || index > (int)path.size() ||
 	    (index < (int)path.size() && !isAnyDirectorySeparator(path[index]))) {
-		TSC_UNREACHABLE("directory boundary must be at a path separator");
+		throw std::string{"directory boundary must be at a path separator"};
 	}
 	return RootedDirectoryPath(std::string(path.substr(0, index)));
 }
@@ -456,7 +456,7 @@ std::string RootedFilePath::SuffixAfterSeparator(int index) const {
 	auto path = asSv(*this);
 	if (index < 0 || index >= (int)path.size() ||
 	    !isAnyDirectorySeparator(path[index])) {
-		TSC_UNREACHABLE("suffix boundary must be at a path separator");
+		throw std::string{"suffix boundary must be at a path separator"};
 	}
 	return std::string(path.substr(index + 1));
 }
@@ -464,16 +464,16 @@ std::string RootedFilePath::SuffixAfterSeparator(int index) const {
 void validateFileNameSuffix(std::string_view prefix,
                             std::string_view suffix) {
 	if (prefix.empty() && !suffix.empty()) {
-		TSC_UNREACHABLE("cannot append a suffix to an empty file name");
+		throw std::string{"cannot append a suffix to an empty file name"};
 	}
 	if (suffix.find_first_of("/\\") != std::string_view::npos) {
-		TSC_UNREACHABLE("file name suffix must not contain a directory separator");
+		throw std::string{"file name suffix must not contain a directory separator"};
 	}
 }
 
 void validateFileExtension(std::string_view extension) {
 	if (extension.find_first_of("/\\") != std::string_view::npos) {
-		TSC_UNREACHABLE("file extension must not contain a directory separator");
+		throw std::string{"file extension must not contain a directory separator"};
 	}
 }
 
@@ -482,7 +482,7 @@ RootedFilePath rootedFilePathFromExtensionMutation(std::string_view path) {
 	if (baseName == "." || baseName == ".." ||
 	    (hasTrailingDirectorySeparator(path) &&
 	     (int)path.size() > getRootLength(path))) {
-		TSC_UNREACHABLE("file extension change must preserve path normalization");
+		throw std::string{"file extension change must preserve path normalization"};
 	}
 	return rootedFilePathFromResolved(path);
 }
@@ -508,7 +508,7 @@ FileNameStem RootedFilePath::RemoveExtension(
     std::string_view extension) const {
 	validateFileExtension(extension);
 	if (!ends_with(extension)) {
-		TSC_UNREACHABLE(("file name does not have extension: " + std::string(extension)).c_str());
+		throw std::string{"file name does not have extension: "} + std::string(extension);
 	}
 	return FileNameStem(tspath::removeExtension(*this, extension));
 }
@@ -689,21 +689,21 @@ std::string appendPathToDirectory(RootedDirectoryPath directory,
 
 RootedFilePath rootedFilePathFromResolved(std::string_view path) {
 	if (hasRootedURLSuffix(path)) {
-		TSC_UNREACHABLE("path must not contain a URL query or fragment");
+		throw std::string{"path must not contain a URL query or fragment"};
 	}
 	return RootedFilePath(path);
 }
 
 RootedFilePath RootedDirectoryPath::ResolveFile(std::string_view path) const {
 	if (empty()) {
-		TSC_UNREACHABLE("cannot resolve from an empty directory name");
+		throw std::string{"cannot resolve from an empty directory name"};
 	}
 	if (path.empty()) {
 		return RootedFilePath(*this);
 	}
 	if (getEncodedRootLength(path) == 0 && hasURLRoot(*this) &&
 	    path.find_first_of("?#") != std::string_view::npos) {
-		TSC_UNREACHABLE("relative URL path must not contain a query or fragment");
+		throw std::string{"relative URL path must not contain a query or fragment"};
 	}
 	if (canAppendPathWithoutNormalization(path)) {
 		return rootedFilePathFromResolved(appendPathToDirectory(*this, path));
@@ -719,14 +719,14 @@ RootedFilePath RootedDirectoryPath::ResolveFile(std::string_view path) const {
 RootedFilePath RootedDirectoryPath::ResolveRelativeFile(
     RelativePath path) const {
 	if (empty()) {
-		TSC_UNREACHABLE("cannot resolve from an empty directory name");
+		throw std::string{"cannot resolve from an empty directory name"};
 	}
 	if (path.empty()) {
 		return RootedFilePath(*this);
 	}
 	if (hasURLRoot(*this) &&
 	    path.find_first_of("?#") != std::string_view::npos) {
-		TSC_UNREACHABLE("relative URL path must not contain a query or fragment");
+		throw std::string{"relative URL path must not contain a query or fragment"};
 	}
 	if (path.requiresResolution()) {
 		return toRootedFilePath(path, *this);
@@ -737,19 +737,19 @@ RootedFilePath RootedDirectoryPath::ResolveRelativeFile(
 RootedFilePath RootedDirectoryPath::ResolveFileFromNormalizedRelative(
     std::string_view path) const {
 	if (empty()) {
-		TSC_UNREACHABLE("cannot resolve from an empty directory path");
+		throw std::string{"cannot resolve from an empty directory path"};
 	}
 	if (path.empty()) {
-		TSC_UNREACHABLE("path must not be empty");
+		throw std::string{"path must not be empty"};
 	}
 	if (getEncodedRootLength(path) == 0 && hasURLRoot(*this) &&
 	    path.find_first_of("?#") != std::string_view::npos) {
-		TSC_UNREACHABLE("relative URL path must not contain a query or fragment");
+		throw std::string{"relative URL path must not contain a query or fragment"};
 	}
 	if (isAnyDirectorySeparator(path[0]) || normalizeSlashes(path) != path ||
 	    hasRelativePathSegment(path) ||
 	    hasTrailingDirectorySeparator(path)) {
-		TSC_UNREACHABLE(("path must be relative and normalized: " + std::string(path)).c_str());
+		throw std::string{"path must be relative and normalized: "} + std::string(path);
 	}
 	return rootedFilePathFromResolved(appendPathToDirectory(*this, path));
 }
@@ -762,14 +762,14 @@ RootedDirectoryPath RootedDirectoryPath::ResolveRelativeDirectory(
 RootedDirectoryPath RootedDirectoryPath::ResolveDirectory(
     std::string_view path) const {
 	if (empty()) {
-		TSC_UNREACHABLE("cannot resolve from an empty directory name");
+		throw std::string{"cannot resolve from an empty directory name"};
 	}
 	if (path.empty()) {
 		return RootedDirectoryPath(*this);
 	}
 	if (getEncodedRootLength(path) == 0 && hasURLRoot(*this) &&
 	    path.find_first_of("?#") != std::string_view::npos) {
-		TSC_UNREACHABLE("relative URL path must not contain a query or fragment");
+		throw std::string{"relative URL path must not contain a query or fragment"};
 	}
 	if (canAppendPathWithoutNormalization(path)) {
 		return RootedDirectoryPath(
@@ -788,7 +788,7 @@ RootedDirectoryPath RootedDirectoryPath::ResolveDirectory(
 PathKey pathKeyFromCanonical(std::string_view path) {
 	auto [result, ok] = tryPathKeyFromCanonical(path);
 	if (!ok) {
-		TSC_UNREACHABLE("path must be normalized");
+		throw std::string{"path must be normalized"};
 	}
 	return result;
 }
@@ -833,12 +833,12 @@ PathKey PathKey::CaseInsensitiveKey() const {
 PathKey PathKey::AppendCanonicalComponent(
     std::string_view component) const {
 	if (empty()) {
-		TSC_UNREACHABLE("cannot append a component to an empty path key");
+		throw std::string{"cannot append a component to an empty path key"};
 	}
 	if (component.empty() ||
 	    component.find_first_of("/\\") != std::string_view::npos ||
 	    component == "." || component == "..") {
-		TSC_UNREACHABLE("invalid canonical path component");
+		throw std::string{"invalid canonical path component"};
 	}
 	std::string result;
 	if (hasTrailingDirectorySeparator(*this)) {
@@ -851,10 +851,10 @@ PathKey PathKey::AppendCanonicalComponent(
 
 PathKey PathKey::AppendCanonicalSuffix(std::string_view suffix) const {
 	if (empty() && !suffix.empty()) {
-		TSC_UNREACHABLE("cannot append a suffix to an empty path key");
+		throw std::string{"cannot append a suffix to an empty path key"};
 	}
 	if (suffix.find_first_of("/\\") != std::string_view::npos) {
-		TSC_UNREACHABLE("path suffix must not contain a directory separator");
+		throw std::string{"path suffix must not contain a directory separator"};
 	}
 	return pathKeyFromCanonical(*this + std::string(suffix));
 }
@@ -864,7 +864,7 @@ std::tuple<PathKey, PathKey, bool> PathKey::SplitAtCanonicalComponent(
 	if (component.empty() ||
 	    component.find_first_of("/\\") != std::string_view::npos ||
 	    component == "." || component == "..") {
-		TSC_UNREACHABLE("invalid canonical path component");
+		throw std::string{"invalid canonical path component"};
 	}
 	auto needle = std::string("/") + std::string(component);
 	auto path = asSv(*this);
@@ -927,14 +927,14 @@ bool PathKey::ContainsPath(const PathKey& child) const {
 
 RelativePath toRelativePath(std::string_view path) {
 	if (getEncodedRootLength(path) != 0) {
-		TSC_UNREACHABLE("relative path must not be rooted");
+		throw std::string{"relative path must not be rooted"};
 	}
 	return RelativePath(normalizePath(path));
 }
 
 RelativePath relativePathFromNormalized(std::string_view path) {
 	if (getEncodedRootLength(path) != 0 || normalizePath(path) != path) {
-		TSC_UNREACHABLE("relative path must be relative and normalized");
+		throw std::string{"relative path must be relative and normalized: "} + std::string(path);
 	}
 	return RelativePath(path);
 }
@@ -1032,7 +1032,7 @@ getCommonParentDirectories(
 	    getComponents,
 	CaseSensitivity caseSensitivity) {
 	if (minComponents < 1) {
-		TSC_UNREACHABLE("minComponents must be at least 1");
+		throw std::string{"minComponents must be at least 1"};
 	}
 	if (directories.empty()) {
 		return {{}, {}};

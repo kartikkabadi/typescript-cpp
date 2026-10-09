@@ -6,6 +6,7 @@
 
 #include <any>
 #include <exception>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <typeinfo>
@@ -116,8 +117,17 @@ void Equal(gostd::testing::T* t, const A& got, const B& expected,
 		ok = (got == expected);
 	}
 	if (!ok) {
-		t->Fatalf("assert.Equal failed%s%s", {msg.empty() ? "" : ": ",
-	                                        std::string(msg)});
+		// TEMP DEBUG: print got/expected when streamable
+		std::string _extra;
+		if constexpr (requires(std::ostringstream& _o, const A& a, const B& b) {
+			              _o << a << b;
+		              }) {
+			std::ostringstream _o;
+			_o << " got=[" << got << "] expected=[" << expected << "]";
+			_extra = _o.str();
+		}
+		t->Fatalf(("assert.Equal failed%s%s" + _extra).c_str(),
+		          {msg.empty() ? "" : ": ", std::string(msg)});
 	}
 }
 
@@ -238,6 +248,13 @@ void AssertPanics(gostd::testing::T* tb, F&& fn, const std::any& expected,
 		got = std::string("<panic>");
 	}
 	gotest::assert::Assert(tb, got.has_value(), std::string(msg));
+	// TEMP DEBUG: surface the caught panic value (std::any can't stream).
+	if (got.has_value()) {
+		if (auto* sv = std::any_cast<std::string>(&got)) {
+			fprintf(stderr, "  AssertPanics got=[%s] expected_any\n",
+			        sv->c_str());
+		}
+	}
 	gotest::assert::Equal(tb, got, expected, std::string(msg));
 }
 

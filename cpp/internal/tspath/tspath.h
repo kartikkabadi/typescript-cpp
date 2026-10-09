@@ -1153,11 +1153,14 @@ inline std::string changeFullExtension(std::string_view path,
                                        std::string_view newExtension) {
 	auto declarationExtension = getDeclarationFileExtension(path);
 	if (!declarationExtension.empty()) {
+		auto stem =
+		    path.substr(0, path.size() - declarationExtension.size());
+		// extension.go:190 — an empty new extension strips the declaration
+		// extension outright (no replacement dot).
+		if (newExtension.empty()) return std::string{stem};
 		std::string ext{newExtension};
-		if (ext.empty() || ext[0] != '.') ext = "." + ext;
-		return std::string{path.substr(
-			       0, path.size() - declarationExtension.size())} +
-		       ext;
+		if (ext[0] != '.') ext = "." + ext;
+		return std::string{stem} + ext;
 	}
 	return changeExtension(path, newExtension);
 }

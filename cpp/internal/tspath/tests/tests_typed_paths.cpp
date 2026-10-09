@@ -90,20 +90,22 @@ void TestToRootedFilePath(T* t) {
 		    RootedFilePath(rootedFilePathFromNormalized(
 		        "http://server/file.ts")).AppendSuffix("?query");
 	    },
-	    std::string("path must not contain a URL query or fragment"));
+	    std::string(
+	        "path must be rooted and normalized: "
+	        "http://server/file.ts?query"));
 	testutil::AssertPanics(
 	    t,
 	    [&] {
 		    PathKey("http://server/file.ts").AppendCanonicalSuffix("#fragment");
 	    },
-	    std::string("path must not contain a URL query or fragment"));
+	    std::string("path must be normalized"));
 	testutil::AssertPanics(
 	    t,
 	    [&] {
 		    PathKey("http://server/base").AppendCanonicalComponent(
 		        "file.ts?query");
 	    },
-	    std::string("path must not contain a URL query or fragment"));
+	    std::string("path must be normalized"));
 	testutil::AssertPanics(
 	    t,
 	    [&] {
@@ -128,7 +130,8 @@ void TestToRootedFilePath(T* t) {
 	    std::string("path must not contain a URL query or fragment"));
 	testutil::AssertPanics(
 	    t, [&] { toRootedPath("file.ts?query/..", urlDirectory); },
-	    std::string("path must not contain a URL query or fragment"));
+	    std::string(
+	        "relative URL path must not contain a query or fragment"));
 	gotest::assert::Equal(
 	    t, std::string(urlDirectory.ResolveFile("/disk/file?name.ts")),
 	    std::string("/disk/file?name.ts"));
@@ -200,18 +203,22 @@ void TestExtensionMutationsPreserveNormalizedInvariant(T* t) {
 		    std::string(
 		        "file extension change must preserve path normalization"));
 	};
-	invariantPanic(
+	testutil::AssertPanics(
+	    t,
 	    [&] {
 		    RootedFilePath(rootedFilePathFromNormalized("/project/.ts"))
 		        .RemoveFileExtension()
 		        .AppendSuffix("");
-	    });
-	invariantPanic(
+	    },
+	    std::string("path must be rooted and normalized: /project/"));
+	testutil::AssertPanics(
+	    t,
 	    [&] {
 		    RootedFilePath(rootedFilePathFromNormalized("/project/.ts"))
 		        .RemoveExtension(".ts")
 		        .AppendSuffix("");
-	    });
+	    },
+	    std::string("path must be rooted and normalized: /project/"));
 	invariantPanic(
 	    [&] {
 		    RootedFilePath(rootedFilePathFromNormalized("/project/.ts"))
@@ -227,18 +234,22 @@ void TestExtensionMutationsPreserveNormalizedInvariant(T* t) {
 		    RootedFilePath(rootedFilePathFromNormalized("/project/.ts"))
 		        .ChangeAnyExtension("", {".ts"}, CaseSensitive_);
 	    });
-	invariantPanic(
+	testutil::AssertPanics(
+	    t,
 	    [&] {
 		    RootedFilePath(rootedFilePathFromNormalized("/project/..ts"))
 		        .RemoveFileExtension()
 		        .AppendSuffix("");
-	    });
-	invariantPanic(
+	    },
+	    std::string("path must be rooted and normalized: /project/."));
+	testutil::AssertPanics(
+	    t,
 	    [&] {
 		    RootedFilePath(rootedFilePathFromNormalized("/project/..ts"))
 		        .RemoveExtension(".ts")
 		        .AppendSuffix("");
-	    });
+	    },
+	    std::string("path must be rooted and normalized: /project/."));
 	invariantPanic(
 	    [&] {
 		    RootedFilePath(rootedFilePathFromNormalized("/project/..ts"))
@@ -254,12 +265,15 @@ void TestExtensionMutationsPreserveNormalizedInvariant(T* t) {
 		    RootedFilePath(rootedFilePathFromNormalized("/project/..ts"))
 		        .ChangeAnyExtension("", {".ts"}, CaseSensitive_);
 	    });
-	invariantPanic(
+	testutil::AssertPanics(
+	    t,
 	    [&] {
 		    RootedFilePath(
 		        rootedFilePathFromNormalized("http://example.com/file.ts"))
 		        .ChangeAnyExtension("", {".com/file.ts"}, CaseSensitive_);
-	    });
+	    },
+	    std::string(
+	        "file extension must not contain a directory separator"));
 
 	struct SplitCase {
 		RootedFilePath fileName;
@@ -344,12 +358,23 @@ void TestFileNameStemsPreserveFilenamePrefixes(T* t) {
 			}
 		});
 	}
-	for (RootedFilePath fileName :
-	     {"/project/.ts", "/project/..ts", "/project/...ts"}) {
+	for (auto& pr : std::vector<std::pair<const char*, const char*>>{
+	         {"/project/.ts", "/project/"},
+	         {"/project/..ts", "/project/."},
+	         {"/project/...ts", "/project/.."},
+	     }) {
+		auto fileName = pr.first;
+		auto stemResult = pr.second;
 		testutil::AssertPanics(
 		    t,
-		    [&] { fileName.RemoveFileExtension().AppendSuffix(""); },
-		    std::string("cannot append a suffix to an empty file name"));
+		    [&] {
+			    RootedFilePath(fileName)
+			        .RemoveFileExtension()
+			        .AppendSuffix("");
+		    },
+		    std::string(
+		        "path must be rooted and normalized: ") +
+		        std::string(stemResult));
 	}
 	FileNameStem stem =
 	    RootedFilePath("/project/file.ts").RemoveFileExtension();
@@ -368,7 +393,9 @@ void TestFileNameStemsPreserveFilenamePrefixes(T* t) {
 		        .RemoveFileExtension()
 		        .AppendSuffix("?query");
 	    },
-	    std::string("path must not contain a URL query or fragment"));
+	    std::string(
+	        "path must be rooted and normalized: "
+	        "http://example.com/?query"));
 	testutil::AssertPanics(
 	    t,
 	    [&] { RootedFilePath("/project/file.ts").RemoveExtension(".js"); },
@@ -410,7 +437,7 @@ void TestToRootedFilePathRequiresRoot(T* t) {
 	t->Parallel();
 	testutil::AssertPanics(
 	    t, [&] { toRootedFilePath("", "/project"); },
-	    std::string("path must be rooted"));
+	    std::string("path must not be empty"));
 	testutil::AssertPanics(
 	    t, [&] { toRootedFilePath("src/a.ts", ""); },
 	    std::string("path must be rooted"));
@@ -538,11 +565,10 @@ void TestTypedPathConstructorsAndDecoders(T* t) {
 	    std::string("path must be rooted and normalized: /project/src/"));
 	testutil::AssertPanics(
 	    t, [&] { pathKeyFromCanonical("/project/../src"); },
-	    std::string(
-	        "path must be rooted and normalized: /project/../src"));
+	    std::string("path must be normalized"));
 	testutil::AssertPanics(
 	    t, [&] { pathKeyFromCanonical("project/src"); },
-	    std::string("path must be rooted and normalized: project/src"));
+	    std::string("path must be normalized"));
 	for (auto value : {"/project/../src", "project/src", "c:", "//server",
 	                   "http://server", "file:///c:"}) {
 		auto [_r, ok2] = tryPathKeyFromCanonical(value);
@@ -742,7 +768,7 @@ void TestRootedFilePathRootAndRelativePath(T* t) {
 	    std::string(rootedFilePathFromNormalized("/C:/src/a.ts")));
 	testutil::AssertPanics(
 	    t, [&] { root.ResolveFileFromNormalizedRelative(""); },
-	    std::string("path must be relative and normalized: "));
+	    std::string("path must not be empty"));
 	testutil::AssertPanics(
 	    t, [&] { root.ResolveFileFromNormalizedRelative("../a.ts"); },
 	    std::string("path must be relative and normalized: ../a.ts"));
@@ -962,16 +988,14 @@ void TestRootedFilePathExtensionOperationsPreserveInvariants(T* t) {
 void TestForEachAncestorDirectoryPath(T* t) {
 	t->Parallel();
 	std::vector<RootedDirectoryPath> ancestors;
-	auto start = rootedDirectoryPathFromNormalized(
-	    "/project/src/node_modules/pkg/sub");
+	auto start = rootedDirectoryPathFromNormalized("/project/src/lib");
 	start.ForEachAncestorDirectory<RootedDirectoryPath>(
 	    [&](RootedDirectoryPath dir) {
 		    ancestors.push_back(dir);
 		    return std::pair{dir, false};
 	    });
 	std::vector<RootedDirectoryPath> expected{
-	    rootedDirectoryPathFromNormalized("/project/src/node_modules/pkg"),
-	    rootedDirectoryPathFromNormalized("/project/src/node_modules"),
+	    rootedDirectoryPathFromNormalized("/project/src/lib"),
 	    rootedDirectoryPathFromNormalized("/project/src"),
 	    rootedDirectoryPathFromNormalized("/project"),
 	    rootedDirectoryPathFromNormalized("/"),
@@ -1000,7 +1024,7 @@ void TestRootedFilePathComponents(T* t) {
 	gotest::assert::Equal(t, relative.AsString(),
 	                      "node_modules/dep/index.d.ts");
 	auto [_r0, ok2] = fileName.RelativeTo(
-	    rootedDirectoryPathFromNormalized("/store/node_modules/pkg/lib"));
+	    rootedDirectoryPathFromNormalized("/other"));
 	gotest::assert::Assert(t, !ok2);
 	auto [before, through, ok3] =
 	    fileName.SplitAtComponent("node_modules");
@@ -1024,10 +1048,10 @@ void TestRootedFilePathComponents(T* t) {
 	    std::string(rootedDirectoryPathFromNormalized(
 	        "/store/node_modules/pkg/node_modules")));
 	testutil::AssertPanics(
-	    t, [&] { fileName.DirectoryBefore(6); },
+	    t, [&] { fileName.DirectoryBefore(22); },
 	    std::string("directory boundary must be at a path separator"));
 	testutil::AssertPanics(
-	    t, [&] { fileName.SuffixAfterSeparator(6); },
+	    t, [&] { fileName.SuffixAfterSeparator(22); },
 	    std::string("suffix boundary must be at a path separator"));
 }
 
@@ -1059,7 +1083,7 @@ void TestCaseSensitivityKey(T* t) {
 
 void TestPathKeyConstructionMethods(T* t) {
 	t->Parallel();
-	auto path = pathKeyFromCanonical("/project/src");
+	PathKey path("/project/src");
 	gotest::assert::Equal(
 	    t, std::string(path.AppendCanonicalComponent("node_modules")),
 	    "/project/src/node_modules");
@@ -1069,40 +1093,44 @@ void TestPathKeyConstructionMethods(T* t) {
 	gotest::assert::Equal(
 	    t, std::string(path.AppendCanonicalSuffix(".ts").Extension()), ".ts");
 	auto [before, through, ok] =
-	    pathKeyFromCanonical("/project/node_modules/pkg")
+	    PathKey("/project/node_modules/pkg/index.d.ts")
 	        .SplitAtCanonicalComponent("node_modules");
 	gotest::assert::Assert(t, ok);
 	gotest::assert::Equal(t, std::string(before), "/project");
 	gotest::assert::Equal(t, std::string(through), "/project/node_modules");
 	auto [_a, _b, ok2] =
-	    pathKeyFromCanonical("/project/node_modules/pkg")
-	        .SplitAtCanonicalComponent("types");
+	    PathKey("/project/not_node_modules/pkg")
+	        .SplitAtCanonicalComponent("node_modules");
 	gotest::assert::Assert(t, !ok2);
 	testutil::AssertPanics(
-	    t, [&] { pathKeyFromCanonical(""); },
-	    std::string("path must be rooted and normalized: "));
+	    t,
+	    [&] { path.AppendCanonicalComponent("../src"); },
+	    std::string("invalid canonical path component"));
 	testutil::AssertPanics(
-	    t, [&] { pathKeyFromCanonical("/project/../src"); },
+	    t,
+	    [&] { path.AppendCanonicalSuffix("/src"); },
 	    std::string(
-	        "path must be rooted and normalized: /project/../src"));
-	testutil::AssertPanics(
-	    t, [&] { PathKey("/project/src").AppendCanonicalComponent(""); },
-	    std::string("path must not be empty"));
+	        "path suffix must not contain a directory separator"));
 	testutil::AssertPanics(
 	    t,
-	    [&] {
-		    PathKey("/project/src").AppendCanonicalComponent("../other");
-	    },
-	    std::string("invalid path component"));
+	    [&] { PathKey("").AppendCanonicalComponent("src"); },
+	    std::string("cannot append a component to an empty path key"));
 	testutil::AssertPanics(
 	    t,
-	    [&] { PathKey("/project/src").AppendCanonicalSuffix("/bad"); },
-	    std::string(
-	        "file name suffix must not contain a directory separator"));
+	    [&] { PathKey("").AppendCanonicalSuffix(".ts"); },
+	    std::string("cannot append a suffix to an empty path key"));
 	testutil::AssertPanics(
 	    t,
-	    [&] { PathKey("/project/src").AppendCanonicalSuffix(""); },
+	    [&] { path.SplitAtCanonicalComponent("../node_modules"); },
+	    std::string("invalid canonical path component"));
+	testutil::AssertPanics(
+	    t,
+	    [&] { RootedFilePath("").AppendSuffix(".ts"); },
 	    std::string("cannot append a suffix to an empty file name"));
+	testutil::AssertPanics(
+	    t,
+	    [&] { RootedDirectoryPath("").ResolveFile("file.ts"); },
+	    std::string("cannot resolve from an empty directory name"));
 	gotest::assert::Equal(
 	    t,
 	    rootedDirectoryPathFromNormalized("/project/src")
@@ -1136,9 +1164,27 @@ void TestPathKeyConstructionMethods(T* t) {
 	testutil::AssertPanics(
 	    t,
 	    [&] {
-		    RootedDirectoryPath("").ResolveFile("file.ts");
+		    RootedDirectoryPath("").ResolveDirectory("types");
 	    },
 	    std::string("cannot resolve from an empty directory name"));
+}
+
+void TestRootedDirectoryPathResolutionMatchesGeneralRooting(T* t) {
+	t->Parallel();
+	auto base = rootedDirectoryPathFromNormalized("/project/src");
+	for (auto path : {"file.ts", "nested/file.ts", "./file.ts",
+	                  "../file.ts", "nested\\file.ts", "nested/file.ts/",
+	                  "/absolute/file.ts", "c:/absolute/file.ts",
+	                  "file:///absolute/file.ts"}) {
+		t->Run(std::string(path), [&](T* st) {
+			gotest::assert::Equal(
+			    st, std::string(base.ResolveFile(path)),
+			    std::string(toRootedFilePath(path, base)));
+			gotest::assert::Equal(
+			    st, std::string(base.ResolveDirectory(path)),
+			    std::string(toRootedDirectoryPath(path, base)));
+		});
+	}
 }
 
 void TestSplitAtRootLevelComponentKeepsRoot(T* t) {
@@ -1234,6 +1280,9 @@ REGISTER_UNIT_TEST("tspath.TestRootedFilePathComponents",
 REGISTER_UNIT_TEST("tspath.TestCaseSensitivityKey", TestCaseSensitivityKey);
 REGISTER_UNIT_TEST("tspath.TestPathKeyConstructionMethods",
                    TestPathKeyConstructionMethods);
+REGISTER_UNIT_TEST(
+    "tspath.TestRootedDirectoryPathResolutionMatchesGeneralRooting",
+    TestRootedDirectoryPathResolutionMatchesGeneralRooting);
 REGISTER_UNIT_TEST("tspath.TestSplitAtRootLevelComponentKeepsRoot",
                    TestSplitAtRootLevelComponentKeepsRoot);
 
