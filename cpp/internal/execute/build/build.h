@@ -92,11 +92,15 @@ struct parseCache {
 		newEntry->mu.lock();
 		std::unique_lock<std::mutex> unlockNewEntry(newEntry->mu,
 		                                            std::adopt_lock);
+		// Go `defer entry.mu.Unlock()` holds the existing entry's lock to
+		// function exit — through `parse(key)` — so a concurrent LoadOrStore
+		// blocks instead of double-parsing. Hoist to function scope.
+		std::unique_lock<std::mutex> unlockEntry;
 		if (auto [entry, loaded] = entries.LoadOrStore(key, newEntry);
 		    loaded) {
 			entry->mu.lock();
-			std::unique_lock<std::mutex> unlockEntry(entry->mu,
-			                                         std::adopt_lock);
+			unlockEntry =
+			    std::unique_lock<std::mutex>(entry->mu, std::adopt_lock);
 			if (allowZero || entry->value != V{}) {
 				return entry->value;
 			}

@@ -592,7 +592,7 @@ resolutionState::resolveTypeReferenceDirective(
 		if (traceBuilder != nullptr) {
 			traceBuilder->write(
 			    Looking_up_in_node_modules_folder_initial_location_0,
-			    containingDirectory);
+			    containingDirectoryPath());
 		}
 		if (!tspath::isExternalModuleNameRelative(name)) {
 			r = loadModuleFromNearestNodeModulesDirectory(
@@ -1059,12 +1059,21 @@ resolutionState::loadModuleFromTargetExportOrImport(
 				}
 				auto savedName = name;
 				auto savedContainingDirectory = containingDirectory;
+				auto savedHasTrailingSep =
+				    containingDirectoryHasTrailingSeparator;
 				name = combinedLookup;
-				containingDirectory = scopeContainingDirectory;
+				// Go stores the raw PackageDirectory (no forced
+				// trailing separator) and sets the flag instead;
+				// resolveNodeLike walks ancestors by basename, which a
+				// trailing separator would corrupt.
+				containingDirectory = scope->PackageDirectory;
+				containingDirectoryHasTrailingSeparator = true;
 				auto result = resolveNodeLike();
 				name = std::move(savedName);
 				containingDirectory =
 				    std::move(savedContainingDirectory);
+				containingDirectoryHasTrailingSeparator =
+				    savedHasTrailingSep;
 				if (result->IsResolved()) {
 					auto r = std::make_unique<resolved>();
 					r->path = result->ResolvedFileName;

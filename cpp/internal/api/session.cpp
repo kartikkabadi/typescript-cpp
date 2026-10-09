@@ -127,9 +127,15 @@ inline std::string base64Encode(const std::vector<uint8_t>& data) {
 	    reinterpret_cast<const char*>(data.data()), data.size()));
 }
 
-// deferGuard — Go `defer f()` as RAII.
+// deferGuard — Go `defer f()` as RAII. The move ctor steals f so a
+// moved-from guard can't fire twice (as happens when a temporary is
+// assigned into std::optional and destructs at the semicolon).
 struct deferGuard {
 	std::function<void()> f;
+	deferGuard() = default;
+	explicit deferGuard(std::function<void()> fn) : f(std::move(fn)) {}
+	deferGuard(const deferGuard&) = delete;
+	deferGuard(deferGuard&& o) noexcept : f(std::move(o.f)) {}
 	~deferGuard() { if (f) f(); }
 };
 
@@ -7208,6 +7214,7 @@ Session::handleGetImportAdderEdits(
 
 	auto userPreferences = workingSnapshot->UserPreferences();
 	auto* pid = autoimport::InternProjectID(projectID);
+	std::optional<deferGuard> preparedDeref;
 	if (auto* registry = workingSnapshot->AutoImportRegistry();
 	    registry == nullptr ||
 	    !autoimport::IsPreparedForImportingFile(registry, sourceFile->FileName(),
@@ -7220,7 +7227,8 @@ Session::handleGetImportAdderEdits(
 			projectSession->TryAdoptSnapshotInBackground(workingSnapshot,
 			                                           preparedSnapshot);
 		}
-		deferGuard _deref{[preparedSnapshot] { preparedSnapshot->Deref(); }};
+		preparedDeref.emplace(
+		    [preparedSnapshot] { preparedSnapshot->Deref(); });
 
 		workingSnapshot = preparedSnapshot;
 		auto* proj = workingSnapshot->ProjectCollection->GetProject(projectID);
@@ -7468,6 +7476,7 @@ Session::handleGetCompletionsAtPosition(
 		return {nullptr, err2};
 	}
 	auto [result, runErr] = run(sd->snapshot, program);
+	std::optional<deferGuard> preparedDeref;
 	if (gostd::errorIs(runErr, ls::ErrNeedsAutoImports)) {
 		if (params->IncludeSymbol) {
 			return {nullptr,
@@ -7488,7 +7497,8 @@ Session::handleGetCompletionsAtPosition(
 			projectSession->TryAdoptSnapshotInBackground(sd->snapshot,
 			                                           preparedSnapshot);
 		}
-		deferGuard _deref{[preparedSnapshot] { preparedSnapshot->Deref(); }};
+		preparedDeref.emplace(
+		    [preparedSnapshot] { preparedSnapshot->Deref(); });
 		if (auto cerr = gostd::ctxErr(ctx)) {
 			return {nullptr, cerr};
 		}
