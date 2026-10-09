@@ -35,7 +35,7 @@ static std::vector<fourslash::MarkerOrRangeOrName> asMonVec(
 }
 
 
-static void TestRenameNamedImportProvidePrefixAndSuffixTextForRenames(gostd::testing::T* t) {
+static void TestRenameNamedImportUseAliasesForRenames(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
 		const std::string content = R"TS(// @Filename: /a.ts
@@ -50,7 +50,7 @@ export interface MyTypeA {
 		f->VerifyBaselineRename(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.ProvidePrefixAndSuffixTextForRename = Tristate::True}), {"import"});
 	});
 }
-REGISTER_FOURSLASH_TEST(TestRenameNamedImportProvidePrefixAndSuffixTextForRenames, TestRenameNamedImportProvidePrefixAndSuffixTextForRenames);
+REGISTER_FOURSLASH_TEST(TestRenameNamedImportUseAliasesForRenames, TestRenameNamedImportUseAliasesForRenames);
 
 static void TestRenameNamedImportDefaultInNodeModules(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
