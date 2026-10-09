@@ -197,6 +197,9 @@ struct resolutionState {
 	// request fields
 	std::string name;
 	std::string containingDirectory;
+	// resolver.go: marks containingDirectory as a directory path (already
+	// carrying, or semantically owning, a trailing separator).
+	bool containingDirectoryHasTrailingSeparator = false;
 	bool isConfigLookup = false;
 	NodeResolutionFeatures features = NodeResolutionFeaturesNone;
 	bool esmMode = false;
@@ -223,6 +226,15 @@ struct resolutionState {
 	std::string getCandidateFromTypeRoot(const std::string& typeRoot);
 	std::string mangleScopedPackageName(const std::string& name);
 	std::unique_ptr<resolved> resolveFromTypeRoot();
+
+	// containingDirectoryPath — resolver.go:318.
+	std::string containingDirectoryPath() const {
+		if (containingDirectoryHasTrailingSeparator) {
+			return tspath::ensureTrailingDirectorySeparator(
+			    containingDirectory);
+		}
+		return containingDirectory;
+	}
 
 	std::shared_ptr<packagejson::InfoCacheEntry> getPackageScopeForPath(
 	    const std::string& directory);

@@ -7072,9 +7072,11 @@ bool clientSupportsItemInsertReplace(const ContextPtr& ctx) {
 
 namespace {
 bool capsHasItemDefault(const ContextPtr& ctx, const std::string& key) {
-	const auto& defaults = resolvedCaps(ctx)
-	                           ->TextDocument.Completion.CompletionList
-	                           .ItemDefaults;
+	// Keep the shared_ptr alive for the whole read — Go GC pins the
+	// capabilities object; a temporary's ->member dies at the semicolon.
+	auto caps = resolvedCaps(ctx);
+	const auto& defaults = caps->TextDocument.Completion.CompletionList
+	                               .ItemDefaults;
 	return defaults.has_value() &&
 	    std::find(defaults->begin(), defaults->end(), key) !=
 	        defaults->end();

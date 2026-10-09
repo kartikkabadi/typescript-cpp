@@ -522,8 +522,12 @@ struct SyncMapEntry : mapEntry<K, V>, IValue<V>,
 		}
 		auto [entry, loaded] =
 			m->dirty.LoadOrStore(this->key, this->shared_from_this());
+		// Go `defer entry.mu.Unlock()` inside `if loaded` holds entry.mu to
+		// function exit, so `entry.delete = true` below is written under the
+		// entry lock; hoist the lock to function scope to match.
+		std::unique_lock<std::mutex> el(entry->mu, std::defer_lock);
 		if (loaded) {
-			std::lock_guard<std::mutex> el(entry->mu);
+			el.lock();
 			proxyFor = entry;
 			this->value = entry->value;
 			this->delete_ = true;
