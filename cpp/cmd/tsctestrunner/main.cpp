@@ -20,11 +20,11 @@
 #include <filesystem>
 #include <iostream>
 #include <optional>
-#include <regex>
 #include <string>
 #include <vector>
 
 #include "internal/execute/tsctests/tests/registry.h"
+#include "internal/gostd/regexp.h"
 #include "internal/gostd/testing.h"
 #include "internal/repo/paths.h"
 #ifdef _WIN32
@@ -91,11 +91,11 @@ int main(int argc, char** argv) {
 		}
 	}
 
-	std::optional<std::regex> re;
+	std::optional<tsc::gostd::regexp::Regexp> re;
 	if (!runPattern.empty()) {
 		try {
 			re.emplace(runPattern);
-		} catch (const std::regex_error& e) {
+		} catch (const std::exception& e) {
 			std::cerr << "invalid -run regex: " << e.what() << "\n";
 			return 2;
 		}
@@ -104,7 +104,7 @@ int main(int argc, char** argv) {
 	int passed = 0, failed = 0, skipped = 0;
 	std::vector<std::string> failedNames;
 	for (const auto& tc : tsc::execute::tsctests::tests::tscTestRegistry()) {
-		if (re && !std::regex_search(tc.name, *re)) {
+		if (re && !re->MatchString(tc.name)) {
 			skipped++;
 			continue;
 		}

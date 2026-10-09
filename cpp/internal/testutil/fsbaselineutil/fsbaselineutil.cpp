@@ -3,9 +3,9 @@
 #include "internal/testutil/fsbaselineutil/fsbaselineutil.h"
 
 #include <algorithm>
-#include <regex>
 
 #include "internal/ast/ast.h" // TSC_UNREACHABLE
+#include "internal/gostd/regexp.h"
 
 namespace tsc::testutil::fsbaselineutil {
 
@@ -93,10 +93,10 @@ void FSDiffer::BaselineFSwithDiff(gostd::io::Writer* baseline) {
 
 namespace {
 
-// internalSymbolRegex — differ.go:97: `\x{FFFD}@[^@]+@[0-9]+`. std::regex
-// lacks \x{...}; U+FFFD is the byte sequence EF BF BD, matched literally.
-const std::regex& internalSymbolRegex() {
-	static const std::regex re("\xEF\xBF\xBD@[^@]+@[0-9]+");
+// internalSymbolRegex — differ.go:97: `\x{FFFD}@[^@]+@[0-9]+` — verbatim
+// now that the engine is RE2 (std::regex lacked \x{...}).
+const gostd::regexp::Regexp& internalSymbolRegex() {
+	static const gostd::regexp::Regexp re(R"(\x{FFFD}@[^@]+@[0-9]+)");
 	return re;
 }
 
@@ -112,19 +112,15 @@ std::string SanitizeInternalSymbolName(std::string_view s) {
 	// Regexp has no Func variant.
 	std::string input(s);
 	std::string out;
-	auto begin = std::sregex_iterator(input.begin(), input.end(),
-	                                  internalSymbolRegex());
-	auto end = std::sregex_iterator();
 	size_t last = 0;
-	for (auto it = begin; it != end; ++it) {
-		const std::smatch& m = *it;
-		size_t pos = (size_t)m.position();
-		size_t len = (size_t)m.length();
-		out += input.substr(last, pos - last);
-		std::string match = m.str();
+	for (auto [pos, mend] : internalSymbolRegex().FindAllStringIndex(input,
+	                                                               -1)) {
+		out += input.substr(last, (size_t)pos - last);
+		std::string match = input.substr((size_t)pos,
+		                               (size_t)(mend - pos));
 		size_t idStart = match.rfind('@');
 		out += match.substr(0, idStart) + "@<symbolId>";
-		last = pos + len;
+		last = (size_t)mend;
 	}
 	out += input.substr(last);
 	return out;

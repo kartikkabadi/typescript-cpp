@@ -76,6 +76,40 @@ else()
 	set(tsc_alloc_objects "")
 endif()
 
+# RE2 (vendored third_party/re2, release 2023-03-01 — the last release that
+# builds self-contained; 2023-06-02 onward requires Abseil). Go's regexp
+# package is an RE2-family linear-time engine; std::regex backtracks and
+# hangs on RE2-valid catastrophic patterns ((a+)+$) that user-controlled
+# regexes (autoImportSpecifierExcludeRegexes) can reach. Source list mirrors
+# upstream CMakeLists RE2_SOURCES (minus its *_test.cc files); the include
+# root is PUBLIC so tsc sources can #include "re2/re2.h".
+add_library(tsc_re2 OBJECT
+	third_party/re2/re2/bitmap256.cc
+	third_party/re2/re2/bitstate.cc
+	third_party/re2/re2/compile.cc
+	third_party/re2/re2/dfa.cc
+	third_party/re2/re2/filtered_re2.cc
+	third_party/re2/re2/mimics_pcre.cc
+	third_party/re2/re2/nfa.cc
+	third_party/re2/re2/onepass.cc
+	third_party/re2/re2/parse.cc
+	third_party/re2/re2/perl_groups.cc
+	third_party/re2/re2/prefilter.cc
+	third_party/re2/re2/prefilter_tree.cc
+	third_party/re2/re2/prog.cc
+	third_party/re2/re2/re2.cc
+	third_party/re2/re2/regexp.cc
+	third_party/re2/re2/set.cc
+	third_party/re2/re2/simplify.cc
+	third_party/re2/re2/stringpiece.cc
+	third_party/re2/re2/tostring.cc
+	third_party/re2/re2/unicode_casefold.cc
+	third_party/re2/re2/unicode_groups.cc
+	third_party/re2/util/rune.cc
+	third_party/re2/util/strutil.cc
+)
+target_include_directories(tsc_re2 PUBLIC third_party/re2)
+
 # Fuzz harnesses (cmd/fuzz/): libFuzzer drivers for the untrusted-byte
 # surfaces (scanner, parser, tsconfig, LSP framing). OFF by default; the
 # dedicated build dir is configured with -DTSCPP_FUZZ=ON plus sanitizer
@@ -530,6 +564,9 @@ if(WIN32)
 else()
 	target_link_libraries(tsc PUBLIC z)
 endif()
+# RE2 engine behind gostd::regexp (vendored object library; PUBLIC brings
+# its objects into every executable linking tsc and exports the include dir).
+target_link_libraries(tsc PUBLIC tsc_re2)
 if(APPLE)
 	# FSEvents + CFString path folding live in CoreServices/CoreFoundation;
 	# libdispatch comes from libSystem.

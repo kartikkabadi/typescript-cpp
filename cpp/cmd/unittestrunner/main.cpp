@@ -10,7 +10,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
-#include <regex>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -26,6 +26,7 @@
 #endif
 
 #include "internal/gostd/gostd.h"
+#include "internal/gostd/regexp.h"
 #include "internal/gostd/testing.h"
 #include "internal/testrunner/testrunner.h"
 #include "internal/testutil/contentmappertest/contentmappertest.h"
@@ -308,17 +309,17 @@ int main(int argc, char** argv) {
 	// compiler_test_filter.go — Go's RunTests reads flag.Lookup("test.run").
 	tsc::testrunner::setCompilerTestRunPattern(runFilter);
 
-	std::regex re;
+	std::optional<tsc::gostd::regexp::Regexp> re;
 	try {
-		re = std::regex(runFilter.empty() ? ".*" : runFilter);
-	} catch (const std::regex_error& e) {
+		re.emplace(runFilter.empty() ? ".*" : runFilter);
+	} catch (const std::exception& e) {
 		fprintf(stderr, "invalid -run regex: %s\n", e.what());
 		return 2;
 	}
 	int total = 0, passed = 0;
 	for (auto& tc : tsc::testutil::unittests::unitTestRegistry()) {
 		std::string name = tc.name;
-		if (!std::regex_search(name, re)) continue;
+		if (!re->MatchString(name)) continue;
 		++total;
 		std::string output;
 		int code = runOne(tc, output);
