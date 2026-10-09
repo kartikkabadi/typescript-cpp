@@ -1,6 +1,7 @@
 // Port of tsc/internal/parser/jsdoc.go — JSDoc comment parsing.
 // Arena note: Go uses nodeSliceArena/stringSliceArena for scratch slices;
-// C++ uses std::vector directly (arena-sliced text is a perf TODO).
+// C++ uses std::vector directly (arena-sliced text is a documented perf
+// tradeoff).
 
 #include "internal/parser/parser.h"
 

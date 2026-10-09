@@ -41,14 +41,6 @@ namespace tspath = tsc::tspath;
 
 // --- export_test.go --------------------------------------------------------
 
-std::string toLowerAscii(std::string_view s) {
-	std::string r(s);
-	for (auto& c : r) {
-		if (c >= 'A' && c <= 'Z') c += 32;
-	}
-	return r;
-}
-
 // TestCommandLineParser — export_test.go:39.
 struct TestCommandLineParser {
 	std::unique_ptr<tsoptions::ParseCommandLineWorkerDiagnostics>

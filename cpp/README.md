@@ -165,3 +165,21 @@ ninja -C cpp/build
 ## Roadmap
 
 See `cpp/ROADMAP.md`.
+
+## Reports and audit trail
+
+- `cpp/ORACLE_BUMP.md` — oracle pin/bump ledger (`microsoft/TypeScript` revision history)
+- `cpp/SECURITY_REVIEW.md` — adversarial security audit vs the Go oracle
+- `cpp/E2E_REPORT.md` — byte-identity report on real-world codebases
+- `cpp/FUZZ_REPORT.md` — libFuzzer+ASan/UBSan pass over input surfaces
+- `cpp/MACOS_PARITY.md` — macOS (Darwin/arm64) build/test parity notes
+- `cpp/WINDOWS_PARITY.md` — Windows x64 build/test parity notes
+- `cpp/CLEANUP_AUDIT.md` — dead-code / port-debt cleanup ledger
+- Fix reports: `cpp/TRUNCATION_FIX.md` (quickinfo `[...]` vs `...`),
+  `cpp/SNAPREF_FIX.md` (disposed-snapshot panic under parallel load),
+  `cpp/DOCHL_FIX.md` (document-highlight multi-file URIs),
+  `cpp/CODEFIXTRUNC_FIX.md` (codefix truncation first-divergence analysis)
+- `cpp/tools/PROJECT_PARITY.md`, `cpp/tools/WATCH_PARITY.md` — project- and
+  watch-mode parity reports
+- `cpp/tools/perf/PERF_REPORT.md`, `cpp/tools/perf/HOTPATHS.md` — perf
+  harness results and hot-path notes

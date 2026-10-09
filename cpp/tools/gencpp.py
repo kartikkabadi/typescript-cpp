@@ -1533,11 +1533,12 @@ def gen_nodes():
         if sname in prop_masks:
             mask, extra = prop_masks[sname]
             out.append(kinds_case(sname, seen_kinds))
-            r = f"\t\t\t{{ auto* n = static_cast<const {sname}*>(this); " \
-                f"return subtreeFacts() & ~{mask}"
             if extra:
-                r += f" | ::tsc::propagateSubtreeFacts(n->{extra})"
-            r += "; }\n"
+                r = f"\t\t\t{{ auto* n = static_cast<const {sname}*>(this); " \
+                    f"return subtreeFacts() & ~{mask}" \
+                    f" | ::tsc::propagateSubtreeFacts(n->{extra}); }}\n"
+            else:
+                r = f"\t\t\treturn subtreeFacts() & ~{mask};\n"
             out.append(r)
     out.append("\t\tdefault:\n\t\t\treturn subtreeFacts() & ~SubtreeExclusionsNode;\n\t}\n}\n\n")
     node_decls.append("\tSubtreeFacts propagateSubtreeFacts() const;\n")
@@ -1694,7 +1695,7 @@ def gen_nodes():
             if ln == "return":
                 lines_out.append("return SubtreeFactsNone;")
                 continue
-            m2 = re.match(r"(\w+) :?= (.*)$", ln)
+            m2 = re.match(r"(\w+) := (.*)$", ln)
             if m2:
                 lines_out.append(f"auto {m2.group(1)} = {facts_expr(m2.group(2))};")
                 continue

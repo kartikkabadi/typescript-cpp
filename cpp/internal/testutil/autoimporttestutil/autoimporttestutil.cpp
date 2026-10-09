@@ -133,7 +133,6 @@ struct fileMapBuilder {
 	std::unordered_map<std::string, std::shared_ptr<projectRecord>>
 	    projects;
 
-	void ensureFiles() {}
 	// projectHandles — fixtures.go:355.
 	std::vector<ProjectHandle> projectHandles() {
 		std::vector<std::string> keys;

@@ -50,7 +50,7 @@ inline bool isInitializedProperty(Node* member) {
 }
 
 // ast.IsObjectBindingOrAssignmentElement — utilities.go:3404
-inline bool isObjectBindingOrAssignmentElement(Node* node) {
+[[maybe_unused]] inline bool isObjectBindingOrAssignmentElement(Node* node) {
 	switch (node->kind) {
 	case Kind::BindingElement:
 	case Kind::PropertyAssignment:

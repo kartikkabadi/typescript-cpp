@@ -307,7 +307,7 @@ bool isTypeAlias(Node* node) { return isTypeOrJSTypeAliasDeclaration(node); }
 
 
 // isNumericLiteralName — checker/utilities.go:941
-bool isNumericLiteralName(const std::string& name) {
+[[maybe_unused]] bool isNumericLiteralName(const std::string& name) {
 	// The intent of numeric names is that
 	//     - they are names with text in a numeric form, and that
 	//     - setting properties/indexing with them is always equivalent to doing so
@@ -406,7 +406,7 @@ bool isTupleType(Type* t) {
 		   (typeTarget(t)->objectFlags & ObjectFlagsTuple);
 }
 
-bool isMutableTupleType(Type* t) {
+[[maybe_unused]] bool isMutableTupleType(Type* t) {
 	return isTupleType(t) && !targetTupleType(t)->readonly;
 }
 
@@ -417,7 +417,7 @@ bool isGenericTupleType(Type* t) {
 		   (targetTupleType(t)->combinedFlags & ElementFlagsVariadic);
 }
 
-bool isSingleElementGenericTupleType(Type* t) {
+[[maybe_unused]] bool isSingleElementGenericTupleType(Type* t) {
 	return isGenericTupleType(t) &&
 		   targetTupleType(t)->elementInfos.size() == 1;
 }
@@ -427,7 +427,7 @@ bool isUnaryTupleTypeNode(Node* node) {
 }
 
 // Return count of starting consecutive tuple elements of the given kind(s)
-int getStartElementCount(TupleType* t, ElementFlags flags) {
+[[maybe_unused]] int getStartElementCount(TupleType* t, ElementFlags flags) {
 	for (size_t i = 0; i < t->elementInfos.size(); i++) {
 		if (!(t->elementInfos[i].flags & flags)) {
 			return static_cast<int>(i);

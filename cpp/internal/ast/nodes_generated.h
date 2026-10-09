@@ -8184,44 +8184,44 @@ inline void Node::setModifiers(ModifierList* m) {
 inline SubtreeFacts Node::propagateSubtreeFacts() const {
 	switch (kind) {
 		case Kind::ArrayLiteralExpression:
-			{ auto* n = static_cast<const ArrayLiteralExpression*>(this); return subtreeFacts() & ~SubtreeExclusionsArrayLiteral; }
+			return subtreeFacts() & ~SubtreeExclusionsArrayLiteral;
 		case Kind::ArrayType:
 			return SubtreeContainsTypeScript;
 		case Kind::ArrowFunction:
-			{ auto* n = static_cast<const ArrowFunction*>(this); return subtreeFacts() & ~SubtreeExclusionsArrowFunction; }
+			return subtreeFacts() & ~SubtreeExclusionsArrowFunction;
 		case Kind::AsExpression:
-			{ auto* n = static_cast<const AsExpression*>(this); return subtreeFacts() & ~SubtreeExclusionsOuterExpression; }
+			return subtreeFacts() & ~SubtreeExclusionsOuterExpression;
 		case Kind::ObjectBindingPattern:
 		case Kind::ArrayBindingPattern:
-			{ auto* n = static_cast<const BindingPattern*>(this); return subtreeFacts() & ~SubtreeExclusionsBindingPattern; }
+			return subtreeFacts() & ~SubtreeExclusionsBindingPattern;
 		case Kind::CallExpression:
-			{ auto* n = static_cast<const CallExpression*>(this); return subtreeFacts() & ~SubtreeExclusionsCall; }
+			return subtreeFacts() & ~SubtreeExclusionsCall;
 		case Kind::CallSignature:
 			return SubtreeContainsTypeScript;
 		case Kind::CatchClause:
-			{ auto* n = static_cast<const CatchClause*>(this); return subtreeFacts() & ~SubtreeExclusionsCatchClause; }
+			return subtreeFacts() & ~SubtreeExclusionsCatchClause;
 		case Kind::ClassDeclaration:
-			{ auto* n = static_cast<const ClassDeclaration*>(this); return subtreeFacts() & ~SubtreeExclusionsClass; }
+			return subtreeFacts() & ~SubtreeExclusionsClass;
 		case Kind::ClassExpression:
-			{ auto* n = static_cast<const ClassExpression*>(this); return subtreeFacts() & ~SubtreeExclusionsClass; }
+			return subtreeFacts() & ~SubtreeExclusionsClass;
 		case Kind::ConditionalType:
 			return SubtreeContainsTypeScript;
 		case Kind::ConstructSignature:
 			return SubtreeContainsTypeScript;
 		case Kind::Constructor:
-			{ auto* n = static_cast<const ConstructorDeclaration*>(this); return subtreeFacts() & ~SubtreeExclusionsConstructor; }
+			return subtreeFacts() & ~SubtreeExclusionsConstructor;
 		case Kind::ConstructorType:
 			return SubtreeContainsTypeScript;
 		case Kind::ElementAccessExpression:
-			{ auto* n = static_cast<const ElementAccessExpression*>(this); return subtreeFacts() & ~SubtreeExclusionsElementAccess; }
+			return subtreeFacts() & ~SubtreeExclusionsElementAccess;
 		case Kind::FunctionDeclaration:
-			{ auto* n = static_cast<const FunctionDeclaration*>(this); return subtreeFacts() & ~SubtreeExclusionsFunction; }
+			return subtreeFacts() & ~SubtreeExclusionsFunction;
 		case Kind::FunctionExpression:
-			{ auto* n = static_cast<const FunctionExpression*>(this); return subtreeFacts() & ~SubtreeExclusionsFunction; }
+			return subtreeFacts() & ~SubtreeExclusionsFunction;
 		case Kind::FunctionType:
 			return SubtreeContainsTypeScript;
 		case Kind::GetAccessor:
-			{ auto* n = static_cast<const GetAccessorDeclaration*>(this); return subtreeFacts() & ~SubtreeExclusionsAccessor | ::tsc::propagateSubtreeFacts(n->name); }
+			{ auto* n = static_cast<const GetAccessorDeclaration*>(this); return (subtreeFacts() & ~SubtreeExclusionsAccessor) | ::tsc::propagateSubtreeFacts(n->name); }
 		case Kind::ImportType:
 			return SubtreeContainsTypeScript;
 		case Kind::IndexSignature:
@@ -8269,37 +8269,37 @@ inline SubtreeFacts Node::propagateSubtreeFacts() const {
 		case Kind::MappedType:
 			return SubtreeContainsTypeScript;
 		case Kind::MethodDeclaration:
-			{ auto* n = static_cast<const MethodDeclaration*>(this); return subtreeFacts() & ~SubtreeExclusionsMethod | ::tsc::propagateSubtreeFacts(n->name); }
+			{ auto* n = static_cast<const MethodDeclaration*>(this); return (subtreeFacts() & ~SubtreeExclusionsMethod) | ::tsc::propagateSubtreeFacts(n->name); }
 		case Kind::MethodSignature:
 			return SubtreeContainsTypeScript;
 		case Kind::ModuleDeclaration:
-			{ auto* n = static_cast<const ModuleDeclaration*>(this); return subtreeFacts() & ~SubtreeExclusionsModule; }
+			return subtreeFacts() & ~SubtreeExclusionsModule;
 		case Kind::NamedTupleMember:
 			return SubtreeContainsTypeScript;
 		case Kind::NamespaceExportDeclaration:
 			return SubtreeContainsTypeScript;
 		case Kind::NewExpression:
-			{ auto* n = static_cast<const NewExpression*>(this); return subtreeFacts() & ~SubtreeExclusionsNew; }
+			return subtreeFacts() & ~SubtreeExclusionsNew;
 		case Kind::ObjectLiteralExpression:
-			{ auto* n = static_cast<const ObjectLiteralExpression*>(this); return subtreeFacts() & ~SubtreeExclusionsObjectLiteral; }
+			return subtreeFacts() & ~SubtreeExclusionsObjectLiteral;
 		case Kind::OptionalType:
 			return SubtreeContainsTypeScript;
 		case Kind::Parameter:
-			{ auto* n = static_cast<const ParameterDeclaration*>(this); return subtreeFacts() & ~SubtreeExclusionsParameter; }
+			return subtreeFacts() & ~SubtreeExclusionsParameter;
 		case Kind::ParenthesizedType:
 			return SubtreeContainsTypeScript;
 		case Kind::PropertyAccessExpression:
-			{ auto* n = static_cast<const PropertyAccessExpression*>(this); return subtreeFacts() & ~SubtreeExclusionsPropertyAccess; }
+			return subtreeFacts() & ~SubtreeExclusionsPropertyAccess;
 		case Kind::PropertyDeclaration:
-			{ auto* n = static_cast<const PropertyDeclaration*>(this); return subtreeFacts() & ~SubtreeExclusionsProperty | ::tsc::propagateSubtreeFacts(n->name); }
+			{ auto* n = static_cast<const PropertyDeclaration*>(this); return (subtreeFacts() & ~SubtreeExclusionsProperty) | ::tsc::propagateSubtreeFacts(n->name); }
 		case Kind::PropertySignature:
 			return SubtreeContainsTypeScript;
 		case Kind::RestType:
 			return SubtreeContainsTypeScript;
 		case Kind::SatisfiesExpression:
-			{ auto* n = static_cast<const SatisfiesExpression*>(this); return subtreeFacts() & ~SubtreeExclusionsOuterExpression; }
+			return subtreeFacts() & ~SubtreeExclusionsOuterExpression;
 		case Kind::SetAccessor:
-			{ auto* n = static_cast<const SetAccessorDeclaration*>(this); return subtreeFacts() & ~SubtreeExclusionsAccessor | ::tsc::propagateSubtreeFacts(n->name); }
+			{ auto* n = static_cast<const SetAccessorDeclaration*>(this); return (subtreeFacts() & ~SubtreeExclusionsAccessor) | ::tsc::propagateSubtreeFacts(n->name); }
 		case Kind::TemplateLiteralType:
 			return SubtreeContainsTypeScript;
 		case Kind::TemplateLiteralTypeSpan:
@@ -8312,7 +8312,7 @@ inline SubtreeFacts Node::propagateSubtreeFacts() const {
 		case Kind::JSTypeAliasDeclaration:
 			return SubtreeContainsTypeScript;
 		case Kind::TypeAssertionExpression:
-			{ auto* n = static_cast<const TypeAssertion*>(this); return subtreeFacts() & ~SubtreeExclusionsOuterExpression; }
+			return subtreeFacts() & ~SubtreeExclusionsOuterExpression;
 		case Kind::TypeLiteral:
 			return SubtreeContainsTypeScript;
 		case Kind::TypeOperator:
@@ -8328,7 +8328,7 @@ inline SubtreeFacts Node::propagateSubtreeFacts() const {
 		case Kind::UnionType:
 			return SubtreeContainsTypeScript;
 		case Kind::VariableDeclarationList:
-			{ auto* n = static_cast<const VariableDeclarationList*>(this); return subtreeFacts() & ~SubtreeExclusionsVariableDeclarationList; }
+			return subtreeFacts() & ~SubtreeExclusionsVariableDeclarationList;
 		default:
 			return subtreeFacts() & ~SubtreeExclusionsNode;
 	}
@@ -9060,7 +9060,7 @@ inline SubtreeFacts computeSubtreeFacts_PrivateIdentifier(const PrivateIdentifie
 inline SubtreeFacts computeSubtreeFacts_PropertyAccessExpression(const PropertyAccessExpression* n) {
 	auto privateName = SubtreeFactsNone;
 	if (!isIdentifier(n->name)) {
-	auto privateName = SubtreeContainsPrivateIdentifierInExpression;
+	privateName = SubtreeContainsPrivateIdentifierInExpression;
 	}
 	return ::tsc::propagateSubtreeFacts(n->Expression) | ::tsc::propagateSubtreeFacts(n->QuestionDotToken) | ::tsc::propagateSubtreeFacts(n->name) | privateName;
 }

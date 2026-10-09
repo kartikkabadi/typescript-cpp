@@ -19,22 +19,6 @@ namespace {
 using namespace tsc;
 namespace tsu = tsc::fourslash::tests::util;
 
-static std::vector<fourslash::MarkerOrRangeOrName> asMonVec(
-	const std::vector<std::any> &v) {
-	std::vector<fourslash::MarkerOrRangeOrName> out;
-	out.reserve(v.size());
-	for (auto &e : v) {
-		if (auto *p = std::any_cast<std::shared_ptr<fourslash::Marker>>(&e))
-			out.push_back(*p);
-		else if (auto *p =
-					 std::any_cast<std::shared_ptr<fourslash::RangeMarker>>(&e))
-			out.push_back(*p);
-		else if (auto *p = std::any_cast<std::string>(&e)) out.push_back(*p);
-	}
-	return out;
-}
-
-
 static void TestGetJavaScriptSyntacticDiagnostics9(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -46,7 +30,6 @@ public function F() { })TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptSyntacticDiagnostics9, TestGetJavaScriptSyntacticDiagnostics9);
-
 
 static void TestGetJavaScriptSyntacticDiagnostics8(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -60,7 +43,6 @@ type a = b;)TS";
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptSyntacticDiagnostics8, TestGetJavaScriptSyntacticDiagnostics8);
 
-
 static void TestGetJavaScriptSyntacticDiagnostics7(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -72,7 +54,6 @@ namespace M { })TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptSyntacticDiagnostics7, TestGetJavaScriptSyntacticDiagnostics7);
-
 
 static void TestGetJavaScriptSyntacticDiagnostics6(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -86,7 +67,6 @@ interface I { })TS";
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptSyntacticDiagnostics6, TestGetJavaScriptSyntacticDiagnostics6);
 
-
 static void TestGetJavaScriptSyntacticDiagnostics5(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -98,7 +78,6 @@ class C implements D { })TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptSyntacticDiagnostics5, TestGetJavaScriptSyntacticDiagnostics5);
-
 
 static void TestGetJavaScriptSyntacticDiagnostics4(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -112,7 +91,6 @@ public class C { })TS";
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptSyntacticDiagnostics4, TestGetJavaScriptSyntacticDiagnostics4);
 
-
 static void TestGetJavaScriptSyntacticDiagnostics3(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -125,7 +103,6 @@ class C<T> { })TS";
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptSyntacticDiagnostics3, TestGetJavaScriptSyntacticDiagnostics3);
 
-
 static void TestGetJavaScriptSyntacticDiagnostics2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -137,7 +114,6 @@ export = b;)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptSyntacticDiagnostics2, TestGetJavaScriptSyntacticDiagnostics2);
-
 
 static void TestGetJavaScriptSyntacticDiagnostics24(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -160,7 +136,6 @@ x.canVote/**/;)TS";
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptSyntacticDiagnostics24, TestGetJavaScriptSyntacticDiagnostics24);
 
-
 static void TestGetJavaScriptSyntacticDiagnostics23(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -180,7 +155,6 @@ function Person(age) {
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptSyntacticDiagnostics23, TestGetJavaScriptSyntacticDiagnostics23);
 
-
 static void TestGetJavaScriptSyntacticDiagnostics22(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -192,7 +166,6 @@ function foo(...a) {})TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptSyntacticDiagnostics22, TestGetJavaScriptSyntacticDiagnostics22);
-
 
 static void TestGetJavaScriptSyntacticDiagnostics21(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -207,7 +180,6 @@ static void TestGetJavaScriptSyntacticDiagnostics21(gostd::testing::T* t) {
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptSyntacticDiagnostics21, TestGetJavaScriptSyntacticDiagnostics21);
 
-
 static void TestGetJavaScriptSyntacticDiagnostics1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -220,7 +192,6 @@ import a = b;)TS";
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptSyntacticDiagnostics1, TestGetJavaScriptSyntacticDiagnostics1);
 
-
 static void TestGetJavaScriptSyntacticDiagnostics19(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -232,7 +203,6 @@ enum E { })TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptSyntacticDiagnostics19, TestGetJavaScriptSyntacticDiagnostics19);
-
 
 static void TestGetJavaScriptSyntacticDiagnostics18(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -254,7 +224,6 @@ class C {
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptSyntacticDiagnostics18, TestGetJavaScriptSyntacticDiagnostics18);
 
-
 static void TestGetJavaScriptSyntacticDiagnostics17(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -266,7 +235,6 @@ function F(a: number) { })TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptSyntacticDiagnostics17, TestGetJavaScriptSyntacticDiagnostics17);
-
 
 static void TestGetJavaScriptSyntacticDiagnostics16(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -280,7 +248,6 @@ function F(p?) { })TS";
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptSyntacticDiagnostics16, TestGetJavaScriptSyntacticDiagnostics16);
 
-
 static void TestGetJavaScriptSyntacticDiagnostics15(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -292,7 +259,6 @@ function F(public p) { })TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptSyntacticDiagnostics15, TestGetJavaScriptSyntacticDiagnostics15);
-
 
 static void TestGetJavaScriptSyntacticDiagnostics14(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -306,7 +272,6 @@ Foo<number>();)TS";
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptSyntacticDiagnostics14, TestGetJavaScriptSyntacticDiagnostics14);
 
-
 static void TestGetJavaScriptSyntacticDiagnostics13(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -318,7 +283,6 @@ var v: () => number;)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptSyntacticDiagnostics13, TestGetJavaScriptSyntacticDiagnostics13);
-
 
 static void TestGetJavaScriptSyntacticDiagnostics12(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -332,7 +296,6 @@ declare var v;)TS";
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptSyntacticDiagnostics12, TestGetJavaScriptSyntacticDiagnostics12);
 
-
 static void TestGetJavaScriptSyntacticDiagnostics11(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -345,7 +308,6 @@ function F(): number { })TS";
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptSyntacticDiagnostics11, TestGetJavaScriptSyntacticDiagnostics11);
 
-
 static void TestGetJavaScriptSyntacticDiagnostics10(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -357,7 +319,6 @@ function F<T>() { })TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptSyntacticDiagnostics10, TestGetJavaScriptSyntacticDiagnostics10);
-
 
 static void TestGetJavaScriptSyntacticDiagnostics02(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -376,7 +337,6 @@ var var = "c";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptSyntacticDiagnostics02, TestGetJavaScriptSyntacticDiagnostics02);
 
-
 static void TestGetJavaScriptSyntacticDiagnostics01(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -390,7 +350,6 @@ var ===;)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptSyntacticDiagnostics01, TestGetJavaScriptSyntacticDiagnostics01);
-
 
 static void TestGetJavaScriptGlobalCompletions1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -413,7 +372,6 @@ hello/**/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptGlobalCompletions1, TestGetJavaScriptGlobalCompletions1);
 
-
 static void TestGetJavaScriptCompletions_tsCheck(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -429,7 +387,6 @@ ij./**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptCompletions_tsCheck, TestGetJavaScriptCompletions_tsCheck);
-
 
 static void TestGetJavaScriptCompletions9(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -448,7 +405,6 @@ new v()./**/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptCompletions9, TestGetJavaScriptCompletions9);
 
-
 static void TestGetJavaScriptCompletions8(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"Known failing fourslash test"}); return;
@@ -465,7 +421,6 @@ v()./**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptCompletions8, TestGetJavaScriptCompletions8);
-
 
 static void TestGetJavaScriptCompletions5(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -485,7 +440,6 @@ foo(1)./**/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptCompletions5, TestGetJavaScriptCompletions5);
 
-
 static void TestGetJavaScriptCompletions4(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -499,7 +453,6 @@ foo(1,2)./**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptCompletions4, TestGetJavaScriptCompletions4);
-
 
 static void TestGetJavaScriptCompletions3(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -515,7 +468,6 @@ v./**/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptCompletions3, TestGetJavaScriptCompletions3);
 
-
 static void TestGetJavaScriptCompletions2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -529,7 +481,6 @@ v./**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptCompletions2, TestGetJavaScriptCompletions2);
-
 
 static void TestGetJavaScriptCompletions22(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -546,7 +497,6 @@ const abc = {};
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptCompletions22, TestGetJavaScriptCompletions22);
 
-
 static void TestGetJavaScriptCompletions21(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -562,7 +512,6 @@ new Prv()['[|/**/|]'];)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptCompletions21, TestGetJavaScriptCompletions21);
-
 
 static void TestGetJavaScriptCompletions20(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -582,7 +531,6 @@ function Person(name, age) {
     this.age = age;
 }
 
-
 Person.getName = 10;
 Person.getNa/**/ = 10;)TS";
 		auto __fsp1 = fourslash::NewFourslash(t, nullptr, content); auto f = __fsp1.first; auto done = __fsp1.second; TSC_DEFER(done());
@@ -590,7 +538,6 @@ Person.getNa/**/ = 10;)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptCompletions20, TestGetJavaScriptCompletions20);
-
 
 static void TestGetJavaScriptCompletions1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -605,7 +552,6 @@ v./**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptCompletions1, TestGetJavaScriptCompletions1);
-
 
 static void TestGetJavaScriptCompletions19(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -636,7 +582,6 @@ if(typeof x === 'string') {
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptCompletions19, TestGetJavaScriptCompletions19);
 
-
 static void TestGetJavaScriptCompletions18(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -660,7 +605,6 @@ exports.foo = function(a, b) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptCompletions18, TestGetJavaScriptCompletions18);
-
 
 static void TestGetJavaScriptCompletions16(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -700,7 +644,6 @@ let x = new Something(/*sig*/);)TS";
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptCompletions16, TestGetJavaScriptCompletions16);
 
-
 static void TestGetJavaScriptCompletions15(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"Known failing fourslash test"}); return;
@@ -729,7 +672,6 @@ v.x.V./*4*/;)TS";
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptCompletions15, TestGetJavaScriptCompletions15);
 
-
 static void TestGetJavaScriptCompletions14(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -745,7 +687,6 @@ x./*1*/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptCompletions14, TestGetJavaScriptCompletions14);
-
 
 static void TestGetJavaScriptCompletions13(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -766,7 +707,6 @@ file2Identifier2./*2*/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptCompletions13, TestGetJavaScriptCompletions13);
-
 
 static void TestGetJavaScriptCompletions12(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -802,7 +742,6 @@ var test1 = function(x) { return x./*4*/ }, test2 = function(a) { return a./*5*/
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptCompletions12, TestGetJavaScriptCompletions12);
 
-
 static void TestGetJavaScriptCompletions11(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -816,7 +755,6 @@ v./**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestGetJavaScriptCompletions11, TestGetJavaScriptCompletions11);
-
 
 static void TestGetJavaScriptCompletions10(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {

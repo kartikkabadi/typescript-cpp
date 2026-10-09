@@ -578,7 +578,7 @@ bool Checker::elaborateIterableOrArrayLikeTargetElementwise(
 			nullptr /*errorNode*/);
 	}
 	bool reportedError = false;
-	iterator([this, &reportedError, source, target, relation, diagnosticOutput,
+	iterator([this, &reportedError, source, relation, diagnosticOutput,
 				tupleOrArrayLikeTargetParts, iterationType](
 				JsxElaborationElement e) -> bool {
 		Node* prop = e.errorNode;

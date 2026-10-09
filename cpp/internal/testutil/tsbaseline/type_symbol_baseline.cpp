@@ -43,7 +43,7 @@ const gostd::regexp::Regexp& bracketLineRegex() {
 // SemanticMeaning — ast/utilities.go:2240 (unported ast constants; file-local
 // replicas matching the Go values).
 using SemanticMeaning = int32_t;
-inline constexpr SemanticMeaning SemanticMeaningNone = 0;
+[[maybe_unused]] inline constexpr SemanticMeaning SemanticMeaningNone = 0;
 inline constexpr SemanticMeaning SemanticMeaningValue = 1 << 0;
 inline constexpr SemanticMeaning SemanticMeaningType = 1 << 1;
 inline constexpr SemanticMeaning SemanticMeaningNamespace = 1 << 2;
@@ -260,14 +260,14 @@ typeWriterResult* writeTypeOrSymbol(typeWriterWalker* walker, Node* node,
 		// Exception for `T` in `type T = something` because that may
 		// evaluate to some interesting type.
 		if (isPartOfTypeNode(node) ||
-		    (node->kind == Kind::AsExpression ||
+		    ((node->kind == Kind::AsExpression ||
 		     node->kind == Kind::SatisfiesExpression) &&
-		        (node->type()->flags & NodeFlagsReparsed) != 0 ||
-		    isIdentifier(node) &&
+		        (node->type()->flags & NodeFlagsReparsed) != 0) ||
+		    (isIdentifier(node) &&
 		        (getMeaningFromDeclaration(node->parent) &
 		         SemanticMeaningValue) == 0 &&
 		        !(isTypeOrJSTypeAliasDeclaration(node->parent) &&
-		          node == node->parent->name())) {
+		          node == node->parent->name()))) {
 			return nullptr;
 		}
 

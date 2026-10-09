@@ -1210,7 +1210,7 @@ public:
 	// program.go:532 — read live off opts.Config (the C++ field was never
 	// populated for fresh programs, silently dropping config-file
 	// diagnostics like TS5023/TS6046/TS18002/TS5083).
-	std::vector<Diagnostic*> GetConfigFileParsingDiagnostics() {
+	std::vector<Diagnostic*> GetConfigFileParsingDiagnostics() override {
 		if (commandLine_ != nullptr) {
 			return commandLine_->GetConfigFileParsingDiagnostics();
 		}
@@ -1218,11 +1218,11 @@ public:
 	}
 	// program.go:828 collectContentMapperOptionDiagnostics.
 	void collectContentMapperOptionDiagnostics();
-	std::vector<Diagnostic*> GetProgramDiagnostics();
-	std::vector<Diagnostic*> GetGlobalDiagnostics();
-	std::vector<Diagnostic*> GetSyntacticDiagnostics(SourceFile* sourceFile);
-	std::vector<Diagnostic*> GetBindDiagnostics(SourceFile* sourceFile);
-	std::vector<Diagnostic*> GetSemanticDiagnostics(SourceFile* sourceFile);
+	std::vector<Diagnostic*> GetProgramDiagnostics() override;
+	std::vector<Diagnostic*> GetGlobalDiagnostics() override;
+	std::vector<Diagnostic*> GetSyntacticDiagnostics(SourceFile* sourceFile) override;
+	std::vector<Diagnostic*> GetBindDiagnostics(SourceFile* sourceFile) override;
+	std::vector<Diagnostic*> GetSemanticDiagnostics(SourceFile* sourceFile) override;
 	// ctx overload — program.go:798 GetSemanticDiagnostics(ctx, file);
 	// needed for CheckerLifetime::Diagnostics checkouts (index-0 checker
 	// merges global diagnostics on release).
@@ -1230,14 +1230,14 @@ public:
 	    const gostd::Context& ctx, SourceFile* sourceFile);
 	std::vector<Diagnostic*> GetIncludeProcessorDiagnostics(
 	    SourceFile* sourceFile);
-	std::vector<Diagnostic*> GetDeclarationDiagnostics(SourceFile* sourceFile);
+	std::vector<Diagnostic*> GetDeclarationDiagnostics(SourceFile* sourceFile) override;
 	bool SkipTypeChecking(SourceFile* sourceFile, bool ignoreNoCheck);
 	bool canIncludeBindAndCheckDiagnostics(SourceFile* sourceFile);
 	bool IsSourceFileDefaultLibrary(const tspath::Path& path) const override;
 	bool IsLibFile(SourceFile* file) const;
-	bool IsSourceFileFromExternalLibrary(SourceFile* file) const;
+	bool IsSourceFileFromExternalLibrary(SourceFile* file) const override;
 	const SourceFileMetaData& GetSourceFileMetaData(
-	    const tspath::Path& path) const;
+	    const tspath::Path& path) const override;
 	SourceFile* GetSourceFileByPath(const tspath::Path& path) const {
 		auto it = filesByPath.find(path);
 		return it != filesByPath.end() ? it->second : nullptr;
@@ -1329,7 +1329,7 @@ public:
 	    bool forceDtsEmit, bool forceJsEmit);
 	// program.go:1867 Emit / :242 GetSourceFileFromReference — Emit returns
 	// a heap EmitResult like Go (nullptr == Go nil).
-	EmitResult* Emit(EmitOptions* options);
+	EmitResult* Emit(EmitOptions* options) override;
 	SourceFile* GetSourceFileFromReference(SourceFile* origin,
 	                                     FileReference* ref);
 	CompilerHost* Host() { return host; }

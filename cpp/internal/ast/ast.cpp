@@ -15,10 +15,6 @@ std::string join(const std::vector<std::string>& parts) {
 	return std::accumulate(parts.begin(), parts.end(), std::string{});
 }
 
-Node* firstOrNull(const NodeList* list) {
-	return list && !list->nodes.empty() ? list->nodes.front() : nullptr;
-}
-
 void traceDiagnosticVector(const std::vector<Diagnostic*>& diags, Arena& a,
                            std::unordered_set<Diagnostic*>& seen) {
 	for (Diagnostic* d : diags) {
@@ -898,7 +894,6 @@ NodeSlice Node::parameters() const {
 // modifiersToFlags — utilities.go:990/1028
 // ---------------------------------------------------------------------------
 
-
 ModifierFlags NodeFactory::modifiersToFlags(const std::vector<Node*>& modifiers) {
 	ModifierFlags flags = ModifierFlagsNone;
 	for (Node* m : modifiers) {
@@ -1329,7 +1324,6 @@ bool isStringOrNumericLiteralLike(Node* node) {
 	return isStringLiteralLike(node) || isNumericLiteral(node);
 }
 
-
 bool isAccessExpression(Node* node) {
 	return node->kind == Kind::PropertyAccessExpression ||
 	       node->kind == Kind::ElementAccessExpression;
@@ -1551,8 +1545,6 @@ Node* getAssignedName(Node* node) {
 	}
 	return nullptr;
 }
-
-
 
 // ---------------------------------------------------------------------------
 // precedence.go
@@ -1853,8 +1845,6 @@ bool isSignedNumericLiteral(Node* node) {
 	}
 	return false;
 }
-
-
 
 // ---------------------------------------------------------------------------
 // utilities.go: SetParentInChildren / GetRightMostAssignedExpression /
@@ -2437,7 +2427,6 @@ void setExternalModuleIndicator(
     SourceFile* file, const ExternalModuleIndicatorOptions& opts) {
 	file->ExternalModuleIndicator = getExternalModuleIndicator(file, opts);
 }
-
 
 // utilities.go:1315 — IsDeclarationNameOrImportPropertyName
 bool isDeclarationNameOrImportPropertyName(Node* name) {

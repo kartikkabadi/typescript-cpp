@@ -92,11 +92,6 @@ static ScopeExit<F> scopeExit(F&& f) {
 }
 
 
-// TypePredicateKind::This (types.go) — used to render `this` predicates.
-static bool predicateIsThisType(TypePredicate* predicate) {
-	return predicate->kind == TypePredicateKind::This;
-}
-
 // isTupleType (checker.go) — file-local replica (see checker_contextual.cpp).
 static bool isTupleType(Type* t) {
 	return t->AsStructuredType() != nullptr &&
@@ -187,7 +182,7 @@ static bool isConstEnumSymbol(Symbol* symbol) {
 }
 
 // ast.isEnumConst (ast/utilities.go).
-static bool isEnumConst(Node* node) {
+[[maybe_unused]] static bool isEnumConst(Node* node) {
 	return (node->modifierFlags() & ModifierFlagsConst) != 0;
 }
 
@@ -3299,7 +3294,6 @@ bool NodeBuilderImpl::isTriviallySerializableComputedName(Node* e) {
 	if (!shapeGood) {
 		return false;
 	}
-	// TODO: going through emit resolver here is weird. Relayer these APIs.
 	return ch->isEntityNameVisible(e->name()->expression(),
 	                                        ctx->enclosingDeclaration, false)
 	           .Accessibility ==
@@ -3461,8 +3455,6 @@ Node* NodeBuilderImpl::serializeTypeForDeclaration(Node* declaration,
 		}
 	}
 
-	// !!! TODO: JSDoc, getEmitResolver call is unfortunate layering for the
-	// helper - hoist it into checker
 	bool requiresAddingUndefined =
 	    declaration != nullptr &&
 	    (isParameterDeclaration(declaration) ||
@@ -4362,7 +4354,7 @@ bool NodeBuilderImpl::shouldEmitTypeOfSymbol(
 		return false;
 	}
 	bool nonFunctionResult =
-	    (symbol->flags & SymbolFlagsClass) != 0 && !forceClassExpansion &&
+	    ((symbol->flags & SymbolFlagsClass) != 0 && !forceClassExpansion &&
 	    ch->getBaseTypeVariableOfClass(symbol) == nullptr &&
 	    !(symbol->valueDeclaration != nullptr &&
 	      isClassLike(symbol->valueDeclaration) &&
@@ -4372,7 +4364,7 @@ bool NodeBuilderImpl::shouldEmitTypeOfSymbol(
 	       ch->IsSymbolAccessible(symbol, ctx->enclosingDeclaration,
 	                              isInstanceType,
 	                              false /*shouldComputeAliasesToMakeVisible*/)
-	               .Accessibility != printer::SymbolAccessibility::Accessible)) ||
+	               .Accessibility != printer::SymbolAccessibility::Accessible))) ||
 	    (symbol->flags &
 	     (SymbolFlagsEnum | SymbolFlagsValueModule)) != 0;
 	if (nonFunctionResult) {

@@ -36,7 +36,7 @@ struct textWriter : EmitTextWriter {
 		lineStart = true;
 	}
 
-	void Grow(size_t n) { builder.reserve(builder.size() + n); }
+	void Grow(size_t n) override { builder.reserve(builder.size() + n); }
 
 	void DecreaseIndent() override { indent--; }
 

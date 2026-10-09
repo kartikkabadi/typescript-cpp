@@ -203,7 +203,7 @@ export const make = (): Box => ({ value: "ok" });
 		    sys->GetCurrentDirectory(), sys->fs(),
 		    sys->DefaultLibraryPath(), nullptr, nullptr, nullptr);
 		auto* program = compiler::NewProgram(
-		    compiler::ProgramOptions{.Config = config, .Host = host});
+		    compiler::ProgramOptions{.Host = host, .Config = config});
 		if (program->GetSourceFile("/lib/lib.d.ts") == nullptr) {
 			t->Fatal({"default library was not loaded"});
 		}

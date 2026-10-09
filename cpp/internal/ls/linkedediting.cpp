@@ -117,10 +117,10 @@ LanguageService::ProvideLinkedEditingRange(
 		}
 		// only return linked cursors if the cursor is within a tag name
 		int positionInt = int(position);
-		if (!(openTagNameStart <= positionInt &&
-		              positionInt <= openTagNameEnd ||
-		      closeTagNameStart <= positionInt &&
-		              positionInt <= closeTagNameEnd)) {
+		if (!((openTagNameStart <= positionInt &&
+		              positionInt <= openTagNameEnd) ||
+		      (closeTagNameStart <= positionInt &&
+		              positionInt <= closeTagNameEnd))) {
 			return {lsp::lsproto::LinkedEditingRangeResponse{}, nullptr};
 		}
 

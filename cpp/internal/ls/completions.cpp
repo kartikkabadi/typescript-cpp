@@ -583,7 +583,7 @@ T firstOrNil(const std::vector<T>& ts) {
 template <class T>
 const std::vector<T*>& checkEachDefined(const std::vector<T*>& s,
                                         const char* msg) {
-	for (auto* x : s) {
+	for ([[maybe_unused]] auto* x : s) {
 		TSC_ASSERT(x != nullptr, msg);
 	}
 	return s;
@@ -799,9 +799,6 @@ symbolOriginInfoObjectLiteralMethod* symbolOriginInfo::asObjectLiteralMethod() {
 // completions.go:384 CompletionList::toLSP.
 
 lsproto::CompletionList* CompletionList::toLSP() const {
-	if (this == nullptr) {
-		return nullptr;
-	}
 	auto* items = new lsproto::CompletionList();
 	items->IsIncomplete = IsIncomplete;
 	items->ItemDefaults = std::shared_ptr<lsproto::CompletionItemDefaults>(ItemDefaults);
@@ -6766,9 +6763,9 @@ bool isInStringOrRegularExpressionOrTemplateLiteral(Node* contextToken,
 	//   2. at the end position of an unterminated token.
 	//   3. at the end of a regular expression (due to trailing flags like
 	// '/foo/g').
-	return (isRegularExpressionLiteral(contextToken) ||
+	return ((isRegularExpressionLiteral(contextToken) ||
 	        isStringTextContainingNode(contextToken)) &&
-	           contextToken->loc.contains(position) ||
+	           contextToken->loc.contains(position)) ||
 	       (position == contextToken->end() &&
 	        (isUnterminatedLiteral(contextToken) ||
 	         isRegularExpressionLiteral(contextToken)));

@@ -66,7 +66,7 @@ bool isCompoundAssignment_(Kind kind) {
 }
 
 // ast.utilities.go:140 — IsObjectBindingOrAssignmentElement.
-bool isObjectBindingOrAssignmentElement(Node* node) {
+[[maybe_unused]] bool isObjectBindingOrAssignmentElement(Node* node) {
 	switch (node->kind) {
 	case Kind::BindingElement:
 	case Kind::PropertyAssignment:
@@ -94,7 +94,7 @@ bool isObjectLiteralElement(Node* element) {
 	}
 }
 
-bool isArrayBindingOrAssignmentElement(Node* node) {
+[[maybe_unused]] bool isArrayBindingOrAssignmentElement(Node* node) {
 	switch (node->kind) {
 	case Kind::BindingElement:
 	case Kind::OmittedExpression:

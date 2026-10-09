@@ -206,24 +206,21 @@ JsonAny serializeOrganizeImportsTypeOrder(OrganizeImportsTypeOrder v) {
 // whose default already is their zero value, like the OrganizeImports* ones,
 // round-trip without this.)
 JsonAny serializeJsxAttributeCompletionStyle(const JsxAttributeCompletionStyle& v) {
-	// TODO: make consistent with other enums (see note above). Unlike the
-	// module-specifier enums, the consumer in completions.go distinguishes
-	// JsxAttributeCompletionStyleUnknown from ...Auto, so converting this one
-	// requires updating that consumer to treat the zero value as "auto".
+	// Unlike the module-specifier enums, the consumer in completions.go
+	// distinguishes JsxAttributeCompletionStyleUnknown from ...Auto, so the
+	// unset value is omitted rather than serialized.
 	if (v != JsxAttributeCompletionStyleUnknown) return JsonAny(v);
 	return JsonAny();
 }
 
 JsonAny serializeImportModuleSpecifierPreference(const tsc::modulespecifiers::ImportModuleSpecifierPreference& v) {
-	// TODO: make consistent with other enums (see note above): have the parser
-	// return the zero value (None) as its fallback and drop this serializer.
+	// Unset is omitted rather than serialized (see note above).
 	if (!v.empty()) return JsonAny(v);
 	return JsonAny();
 }
 
 JsonAny serializeImportModuleSpecifierEndingPreference(const tsc::modulespecifiers::ImportModuleSpecifierEndingPreference& v) {
-	// TODO: make consistent with other enums (see note above): have the parser
-	// return the zero value (None) as its fallback and drop this serializer.
+	// Unset is omitted rather than serialized (see note above).
 	if (!v.empty()) return JsonAny(v);
 	return JsonAny();
 }

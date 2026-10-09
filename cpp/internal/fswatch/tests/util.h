@@ -77,7 +77,7 @@ inline Error osWriteFile(const std::string& path, std::string_view data,
 		if (n < 0) {
 			if (errno == EINTR)
 				continue;
-			int e = errno;
+			[[maybe_unused]] int e = errno;
 			(void)::close(fd);
 			return osErrno("write");
 		}
@@ -432,7 +432,7 @@ inline void runForEachWatcher(T* t,
                               const std::function<void(TestI*, Watcher*)>& fn) {
 	t->Helper();
 	for (auto* b : availableWatchers()) {
-		t->Run(b->name(), [t, b, &fn](T* sub) {
+		t->Run(b->name(), [b, &fn](T* sub) {
 			sub->Parallel();
 			runWithRetry(sub, [&](TestI* rt) { fn(rt, b); });
 		});

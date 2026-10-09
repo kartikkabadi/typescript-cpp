@@ -102,7 +102,7 @@ std::string_view leadingIndentation(std::string_view text) {
 
 // positionsAreOnSameLine — delete.go:247 (shared within the package; also
 // defined in tracker.cpp's anonymous namespace).
-bool positionsAreOnSameLine(int pos1, int pos2, SourceFile* sourceFile) {
+[[maybe_unused]] bool positionsAreOnSameLine(int pos1, int pos2, SourceFile* sourceFile) {
 	return format::GetLineStartPositionForPosition(pos1, sourceFile) ==
 		   format::GetLineStartPositionForPosition(pos2, sourceFile);
 }

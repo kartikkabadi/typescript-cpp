@@ -300,7 +300,7 @@ std::vector<std::shared_ptr<glob::Glob>>* ParsedCommandLine::WildcardDirectoryGl
 
 // LiteralFileNames — parsedcommandline.go:299.
 std::vector<std::string> ParsedCommandLine::LiteralFileNames() {
-	if (this != nullptr && ConfigFile != nullptr) {
+	if (ConfigFile != nullptr) {
 		auto names = FileNames();
 		return {names.begin(), names.begin() + literalFileNamesLen};
 	}

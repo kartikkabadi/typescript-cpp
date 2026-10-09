@@ -2351,7 +2351,6 @@ void Session::publishProgramDiagnostics(
 		for (auto& kv :
 		     oldSnapshot->ProjectCollection->ProjectsByID()
 		         ->Entries()) {
-			auto& pid = kv.first;
 			auto* oldProject = kv.second;
 			auto [configuredID, configured] =
 			    idConfigured(oldProject->ID());

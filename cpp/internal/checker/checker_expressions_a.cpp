@@ -269,14 +269,14 @@ ModifierFlags getSelectedModifierFlags(Node* node, ModifierFlags flags) {
 ModifierFlags getDeclarationModifierFlagsFromSymbolEx(Symbol* s, bool isWrite) {
 	if ((s->checkFlags & CheckFlagsSynthetic) != 0) {
 		ModifierFlags accessModifier{};
-		if (!isWrite && (s->checkFlags & CheckFlagsContainsPublic) != 0 ||
-			isWrite && (s->checkFlags & CheckFlagsContainsWritePublic) != 0) {
+		if ((!isWrite && (s->checkFlags & CheckFlagsContainsPublic) != 0) ||
+			(isWrite && (s->checkFlags & CheckFlagsContainsWritePublic) != 0)) {
 			accessModifier = ModifierFlagsPublic;
-		} else if (!isWrite && (s->checkFlags & CheckFlagsContainsProtected) != 0 ||
-				   isWrite && (s->checkFlags & CheckFlagsContainsWriteProtected) != 0) {
+		} else if ((!isWrite && (s->checkFlags & CheckFlagsContainsProtected) != 0) ||
+				   (isWrite && (s->checkFlags & CheckFlagsContainsWriteProtected) != 0)) {
 			accessModifier = ModifierFlagsProtected;
-		} else if (!isWrite && (s->checkFlags & CheckFlagsContainsPrivate) != 0 ||
-				   isWrite && (s->checkFlags & CheckFlagsContainsWritePrivate) != 0) {
+		} else if ((!isWrite && (s->checkFlags & CheckFlagsContainsPrivate) != 0) ||
+				   (isWrite && (s->checkFlags & CheckFlagsContainsWritePrivate) != 0)) {
 			accessModifier = ModifierFlagsPrivate;
 		}
 		if ((s->checkFlags & CheckFlagsContainsStatic) != 0) {

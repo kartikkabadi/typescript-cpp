@@ -59,8 +59,6 @@ static bool signatureHasRestParameter(Signature* sig) {
 // printer slice lands; keep names distinct from any future printer exports).
 namespace {
 
-const char kEscapedChars[] = "\t\v\f\b\r\n\0\"\'\\`";
-
 const char* getLiteralTextFlagsChar(char ch) {
 	switch (ch) {
 		case '\t': return "\\t";
@@ -83,8 +81,6 @@ std::string encodeUtf16EscapeSequence(uint32_t charCode) {
 	snprintf(buf, sizeof(buf), "\\u%04x", charCode);
 	return buf;
 }
-
-bool isDoubleQuote(char ch) { return ch == '\"' || ch == '\''; }
 
 std::string escapeStringWorker(std::string_view s, char quoteChar) {
 	std::string escaped;

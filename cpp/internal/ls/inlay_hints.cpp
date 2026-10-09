@@ -362,10 +362,10 @@ struct inlayHintState {
 
 	// inlay_hints.go:211 — visitVariableLikeDeclaration
 	void visitVariableLikeDeclaration(::tsc::Node* decl) {
-		if (decl->initializer() == nullptr &&
+		if ((decl->initializer() == nullptr &&
 				!(isPropertyDeclaration(decl) &&
 				  (checker->GetTypeAtLocation(decl)->flags &
-				   checker::TypeFlagsAny) == 0) ||
+				   checker::TypeFlagsAny) == 0)) ||
 			isBindingPattern(decl->name()) ||
 			(isVariableDeclaration(decl) &&
 			 !isHintableDeclaration(decl))) {

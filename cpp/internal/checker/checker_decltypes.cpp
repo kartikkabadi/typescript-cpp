@@ -39,8 +39,8 @@ T orElse(const T& a, const T& b) {
 template <class R, typename F>
 auto sameMap(R&& values, F f)
 	-> std::vector<std::decay_t<std::ranges::range_value_t<R>>> {
-	using T = std::decay_t<std::ranges::range_value_t<R>>;
-	std::vector<T> result;
+
+	using T = std::decay_t<std::ranges::range_value_t<R>>;	std::vector<T> result;
 	result.reserve(values.size());
 	bool same = true;
 	for (const T& v : values) {
@@ -55,8 +55,8 @@ auto sameMap(R&& values, F f)
 
 template <class R, typename F>
 auto mapVec(R&& values, F f) -> std::vector<decltype(f(std::declval<std::decay_t<std::ranges::range_value_t<R>>>()))> {
-	using T = std::decay_t<std::ranges::range_value_t<R>>;
-	std::vector<decltype(f(std::declval<T>()))> result;
+
+	using T = std::decay_t<std::ranges::range_value_t<R>>;	std::vector<decltype(f(std::declval<T>()))> result;
 	result.reserve(values.size());
 	for (const T& v : values) {
 		result.push_back(f(v));
@@ -67,8 +67,8 @@ auto mapVec(R&& values, F f) -> std::vector<decltype(f(std::declval<std::decay_t
 template <class R, typename F>
 auto mapIndex(R&& values, F f)
 	-> std::vector<decltype(f(std::declval<std::decay_t<std::ranges::range_value_t<R>>>(), 0))> {
-	using T = std::decay_t<std::ranges::range_value_t<R>>;
-	using U = decltype(f(std::declval<T>(), 0));
+
+	using T = std::decay_t<std::ranges::range_value_t<R>>;	using U = decltype(f(std::declval<T>(), 0));
 	std::vector<U> result;
 	result.reserve(values.size());
 	for (size_t i = 0; i < values.size(); i++) {
@@ -102,25 +102,21 @@ int findLastIndex(const std::vector<Node*>& values, F f) {
 
 template <class R, typename F>
 bool someOf(R&& values, F f) {
-	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	return std::any_of(values.begin(), values.end(), f);
 }
 
 template <class R, typename F>
 bool everyOf(R&& values, F f) {
-	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	return std::all_of(values.begin(), values.end(), f);
 }
 
 template <class R>
 bool containsElem(R&& values, const auto& v) {
-	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	return std::find(values.begin(), values.end(), v) != values.end();
 }
 
 template <class R>
 int indexOf(R&& values, const auto& v) {
-	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	auto it = std::find(values.begin(), values.end(), v);
 	return it == values.end() ? -1 : static_cast<int>(it - values.begin());
 }
@@ -145,7 +141,7 @@ bool isTupleType(Type* t) {
 }
 
 // isShorthandAmbientModule — utilities.go:201
-bool isShorthandAmbientModule(Node* node) {
+[[maybe_unused]] bool isShorthandAmbientModule(Node* node) {
 	// The only kind of module that can be missing a body is a shorthand ambient module.
 	return node != nullptr && node->kind == Kind::ModuleDeclaration && node->body() == nullptr;
 }
@@ -154,9 +150,9 @@ bool isShorthandAmbientModule(Node* node) {
 // isRightSideOfAccessExpression — utilities.go:240
 bool isRightSideOfAccessExpression(Node* node) {
 	return node->parent != nullptr &&
-		(isPropertyAccessExpression(node->parent) && node->parent->name() == node ||
-		 isElementAccessExpression(node->parent) &&
-			 node->parent->as<ElementAccessExpression>()->ArgumentExpression == node);
+		((isPropertyAccessExpression(node->parent) && node->parent->name() == node) ||
+		 (isElementAccessExpression(node->parent) &&
+			 node->parent->as<ElementAccessExpression>()->ArgumentExpression == node));
 }
 
 // isRightSideOfQualifiedNameOrPropertyAccess — canonical def in ast.cpp
@@ -277,14 +273,14 @@ ModifierFlags getDeclarationModifierFlagsFromSymbol(Symbol* s) {
 ModifierFlags getDeclarationModifierFlagsFromSymbolEx(Symbol* s, bool isWrite) {
 	if (s->checkFlags & CheckFlagsSynthetic) {
 		ModifierFlags accessModifier = ModifierFlagsNone;
-		if (!isWrite && (s->checkFlags & CheckFlagsContainsPublic) ||
-			isWrite && (s->checkFlags & CheckFlagsContainsWritePublic)) {
+		if ((!isWrite && (s->checkFlags & CheckFlagsContainsPublic)) ||
+			(isWrite && (s->checkFlags & CheckFlagsContainsWritePublic))) {
 			accessModifier = ModifierFlagsPublic;
-		} else if (!isWrite && (s->checkFlags & CheckFlagsContainsProtected) ||
-				   isWrite && (s->checkFlags & CheckFlagsContainsWriteProtected)) {
+		} else if ((!isWrite && (s->checkFlags & CheckFlagsContainsProtected)) ||
+				   (isWrite && (s->checkFlags & CheckFlagsContainsWriteProtected))) {
 			accessModifier = ModifierFlagsProtected;
-		} else if (!isWrite && (s->checkFlags & CheckFlagsContainsPrivate) ||
-				   isWrite && (s->checkFlags & CheckFlagsContainsWritePrivate)) {
+		} else if ((!isWrite && (s->checkFlags & CheckFlagsContainsPrivate)) ||
+				   (isWrite && (s->checkFlags & CheckFlagsContainsWritePrivate))) {
 			accessModifier = ModifierFlagsPrivate;
 		}
 		if (s->checkFlags & CheckFlagsContainsStatic) {
@@ -616,7 +612,7 @@ bool isNonDeferredTypeReference(Type* t) {
 
 // isUnconstrainedTypeParameter — checker.go:17987. Return true if the type
 // parameter originates in an unconstrained declaration in a type parameter list.
-bool isUnconstrainedTypeParameter(Type* tp) {
+[[maybe_unused]] bool isUnconstrainedTypeParameter(Type* tp) {
 	Type* target = tp->Target();
 	if (target == nullptr) {
 		target = tp;
@@ -965,7 +961,7 @@ Type* Checker::getTypeForVariableLikeDeclaration(Node* declaration, bool include
 		return getTypeForBindingElement(declaration);
 	}
 	bool isProperty =
-		isPropertyDeclaration(declaration) && !hasAccessorModifier(declaration) ||
+		(isPropertyDeclaration(declaration) && !hasAccessorModifier(declaration)) ||
 		isPropertySignatureDeclaration(declaration);
 	bool isOptional = includeOptionality && isOptionalDeclaration(declaration);
 	// Use type from type annotation if one is present
@@ -3038,7 +3034,7 @@ ModifierFlags Checker::getCombinedModifierFlagsCached(Node* node) {
 // ---------------------------------------------------------------------------
 
 namespace {
-[[noreturn]] void decltypesDepUnreachable(const char* name) {
+[[maybe_unused]] [[noreturn]] void decltypesDepUnreachable(const char* name) {
 	TSC_UNREACHABLE(name);
 }
 } // namespace

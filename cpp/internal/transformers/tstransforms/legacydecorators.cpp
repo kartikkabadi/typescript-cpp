@@ -15,7 +15,7 @@ struct allDecorators {
 	std::vector<std::vector<Node*>> parameters;
 };
 
-NodeList* elideNodes(printer::NodeFactory* f, NodeList* nodes) {
+[[maybe_unused]] NodeList* elideNodes(printer::NodeFactory* f, NodeList* nodes) {
 	if (nodes == nullptr) {
 		return nullptr;
 	}

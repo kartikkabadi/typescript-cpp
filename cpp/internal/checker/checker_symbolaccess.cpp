@@ -216,7 +216,6 @@ printer::SymbolAccessibilityResult* Checker::IsAnySymbolAccessible(
 			symbol, enclosingDeclaration, meaning, /*useOnlyExternalAliasing*/ false);
 		if (!accessibleSymbolChain.empty()) {
 			hadAccessibleChain = symbol;
-			// TODO: going through emit resolver here is weird. Relayer these APIs.
 			printer::SymbolAccessibilityResult* hasAccessibleDeclarations =
 				hasVisibleDeclarations(
 					accessibleSymbolChain[0], shouldComputeAliasesToMakeVisible);

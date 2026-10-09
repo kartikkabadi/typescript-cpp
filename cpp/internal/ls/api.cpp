@@ -73,8 +73,8 @@ LanguageService::LanguageService(autoimport::ProjectID* projectID,
                                  ls::Host* host,
                                  const std::string& activeFile)
     : projectID_(projectID), host(host), program(program),
-      converters(host->Converters()),
-      activeConfig(host->GetPreferences(activeFile)) {}
+      activeConfig(host->GetPreferences(activeFile)),
+      converters(host->Converters()) {}
 
 // languageservice.go:41 toPath.
 tspath::Path LanguageService::toPath(const std::string& fileName) {

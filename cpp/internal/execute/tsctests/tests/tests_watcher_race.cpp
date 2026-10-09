@@ -89,7 +89,7 @@ void TestWatcherConcurrentDoCycle(T* t) {
 	t->Parallel();
 	auto created = createTestWatcher(t);
 	auto* w = created.first;
-	auto* sys = created.second;
+	[[maybe_unused]] auto* sys = created.second;
 
 	waitGroup wg;
 	for (int i = 0; i < 8; i++) {

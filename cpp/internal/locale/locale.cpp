@@ -38,7 +38,7 @@ bool isAlpha(char b) {
 // isAlphaNum returns true if the string contains only ASCII letters or digits.
 bool isAlphaNum(std::string_view s) {
     for (char c : s) {
-        if (!('a' <= c && c <= 'z' || 'A' <= c && c <= 'Z' || '0' <= c && c <= '9')) {
+        if (!(('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || ('0' <= c && c <= '9'))) {
             return false;
         }
     }

@@ -12,7 +12,7 @@
 
 namespace tsc {
 struct CompilerOptions;
-class SourceFile;
+struct SourceFile;
 } // namespace tsc
 
 namespace tsc::outputpaths {

@@ -77,7 +77,7 @@ createPrinterWithRemoveCommentsOmitTrailingSemicolonNeverAsciiEscape(
 		printer::PrintHandlers{}, emitContext);
 }
 
-printer::Printer* createPrinterWithRemoveCommentsNeverAsciiEscape(
+[[maybe_unused]] printer::Printer* createPrinterWithRemoveCommentsNeverAsciiEscape(
 	printer::EmitContext* emitContext) {
 	return printer::NewPrinter(
 		printer::PrinterOptions{.RemoveComments = true,

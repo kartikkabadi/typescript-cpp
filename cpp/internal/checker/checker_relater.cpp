@@ -205,7 +205,7 @@ struct keyBuilder {
 };
 
 // getTypeListKey (checker.go)
-CacheKey getTypeListKey(const std::vector<Type*>& types) {
+[[maybe_unused]] CacheKey getTypeListKey(const std::vector<Type*>& types) {
 	keyBuilder b;
 	b.writeTypes(types);
 	return b.hash();
@@ -239,7 +239,7 @@ std::string getStringLiteralValue(Type* t) {
 	return std::get<std::string>(t->AsLiteralType()->value);
 }
 
-Number getNumberLiteralValue(Type* t) {
+[[maybe_unused]] Number getNumberLiteralValue(Type* t) {
 	return std::get<Number>(t->AsLiteralType()->value);
 }
 
@@ -617,8 +617,8 @@ bool Checker::isTypeRelatedTo(Type* source, Type* target, Relation* relation) {
 		return true;
 	}
 	if (relation != identityRelation) {
-		if (relation == comparableRelation && !(target->flags & TypeFlagsNever) &&
-				isSimpleTypeRelatedTo(target, source, relation, nullptr) ||
+		if ((relation == comparableRelation && !(target->flags & TypeFlagsNever) &&
+				isSimpleTypeRelatedTo(target, source, relation, nullptr)) ||
 			isSimpleTypeRelatedTo(source, target, relation, nullptr)) {
 			return true;
 		}
@@ -709,12 +709,12 @@ bool Checker::isSimpleTypeRelatedTo(Type* source, Type* target, Relation* relati
 	// anything except `never`. Since unions and intersections may reduce to
 	// `never`, we exclude them here.
 	if ((s & TypeFlagsUndefined) &&
-		(!strictNullChecks && !(t & TypeFlagsUnionOrIntersection) ||
+		((!strictNullChecks && !(t & TypeFlagsUnionOrIntersection)) ||
 		 (t & (TypeFlagsUndefined | TypeFlagsVoid)))) {
 		return true;
 	}
 	if ((s & TypeFlagsNull) &&
-		(!strictNullChecks && !(t & TypeFlagsUnionOrIntersection) ||
+		((!strictNullChecks && !(t & TypeFlagsUnionOrIntersection)) ||
 		 (t & TypeFlagsNull))) {
 		return true;
 	}
@@ -1584,7 +1584,7 @@ RecursionId getRecursionIdentityFromTarget(Type* t, Checker* c) {
 }
 
 // relater.go:810
-RecursionId getRecursionIdentity(Type* t, Checker* c) {
+[[maybe_unused]] RecursionId getRecursionIdentity(Type* t, Checker* c) {
 	return getRecursionIdentityFromTarget(getRecursionIdentityTarget(t, c), c);
 }
 
@@ -4337,7 +4337,7 @@ bool Relater::hasExcessProperties(Type* source, Type* target, bool reportErrors)
 					// Report error in terms of object types in the target as those are the only ones
 					// we check in isKnownProperty.
 					Type* errorTarget = c->filterType(
-						reducedTarget, [this](Type* t) {
+						reducedTarget, [](Type* t) {
 							return isExcessPropertyCheckTarget(t);
 						});
 					// We know *exactly* where things went wrong when comparing the types.
@@ -7244,7 +7244,7 @@ void Relater::reportErrorResults(Type* originalSource, Type* originalTarget,
 					The_intersection_0_was_reduced_to_never_because_property_1_exists_in_multiple_constituents_and_is_private_in_some;
 			prop = findOr(
 				c->getPropertiesOfUnionOrIntersectionType(originalTarget),
-				[this](Symbol* p) {
+				[](Symbol* p) {
 					return members_detail::isConflictingPrivateProperty(p);
 				},
 				(Symbol*) nullptr);

@@ -573,7 +573,7 @@ bool unmarshalOptionalStringArray(
 	return true;
 }
 
-bool unmarshalRawSourceMap(const JsonValue& v, RawSourceMap& out) {
+[[maybe_unused]] bool unmarshalRawSourceMap(const JsonValue& v, RawSourceMap& out) {
 	if (v.kind == JsonValue::Null) {
 		return true; // unmarshaling null into a struct is a no-op
 	}

@@ -162,7 +162,7 @@ static const std::pair<const char*, Kind> kTokenList[] = {
 	{"^=", Kind::CaretEqualsToken},
 	{"||=", Kind::BarBarEqualsToken},
 	{"&&=", Kind::AmpersandAmpersandEqualsToken},
-	{"??=", Kind::QuestionQuestionEqualsToken},
+	{ "?\?=", Kind::QuestionQuestionEqualsToken },
 	{"@", Kind::AtToken},
 	{"#", Kind::HashToken},
 	{"`", Kind::BacktickToken},
@@ -1957,7 +1957,7 @@ std::string Scanner::scanBinaryOrOctalDigits(int32_t base) {
 	bool isPreviousTokenSeparator = false;
 	for (;;) {
 		char32_t ch = char_();
-		if (isDigit(ch) && ch - '0' < base) {
+		if (isDigit(ch) && ch - '0' < static_cast<unsigned>(base)) {
 			sb.push_back(static_cast<char>(ch));
 			allowSeparator = true;
 			isPreviousTokenSeparator = false;

@@ -19,22 +19,6 @@ namespace {
 using namespace tsc;
 namespace tsu = tsc::fourslash::tests::util;
 
-static std::vector<fourslash::MarkerOrRangeOrName> asMonVec(
-	const std::vector<std::any> &v) {
-	std::vector<fourslash::MarkerOrRangeOrName> out;
-	out.reserve(v.size());
-	for (auto &e : v) {
-		if (auto *p = std::any_cast<std::shared_ptr<fourslash::Marker>>(&e))
-			out.push_back(*p);
-		else if (auto *p =
-					 std::any_cast<std::shared_ptr<fourslash::RangeMarker>>(&e))
-			out.push_back(*p);
-		else if (auto *p = std::any_cast<std::string>(&e)) out.push_back(*p);
-	}
-	return out;
-}
-
-
 static void TestImportModuleSpecifierPreferenceShortest(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -128,7 +112,6 @@ helper/**/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestImportModuleSpecifierPreferenceNonRelative, TestImportModuleSpecifierPreferenceNonRelative);
 
-
 static void TestImportModuleSpecifierEndingAuto(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -188,7 +171,6 @@ helper/**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestImportModuleSpecifierEndingJs, TestImportModuleSpecifierEndingJs);
-
 
 static void TestExhaustiveCaseCompletionsUntitledLocalEnum(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -315,7 +297,6 @@ static void verifyObjectLiteralKeyCompletions(gostd::testing::T* t, std::shared_
 	f->VerifyCompletions(t, "", tsu::ptr(fourslash::CompletionsExpectedList{.IsIncomplete = false, .ItemDefaults = std::make_shared<fourslash::CompletionsExpectedItemDefaults>(fourslash::CompletionsExpectedItemDefaults{.CommitCharacters = std::make_shared<std::vector<std::string>>(tsu::DefaultCommitCharacters), .EditRange = fourslash::Ignored{}}), .Items = std::make_shared<fourslash::CompletionsExpectedItems>(fourslash::CompletionsExpectedItems{.Exact = expected})}));
 }
 
-
 static void TestCompletionsObjectPropertyName_quotePreferenceSingle(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -394,7 +375,6 @@ export const foo = 0;
 	f->VerifyCompletions(t, "", tsu::ptr(fourslash::CompletionsExpectedList{.IsIncomplete = false, .ItemDefaults = std::make_shared<fourslash::CompletionsExpectedItemDefaults>(fourslash::CompletionsExpectedItemDefaults{.CommitCharacters = std::make_shared<std::vector<std::string>>(std::vector<std::string>{}), .EditRange = fourslash::Ignored{}}), .Items = std::make_shared<fourslash::CompletionsExpectedItems>(fourslash::CompletionsExpectedItems{.Includes = {std::make_shared<lsproto::CompletionItem>(lsproto::CompletionItem{.Label = "foo", .FilterText = text, .InsertText = text, .InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(lsproto::InsertTextFormatSnippet), .TextEdit = std::make_shared<lsproto::TextEditOrInsertReplaceEdit>(lsproto::TextEditOrInsertReplaceEdit{.TextEdit = std::make_shared<lsproto::TextEdit>(lsproto::TextEdit{ .Range = f->Ranges()[0]->LSRange,.NewText = text})}), .Data = std::make_shared<lsproto::CompletionItemData>(lsproto::CompletionItemData{.AutoImport = std::make_shared<lsproto::AutoImportFix>(lsproto::AutoImportFix{.ModuleSpecifier = "./mod"})})})}})}));
 }
 
-
 static void TestImportStatementCompletions_bareBrace(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -410,7 +390,6 @@ static void TestImportStatementCompletions_bracePrefix(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestImportStatementCompletions_bracePrefix, TestImportStatementCompletions_bracePrefix);
-
 
 static void TestCompletionsPatternAmbientModuleWithImportAttributes(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -480,7 +459,6 @@ text./*textUse*/shared;)TS";
 }
 REGISTER_FOURSLASH_TEST(TestPatternAmbientModuleWithImportAttributesLanguageService, TestPatternAmbientModuleWithImportAttributesLanguageService);
 
-
 static void TestAllowRenameOfImportPath(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -525,7 +503,6 @@ export * from "./[|lib/*rename*/rary|]";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestRenameInfoForImportPathTriggerSpan, TestRenameInfoForImportPathTriggerSpan);
-
 
 static void TestCompletionsInJsxTag(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -581,7 +558,6 @@ declare namespace JSX {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsInJsxNamespacedIntrinsicTag, TestCompletionsInJsxNamespacedIntrinsicTag);
 
-
 static void TestCompletionsOnImportIdentifierWithFromOnNextLine(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -603,7 +579,6 @@ from)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsOnImportTypeWithFromOnNextLine, TestCompletionsOnImportTypeWithFromOnNextLine);
-
 
 static void TestCompletionResolveAfterEdit(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -653,7 +628,6 @@ export const u = 1;
 }
 REGISTER_FOURSLASH_TEST(TestResolveImportStatementCompletion, TestResolveImportStatementCompletion);
 
-
 static void TestImportValueUsedAsType(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -669,7 +643,6 @@ namespace A {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestImportValueUsedAsType, TestImportValueUsedAsType);
-
 
 static void TestImportTypesDeclarationDiagnosticsNoServerError(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -690,7 +663,6 @@ export const x = f();)TS";
 }
 REGISTER_FOURSLASH_TEST(TestImportTypesDeclarationDiagnosticsNoServerError, TestImportTypesDeclarationDiagnosticsNoServerError);
 
-
 static void TestImportTypeNodeGoToDefinition(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -708,7 +680,6 @@ type B = import([|/*4*/"./ns"|]).[|/*5*/Foo|].[|/*6*/Bar|].[|/*7*/Baz|];)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestImportTypeNodeGoToDefinition, TestImportTypeNodeGoToDefinition);
-
 
 static void TestImportTypeMemberCompletions(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -763,7 +734,6 @@ type H = typeof import("./equals")./*9*/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestImportTypeMemberCompletions, TestImportTypeMemberCompletions);
 
-
 static void TestImportTypeFormatting(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -776,7 +746,6 @@ var z: import("./c2").mytype;)TS");
 	});
 }
 REGISTER_FOURSLASH_TEST(TestImportTypeFormatting, TestImportTypeFormatting);
-
 
 static void TestImportTypeCompletions9(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -793,7 +762,6 @@ export interface Foo {}
 }
 REGISTER_FOURSLASH_TEST(TestImportTypeCompletions9, TestImportTypeCompletions9);
 
-
 static void TestImportTypeCompletions8(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -808,7 +776,6 @@ export interface Foo {}
 	});
 }
 REGISTER_FOURSLASH_TEST(TestImportTypeCompletions8, TestImportTypeCompletions8);
-
 
 static void TestImportTypeCompletions7(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -827,7 +794,6 @@ export = Foo;
 }
 REGISTER_FOURSLASH_TEST(TestImportTypeCompletions7, TestImportTypeCompletions7);
 
-
 static void TestImportTypeCompletions6(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -843,7 +809,6 @@ export interface Foo { };
 	});
 }
 REGISTER_FOURSLASH_TEST(TestImportTypeCompletions6, TestImportTypeCompletions6);
-
 
 static void TestImportTypeCompletions5(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -863,7 +828,6 @@ export = Foo;
 }
 REGISTER_FOURSLASH_TEST(TestImportTypeCompletions5, TestImportTypeCompletions5);
 
-
 static void TestImportTypeCompletions4(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -880,7 +844,6 @@ export = Foo;
 }
 REGISTER_FOURSLASH_TEST(TestImportTypeCompletions4, TestImportTypeCompletions4);
 
-
 static void TestImportTypeCompletions3(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -895,7 +858,6 @@ export interface Foo {}
 	});
 }
 REGISTER_FOURSLASH_TEST(TestImportTypeCompletions3, TestImportTypeCompletions3);
-
 
 static void TestImportTypeCompletions2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -912,7 +874,6 @@ export const Foo = {};
 }
 REGISTER_FOURSLASH_TEST(TestImportTypeCompletions2, TestImportTypeCompletions2);
 
-
 static void TestImportTypeCompletions1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -927,7 +888,6 @@ export interface Foo {}
 	});
 }
 REGISTER_FOURSLASH_TEST(TestImportTypeCompletions1, TestImportTypeCompletions1);
-
 
 static void TestImportSuggestionsCache_invalidPackageJson(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -962,7 +922,6 @@ readF/**/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestImportSuggestionsCache_invalidPackageJson, TestImportSuggestionsCache_invalidPackageJson);
 
-
 static void TestImportSuggestionsCache_exportUndefined(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -984,7 +943,6 @@ export = x;
 }
 REGISTER_FOURSLASH_TEST(TestImportSuggestionsCache_exportUndefined, TestImportSuggestionsCache_exportUndefined);
 
-
 static void TestImportStatementCompletions_semicolons(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -999,7 +957,6 @@ import * as fs from "fs"
 }
 REGISTER_FOURSLASH_TEST(TestImportStatementCompletions_semicolons, TestImportStatementCompletions_semicolons);
 
-
 static void TestImportStatementCompletions_quotes(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -1013,7 +970,6 @@ import * as fs from 'fs';
 	});
 }
 REGISTER_FOURSLASH_TEST(TestImportStatementCompletions_quotes, TestImportStatementCompletions_quotes);
-
 
 static void TestImportStatementCompletions_pnpmTransitive(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -1037,7 +993,6 @@ export interface SvgProperties {}
 }
 REGISTER_FOURSLASH_TEST(TestImportStatementCompletions_pnpmTransitive, TestImportStatementCompletions_pnpmTransitive);
 
-
 static void TestImportStatementCompletions_pnpm1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -1056,7 +1011,6 @@ export declare function Component(): void;
 }
 REGISTER_FOURSLASH_TEST(TestImportStatementCompletions_pnpm1, TestImportStatementCompletions_pnpm1);
 
-
 static void TestImportStatementCompletions_noSnippet(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -1069,7 +1023,6 @@ export const foo = 0;
 	});
 }
 REGISTER_FOURSLASH_TEST(TestImportStatementCompletions_noSnippet, TestImportStatementCompletions_noSnippet);
-
 
 static void TestImportStatementCompletions_noPatternAmbient(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -1087,14 +1040,12 @@ import style/**/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestImportStatementCompletions_noPatternAmbient, TestImportStatementCompletions_noPatternAmbient);
 
-
 static void TestImportStatementCompletions_js(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"GOOS=js-only in Go; gated in the port"}); return;
 	});
 }
 REGISTER_FOURSLASH_TEST(TestImportStatementCompletions_js, TestImportStatementCompletions_js);
-
 
 static void TestImportStatementCompletions_js2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -1119,7 +1070,6 @@ export = React;
 }
 REGISTER_FOURSLASH_TEST(TestImportStatementCompletions_js2, TestImportStatementCompletions_js2);
 
-
 static void TestImportStatementCompletions_esModuleInterop2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -1134,7 +1084,6 @@ export = foo;
 	});
 }
 REGISTER_FOURSLASH_TEST(TestImportStatementCompletions_esModuleInterop2, TestImportStatementCompletions_esModuleInterop2);
-
 
 static void TestImportStatementCompletions_esModuleInterop1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -1152,7 +1101,6 @@ export = foo;
 	});
 }
 REGISTER_FOURSLASH_TEST(TestImportStatementCompletions_esModuleInterop1, TestImportStatementCompletions_esModuleInterop1);
-
 
 static void TestImportStatementCompletions4(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -1172,7 +1120,6 @@ function fromBar() {})TS";
 }
 REGISTER_FOURSLASH_TEST(TestImportStatementCompletions4, TestImportStatementCompletions4);
 
-
 static void TestImportStatementCompletionUsesNamedImport(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -1189,7 +1136,6 @@ import * as u from "./a";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestImportStatementCompletionUsesNamedImport, TestImportStatementCompletionUsesNamedImport);
-
 
 static void TestPreferTypeOnlyAutoImports(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -1208,7 +1154,6 @@ let y = MyV/*value*/;
 }
 REGISTER_FOURSLASH_TEST(TestPreferTypeOnlyAutoImports, TestPreferTypeOnlyAutoImports);
 
-
 static void TestImportMetaCompletionDetails(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"Known failing fourslash test"}); return;
@@ -1223,7 +1168,6 @@ let x = import.meta/**/;)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestImportMetaCompletionDetails, TestImportMetaCompletionDetails);
-
 
 static void TestImportHelpersAfterScriptBecomesDecoratedModule(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -1262,7 +1206,6 @@ export )TS");
 }
 REGISTER_FOURSLASH_TEST(TestImportHelpersAfterScriptBecomesDecoratedModule, TestImportHelpersAfterScriptBecomesDecoratedModule);
 
-
 static void TestImportCompletions_importsMap5(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -1297,7 +1240,6 @@ import {} from "/*1*/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestImportCompletions_importsMap5, TestImportCompletions_importsMap5);
 
-
 static void TestImportCompletions_importsMap4(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -1331,7 +1273,6 @@ import {} from "/*1*/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestImportCompletions_importsMap4, TestImportCompletions_importsMap4);
 
-
 static void TestImportCompletions_importsMap3(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -1364,7 +1305,6 @@ import {} from "#internal//*2*/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestImportCompletions_importsMap3, TestImportCompletions_importsMap3);
 
-
 static void TestImportCompletions_importsMap2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -1396,7 +1336,6 @@ import {} from "#internal//*2*/";)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestImportCompletions_importsMap2, TestImportCompletions_importsMap2);
-
 
 static void TestImportCompletions_importsMap1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -1433,7 +1372,6 @@ import {} from "/*1*/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestImportCompletions_importsMap1, TestImportCompletions_importsMap1);
 
-
 static void TestImportCompletionsPackageJsonImports_ts(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -1454,14 +1392,12 @@ import {} from "/*1*/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestImportCompletionsPackageJsonImports_ts, TestImportCompletionsPackageJsonImports_ts);
 
-
 static void TestImportCompletionsPackageJsonImports_js(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"GOOS=js-only in Go; gated in the port"}); return;
 	});
 }
 REGISTER_FOURSLASH_TEST(TestImportCompletionsPackageJsonImports_js, TestImportCompletionsPackageJsonImports_js);
-
 
 static void TestImportCompletionsPackageJsonImportsPattern_ts_ts(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -1483,7 +1419,6 @@ import {} from "/*1*/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestImportCompletionsPackageJsonImportsPattern_ts_ts, TestImportCompletionsPackageJsonImportsPattern_ts_ts);
 
-
 static void TestImportCompletionsPackageJsonImportsPattern_ts(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -1504,14 +1439,12 @@ import {} from "/*1*/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestImportCompletionsPackageJsonImportsPattern_ts, TestImportCompletionsPackageJsonImportsPattern_ts);
 
-
 static void TestImportCompletionsPackageJsonImportsPattern_ts_js(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"GOOS=js-only in Go; gated in the port"}); return;
 	});
 }
 REGISTER_FOURSLASH_TEST(TestImportCompletionsPackageJsonImportsPattern_ts_js, TestImportCompletionsPackageJsonImportsPattern_ts_js);
-
 
 static void TestImportCompletionsPackageJsonImportsPattern(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -1533,7 +1466,6 @@ import {} from "/*1*/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestImportCompletionsPackageJsonImportsPattern, TestImportCompletionsPackageJsonImportsPattern);
 
-
 static void TestImportCompletionsPackageJsonImportsPattern_js_ts(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -1554,14 +1486,12 @@ import {} from "/*1*/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestImportCompletionsPackageJsonImportsPattern_js_ts, TestImportCompletionsPackageJsonImportsPattern_js_ts);
 
-
 static void TestImportCompletionsPackageJsonImportsPattern_js(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"GOOS=js-only in Go; gated in the port"}); return;
 	});
 }
 REGISTER_FOURSLASH_TEST(TestImportCompletionsPackageJsonImportsPattern_js, TestImportCompletionsPackageJsonImportsPattern_js);
-
 
 static void TestImportCompletionsPackageJsonImportsPattern_capsInPath2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -1583,7 +1513,6 @@ import {} from "#thing//*2*/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestImportCompletionsPackageJsonImportsPattern_capsInPath2, TestImportCompletionsPackageJsonImportsPattern_capsInPath2);
 
-
 static void TestImportCompletionsPackageJsonImportsPattern_capsInPath1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -1603,7 +1532,6 @@ import {} from "/*1*/";)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestImportCompletionsPackageJsonImportsPattern_capsInPath1, TestImportCompletionsPackageJsonImportsPattern_capsInPath1);
-
 
 static void TestImportCompletionsPackageJsonImportsPatternRootWildcard(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -1628,7 +1556,6 @@ import {} from "#//*1*/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestImportCompletionsPackageJsonImportsPatternRootWildcard, TestImportCompletionsPackageJsonImportsPatternRootWildcard);
 
-
 static void TestImportCompletionsPackageJsonImportsPattern2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -1649,7 +1576,6 @@ import {} from "/*1*/";)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestImportCompletionsPackageJsonImportsPattern2, TestImportCompletionsPackageJsonImportsPattern2);
-
 
 static void TestImportCompletionsPackageJsonImportsLength2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -1679,7 +1605,6 @@ import {} from "#a/b/c/something//*5*/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestImportCompletionsPackageJsonImportsLength2, TestImportCompletionsPackageJsonImportsLength2);
 
-
 static void TestImportCompletionsPackageJsonImportsLength1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -1708,7 +1633,6 @@ import {} from "#a/b/c/something//*5*/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestImportCompletionsPackageJsonImportsLength1, TestImportCompletionsPackageJsonImportsLength1);
 
-
 static void TestImportCompletionsPackageJsonImportsConditions1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -1731,7 +1655,6 @@ import {} from "/*1*/";)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestImportCompletionsPackageJsonImportsConditions1, TestImportCompletionsPackageJsonImportsConditions1);
-
 
 static void TestImportCompletionsPackageJsonExportsTrailingSlash1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -1764,7 +1687,6 @@ import {} from "pkg/test//*2*/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestImportCompletionsPackageJsonExportsTrailingSlash1, TestImportCompletionsPackageJsonExportsTrailingSlash1);
 
-
 static void TestImportCompletionsPackageJsonExportsSpecifierEndsInTs(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -1793,7 +1715,6 @@ import {} from "pkg//*1*/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestImportCompletionsPackageJsonExportsSpecifierEndsInTs, TestImportCompletionsPackageJsonExportsSpecifierEndsInTs);
 
-
 static void TestExhaustiveCaseCompletions8(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -1809,7 +1730,6 @@ case 0n:$2)TS", .InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(
 	});
 }
 REGISTER_FOURSLASH_TEST(TestExhaustiveCaseCompletions8, TestExhaustiveCaseCompletions8);
-
 
 static void TestExhaustiveCaseCompletions7(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -1828,7 +1748,6 @@ case 1:$3)TS", .InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>(l
 }
 REGISTER_FOURSLASH_TEST(TestExhaustiveCaseCompletions7, TestExhaustiveCaseCompletions7);
 
-
 static void TestExhaustiveCaseCompletions6(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -1845,7 +1764,6 @@ case 'C':$3)TS", .InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>
 	});
 }
 REGISTER_FOURSLASH_TEST(TestExhaustiveCaseCompletions6, TestExhaustiveCaseCompletions6);
-
 
 static void TestExhaustiveCaseCompletions5(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -1867,7 +1785,6 @@ case P.Bar:$2)TS", .InsertTextFormat = std::make_shared<lsproto::InsertTextForma
 	});
 }
 REGISTER_FOURSLASH_TEST(TestExhaustiveCaseCompletions5, TestExhaustiveCaseCompletions5);
-
 
 static void TestExhaustiveCaseCompletions4(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -1956,7 +1873,6 @@ case G.DorE:$3)TS", .InsertTextFormat = std::make_shared<lsproto::InsertTextForm
 }
 REGISTER_FOURSLASH_TEST(TestExhaustiveCaseCompletions4, TestExhaustiveCaseCompletions4);
 
-
 static void TestExhaustiveCaseCompletions3(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -2009,7 +1925,6 @@ case E.C:$3)TS", .Insert = f->Ranges()[0]->LSRange, .Replace = f->Ranges()[0]->L
 }
 REGISTER_FOURSLASH_TEST(TestExhaustiveCaseCompletions3, TestExhaustiveCaseCompletions3);
 
-
 static void TestExhaustiveCaseCompletions2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -2047,7 +1962,6 @@ switch (u) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestExhaustiveCaseCompletions2, TestExhaustiveCaseCompletions2);
-
 
 static void TestExhaustiveCaseCompletions1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -2092,7 +2006,6 @@ case F.F:$3)TS", .InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>
 }
 REGISTER_FOURSLASH_TEST(TestExhaustiveCaseCompletions1, TestExhaustiveCaseCompletions1);
 
-
 static void TestExhaustiveCaseCompletions11(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -2107,7 +2020,6 @@ case "2":$2)TS", .InsertTextFormat = std::make_shared<lsproto::InsertTextFormat>
 	});
 }
 REGISTER_FOURSLASH_TEST(TestExhaustiveCaseCompletions11, TestExhaustiveCaseCompletions11);
-
 
 static void TestExhaustiveCaseCompletions10(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -2126,7 +2038,6 @@ case "2":)TS"})}})}));
 }
 REGISTER_FOURSLASH_TEST(TestExhaustiveCaseCompletions10, TestExhaustiveCaseCompletions10);
 
-
 static void TestCompletionsWritingSpreadArgument(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -2144,7 +2055,6 @@ const [] = [Math.min(./*marker*/)]
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsWritingSpreadArgument, TestCompletionsWritingSpreadArgument);
-
 
 static void TestCompletionsWrappedClass(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -2168,7 +2078,6 @@ class Service {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsWrappedClass, TestCompletionsWrappedClass);
-
 
 static void TestCompletionsWithStringReplacementMode1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -2199,7 +2108,6 @@ f('[|login./**/|]'))TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsWithStringReplacementMode1, TestCompletionsWithStringReplacementMode1);
 
-
 static void TestCompletionsWithOverride2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -2219,7 +2127,6 @@ class B extends A implements I {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsWithOverride2, TestCompletionsWithOverride2);
 
-
 static void TestCompletionsWithOverride1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -2235,7 +2142,6 @@ class B extends A {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsWithOverride1, TestCompletionsWithOverride1);
-
 
 static void TestCompletionsWithOptionalProperties(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -2256,7 +2162,6 @@ foo({
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsWithOptionalProperties, TestCompletionsWithOptionalProperties);
 
-
 static void TestCompletionsWithOptionalPropertiesGeneric(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -2273,7 +2178,6 @@ bar({ hello, /*1*/ });)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsWithOptionalPropertiesGeneric, TestCompletionsWithOptionalPropertiesGeneric);
 
-
 static void TestCompletionsWithOptionalPropertiesGenericValidBoolean(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -2289,7 +2193,6 @@ bar({ hello: true, /*1*/ });)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsWithOptionalPropertiesGenericValidBoolean, TestCompletionsWithOptionalPropertiesGenericValidBoolean);
-
 
 static void TestCompletionsWithOptionalPropertiesGenericPartial(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -2309,7 +2212,6 @@ partialFoo({ /*1*/ });)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsWithOptionalPropertiesGenericPartial, TestCompletionsWithOptionalPropertiesGenericPartial);
 
-
 static void TestCompletionsWithOptionalPropertiesGenericPartial3(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -2328,7 +2230,6 @@ partialFoo({ a: true, b: true }, { /*1*/ });)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsWithOptionalPropertiesGenericPartial3, TestCompletionsWithOptionalPropertiesGenericPartial3);
 
-
 static void TestCompletionsWithOptionalPropertiesGenericPartial2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -2343,7 +2244,6 @@ partialFoo({ a: true, b: true }, { /*1*/ });)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsWithOptionalPropertiesGenericPartial2, TestCompletionsWithOptionalPropertiesGenericPartial2);
-
 
 static void TestCompletionsWithOptionalPropertiesGenericDeep(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -2365,7 +2265,6 @@ bar({ deep: {/*1*/} });)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsWithOptionalPropertiesGenericDeep, TestCompletionsWithOptionalPropertiesGenericDeep);
 
-
 static void TestCompletionsWithOptionalPropertiesGenericConstructor(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -2385,7 +2284,6 @@ new Clazz({ /*1*/ }))TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsWithOptionalPropertiesGenericConstructor, TestCompletionsWithOptionalPropertiesGenericConstructor);
-
 
 static void TestCompletionsWithDeprecatedTag7(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -2408,7 +2306,6 @@ const i: I = {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsWithDeprecatedTag7, TestCompletionsWithDeprecatedTag7);
 
-
 static void TestCompletionsWithDeprecatedTag6(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -2422,7 +2319,6 @@ Foo./**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsWithDeprecatedTag6, TestCompletionsWithDeprecatedTag6);
-
 
 static void TestCompletionsWithDeprecatedTag5(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -2438,7 +2334,6 @@ Foo./**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsWithDeprecatedTag5, TestCompletionsWithDeprecatedTag5);
-
 
 static void TestCompletionsWithDeprecatedTag4(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -2459,7 +2354,6 @@ declare function f(options: {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsWithDeprecatedTag4, TestCompletionsWithDeprecatedTag4);
 
-
 static void TestCompletionsWithDeprecatedTag3(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -2475,7 +2369,6 @@ foo/**/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsWithDeprecatedTag3, TestCompletionsWithDeprecatedTag3);
 
-
 static void TestCompletionsWithDeprecatedTag2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -2490,7 +2383,6 @@ foo/**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsWithDeprecatedTag2, TestCompletionsWithDeprecatedTag2);
-
 
 static void TestCompletionsWithDeprecatedTag1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -2525,7 +2417,6 @@ fooba/*5*/;)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsWithDeprecatedTag1, TestCompletionsWithDeprecatedTag1);
 
-
 static void TestCompletionsWithDeprecatedTag10(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"Known failing fourslash test"}); return;
@@ -2541,7 +2432,6 @@ export const foo = 0;
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsWithDeprecatedTag10, TestCompletionsWithDeprecatedTag10);
 
-
 static void TestCompletionsUnterminatedLiteral(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -2552,7 +2442,6 @@ function foo(a"/*1*/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsUnterminatedLiteral, TestCompletionsUnterminatedLiteral);
-
 
 static void TestCompletionsUniqueSymbol_import(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -2582,7 +2471,6 @@ i.;)TS")}));
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsUniqueSymbol_import, TestCompletionsUniqueSymbol_import);
 
-
 static void TestCompletionsUniqueSymbol1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -2605,7 +2493,6 @@ i[|./**/|];)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsUniqueSymbol1, TestCompletionsUniqueSymbol1);
-
 
 static void TestCompletionsUnionStringLiteralProperty(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -2632,7 +2519,6 @@ const baz4: Baz = { x: 2, y: 1, z: '/*6*/' };)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsUnionStringLiteralProperty, TestCompletionsUnionStringLiteralProperty);
 
-
 static void TestCompletionsTypeOnlyNamespace(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -2651,7 +2537,6 @@ let x: ns./**/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsTypeOnlyNamespace, TestCompletionsTypeOnlyNamespace);
 
-
 static void TestCompletionsTypeKeywords(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -2662,7 +2547,6 @@ type T = /**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsTypeKeywords, TestCompletionsTypeKeywords);
-
 
 static void TestCompletionsTypeAssertionKeywords(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -2683,7 +2567,6 @@ var c = </*3*/>42)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsTypeAssertionKeywords, TestCompletionsTypeAssertionKeywords);
 
-
 static void TestCompletionsTuple(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -2694,7 +2577,6 @@ x[|./**/|];)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsTuple, TestCompletionsTuple);
-
 
 static void TestCompletionsTriggerCharacter(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -2744,7 +2626,6 @@ const divide = 1 //*divide*/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsTriggerCharacter, TestCompletionsTriggerCharacter);
 
-
 static void TestCompletionsSymbolMembers(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -2764,7 +2645,6 @@ j[|./*j*/|];)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsSymbolMembers, TestCompletionsSymbolMembers);
-
 
 static void TestCompletionsStringsWithTriggerCharacter(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -2802,7 +2682,6 @@ const g: G = '[|a</*7*/|]';)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsStringsWithTriggerCharacter, TestCompletionsStringsWithTriggerCharacter);
 
-
 static void TestCompletionsStringLiteral_fromTypeConstraint(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -2814,7 +2693,6 @@ type T = Pick<Foo, "[|/**/|]">;)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsStringLiteral_fromTypeConstraint, TestCompletionsStringLiteral_fromTypeConstraint);
-
 
 static void TestCompletionsSelfDeclaring3(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -2830,7 +2708,6 @@ f({ x/*x*/: 0, hello/*hello*/: "", goodbye/*goodbye*/: 0, abc/*abc*/: "" }))TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsSelfDeclaring3, TestCompletionsSelfDeclaring3);
 
-
 static void TestCompletionsSelfDeclaring2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -2842,7 +2719,6 @@ f1({ [|abc|]/*1*/ });)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsSelfDeclaring2, TestCompletionsSelfDeclaring2);
-
 
 static void TestCompletionsSelfDeclaring1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -2865,7 +2741,6 @@ test({
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsSelfDeclaring1, TestCompletionsSelfDeclaring1);
-
 
 static void TestCompletionsRedeclareModuleAsGlobal(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -2894,7 +2769,6 @@ asser/**/;)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsRedeclareModuleAsGlobal, TestCompletionsRedeclareModuleAsGlobal);
 
-
 static void TestCompletionsRecommended_union(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"Known failing fourslash test"}); return;
@@ -2911,7 +2785,6 @@ const e2: E | E2 = /*b*/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsRecommended_union, TestCompletionsRecommended_union);
 
-
 static void TestCompletionsRecommended_switch(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -2927,7 +2800,6 @@ switch (e) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsRecommended_switch, TestCompletionsRecommended_switch);
 
-
 static void TestCompletionsRecommended_nonAccessibleSymbol(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -2941,7 +2813,6 @@ f()(new /**/);)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsRecommended_nonAccessibleSymbol, TestCompletionsRecommended_nonAccessibleSymbol);
-
 
 static void TestCompletionsRecommended_namespace(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -2971,7 +2842,6 @@ alpha.f(new /*c1*/);)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsRecommended_namespace, TestCompletionsRecommended_namespace);
 
-
 static void TestCompletionsRecommended_equals(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -2984,7 +2854,6 @@ e === E/*b*/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsRecommended_equals, TestCompletionsRecommended_equals);
-
 
 static void TestCompletionsQuotedObjectLiteralUnion(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -3006,7 +2875,6 @@ const obj: A | B = {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsQuotedObjectLiteralUnion, TestCompletionsQuotedObjectLiteralUnion);
 
-
 static void TestCompletionsPropertiesWithPromiseUnionType(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -3025,7 +2893,6 @@ fakeTest(() => {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsPropertiesWithPromiseUnionType, TestCompletionsPropertiesWithPromiseUnionType);
-
 
 static void TestCompletionsPropertiesPriorities(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -3051,7 +2918,6 @@ const i: I = {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsPropertiesPriorities, TestCompletionsPropertiesPriorities);
 
-
 static void TestCompletionsPrivateProperties_Js(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -3075,7 +2941,6 @@ foo./**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsPrivateProperties_Js, TestCompletionsPrivateProperties_Js);
-
 
 static void TestCompletionsPaths_pathMapping(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -3103,7 +2968,6 @@ import {} from "foo/dir//*1*/";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsPaths_pathMapping, TestCompletionsPaths_pathMapping);
 
-
 static void TestCompletionsPaths_pathMapping_parentDirectory(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -3126,7 +2990,6 @@ export const x = 0;
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsPaths_pathMapping_parentDirectory, TestCompletionsPaths_pathMapping_parentDirectory);
 
-
 static void TestCompletionsPaths_pathMapping_notInNestedDirectory(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -3146,7 +3009,6 @@ import {} from "something//**/";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsPaths_pathMapping_notInNestedDirectory, TestCompletionsPaths_pathMapping_notInNestedDirectory);
-
 
 static void TestCompletionsPaths_pathMapping_nonTrailingWildcard1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -3178,7 +3040,6 @@ import {} from "foo/_dir//*3*/";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsPaths_pathMapping_nonTrailingWildcard1, TestCompletionsPaths_pathMapping_nonTrailingWildcard1);
 
-
 static void TestCompletionsPaths_kinds(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -3204,7 +3065,6 @@ import {} from "./[|/*1*/|]";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsPaths_kinds, TestCompletionsPaths_kinds);
 
-
 static void TestCompletionsPaths_importType(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -3227,7 +3087,6 @@ type B = import(".//*2*/");
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsPaths_importType, TestCompletionsPaths_importType);
 
-
 static void TestCompletionsPathsRelativeJsonModule(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -3242,7 +3101,6 @@ import { } from ".//**/";)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsPathsRelativeJsonModule, TestCompletionsPathsRelativeJsonModule);
-
 
 static void TestCompletionsPathsJsonModule(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -3259,7 +3117,6 @@ import { } from "/**/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsPathsJsonModule, TestCompletionsPathsJsonModule);
 
-
 static void TestCompletionsPathsJsonModuleWithoutResolveJsonModule(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -3273,7 +3130,6 @@ import { } from ".//**/";)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsPathsJsonModuleWithoutResolveJsonModule, TestCompletionsPathsJsonModuleWithoutResolveJsonModule);
-
 
 static void TestCompletionsPathUnknownExtension(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -3309,7 +3165,6 @@ import "#//*$*/"
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsPathUnknownExtension, TestCompletionsPathUnknownExtension);
 
-
 static void TestCompletionsOverridingProperties3(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -3325,7 +3180,6 @@ class C implements I {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsOverridingProperties3, TestCompletionsOverridingProperties3);
 
-
 static void TestCompletionsOverridingProperties2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -3340,7 +3194,6 @@ class C implements I {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsOverridingProperties2, TestCompletionsOverridingProperties2);
-
 
 static void TestCompletionsOverridingProperties1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -3359,7 +3212,6 @@ class Sub extends Base {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsOverridingProperties1, TestCompletionsOverridingProperties1);
-
 
 static void TestCompletionsOverridingMethodDefaultExported(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -3384,7 +3236,6 @@ export class Derived extends Base {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsOverridingMethodDefaultExported, TestCompletionsOverridingMethodDefaultExported);
-
 
 static void TestCompletionsOverridingMethodCrash2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -3425,7 +3276,6 @@ export class MyComponent extends Component {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsOverridingMethodCrash2, TestCompletionsOverridingMethodCrash2);
 
-
 static void TestCompletionsOverridingMethodCrash1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -3444,7 +3294,6 @@ class SubComponent extends Component<{}> {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsOverridingMethodCrash1, TestCompletionsOverridingMethodCrash1);
-
 
 static void TestCompletionsOverridingMethod9(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -3465,7 +3314,6 @@ class Foo implements IFoo {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsOverridingMethod9, TestCompletionsOverridingMethod9);
-
 
 static void TestCompletionsOverridingMethod8(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -3494,7 +3342,6 @@ export class C implements Base {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsOverridingMethod8, TestCompletionsOverridingMethod8);
 
-
 static void TestCompletionsOverridingMethod7(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -3522,7 +3369,6 @@ abstract class Derived extends Base {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsOverridingMethod7, TestCompletionsOverridingMethod7);
-
 
 static void TestCompletionsOverridingMethod6(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -3560,7 +3406,6 @@ class f extends Base {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsOverridingMethod6, TestCompletionsOverridingMethod6);
 
-
 static void TestCompletionsOverridingMethod5(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -3587,7 +3432,6 @@ abstract class Abc extends Ab {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsOverridingMethod5, TestCompletionsOverridingMethod5);
-
 
 static void TestCompletionsOverridingMethod4(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -3624,7 +3468,6 @@ class Gossip extends Secret {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsOverridingMethod4, TestCompletionsOverridingMethod4);
 
-
 static void TestCompletionsOverridingMethod3(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -3642,7 +3485,6 @@ declare class Poltergeist implements Ghost {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsOverridingMethod3, TestCompletionsOverridingMethod3);
-
 
 static void TestCompletionsOverridingMethod2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -3672,7 +3514,6 @@ class USD implements DollarSign {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsOverridingMethod2, TestCompletionsOverridingMethod2);
 
-
 static void TestCompletionsOverridingMethod22(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -3699,7 +3540,6 @@ abstract class ExtBase implements ExtShape {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsOverridingMethod22, TestCompletionsOverridingMethod22);
 
-
 static void TestCompletionsOverridingMethod21(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -3723,7 +3563,6 @@ class BFoo extends AFoo {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsOverridingMethod21, TestCompletionsOverridingMethod21);
-
 
 static void TestCompletionsOverridingMethod20(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -3749,7 +3588,6 @@ class Foo extends AFoo {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsOverridingMethod20, TestCompletionsOverridingMethod20);
 
-
 static void TestCompletionsOverridingMethod1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -3769,7 +3607,6 @@ class HSub extends HBase {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsOverridingMethod1, TestCompletionsOverridingMethod1);
-
 
 static void TestCompletionsOverridingMethod19(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -3796,7 +3633,6 @@ class E extends Base {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsOverridingMethod19, TestCompletionsOverridingMethod19);
-
 
 static void TestCompletionsOverridingMethod18(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -3835,7 +3671,6 @@ class DecoratorSub extends DecoratorBase {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsOverridingMethod18, TestCompletionsOverridingMethod18);
 
-
 static void TestCompletionsOverridingMethod17(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -3857,7 +3692,6 @@ export class Class implements Interface {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsOverridingMethod17, TestCompletionsOverridingMethod17);
 
-
 static void TestCompletionsOverridingMethod14(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -3876,7 +3710,6 @@ class Foo implements IFoo {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsOverridingMethod14, TestCompletionsOverridingMethod14);
-
 
 static void TestCompletionsOverridingMethod12(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -3916,7 +3749,6 @@ abstract class B1 extends A {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsOverridingMethod12, TestCompletionsOverridingMethod12);
 
-
 static void TestCompletionsOverridingMethod11(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -3948,7 +3780,6 @@ c(a: unknown): string | number {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsOverridingMethod11, TestCompletionsOverridingMethod11);
 
-
 static void TestCompletionsOverridingMethod10(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -3972,7 +3803,6 @@ c(a: unknown): string | number {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsOverridingMethod10, TestCompletionsOverridingMethod10);
-
 
 static void TestCompletionsOverridingMethod0(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -4096,7 +3926,6 @@ foo(a: unknown, b?: unknown): string {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsOverridingMethod0, TestCompletionsOverridingMethod0);
 
-
 static void TestCompletionsOptionalKindModifier(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -4109,7 +3938,6 @@ x./*a*/;
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsOptionalKindModifier, TestCompletionsOptionalKindModifier);
-
 
 static void TestCompletionsObjectLiteralWithPartialConstraint(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -4178,7 +4006,6 @@ f4({
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsObjectLiteralWithPartialConstraint, TestCompletionsObjectLiteralWithPartialConstraint);
 
-
 static void TestCompletionsObjectLiteralUnionTemplateLiteralType(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -4202,7 +4029,6 @@ const obj2: UnionType = {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsObjectLiteralUnionTemplateLiteralType, TestCompletionsObjectLiteralUnionTemplateLiteralType);
-
 
 static void TestCompletionsObjectLiteralUnionStringMappingType(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -4228,7 +4054,6 @@ const obj2: UnionType = {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsObjectLiteralUnionStringMappingType, TestCompletionsObjectLiteralUnionStringMappingType);
 
-
 static void TestCompletionsObjectLiteralModuleExports(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -4245,7 +4070,6 @@ module.exports = {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsObjectLiteralModuleExports, TestCompletionsObjectLiteralModuleExports);
 
-
 static void TestCompletionsObjectLiteralMethod6(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -4261,7 +4085,6 @@ const foo: T = {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsObjectLiteralMethod6, TestCompletionsObjectLiteralMethod6);
-
 
 static void TestCompletionsObjectLiteralMethod5(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -4282,7 +4105,6 @@ const foo: Foo = {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsObjectLiteralMethod5, TestCompletionsObjectLiteralMethod5);
 
-
 static void TestCompletionsObjectLiteralMethod4(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -4301,7 +4123,6 @@ const obj: IFoo = {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsObjectLiteralMethod4, TestCompletionsObjectLiteralMethod4);
-
 
 static void TestCompletionsObjectLiteralMethod3(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -4357,7 +4178,6 @@ const op: Op = {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsObjectLiteralMethod3, TestCompletionsObjectLiteralMethod3);
 
-
 static void TestCompletionsObjectLiteralMethod2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -4382,7 +4202,6 @@ const obj: IBar = {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsObjectLiteralMethod2, TestCompletionsObjectLiteralMethod2);
-
 
 static void TestCompletionsObjectLiteralMethod1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -4446,7 +4265,6 @@ const p: Prop = {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsObjectLiteralMethod1, TestCompletionsObjectLiteralMethod1);
 
-
 static void TestCompletionsNewTarget(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"Known failing fourslash test"}); return;
@@ -4468,7 +4286,6 @@ class D {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsNewTarget, TestCompletionsNewTarget);
 
-
 static void TestCompletionsNamespaceName(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -4489,7 +4306,6 @@ namespace N2.M/*4*/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsNamespaceName, TestCompletionsNamespaceName);
 
-
 static void TestCompletionsNamespaceMergedWithObject(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -4505,7 +4321,6 @@ N./*value*/;)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsNamespaceMergedWithObject, TestCompletionsNamespaceMergedWithObject);
-
 
 static void TestCompletionsNamespaceMergedWithClass(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -4529,7 +4344,6 @@ D./*value*/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsNamespaceMergedWithClass, TestCompletionsNamespaceMergedWithClass);
 
-
 static void TestCompletionsMergedDeclarations2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -4551,7 +4365,6 @@ var b = point./*2*/equals(p1, p2);)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsMergedDeclarations2, TestCompletionsMergedDeclarations2);
-
 
 static void TestCompletionsMergedDeclarations1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -4581,7 +4394,6 @@ var b = point./*3*/equals(p1, p2);)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsMergedDeclarations1, TestCompletionsMergedDeclarations1);
 
-
 static void TestCompletionsLiterals(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"Known failing fourslash test"}); return;
@@ -4596,7 +4408,6 @@ const y2: 0 | "one" | 1n = 'one'/*2*/;)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsLiterals, TestCompletionsLiterals);
-
 
 static void TestCompletionsLiteralOverload(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -4624,7 +4435,6 @@ addListener("/*js*/");)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsLiteralOverload, TestCompletionsLiteralOverload);
 
-
 static void TestCompletionsLiteralOnPropertyValueMatchingGeneric(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -4639,7 +4449,6 @@ bar1({ type: "/*ts*/" })
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsLiteralOnPropertyValueMatchingGeneric, TestCompletionsLiteralOnPropertyValueMatchingGeneric);
 
-
 static void TestCompletionsLiteralMatchingGenericSignature(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -4653,7 +4462,6 @@ bar1("/*ts*/")
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsLiteralMatchingGenericSignature, TestCompletionsLiteralMatchingGenericSignature);
-
 
 static void TestCompletionsLiteralFromInferenceWithinInferredType3(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -4685,7 +4493,6 @@ test({
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsLiteralFromInferenceWithinInferredType3, TestCompletionsLiteralFromInferenceWithinInferredType3);
-
 
 static void TestCompletionsLiteralFromInferenceWithinInferredType2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -4744,7 +4551,6 @@ createMachine({
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsLiteralFromInferenceWithinInferredType2, TestCompletionsLiteralFromInferenceWithinInferredType2);
 
-
 static void TestCompletionsLiteralFromInferenceWithinInferredType1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -4776,7 +4582,6 @@ test({
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsLiteralFromInferenceWithinInferredType1, TestCompletionsLiteralFromInferenceWithinInferredType1);
 
-
 static void TestCompletionsLiteralDirectlyInRestConstrainedToTupleType(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -4799,7 +4604,6 @@ func("/*1*/");)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsLiteralDirectlyInRestConstrainedToTupleType, TestCompletionsLiteralDirectlyInRestConstrainedToTupleType);
 
-
 static void TestCompletionsLiteralDirectlyInRestConstrainedToArrayType(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -4814,7 +4618,6 @@ const value2 = fn('value1', '/*2*/');)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsLiteralDirectlyInRestConstrainedToArrayType, TestCompletionsLiteralDirectlyInRestConstrainedToArrayType);
-
 
 static void TestCompletionsLiteralDirectlyInArgumentWithNullableConstraint(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -4832,7 +4635,6 @@ func('/*1*/');)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsLiteralDirectlyInArgumentWithNullableConstraint, TestCompletionsLiteralDirectlyInArgumentWithNullableConstraint);
 
-
 static void TestCompletionsKeywordsExtends(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -4844,7 +4646,6 @@ class C e/*c*/ {})TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsKeywordsExtends, TestCompletionsKeywordsExtends);
-
 
 static void TestCompletionsKeyof(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -4861,7 +4662,6 @@ g("[|/*g*/|]");)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsKeyof, TestCompletionsKeyof);
-
 
 static void TestCompletionsJsxExpression(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -4880,7 +4680,6 @@ const value = "test";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsJsxExpression, TestCompletionsJsxExpression);
-
 
 static void TestCompletionsJsxAttributeInitializer2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -4903,7 +4702,6 @@ const foo = 0;
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsJsxAttributeInitializer2, TestCompletionsJsxAttributeInitializer2);
-
 
 static void TestCompletionsJsxAttribute2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -4935,7 +4733,6 @@ declare namespace JSX {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsJsxAttribute2, TestCompletionsJsxAttribute2);
 
-
 static void TestCompletionsJsdocTypeTagCast(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"Known failing fourslash test"}); return;
@@ -4949,7 +4746,6 @@ const x = /** @type {{ s: string }} */ ({ /**/ });)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsJsdocTypeTagCast, TestCompletionsJsdocTypeTagCast);
 
-
 static void TestCompletionsJsdocTag(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -4962,7 +4758,6 @@ static void TestCompletionsJsdocTag(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsJsdocTag, TestCompletionsJsdocTag);
-
 
 static void TestCompletionsJsdocParamTypeBeforeName(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -4978,7 +4773,6 @@ function toString(obj) {})TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsJsdocParamTypeBeforeName, TestCompletionsJsdocParamTypeBeforeName);
 
-
 static void TestCompletionsJsPropertyAssignment(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -4992,7 +4786,6 @@ x.p = "[|/**/|]";)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsJsPropertyAssignment, TestCompletionsJsPropertyAssignment);
-
 
 static void TestCompletionsJSDocTrivia(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -5011,7 +4804,6 @@ var someVariable;)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsJSDocTrivia, TestCompletionsJSDocTrivia);
-
 
 static void TestCompletionsJSDocSignature(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -5032,7 +4824,6 @@ let x;)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsJSDocSignature, TestCompletionsJSDocSignature);
-
 
 static void TestCompletionsJSDocNoCrash3(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -5055,7 +4846,6 @@ export default MssqlClient;)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsJSDocNoCrash3, TestCompletionsJSDocNoCrash3);
-
 
 static void TestCompletionsJSDocNoCrash2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -5083,7 +4873,6 @@ var ngShowDirective = ['$animate', function($animate) {}];)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsJSDocNoCrash2, TestCompletionsJSDocNoCrash2);
-
 
 static void TestCompletionsJSDocNoCrash1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -5114,7 +4903,6 @@ var ngShowDirective = ['$animate', function($animate) {}];)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsJSDocNoCrash1, TestCompletionsJSDocNoCrash1);
 
-
 static void TestCompletionsJSDocImportTagEmptyModuleSpecifier1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -5131,7 +4919,6 @@ export type MyUnion = string | number;
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsJSDocImportTagEmptyModuleSpecifier1, TestCompletionsJSDocImportTagEmptyModuleSpecifier1);
-
 
 static void TestCompletionsJSDocImportTagAttributesErrorModuleSpecifier1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -5151,7 +4938,6 @@ interface ImportAttributes {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsJSDocImportTagAttributesErrorModuleSpecifier1, TestCompletionsJSDocImportTagAttributesErrorModuleSpecifier1);
 
-
 static void TestCompletionsJSDocImportTagAttributesEmptyModuleSpecifier1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -5170,7 +4956,6 @@ interface ImportAttributes {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsJSDocImportTagAttributesEmptyModuleSpecifier1, TestCompletionsJSDocImportTagAttributesEmptyModuleSpecifier1);
 
-
 static void TestCompletionsIsTypeOnlyCompletion(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -5185,7 +4970,6 @@ function f(Abc: Ab/**/) {})TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsIsTypeOnlyCompletion, TestCompletionsIsTypeOnlyCompletion);
-
 
 static void TestCompletionsInterfaceElement(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -5205,7 +4989,6 @@ interface EndOfFile { f; /*e*/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsInterfaceElement, TestCompletionsInterfaceElement);
-
 
 static void TestCompletionsIndexSignatureConstraint1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -5236,7 +5019,6 @@ testFunc({
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsIndexSignatureConstraint1, TestCompletionsIndexSignatureConstraint1);
 
-
 static void TestCompletionsInRequire(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -5261,7 +5043,6 @@ function foo() {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsInRequire, TestCompletionsInRequire);
 
-
 static void TestCompletionsInMapConstructorNoCrash(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -5278,7 +5059,6 @@ static void TestCompletionsInMapConstructorNoCrash(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsInMapConstructorNoCrash, TestCompletionsInMapConstructorNoCrash);
-
 
 static void TestCompletionsInJsxTagDifferentSpreadElementTypes(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -5336,7 +5116,6 @@ export function ComponentNumber(props: number) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsInJsxTagDifferentSpreadElementTypes, TestCompletionsInJsxTagDifferentSpreadElementTypes);
 
-
 static void TestCompletionsInExport(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"Known failing fourslash test"}); return;
@@ -5357,7 +5136,6 @@ export { /**/ };)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsInExport, TestCompletionsInExport);
-
 
 static void TestCompletionsInExport_moduleBlock(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -5384,7 +5162,6 @@ declare module 'mod' {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsInExport_moduleBlock, TestCompletionsInExport_moduleBlock);
 
-
 static void TestCompletionsInExport_invalid(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -5398,7 +5175,6 @@ if (!!true) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsInExport_invalid, TestCompletionsInExport_invalid);
-
 
 static void TestCompletionsInEmptyTupleType(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -5415,7 +5191,6 @@ const User: UserTuple = [["name", "2333"], ["age", 2333], ["address", "2333"]];)
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsInEmptyTupleType, TestCompletionsInEmptyTupleType);
-
 
 static void TestCompletionsInArrayLiteralWithContextualType(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -5435,7 +5210,6 @@ static void TestCompletionsInArrayLiteralWithContextualType(gostd::testing::T* t
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsInArrayLiteralWithContextualType, TestCompletionsInArrayLiteralWithContextualType);
-
 
 static void TestCompletionsImport_windowsPathsProjectRelative(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -5469,7 +5243,6 @@ myFunction/**/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_windowsPathsProjectRelative, TestCompletionsImport_windowsPathsProjectRelative);
 
-
 static void TestCompletionsImport_weirdDefaultSynthesis(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -5490,7 +5263,6 @@ Colle)TS"), .UserPreferences = nullptr}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_weirdDefaultSynthesis, TestCompletionsImport_weirdDefaultSynthesis);
-
 
 static void TestCompletionsImport_uriStyleNodeCoreModules3(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -5541,7 +5313,6 @@ writeFile/*test2*/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_uriStyleNodeCoreModules3, TestCompletionsImport_uriStyleNodeCoreModules3);
 
-
 static void TestCompletionsImport_uriStyleNodeCoreModules2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"Known failing fourslash test"}); return;
@@ -5563,7 +5334,6 @@ write/**/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_uriStyleNodeCoreModules2, TestCompletionsImport_uriStyleNodeCoreModules2);
 
-
 static void TestCompletionsImport_uriStyleNodeCoreModules1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -5581,7 +5351,6 @@ write/**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_uriStyleNodeCoreModules1, TestCompletionsImport_uriStyleNodeCoreModules1);
-
 
 static void TestCompletionsImport_umdModules3_script(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -5605,7 +5374,6 @@ const el1 = <div className={class/*1*/}>foo</div>)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_umdModules3_script, TestCompletionsImport_umdModules3_script);
-
 
 static void TestCompletionsImport_umdModules2_moduleExports(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -5631,7 +5399,6 @@ const el1 = <div className={class/*1*/}>foo</div>;)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_umdModules2_moduleExports, TestCompletionsImport_umdModules2_moduleExports);
 
-
 static void TestCompletionsImport_umdModules1_globalAccess(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -5655,7 +5422,6 @@ const el1 = <div className={class/*1*/}>foo</div>;)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_umdModules1_globalAccess, TestCompletionsImport_umdModules1_globalAccess);
-
 
 static void TestCompletionsImport_umdDefaultNoCrash2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -5698,7 +5464,6 @@ import Dottie from 'dottie';
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_umdDefaultNoCrash2, TestCompletionsImport_umdDefaultNoCrash2);
 
-
 static void TestCompletionsImport_umdDefaultNoCrash1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"Known failing fourslash test"}); return;
@@ -5740,7 +5505,6 @@ static void TestCompletionsImport_umdDefaultNoCrash1(gostd::testing::T* t) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_umdDefaultNoCrash1, TestCompletionsImport_umdDefaultNoCrash1);
 
-
 static void TestCompletionsImport_typeOnly(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -5760,7 +5524,6 @@ const b: B)TS"), .UserPreferences = nullptr}));
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_typeOnly, TestCompletionsImport_typeOnly);
 
-
 static void TestCompletionsImport_tsx(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -5776,7 +5539,6 @@ export default function Foo() {};
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_tsx, TestCompletionsImport_tsx);
-
 
 static void TestCompletionsImport_sortingModuleSpecifiers(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -5802,7 +5564,6 @@ normalize/**/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_sortingModuleSpecifiers, TestCompletionsImport_sortingModuleSpecifiers);
 
-
 static void TestCompletionsImport_shadowedByLocal(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -5817,7 +5578,6 @@ fo/**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_shadowedByLocal, TestCompletionsImport_shadowedByLocal);
-
 
 static void TestCompletionsImport_require(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -5836,7 +5596,6 @@ fo)TS")}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_require, TestCompletionsImport_require);
-
 
 static void TestCompletionsImport_require_addToExisting(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -5860,7 +5619,6 @@ x)TS")}));
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_require_addToExisting, TestCompletionsImport_require_addToExisting);
 
-
 static void TestCompletionsImport_require_addNew(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -5879,7 +5637,6 @@ x)TS")}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_require_addNew, TestCompletionsImport_require_addNew);
-
 
 static void TestCompletionsImport_reexportTransient(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -5901,7 +5658,6 @@ one/**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_reexportTransient, TestCompletionsImport_reexportTransient);
-
 
 static void TestCompletionsImport_reExport_wrongName(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -5928,7 +5684,6 @@ import { x } from "./a";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_reExport_wrongName, TestCompletionsImport_reExport_wrongName);
 
-
 static void TestCompletionsImport_reExportDefault(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -5949,7 +5704,6 @@ fo)TS")}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_reExportDefault, TestCompletionsImport_reExportDefault);
-
 
 static void TestCompletionsImport_reExportDefault2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -5976,7 +5730,6 @@ defaultExp/**/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_reExportDefault2, TestCompletionsImport_reExportDefault2);
 
-
 static void TestCompletionsImport_quoteStyle(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -5994,7 +5747,6 @@ fo)TS"), .UserPreferences = std::make_shared<lsutil::UserPreferences>(lsutil::Us
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_quoteStyle, TestCompletionsImport_quoteStyle);
 
-
 static void TestCompletionsImport_promoteTypeOnly2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -6011,7 +5763,6 @@ SomeI/**/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_promoteTypeOnly2, TestCompletionsImport_promoteTypeOnly2);
 
-
 static void TestCompletionsImport_previousTokenIsSemicolon(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -6025,7 +5776,6 @@ import * as a from 'a';
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_previousTokenIsSemicolon, TestCompletionsImport_previousTokenIsSemicolon);
-
 
 static void TestCompletionsImport_preferUpdatingExistingImport(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -6047,7 +5797,6 @@ y/**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_preferUpdatingExistingImport, TestCompletionsImport_preferUpdatingExistingImport);
-
 
 static void TestCompletionsImport_packageJsonImportsPreference(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -6076,7 +5825,6 @@ internalFoo/**/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_packageJsonImportsPreference, TestCompletionsImport_packageJsonImportsPreference);
 
-
 static void TestCompletionsImport_ofAlias_preferShortPath(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -6098,7 +5846,6 @@ fo)TS")}));
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_ofAlias_preferShortPath, TestCompletionsImport_ofAlias_preferShortPath);
 
-
 static void TestCompletionsImport_notFromUnrelatedNodeModules(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -6112,7 +5859,6 @@ fo/**/;)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_notFromUnrelatedNodeModules, TestCompletionsImport_notFromUnrelatedNodeModules);
-
 
 static void TestCompletionsImport_named_namespaceImportExists(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -6129,7 +5875,6 @@ a.f;)TS")}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_named_namespaceImportExists, TestCompletionsImport_named_namespaceImportExists);
-
 
 static void TestCompletionsImport_named_fromMergedDeclarations(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -6155,7 +5900,6 @@ interface M)TS", .SortText = std::string(ls::SortTextAutoImportSuggestions), .Ad
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_named_fromMergedDeclarations, TestCompletionsImport_named_fromMergedDeclarations);
 
-
 static void TestCompletionsImport_named_exportEqualsNamespace(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -6175,7 +5919,6 @@ f;)TS")}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_named_exportEqualsNamespace, TestCompletionsImport_named_exportEqualsNamespace);
-
 
 static void TestCompletionsImport_named_exportEqualsNamespace_merged(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -6198,7 +5941,6 @@ fo/**/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_named_exportEqualsNamespace_merged, TestCompletionsImport_named_exportEqualsNamespace_merged);
 
-
 static void TestCompletionsImport_named_didNotExistBefore(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"Known failing fourslash test"}); return;
@@ -6218,7 +5960,6 @@ t)TS"}));
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_named_didNotExistBefore, TestCompletionsImport_named_didNotExistBefore);
 
-
 static void TestCompletionsImport_named_addToNamedImports(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -6235,7 +5976,6 @@ f;)TS")}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_named_addToNamedImports, TestCompletionsImport_named_addToNamedImports);
-
 
 static void TestCompletionsImport_multipleWithSameName(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -6259,7 +5999,6 @@ fo)TS")}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_multipleWithSameName, TestCompletionsImport_multipleWithSameName);
-
 
 static void TestCompletionsImport_mergedReExport(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -6297,7 +6036,6 @@ C/**/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_mergedReExport, TestCompletionsImport_mergedReExport);
 
-
 static void TestCompletionsImport_jsxOpeningTagImportDefault(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -6320,7 +6058,6 @@ export function Index() {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_jsxOpeningTagImportDefault, TestCompletionsImport_jsxOpeningTagImportDefault);
-
 
 static void TestCompletionsImport_jsModuleExportsAssignment(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -6362,7 +6099,6 @@ d)TS")}));
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_jsModuleExportsAssignment, TestCompletionsImport_jsModuleExportsAssignment);
 
-
 static void TestCompletionsImport_importType(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -6390,7 +6126,6 @@ export const m = 0;
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_importType, TestCompletionsImport_importType);
-
 
 static void TestCompletionsImport_filteredByPackageJson_peerDependencies(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -6424,7 +6159,6 @@ const x = Re/**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_filteredByPackageJson_peerDependencies, TestCompletionsImport_filteredByPackageJson_peerDependencies);
-
 
 static void TestCompletionsImport_filteredByPackageJson_nested(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -6466,7 +6200,6 @@ const x = Re/**/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_filteredByPackageJson_nested, TestCompletionsImport_filteredByPackageJson_nested);
 
-
 static void TestCompletionsImport_filteredByPackageJson_direct(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"Known failing fourslash test"}); return;
@@ -6499,7 +6232,6 @@ const x = Re/**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_filteredByPackageJson_direct, TestCompletionsImport_filteredByPackageJson_direct);
-
 
 static void TestCompletionsImport_filteredByPackageJson_ambient(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -6556,7 +6288,6 @@ loca/*5*/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_filteredByPackageJson_ambient, TestCompletionsImport_filteredByPackageJson_ambient);
 
-
 static void TestCompletionsImport_filteredByPackageJson_typesOnly(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"Known failing fourslash test"}); return;
@@ -6588,7 +6319,6 @@ const x = Re/**/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_filteredByPackageJson_typesOnly, TestCompletionsImport_filteredByPackageJson_typesOnly);
 
-
 static void TestCompletionsImport_filteredByPackageJson_typesImplicit(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"Known failing fourslash test"}); return;
@@ -6619,7 +6349,6 @@ const x = Re/**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_filteredByPackageJson_typesImplicit, TestCompletionsImport_filteredByPackageJson_typesImplicit);
-
 
 static void TestCompletionsImport_filteredByInvalidPackageJson_direct(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -6655,7 +6384,6 @@ const x = Re/**/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_filteredByInvalidPackageJson_direct, TestCompletionsImport_filteredByInvalidPackageJson_direct);
 
-
 static void TestCompletionsImport_exportEquals(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -6687,7 +6415,6 @@ let x: b;)TS")}));
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_exportEquals, TestCompletionsImport_exportEquals);
 
-
 static void TestCompletionsImport_exportEquals_global(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"Known failing fourslash test"}); return;
@@ -6714,7 +6441,6 @@ conso/**/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_exportEquals_global, TestCompletionsImport_exportEquals_global);
 
-
 static void TestCompletionsImport_exportEquals_anonymous(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -6739,7 +6465,6 @@ fooB)TS")}));
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_exportEquals_anonymous, TestCompletionsImport_exportEquals_anonymous);
 
-
 static void TestCompletionsImport_exportEqualsNamespace_noDuplicate(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -6761,7 +6486,6 @@ import * as a from "a";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_exportEqualsNamespace_noDuplicate, TestCompletionsImport_exportEqualsNamespace_noDuplicate);
-
 
 static void TestCompletionsImport_duplicatePackages_types(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -6797,7 +6521,6 @@ import "react";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_duplicatePackages_types, TestCompletionsImport_duplicatePackages_types);
 
-
 static void TestCompletionsImport_duplicatePackages_typesAndNotTypes(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -6831,7 +6554,6 @@ useState/**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_duplicatePackages_typesAndNotTypes, TestCompletionsImport_duplicatePackages_typesAndNotTypes);
-
 
 static void TestCompletionsImport_duplicatePackages_scoped(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -6867,7 +6589,6 @@ import "@scope/react";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_duplicatePackages_scoped, TestCompletionsImport_duplicatePackages_scoped);
 
-
 static void TestCompletionsImport_duplicatePackages_scopedTypes(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -6901,7 +6622,6 @@ import "@scope/react";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_duplicatePackages_scopedTypes, TestCompletionsImport_duplicatePackages_scopedTypes);
-
 
 static void TestCompletionsImport_duplicatePackages_scopedTypesAndNotTypes(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -6937,7 +6657,6 @@ import "react";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_duplicatePackages_scopedTypesAndNotTypes, TestCompletionsImport_duplicatePackages_scopedTypesAndNotTypes);
 
-
 static void TestCompletionsImport_details_withMisspelledName(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"Known failing fourslash test"}); return;
@@ -6960,7 +6679,6 @@ acb;)TS")}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_details_withMisspelledName, TestCompletionsImport_details_withMisspelledName);
-
 
 static void TestCompletionsImport_default_symbolName(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -6988,7 +6706,6 @@ R)TS")}));
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_default_symbolName, TestCompletionsImport_default_symbolName);
 
-
 static void TestCompletionsImport_default_reExport(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -7011,7 +6728,6 @@ export default foo.b;)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_default_reExport, TestCompletionsImport_default_reExport);
-
 
 static void TestCompletionsImport_default_fromMergedDeclarations(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -7036,7 +6752,6 @@ declare module "m" {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_default_fromMergedDeclarations, TestCompletionsImport_default_fromMergedDeclarations);
 
-
 static void TestCompletionsImport_default_exportDefaultIdentifier(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -7057,7 +6772,6 @@ f;)TS")}));
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_default_exportDefaultIdentifier, TestCompletionsImport_default_exportDefaultIdentifier);
 
-
 static void TestCompletionsImport_default_didNotExistBefore(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -7074,7 +6788,6 @@ f;)TS")}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_default_didNotExistBefore, TestCompletionsImport_default_didNotExistBefore);
-
 
 static void TestCompletionsImport_default_anonymous(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -7099,7 +6812,6 @@ fooB)TS")}));
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_default_anonymous, TestCompletionsImport_default_anonymous);
 
-
 static void TestCompletionsImport_default_alreadyExistedWithRename(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -7117,7 +6829,6 @@ f;)TS")}));
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_default_alreadyExistedWithRename, TestCompletionsImport_default_alreadyExistedWithRename);
 
-
 static void TestCompletionsImport_default_addToNamespaceImport(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -7133,7 +6844,6 @@ f;)TS")}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_default_addToNamespaceImport, TestCompletionsImport_default_addToNamespaceImport);
-
 
 static void TestCompletionsImport_default_addToNamedImports(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -7151,7 +6861,6 @@ f;)TS")}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_default_addToNamedImports, TestCompletionsImport_default_addToNamedImports);
-
 
 static void TestCompletionsImport_defaultFalsePositive(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -7177,7 +6886,6 @@ conca)TS"), .UserPreferences = std::make_shared<lsutil::UserPreferences>(prefs)}
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_defaultFalsePositive, TestCompletionsImport_defaultFalsePositive);
 
-
 static void TestCompletionsImport_defaultAndNamedConflict(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -7195,7 +6903,6 @@ someMo)TS")}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_defaultAndNamedConflict, TestCompletionsImport_defaultAndNamedConflict);
-
 
 static void TestCompletionsImport_computedSymbolName(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -7235,7 +6942,6 @@ I/**/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_computedSymbolName, TestCompletionsImport_computedSymbolName);
 
-
 static void TestCompletionsImport_compilerOptionsModule(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -7269,7 +6975,6 @@ fo/*dts*/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_compilerOptionsModule, TestCompletionsImport_compilerOptionsModule);
 
-
 static void TestCompletionsImport_augmentation(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -7287,7 +6992,6 @@ declare module "./a" {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_augmentation, TestCompletionsImport_augmentation);
-
 
 static void TestCompletionsImport_ambient(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -7315,7 +7019,6 @@ Ba)TS"), .UserPreferences = nullptr}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_ambient, TestCompletionsImport_ambient);
-
 
 static void TestCompletionsImport_addToNamedWithDifferentCacheValue(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -7355,7 +7058,6 @@ const b = new MyClass2();)TS"), .UserPreferences = nullptr}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_addToNamedWithDifferentCacheValue, TestCompletionsImport_addToNamedWithDifferentCacheValue);
-
 
 static void TestCompletionsImport_46332(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -7419,7 +7121,6 @@ ref)TS"), .UserPreferences = nullptr}));
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImport_46332, TestCompletionsImport_46332);
 
-
 static void TestCompletionsImportTypeKeyword(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -7435,7 +7136,6 @@ type/**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImportTypeKeyword, TestCompletionsImportTypeKeyword);
-
 
 static void TestCompletionsImportPathsConflict(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -7464,7 +7164,6 @@ import {} from "@reduxjs/toolkit";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImportPathsConflict, TestCompletionsImportPathsConflict);
-
 
 static void TestCompletionsImportOrExportSpecifier(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -7525,7 +7224,6 @@ export { type foo, type /*typeExport3*/ } from "./exports";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImportOrExportSpecifier, TestCompletionsImportOrExportSpecifier);
 
-
 static void TestCompletionsImportModuleAugmentationWithJS(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -7560,7 +7258,6 @@ Abcde)TS"), .UserPreferences = nullptr}));
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImportModuleAugmentationWithJS, TestCompletionsImportModuleAugmentationWithJS);
 
-
 static void TestCompletionsImportFromJSXTag(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -7592,7 +7289,6 @@ export function App() {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImportFromJSXTag, TestCompletionsImportFromJSXTag);
-
 
 static void TestCompletionsImportDefaultExportCrash2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -7630,7 +7326,6 @@ export default methods.$;
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImportDefaultExportCrash2, TestCompletionsImportDefaultExportCrash2);
-
 
 static void TestCompletionsImportDefaultExportCrash1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -7670,7 +7365,6 @@ import $ from './dom7.js';
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImportDefaultExportCrash1, TestCompletionsImportDefaultExportCrash1);
 
-
 static void TestCompletionsImportDeclarationAttributesErrorModuleSpecifier1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -7687,7 +7381,6 @@ import * as ns from () with { type: "/**/" };)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImportDeclarationAttributesErrorModuleSpecifier1, TestCompletionsImportDeclarationAttributesErrorModuleSpecifier1);
 
-
 static void TestCompletionsImportDeclarationAttributesEmptyModuleSpecifier1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -7703,7 +7396,6 @@ import * as ns from "" with { type: "/**/" };)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImportDeclarationAttributesEmptyModuleSpecifier1, TestCompletionsImportDeclarationAttributesEmptyModuleSpecifier1);
-
 
 static void TestCompletionsImportBaseUrl(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -7725,7 +7417,6 @@ fo/**/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsImportBaseUrl, TestCompletionsImportBaseUrl);
 
-
 static void TestCompletionsGenericUnconstrained(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -7740,7 +7431,6 @@ f({ /**/ });)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsGenericUnconstrained, TestCompletionsGenericUnconstrained);
-
 
 static void TestCompletionsGenericTypeWithMultipleBases1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -7761,7 +7451,6 @@ x./**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsGenericTypeWithMultipleBases1, TestCompletionsGenericTypeWithMultipleBases1);
-
 
 static void TestCompletionsGenericIndexedAccess6(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -7786,7 +7475,6 @@ const c = <Component /**/ kind="component-one" />)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsGenericIndexedAccess6, TestCompletionsGenericIndexedAccess6);
-
 
 static void TestCompletionsGenericIndexedAccess5(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -7816,7 +7504,6 @@ f("component-one", {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsGenericIndexedAccess5, TestCompletionsGenericIndexedAccess5);
-
 
 static void TestCompletionsGenericIndexedAccess4(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -7848,7 +7535,6 @@ create('component-one', { props: { /*3*/ } });)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsGenericIndexedAccess4, TestCompletionsGenericIndexedAccess4);
 
-
 static void TestCompletionsGenericIndexedAccess3(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -7876,13 +7562,11 @@ create('component-two', { props: { /*2*/ } });)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsGenericIndexedAccess3, TestCompletionsGenericIndexedAccess3);
 
-
 static void TestCompletionsGenericIndexedAccess2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
 		const std::string content = R"TS(export type GetMethodsForType<T, G extends string> = { [K in keyof T]:
   T[K] extends () => any ? { name: K, group: G, } : T[K] extends (s: infer U) => any ? { name: K, group: G, payload: U } : never }[keyof T];
-
 
 class Sample {
   count = 0;
@@ -7898,7 +7582,6 @@ class Sample {
 }
 export declare function testIt<T, G extends string>(): (input: any, method: GetMethodsForType<T, G>) => any
 
-
 const t = testIt<Sample, "Sample">()
 
 const i = t(null, { name: "addBook", group: "Sample", payload: { /**/ } }))TS";
@@ -7907,7 +7590,6 @@ const i = t(null, { name: "addBook", group: "Sample", payload: { /**/ } }))TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsGenericIndexedAccess2, TestCompletionsGenericIndexedAccess2);
-
 
 static void TestCompletionsGenericIndexedAccess1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -7923,7 +7605,6 @@ testIt<Sample>({ /**/ });)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsGenericIndexedAccess1, TestCompletionsGenericIndexedAccess1);
-
 
 static void TestCompletionsGeneratorFunctions(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -7950,7 +7631,6 @@ const o: I = {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsGeneratorFunctions, TestCompletionsGeneratorFunctions);
 
-
 static void TestCompletionsFromUntitledFile(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -7964,7 +7644,6 @@ export function helper() {}
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsFromUntitledFile, TestCompletionsFromUntitledFile);
-
 
 static void TestCompletionsForStringDependingOnContexSensitiveSignature(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -8013,7 +7692,6 @@ createMachine<{
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsForStringDependingOnContexSensitiveSignature, TestCompletionsForStringDependingOnContexSensitiveSignature);
 
-
 static void TestCompletionsForSelfTypeParameterInConstraint1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -8029,7 +7707,6 @@ declare function createMachine<Config extends StateMachine</*1*/>>(
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsForSelfTypeParameterInConstraint1, TestCompletionsForSelfTypeParameterInConstraint1);
-
 
 static void TestCompletionsForRecursiveGenericTypesMember(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -8050,7 +7727,6 @@ static void TestCompletionsForRecursiveGenericTypesMember(gostd::testing::T* t) 
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsForRecursiveGenericTypesMember, TestCompletionsForRecursiveGenericTypesMember);
 
-
 static void TestCompletionsForLatterTypeParametersInConstraints1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -8063,7 +7739,6 @@ type A1<K extends /*2*/, L> = K)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsForLatterTypeParametersInConstraints1, TestCompletionsForLatterTypeParametersInConstraints1);
-
 
 static void TestCompletionsForContextualConstraintTypeInJsDoc(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -8091,7 +7766,6 @@ let x;
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsForContextualConstraintTypeInJsDoc, TestCompletionsForContextualConstraintTypeInJsDoc);
 
-
 static void TestCompletionsExternalModuleRenamedExports(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -8108,7 +7782,6 @@ export * as alsoNotInScope from "./other";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsExternalModuleRenamedExports, TestCompletionsExternalModuleRenamedExports);
-
 
 static void TestCompletionsExternalModuleReferenceResolutionOrderInImportDeclaration(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -8131,7 +7804,6 @@ import file1 = require('externalModuleRefernceResolutionOrderInImportDeclaration
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsExternalModuleReferenceResolutionOrderInImportDeclaration, TestCompletionsExternalModuleReferenceResolutionOrderInImportDeclaration);
 
-
 static void TestCompletionsExportImport(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"Known failing fourslash test"}); return;
@@ -8150,7 +7822,6 @@ import foo = N.foo)TS"}), std::make_shared<lsproto::CompletionItem>(lsproto::Com
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsExportImport, TestCompletionsExportImport);
-
 
 static void TestCompletionsElementAccessNumeric(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -8175,7 +7846,6 @@ x[|./**/|])TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsElementAccessNumeric, TestCompletionsElementAccessNumeric);
 
-
 static void TestCompletionsECMAPrivateMember(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -8192,7 +7862,6 @@ class K {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsECMAPrivateMember, TestCompletionsECMAPrivateMember);
-
 
 static void TestCompletionsECMAPrivateMemberTriggerCharacter(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -8212,7 +7881,6 @@ class K {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsECMAPrivateMemberTriggerCharacter, TestCompletionsECMAPrivateMemberTriggerCharacter);
 
-
 static void TestCompletionsDotInArrayLiteralInObjectLiteral(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -8223,7 +7891,6 @@ static void TestCompletionsDotInArrayLiteralInObjectLiteral(gostd::testing::T* t
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsDotInArrayLiteralInObjectLiteral, TestCompletionsDotInArrayLiteralInObjectLiteral);
-
 
 static void TestCompletionsDotDotDotInObjectLiteral1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -8245,7 +7912,6 @@ const bar: {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsDotDotDotInObjectLiteral1, TestCompletionsDotDotDotInObjectLiteral1);
 
-
 static void TestCompletionsDestructuring(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -8258,7 +7924,6 @@ for (const { /*c*/ } of points) {})TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsDestructuring, TestCompletionsDestructuring);
-
 
 static void TestCompletionsDeprecatedTags(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -8276,7 +7941,6 @@ o./**/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsDeprecatedTags, TestCompletionsDeprecatedTags);
 
-
 static void TestCompletionsDefaultKeywordWhenDefaultExportAvailable(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -8288,7 +7952,6 @@ def/*1*/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsDefaultKeywordWhenDefaultExportAvailable, TestCompletionsDefaultKeywordWhenDefaultExportAvailable);
-
 
 static void TestCompletionsDefaultExport(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -8303,7 +7966,6 @@ a./**/;)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsDefaultExport, TestCompletionsDefaultExport);
-
 
 static void TestCompletionsConditionalMember(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -8321,7 +7983,6 @@ f<string>({ a: { /*2*/ } });)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsConditionalMember, TestCompletionsConditionalMember);
 
-
 static void TestCompletionsCombineOverloads(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -8336,7 +7997,6 @@ f({ /**/ });)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsCombineOverloads, TestCompletionsCombineOverloads);
 
-
 static void TestCompletionsCombineOverloads_returnType(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -8350,7 +8010,6 @@ f()./**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsCombineOverloads_returnType, TestCompletionsCombineOverloads_returnType);
-
 
 static void TestCompletionsCombineOverloads_restParameter(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -8370,7 +8029,6 @@ f({ a: 1 }, { /*2*/ });)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsCombineOverloads_restParameter, TestCompletionsCombineOverloads_restParameter);
 
-
 static void TestCompletionsClassPropertiesAfterPrivateProperty(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -8386,7 +8044,6 @@ class Y implements X {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsClassPropertiesAfterPrivateProperty, TestCompletionsClassPropertiesAfterPrivateProperty);
-
 
 static void TestCompletionsClassMemberImportTypeNodeParameter4(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -8409,7 +8066,6 @@ export declare class Derived extends Cls {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsClassMemberImportTypeNodeParameter4, TestCompletionsClassMemberImportTypeNodeParameter4);
-
 
 static void TestCompletionsClassMemberImportTypeNodeParameter3(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -8435,7 +8091,6 @@ export declare class Derived extends Cls {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsClassMemberImportTypeNodeParameter3, TestCompletionsClassMemberImportTypeNodeParameter3);
 
-
 static void TestCompletionsClassMemberImportTypeNodeParameter2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -8455,7 +8110,6 @@ export declare class Derived extends Cls {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsClassMemberImportTypeNodeParameter2, TestCompletionsClassMemberImportTypeNodeParameter2);
-
 
 static void TestCompletionsClassMemberImportTypeNodeParameter1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -8479,7 +8133,6 @@ export declare class BlenderbotSmallPreTrainedModel extends PreTrainedModel {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsClassMemberImportTypeNodeParameter1, TestCompletionsClassMemberImportTypeNodeParameter1);
 
-
 static void TestCompletionsAugmentedTypesClass2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -8496,7 +8149,6 @@ r./*2*/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsAugmentedTypesClass2, TestCompletionsAugmentedTypesClass2);
 
-
 static void TestCompletionsAtTypeArguments(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -8511,7 +8163,6 @@ interface T2 extends Pick<I, "/*2*/"> {})TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsAtTypeArguments, TestCompletionsAtTypeArguments);
-
 
 static void TestCompletionsAtTopLevelImportAssignmentNoCrash1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -8531,7 +8182,6 @@ import x =/*3*/
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsAtTopLevelImportAssignmentNoCrash1, TestCompletionsAtTopLevelImportAssignmentNoCrash1);
 
-
 static void TestCompletionsAtIncompleteObjectLiteralProperty(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -8546,7 +8196,6 @@ declare function f(options: { abc?: number, xyz?: string }): void;)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsAtIncompleteObjectLiteralProperty, TestCompletionsAtIncompleteObjectLiteralProperty);
-
 
 static void TestCompletionsAtGenericTypeArguments(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -8566,7 +8215,6 @@ const f = foo</*3*/, /*4*/,)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsAtGenericTypeArguments, TestCompletionsAtGenericTypeArguments);
 
-
 static void TestCompletionsAsserts(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -8576,7 +8224,6 @@ static void TestCompletionsAsserts(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsAsserts, TestCompletionsAsserts);
-
 
 static void TestCompletionsAssertKeyword(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -8607,7 +8254,6 @@ static void TestCompletionsAssertKeyword(gostd::testing::T* t) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsAssertKeyword, TestCompletionsAssertKeyword);
 
-
 static void TestCompletionsAfterLessThanToken(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -8620,7 +8266,6 @@ static void TestCompletionsAfterLessThanToken(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsAfterLessThanToken, TestCompletionsAfterLessThanToken);
-
 
 static void TestCompletionsAfterKeywordsInBlock(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -8672,7 +8317,6 @@ class C4 {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsAfterKeywordsInBlock, TestCompletionsAfterKeywordsInBlock);
 
-
 static void TestCompletionsAfterJSDoc(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -8685,7 +8329,6 @@ static void TestCompletionsAfterJSDoc(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionsAfterJSDoc, TestCompletionsAfterJSDoc);
-
 
 static void TestCompletions03(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -8709,7 +8352,6 @@ let x: Foo = {
 }
 REGISTER_FOURSLASH_TEST(TestCompletions03, TestCompletions03);
 
-
 static void TestCompletionWithUnterminatedJSDocEndingWithAt2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -8722,7 +8364,6 @@ function foo(x) {}
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionWithUnterminatedJSDocEndingWithAt2, TestCompletionWithUnterminatedJSDocEndingWithAt2);
-
 
 static void TestCompletionWithUnterminatedJSDocEndingWithAt1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -8737,7 +8378,6 @@ function foo(x) {}
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionWithUnterminatedJSDocEndingWithAt1, TestCompletionWithUnterminatedJSDocEndingWithAt1);
-
 
 static void TestCompletionWithNamespaceInsideFunction(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -8771,7 +8411,6 @@ function f2() {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionWithNamespaceInsideFunction, TestCompletionWithNamespaceInsideFunction);
 
-
 static void TestCompletionWithDotFollowedByNamespaceKeyword(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -8788,7 +8427,6 @@ static void TestCompletionWithDotFollowedByNamespaceKeyword(gostd::testing::T* t
 }
 REGISTER_FOURSLASH_TEST(TestCompletionWithDotFollowedByNamespaceKeyword, TestCompletionWithDotFollowedByNamespaceKeyword);
 
-
 static void TestCompletionWithConditionalOperatorMissingColon(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -8799,7 +8437,6 @@ function func () {})TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionWithConditionalOperatorMissingColon, TestCompletionWithConditionalOperatorMissingColon);
-
 
 static void TestCompletionUsingKeyword(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -8826,7 +8463,6 @@ class C {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionUsingKeyword, TestCompletionUsingKeyword);
 
-
 static void TestCompletionTypeofExpressions(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -8839,7 +8475,6 @@ function test1(arg: typeof (x./*2*/)) {})TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionTypeofExpressions, TestCompletionTypeofExpressions);
-
 
 static void TestCompletionTypeGuard(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -8858,7 +8493,6 @@ hi)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionTypeGuard, TestCompletionTypeGuard);
 
-
 static void TestCompletionTypeAssertion(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -8870,7 +8504,6 @@ var y = this as/*1*/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionTypeAssertion, TestCompletionTypeAssertion);
-
 
 static void TestCompletionSatisfiesKeyword(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -8884,7 +8517,6 @@ function foo() {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionSatisfiesKeyword, TestCompletionSatisfiesKeyword);
-
 
 static void TestCompletionReturnConstAssertion(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -8901,7 +8533,6 @@ F(()=>({/*1*/} as const)))TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionReturnConstAssertion, TestCompletionReturnConstAssertion);
 
-
 static void TestCompletionResolveKeyword(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -8913,7 +8544,6 @@ static void TestCompletionResolveKeyword(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionResolveKeyword, TestCompletionResolveKeyword);
-
 
 static void TestCompletionPropertyShorthandForObjectLiteral5(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -8930,7 +8560,6 @@ const obj = { exp/**/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionPropertyShorthandForObjectLiteral5, TestCompletionPropertyShorthandForObjectLiteral5);
 
-
 static void TestCompletionPropertyShorthandForObjectLiteral4(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -8945,7 +8574,6 @@ const obj: any = {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionPropertyShorthandForObjectLiteral4, TestCompletionPropertyShorthandForObjectLiteral4);
 
-
 static void TestCompletionPropertyShorthandForObjectLiteral3(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -8959,7 +8587,6 @@ const obj = {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionPropertyShorthandForObjectLiteral3, TestCompletionPropertyShorthandForObjectLiteral3);
-
 
 static void TestCompletionPropertyShorthandForObjectLiteral2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -8979,7 +8606,6 @@ const obj2: any = {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionPropertyShorthandForObjectLiteral2, TestCompletionPropertyShorthandForObjectLiteral2);
-
 
 static void TestCompletionPreferredSuggestions1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -9007,7 +8633,6 @@ v5 = "/*5*/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionPreferredSuggestions1, TestCompletionPreferredSuggestions1);
 
-
 static void TestCompletionOfInterfaceAndVar(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"Known failing fourslash test"}); return;
@@ -9030,7 +8655,6 @@ var AnalyserNode: {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionOfInterfaceAndVar, TestCompletionOfInterfaceAndVar);
 
-
 static void TestCompletionOfAwaitPromise7(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -9043,7 +8667,6 @@ static void TestCompletionOfAwaitPromise7(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionOfAwaitPromise7, TestCompletionOfAwaitPromise7);
-
 
 static void TestCompletionOfAwaitPromise6(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -9059,7 +8682,6 @@ async function foo(x: Promise<string>) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionOfAwaitPromise6, TestCompletionOfAwaitPromise6);
 
-
 static void TestCompletionOfAwaitPromise5(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -9073,7 +8695,6 @@ async function foo(x: (a: number) => Promise<Foo>) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionOfAwaitPromise5, TestCompletionOfAwaitPromise5);
 
-
 static void TestCompletionOfAwaitPromise4(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -9085,7 +8706,6 @@ static void TestCompletionOfAwaitPromise4(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionOfAwaitPromise4, TestCompletionOfAwaitPromise4);
-
 
 static void TestCompletionOfAwaitPromise3(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -9100,7 +8720,6 @@ async function foo(x: Promise<Foo>) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionOfAwaitPromise3, TestCompletionOfAwaitPromise3);
 
-
 static void TestCompletionOfAwaitPromise2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -9114,7 +8733,6 @@ async function foo(x: Promise<Foo>) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionOfAwaitPromise2, TestCompletionOfAwaitPromise2);
 
-
 static void TestCompletionOfAwaitPromise1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -9126,7 +8744,6 @@ static void TestCompletionOfAwaitPromise1(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionOfAwaitPromise1, TestCompletionOfAwaitPromise1);
-
 
 static void TestCompletionNoAutoInsertQuestionDotWithUserPreferencesOff(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -9147,7 +8764,6 @@ user.address[|./**/|])TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionNoAutoInsertQuestionDotWithUserPreferencesOff, TestCompletionNoAutoInsertQuestionDotWithUserPreferencesOff);
 
-
 static void TestCompletionNoAutoInsertQuestionDotForTypeParameter(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -9165,7 +8781,6 @@ function f<T extends Address>(x: T) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionNoAutoInsertQuestionDotForTypeParameter, TestCompletionNoAutoInsertQuestionDotForTypeParameter);
 
-
 static void TestCompletionNoAutoInsertQuestionDotForThis(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -9182,7 +8797,6 @@ class Address {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionNoAutoInsertQuestionDotForThis, TestCompletionNoAutoInsertQuestionDotForThis);
-
 
 static void TestCompletionListsStringLiteralTypeAsIndexedAccessTypeObject(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -9206,7 +8820,6 @@ let sixthCase: Foo["qu/*case_6*/"])TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListsStringLiteralTypeAsIndexedAccessTypeObject, TestCompletionListsStringLiteralTypeAsIndexedAccessTypeObject);
 
-
 static void TestCompletionList_getExportsOfModule(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -9221,7 +8834,6 @@ let y: /**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionList_getExportsOfModule, TestCompletionList_getExportsOfModule);
-
 
 static void TestCompletionListWithoutVariableinitializer(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -9258,7 +8870,6 @@ const [ a4 ] = fn([a/*13*/]);)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListWithoutVariableinitializer, TestCompletionListWithoutVariableinitializer);
 
-
 static void TestCompletionListWithUnresolvedModule(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -9271,7 +8882,6 @@ static void TestCompletionListWithUnresolvedModule(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListWithUnresolvedModule, TestCompletionListWithUnresolvedModule);
-
 
 static void TestCompletionListWithLabel(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -9296,7 +8906,6 @@ static void TestCompletionListWithLabel(gostd::testing::T* t) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListWithLabel, TestCompletionListWithLabel);
 
-
 static void TestCompletionListWithAmbientDeclaration(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -9313,7 +8922,6 @@ declare module 'https' {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListWithAmbientDeclaration, TestCompletionListWithAmbientDeclaration);
-
 
 static void TestCompletionListSuperMembers(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -9345,7 +8953,6 @@ class Class extends Base {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListSuperMembers, TestCompletionListSuperMembers);
-
 
 static void TestCompletionListStringParenthesizedType(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -9382,7 +8989,6 @@ const b: Foo[(("[|/*8*/|]"))];)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListStringParenthesizedType, TestCompletionListStringParenthesizedType);
 
-
 static void TestCompletionListStringParenthesizedExpression(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"Known failing fourslash test"}); return;
@@ -9402,7 +9008,6 @@ const c = foo[(("[|/*3*/|]"))];)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListStringParenthesizedExpression, TestCompletionListStringParenthesizedExpression);
-
 
 static void TestCompletionListStaticProtectedMembers(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -9438,7 +9043,6 @@ class C1 extends Base {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListStaticProtectedMembers, TestCompletionListStaticProtectedMembers);
 
-
 static void TestCompletionListStaticProtectedMembers3(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -9469,7 +9073,6 @@ C3./*2*/;)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListStaticProtectedMembers3, TestCompletionListStaticProtectedMembers3);
-
 
 static void TestCompletionListStaticProtectedMembers2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -9509,7 +9112,6 @@ class C2 extends Base {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListStaticProtectedMembers2, TestCompletionListStaticProtectedMembers2);
 
-
 static void TestCompletionListStaticMembers(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -9524,7 +9126,6 @@ Foo./**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListStaticMembers, TestCompletionListStaticMembers);
-
 
 static void TestCompletionListProtectedMembers(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -9555,7 +9156,6 @@ f./*5*/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListProtectedMembers, TestCompletionListProtectedMembers);
-
 
 static void TestCompletionListPrivateNames(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -9592,7 +9192,6 @@ new Foo()./*4*/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListPrivateNames, TestCompletionListPrivateNames);
 
-
 static void TestCompletionListPrivateNamesMethods(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -9626,7 +9225,6 @@ new Foo()./*4*/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListPrivateNamesMethods, TestCompletionListPrivateNamesMethods);
-
 
 static void TestCompletionListPrivateNamesAccessors(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -9668,7 +9266,6 @@ new Foo()./*4*/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListPrivateNamesAccessors, TestCompletionListPrivateNamesAccessors);
 
-
 static void TestCompletionListPrivateMembers(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -9687,7 +9284,6 @@ class Bar extends Foo {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListPrivateMembers, TestCompletionListPrivateMembers);
-
 
 static void TestCompletionListPrivateMembers3(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -9715,7 +9311,6 @@ class Self {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListPrivateMembers3, TestCompletionListPrivateMembers3);
 
-
 static void TestCompletionListPrivateMembers2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -9733,7 +9328,6 @@ f./*2*/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListPrivateMembers2, TestCompletionListPrivateMembers2);
 
-
 static void TestCompletionListOutsideOfForLoop02(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -9744,7 +9338,6 @@ static void TestCompletionListOutsideOfForLoop02(gostd::testing::T* t) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListOutsideOfForLoop02, TestCompletionListOutsideOfForLoop02);
 
-
 static void TestCompletionListOutsideOfForLoop01(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -9754,7 +9347,6 @@ static void TestCompletionListOutsideOfForLoop01(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListOutsideOfForLoop01, TestCompletionListOutsideOfForLoop01);
-
 
 static void TestCompletionListOutsideOfClosedFunctionDeclaration01(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -9767,7 +9359,6 @@ static void TestCompletionListOutsideOfClosedFunctionDeclaration01(gostd::testin
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListOutsideOfClosedFunctionDeclaration01, TestCompletionListOutsideOfClosedFunctionDeclaration01);
 
-
 static void TestCompletionListOutsideOfClosedArrowFunction02(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -9779,7 +9370,6 @@ static void TestCompletionListOutsideOfClosedArrowFunction02(gostd::testing::T* 
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListOutsideOfClosedArrowFunction02, TestCompletionListOutsideOfClosedArrowFunction02);
 
-
 static void TestCompletionListOutsideOfClosedArrowFunction01(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -9790,7 +9380,6 @@ static void TestCompletionListOutsideOfClosedArrowFunction01(gostd::testing::T* 
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListOutsideOfClosedArrowFunction01, TestCompletionListOutsideOfClosedArrowFunction01);
-
 
 static void TestCompletionListOnVarBetweenModules(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -9811,7 +9400,6 @@ namespace M2 {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListOnVarBetweenModules, TestCompletionListOnVarBetweenModules);
-
 
 static void TestCompletionListOnSuper(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -9837,7 +9425,6 @@ class TAD<T> extends TAB<T> {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListOnSuper, TestCompletionListOnSuper);
 
-
 static void TestCompletionListOnPrivateVariableInModule(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -9847,7 +9434,6 @@ static void TestCompletionListOnPrivateVariableInModule(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListOnPrivateVariableInModule, TestCompletionListOnPrivateVariableInModule);
-
 
 static void TestCompletionListOnParam(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -9865,7 +9451,6 @@ class Point {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListOnParam, TestCompletionListOnParam);
 
-
 static void TestCompletionListOnParamInClass(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -9877,7 +9462,6 @@ static void TestCompletionListOnParamInClass(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListOnParamInClass, TestCompletionListOnParamInClass);
-
 
 static void TestCompletionListOnMethodParameterName(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -9892,7 +9476,6 @@ static void TestCompletionListOnMethodParameterName(gostd::testing::T* t) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListOnMethodParameterName, TestCompletionListOnMethodParameterName);
 
-
 static void TestCompletionListOnFunctionCallWithOptionalArgument(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -9903,7 +9486,6 @@ Foo(function () { } )./**/;)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListOnFunctionCallWithOptionalArgument, TestCompletionListOnFunctionCallWithOptionalArgument);
-
 
 static void TestCompletionListOnAliases(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -9924,7 +9506,6 @@ import x = M)TS"})}})}));
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListOnAliases, TestCompletionListOnAliases);
 
-
 static void TestCompletionListOnAliases3(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -9940,7 +9521,6 @@ declare module 'thing' {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListOnAliases3, TestCompletionListOnAliases3);
-
 
 static void TestCompletionListOnAliases2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -9991,7 +9571,6 @@ var tmp2: a./*7Type*/;)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListOnAliases2, TestCompletionListOnAliases2);
 
-
 static void TestCompletionListOnAliasedModule(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -10009,7 +9588,6 @@ p./**/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListOnAliasedModule, TestCompletionListOnAliasedModule);
 
-
 static void TestCompletionListOfUnion(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -10024,7 +9602,6 @@ f({ /*f*/ });)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListOfUnion, TestCompletionListOfUnion);
-
 
 static void TestCompletionListOfSplitInterface(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -10067,7 +9644,6 @@ ci1./*2*/b;)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListOfSplitInterface, TestCompletionListOfSplitInterface);
 
-
 static void TestCompletionListOfGenericSymbol(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -10078,7 +9654,6 @@ a./**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListOfGenericSymbol, TestCompletionListOfGenericSymbol);
-
 
 static void TestCompletionListObjectMembers(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -10097,7 +9672,6 @@ object./**/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListObjectMembers, TestCompletionListObjectMembers);
 
-
 static void TestCompletionListObjectMembersInTypeLocationWithTypeof(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -10114,7 +9688,6 @@ type B = Parameters<typeof obj./*2*/>)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListObjectMembersInTypeLocationWithTypeof, TestCompletionListObjectMembersInTypeLocationWithTypeof);
 
-
 static void TestCompletionListNewIdentifierVariableDeclaration(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -10124,7 +9697,6 @@ static void TestCompletionListNewIdentifierVariableDeclaration(gostd::testing::T
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListNewIdentifierVariableDeclaration, TestCompletionListNewIdentifierVariableDeclaration);
-
 
 static void TestCompletionListNewIdentifierFunctionDeclaration(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -10137,7 +9709,6 @@ function F(pref: (a/*1*/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListNewIdentifierFunctionDeclaration, TestCompletionListNewIdentifierFunctionDeclaration);
 
-
 static void TestCompletionListNewIdentifierBindingElement(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -10147,7 +9718,6 @@ static void TestCompletionListNewIdentifierBindingElement(gostd::testing::T* t) 
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListNewIdentifierBindingElement, TestCompletionListNewIdentifierBindingElement);
-
 
 static void TestCompletionListModuleMembers(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -10179,7 +9749,6 @@ interface TestInterface implements Module./*TypeReferenceInImplementsList*/ { })
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListModuleMembers, TestCompletionListModuleMembers);
 
-
 static void TestCompletionListKeywords(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -10190,7 +9759,6 @@ static void TestCompletionListKeywords(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListKeywords, TestCompletionListKeywords);
-
 
 static void TestCompletionListInvalidMemberNames_withExistingIdentifier(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -10206,7 +9774,6 @@ unrelatedIdentifier;)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInvalidMemberNames_withExistingIdentifier, TestCompletionListInvalidMemberNames_withExistingIdentifier);
-
 
 static void TestCompletionListInvalidMemberNames(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -10232,7 +9799,6 @@ x["[|/*b*/|]"];)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInvalidMemberNames, TestCompletionListInvalidMemberNames);
 
-
 static void TestCompletionListInvalidMemberNames_startWithSpace(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -10243,7 +9809,6 @@ x[|./**/|];)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInvalidMemberNames_startWithSpace, TestCompletionListInvalidMemberNames_startWithSpace);
-
 
 static void TestCompletionListInvalidMemberNames_escapeQuote(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -10256,7 +9821,6 @@ x[|./**/|];)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInvalidMemberNames_escapeQuote, TestCompletionListInvalidMemberNames_escapeQuote);
-
 
 static void TestCompletionListInvalidMemberNames2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -10280,7 +9844,6 @@ _./**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInvalidMemberNames2, TestCompletionListInvalidMemberNames2);
-
 
 static void TestCompletionListInstanceProtectedMembers(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -10320,7 +9883,6 @@ class C1 extends Base {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInstanceProtectedMembers, TestCompletionListInstanceProtectedMembers);
 
-
 static void TestCompletionListInstanceProtectedMembers4(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -10350,7 +9912,6 @@ class C1 extends Base {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInstanceProtectedMembers4, TestCompletionListInstanceProtectedMembers4);
-
 
 static void TestCompletionListInstanceProtectedMembers3(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -10383,7 +9944,6 @@ class C1 extends Base {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInstanceProtectedMembers3, TestCompletionListInstanceProtectedMembers3);
-
 
 static void TestCompletionListInstanceProtectedMembers2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -10426,7 +9986,6 @@ class C1 extends Base {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInstanceProtectedMembers2, TestCompletionListInstanceProtectedMembers2);
 
-
 static void TestCompletionListInsideTargetTypedFunction(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -10440,7 +9999,6 @@ static void TestCompletionListInsideTargetTypedFunction(gostd::testing::T* t) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInsideTargetTypedFunction, TestCompletionListInsideTargetTypedFunction);
 
-
 static void TestCompletionListInferKeyword(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -10453,7 +10011,6 @@ static void TestCompletionListInferKeyword(gostd::testing::T* t) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInferKeyword, TestCompletionListInferKeyword);
 
-
 static void TestCompletionListInUnclosedVoidExpression01(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -10464,7 +10021,6 @@ var y = (p) => void /*1*/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedVoidExpression01, TestCompletionListInUnclosedVoidExpression01);
-
 
 static void TestCompletionListInUnclosedTypeOfExpression02(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -10477,7 +10033,6 @@ var y = (p) => typeof /*1*/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedTypeOfExpression02, TestCompletionListInUnclosedTypeOfExpression02);
 
-
 static void TestCompletionListInUnclosedTypeOfExpression01(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -10488,7 +10043,6 @@ var y = typeof /*1*/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedTypeOfExpression01, TestCompletionListInUnclosedTypeOfExpression01);
-
 
 static void TestCompletionListInUnclosedTypeArguments(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -10542,7 +10096,6 @@ f2<any, () =>/*1z*/T/*2z*/y/*3z*/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedTypeArguments, TestCompletionListInUnclosedTypeArguments);
 
-
 static void TestCompletionListInUnclosedTemplate02(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"Known failing fourslash test"}); return;
@@ -10554,7 +10107,6 @@ var y = (p) => `abc ${ 123 } ${ /*1*/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedTemplate02, TestCompletionListInUnclosedTemplate02);
-
 
 static void TestCompletionListInUnclosedTemplate01(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -10568,7 +10120,6 @@ var y = (p) => `abc ${ /*1*/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedTemplate01, TestCompletionListInUnclosedTemplate01);
 
-
 static void TestCompletionListInUnclosedTaggedTemplate02(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"Known failing fourslash test"}); return;
@@ -10580,7 +10131,6 @@ var y = (p) => x `abc ${ 123 } ${ /*1*/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedTaggedTemplate02, TestCompletionListInUnclosedTaggedTemplate02);
-
 
 static void TestCompletionListInUnclosedTaggedTemplate01(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -10594,7 +10144,6 @@ var y = (p) => x `abc ${ /*1*/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedTaggedTemplate01, TestCompletionListInUnclosedTaggedTemplate01);
 
-
 static void TestCompletionListInUnclosedSpreadExpression02(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -10606,7 +10155,6 @@ var y = (p) => [1,2,.../*1*/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedSpreadExpression02, TestCompletionListInUnclosedSpreadExpression02);
 
-
 static void TestCompletionListInUnclosedSpreadExpression01(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -10617,7 +10165,6 @@ var y = [1,2,.../*1*/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedSpreadExpression01, TestCompletionListInUnclosedSpreadExpression01);
-
 
 static void TestCompletionListInUnclosedObjectTypeLiteralInSignature04(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -10634,7 +10181,6 @@ declare function foo<TString, TNumber>(obj: I<TString, TNumber>): { /*1*/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedObjectTypeLiteralInSignature04, TestCompletionListInUnclosedObjectTypeLiteralInSignature04);
 
-
 static void TestCompletionListInUnclosedObjectTypeLiteralInSignature03(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -10649,7 +10195,6 @@ declare function foo<TString, TNumber>(obj: I<TString, TNumber>): { str: TString
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedObjectTypeLiteralInSignature03, TestCompletionListInUnclosedObjectTypeLiteralInSignature03);
-
 
 static void TestCompletionListInUnclosedObjectTypeLiteralInSignature02(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -10666,7 +10211,6 @@ declare function foo<TString, TNumber>(obj: I<TString, TNumber>): { str: TStr/*1
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedObjectTypeLiteralInSignature02, TestCompletionListInUnclosedObjectTypeLiteralInSignature02);
 
-
 static void TestCompletionListInUnclosedObjectTypeLiteralInSignature01(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -10682,7 +10226,6 @@ declare function foo<TString, TNumber>(obj: I<TString, TNumber>): { str: T/*1*/)
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedObjectTypeLiteralInSignature01, TestCompletionListInUnclosedObjectTypeLiteralInSignature01);
 
-
 static void TestCompletionListInUnclosedIndexSignature03(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -10694,7 +10237,6 @@ static void TestCompletionListInUnclosedIndexSignature03(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedIndexSignature03, TestCompletionListInUnclosedIndexSignature03);
-
 
 static void TestCompletionListInUnclosedIndexSignature02(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -10710,7 +10252,6 @@ static void TestCompletionListInUnclosedIndexSignature02(gostd::testing::T* t) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedIndexSignature02, TestCompletionListInUnclosedIndexSignature02);
 
-
 static void TestCompletionListInUnclosedIndexSignature01(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -10722,7 +10263,6 @@ static void TestCompletionListInUnclosedIndexSignature01(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedIndexSignature01, TestCompletionListInUnclosedIndexSignature01);
-
 
 static void TestCompletionListInUnclosedFunction19(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -10738,7 +10278,6 @@ function foo(x: string, y: number, z: boolean) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedFunction19, TestCompletionListInUnclosedFunction19);
-
 
 static void TestCompletionListInUnclosedFunction18(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -10756,7 +10295,6 @@ function foo(x: string, y: number, z: boolean) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedFunction18, TestCompletionListInUnclosedFunction18);
 
-
 static void TestCompletionListInUnclosedFunction17(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -10771,7 +10309,6 @@ function foo(x: string, y: number, z: boolean) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedFunction17, TestCompletionListInUnclosedFunction17);
-
 
 static void TestCompletionListInUnclosedFunction16(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -10788,7 +10325,6 @@ function foo(x: string, y: number, z: boolean) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedFunction16, TestCompletionListInUnclosedFunction16);
 
-
 static void TestCompletionListInUnclosedFunction15(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -10804,7 +10340,6 @@ function foo(x: string, y: number, z: boolean) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedFunction15, TestCompletionListInUnclosedFunction15);
-
 
 static void TestCompletionListInUnclosedFunction14(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -10823,7 +10358,6 @@ function foo(x: string, y: number, z: boolean) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedFunction14, TestCompletionListInUnclosedFunction14);
 
-
 static void TestCompletionListInUnclosedFunction13(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -10841,7 +10375,6 @@ function foo(x: string, y: number, z: boolean) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedFunction13, TestCompletionListInUnclosedFunction13);
 
-
 static void TestCompletionListInUnclosedFunction12(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -10858,7 +10391,6 @@ function foo(x: string, y: number, z: boolean) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedFunction12, TestCompletionListInUnclosedFunction12);
 
-
 static void TestCompletionListInUnclosedFunction11(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -10873,7 +10405,6 @@ function foo(x: string, y: number, z: boolean) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedFunction11, TestCompletionListInUnclosedFunction11);
-
 
 static void TestCompletionListInUnclosedFunction10(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -10890,7 +10421,6 @@ function foo(x: string, y: number, z: boolean) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedFunction10, TestCompletionListInUnclosedFunction10);
 
-
 static void TestCompletionListInUnclosedFunction09(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"Known failing fourslash test"}); return;
@@ -10905,7 +10435,6 @@ static void TestCompletionListInUnclosedFunction09(gostd::testing::T* t) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedFunction09, TestCompletionListInUnclosedFunction09);
 
-
 static void TestCompletionListInUnclosedFunction08(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"Known failing fourslash test"}); return;
@@ -10919,7 +10448,6 @@ static void TestCompletionListInUnclosedFunction08(gostd::testing::T* t) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedFunction08, TestCompletionListInUnclosedFunction08);
 
-
 static void TestCompletionListInUnclosedFunction07(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -10931,7 +10459,6 @@ static void TestCompletionListInUnclosedFunction07(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedFunction07, TestCompletionListInUnclosedFunction07);
-
 
 static void TestCompletionListInUnclosedFunction06(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -10945,7 +10472,6 @@ static void TestCompletionListInUnclosedFunction06(gostd::testing::T* t) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedFunction06, TestCompletionListInUnclosedFunction06);
 
-
 static void TestCompletionListInUnclosedFunction05(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -10958,7 +10484,6 @@ static void TestCompletionListInUnclosedFunction05(gostd::testing::T* t) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedFunction05, TestCompletionListInUnclosedFunction05);
 
-
 static void TestCompletionListInUnclosedFunction04(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -10969,7 +10494,6 @@ static void TestCompletionListInUnclosedFunction04(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedFunction04, TestCompletionListInUnclosedFunction04);
-
 
 static void TestCompletionListInUnclosedFunction03(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -10983,7 +10507,6 @@ static void TestCompletionListInUnclosedFunction03(gostd::testing::T* t) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedFunction03, TestCompletionListInUnclosedFunction03);
 
-
 static void TestCompletionListInUnclosedFunction02(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -10994,7 +10517,6 @@ static void TestCompletionListInUnclosedFunction02(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedFunction02, TestCompletionListInUnclosedFunction02);
-
 
 static void TestCompletionListInUnclosedFunction01(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -11008,7 +10530,6 @@ static void TestCompletionListInUnclosedFunction01(gostd::testing::T* t) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedFunction01, TestCompletionListInUnclosedFunction01);
 
-
 static void TestCompletionListInUnclosedForLoop02(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -11019,7 +10540,6 @@ static void TestCompletionListInUnclosedForLoop02(gostd::testing::T* t) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedForLoop02, TestCompletionListInUnclosedForLoop02);
 
-
 static void TestCompletionListInUnclosedForLoop01(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -11029,7 +10549,6 @@ static void TestCompletionListInUnclosedForLoop01(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedForLoop01, TestCompletionListInUnclosedForLoop01);
-
 
 static void TestCompletionListInUnclosedElementAccessExpression02(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -11042,7 +10561,6 @@ var y = (p) => x[/*1*/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedElementAccessExpression02, TestCompletionListInUnclosedElementAccessExpression02);
 
-
 static void TestCompletionListInUnclosedElementAccessExpression01(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -11053,7 +10571,6 @@ var y = x[/*1*/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedElementAccessExpression01, TestCompletionListInUnclosedElementAccessExpression01);
-
 
 static void TestCompletionListInUnclosedDeleteExpression02(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -11066,7 +10583,6 @@ var y = (p) => delete /*1*/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedDeleteExpression02, TestCompletionListInUnclosedDeleteExpression02);
 
-
 static void TestCompletionListInUnclosedDeleteExpression01(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -11077,7 +10593,6 @@ var y = delete /*1*/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedDeleteExpression01, TestCompletionListInUnclosedDeleteExpression01);
-
 
 static void TestCompletionListInUnclosedCommaExpression02(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -11091,7 +10606,6 @@ foo((a, b) => (a,/*1*/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedCommaExpression02, TestCompletionListInUnclosedCommaExpression02);
 
-
 static void TestCompletionListInUnclosedCommaExpression01(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"Known failing fourslash test"}); return;
@@ -11103,7 +10617,6 @@ foo((a, b) => a,/*1*/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInUnclosedCommaExpression01, TestCompletionListInUnclosedCommaExpression01);
-
 
 static void TestCompletionListInTypedObjectLiteralsWithPartialPropertyNames(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -11127,7 +10640,6 @@ var p15: MyPoint = {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInTypedObjectLiteralsWithPartialPropertyNames, TestCompletionListInTypedObjectLiteralsWithPartialPropertyNames);
 
-
 static void TestCompletionListInTypedObjectLiteralsWithPartialPropertyNames2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -11143,7 +10655,6 @@ var p15: MyPoint = {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInTypedObjectLiteralsWithPartialPropertyNames2, TestCompletionListInTypedObjectLiteralsWithPartialPropertyNames2);
-
 
 static void TestCompletionListInTypedObjectLiterals4(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -11162,7 +10673,6 @@ var p15: MyPoint = {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInTypedObjectLiterals4, TestCompletionListInTypedObjectLiterals4);
 
-
 static void TestCompletionListInTypedObjectLiterals3(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -11176,7 +10686,6 @@ aaa.x = { /*10*/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInTypedObjectLiterals3, TestCompletionListInTypedObjectLiterals3);
-
 
 static void TestCompletionListInTypedObjectLiterals2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -11192,7 +10701,6 @@ aaa = { /*9*/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInTypedObjectLiterals2, TestCompletionListInTypedObjectLiterals2);
 
-
 static void TestCompletionListInTypeParameterOfTypeAlias3(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -11202,7 +10710,6 @@ static void TestCompletionListInTypeParameterOfTypeAlias3(gostd::testing::T* t) 
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInTypeParameterOfTypeAlias3, TestCompletionListInTypeParameterOfTypeAlias3);
-
 
 static void TestCompletionListInTypeParameterOfTypeAlias2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -11219,7 +10726,6 @@ type Map1<K1, V1> = </*3*/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInTypeParameterOfTypeAlias2, TestCompletionListInTypeParameterOfTypeAlias2);
 
-
 static void TestCompletionListInTypeParameterOfTypeAlias1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -11234,7 +10740,6 @@ type List3<T1> = /*3*/;)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInTypeParameterOfTypeAlias1, TestCompletionListInTypeParameterOfTypeAlias1);
-
 
 static void TestCompletionListInTypeParameterOfClassExpression1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -11251,7 +10756,6 @@ var C4 = class D<T extends /*4*/>{})TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInTypeParameterOfClassExpression1, TestCompletionListInTypeParameterOfClassExpression1);
-
 
 static void TestCompletionListInTypeLiteralInTypeParameter8(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -11288,7 +10792,6 @@ var foobar: Bar<{
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInTypeLiteralInTypeParameter8, TestCompletionListInTypeLiteralInTypeParameter8);
 
-
 static void TestCompletionListInTypeLiteralInTypeParameter7(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -11311,7 +10814,6 @@ var foobar: Bar<{
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInTypeLiteralInTypeParameter7, TestCompletionListInTypeLiteralInTypeParameter7);
 
-
 static void TestCompletionListInTypeLiteralInTypeParameter6(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -11330,7 +10832,6 @@ var foobar: Bar<{ one: string } | {/**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInTypeLiteralInTypeParameter6, TestCompletionListInTypeLiteralInTypeParameter6);
-
 
 static void TestCompletionListInTypeLiteralInTypeParameter5(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -11351,7 +10852,6 @@ var foobar: Bar<{ prop1: string } & {/**/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInTypeLiteralInTypeParameter5, TestCompletionListInTypeLiteralInTypeParameter5);
 
-
 static void TestCompletionListInTypeLiteralInTypeParameter4(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -11370,7 +10870,6 @@ var foobar: Bar<{ one: string } & {/**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInTypeLiteralInTypeParameter4, TestCompletionListInTypeLiteralInTypeParameter4);
-
 
 static void TestCompletionListInTypeLiteralInTypeParameter3(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -11391,7 +10890,6 @@ var foobar: Bar<{ one: string, /**/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInTypeLiteralInTypeParameter3, TestCompletionListInTypeLiteralInTypeParameter3);
 
-
 static void TestCompletionListInTypeLiteralInTypeParameter2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -11410,7 +10908,6 @@ var foobar: Bar<{ on/**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInTypeLiteralInTypeParameter2, TestCompletionListInTypeLiteralInTypeParameter2);
-
 
 static void TestCompletionListInTypeLiteralInTypeParameter21(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -11433,7 +10930,6 @@ Foo<[/*4*/]>;)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInTypeLiteralInTypeParameter21, TestCompletionListInTypeLiteralInTypeParameter21);
 
-
 static void TestCompletionListInTypeLiteralInTypeParameter20(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -11454,7 +10950,6 @@ const Component2 = <T extends 'one' | 'two'>() => <></>;
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInTypeLiteralInTypeParameter20, TestCompletionListInTypeLiteralInTypeParameter20);
-
 
 static void TestCompletionListInTypeLiteralInTypeParameter1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -11479,7 +10974,6 @@ var foobar: Bar<{/**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInTypeLiteralInTypeParameter1, TestCompletionListInTypeLiteralInTypeParameter1);
-
 
 static void TestCompletionListInTypeLiteralInTypeParameter19(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -11508,7 +11002,6 @@ class { @decorator<'/*6*/'>; method() {} })TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInTypeLiteralInTypeParameter19, TestCompletionListInTypeLiteralInTypeParameter19);
 
-
 static void TestCompletionListInTypeLiteralInTypeParameter18(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -11536,7 +11029,6 @@ class { @decorator<{ x: '/*6*/' }>; method() {} })TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInTypeLiteralInTypeParameter18, TestCompletionListInTypeLiteralInTypeParameter18);
 
-
 static void TestCompletionListInTypeLiteralInTypeParameter17(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -11557,7 +11049,6 @@ Foo<{ x: /*4*/ }>;)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInTypeLiteralInTypeParameter17, TestCompletionListInTypeLiteralInTypeParameter17);
-
 
 static void TestCompletionListInTypeLiteralInTypeParameter16(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -11597,7 +11088,6 @@ b<{/*3*/}>;)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInTypeLiteralInTypeParameter16, TestCompletionListInTypeLiteralInTypeParameter16);
 
-
 static void TestCompletionListInTypeLiteralInTypeParameter15(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -11618,7 +11108,6 @@ class {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInTypeLiteralInTypeParameter15, TestCompletionListInTypeLiteralInTypeParameter15);
 
-
 static void TestCompletionListInTypeLiteralInTypeParameter14(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -11633,7 +11122,6 @@ f<{/*0*/}>``;)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInTypeLiteralInTypeParameter14, TestCompletionListInTypeLiteralInTypeParameter14);
-
 
 static void TestCompletionListInTypeLiteralInTypeParameter13(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -11655,7 +11143,6 @@ const Component = <T extends Foo>() => <></>;
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInTypeLiteralInTypeParameter13, TestCompletionListInTypeLiteralInTypeParameter13);
-
 
 static void TestCompletionListInTypeLiteralInTypeParameter12(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -11682,7 +11169,6 @@ b<{/*1*/}>('bar');)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInTypeLiteralInTypeParameter12, TestCompletionListInTypeLiteralInTypeParameter12);
-
 
 static void TestCompletionListInTypeLiteralInTypeParameter11(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -11718,7 +11204,6 @@ new (class <T extends Foo> {})<{/*4*/}>();)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInTypeLiteralInTypeParameter11, TestCompletionListInTypeLiteralInTypeParameter11);
-
 
 static void TestCompletionListInTypeLiteralInTypeParameter10(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -11761,7 +11246,6 @@ d<Foo, { four: {/*5*/} }>();
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInTypeLiteralInTypeParameter10, TestCompletionListInTypeLiteralInTypeParameter10);
 
-
 static void TestCompletionListInTemplateLiteralPartsNegatives1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -11773,7 +11257,6 @@ static void TestCompletionListInTemplateLiteralPartsNegatives1(gostd::testing::T
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInTemplateLiteralPartsNegatives1, TestCompletionListInTemplateLiteralPartsNegatives1);
-
 
 static void TestCompletionListInTemplateLiteralParts1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -11790,7 +11273,6 @@ static void TestCompletionListInTemplateLiteralParts1(gostd::testing::T* t) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInTemplateLiteralParts1, TestCompletionListInTemplateLiteralParts1);
 
-
 static void TestCompletionListInStringLiterals2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -11803,7 +11285,6 @@ static void TestCompletionListInStringLiterals2(gostd::testing::T* t) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInStringLiterals2, TestCompletionListInStringLiterals2);
 
-
 static void TestCompletionListInStringLiterals1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -11814,7 +11295,6 @@ static void TestCompletionListInStringLiterals1(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInStringLiterals1, TestCompletionListInStringLiterals1);
-
 
 static void TestCompletionListInScope(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -11886,7 +11366,6 @@ class TestClass {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInScope, TestCompletionListInScope);
 
-
 static void TestCompletionListInScope_doesNotIncludeAugmentations(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"Known failing fourslash test"}); return;
@@ -11904,7 +11383,6 @@ declare module "a" {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInScope_doesNotIncludeAugmentations, TestCompletionListInScope_doesNotIncludeAugmentations);
-
 
 static void TestCompletionListInReturnWithContextualThis(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -11934,7 +11412,6 @@ wrap(function () {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInReturnWithContextualThis, TestCompletionListInReturnWithContextualThis);
 
-
 static void TestCompletionListInObjectLiteral(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -11954,7 +11431,6 @@ t.pos = { x: 4, y: 3 + t./**/ };)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInObjectLiteral, TestCompletionListInObjectLiteral);
 
-
 static void TestCompletionListInObjectLiteralThatIsParameterOfFunctionCall(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -11967,7 +11443,6 @@ f({
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInObjectLiteralThatIsParameterOfFunctionCall, TestCompletionListInObjectLiteralThatIsParameterOfFunctionCall);
-
 
 static void TestCompletionListInObjectLiteralPropertyAssignment(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -11986,7 +11461,6 @@ var x: I = {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInObjectLiteralPropertyAssignment, TestCompletionListInObjectLiteralPropertyAssignment);
 
-
 static void TestCompletionListInObjectLiteralAssignmentPattern2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -11998,7 +11472,6 @@ let y = ({ a, /**/ } = x, 1);)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInObjectLiteralAssignmentPattern2, TestCompletionListInObjectLiteralAssignmentPattern2);
 
-
 static void TestCompletionListInObjectLiteralAssignmentPattern1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -12009,7 +11482,6 @@ let y = ({ /**/ } = x, 1);)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInObjectLiteralAssignmentPattern1, TestCompletionListInObjectLiteralAssignmentPattern1);
-
 
 static void TestCompletionListInObjectLiteral8(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -12027,7 +11499,6 @@ test({
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInObjectLiteral8, TestCompletionListInObjectLiteral8);
-
 
 static void TestCompletionListInObjectLiteral7(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -12047,7 +11518,6 @@ f(() => (({ /*3*/ })));)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInObjectLiteral7, TestCompletionListInObjectLiteral7);
-
 
 static void TestCompletionListInObjectLiteral6(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -12069,7 +11539,6 @@ fn({ a: "a", b: "b" }, {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInObjectLiteral6, TestCompletionListInObjectLiteral6);
-
 
 static void TestCompletionListInObjectLiteral5(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -12102,7 +11571,6 @@ const obj = {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInObjectLiteral5, TestCompletionListInObjectLiteral5);
 
-
 static void TestCompletionListInObjectLiteral4(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -12131,7 +11599,6 @@ funcF({ /*F*/ });)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInObjectLiteral4, TestCompletionListInObjectLiteral4);
 
-
 static void TestCompletionListInObjectLiteral3(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -12147,7 +11614,6 @@ var ast2: IASTNode = {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInObjectLiteral3, TestCompletionListInObjectLiteral3);
-
 
 static void TestCompletionListInObjectLiteral2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -12178,7 +11644,6 @@ class Foo {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInObjectLiteral2, TestCompletionListInObjectLiteral2);
 
-
 static void TestCompletionListInObjectBindingPattern16(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -12200,7 +11665,6 @@ function f({ /**/ }) {})TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInObjectBindingPattern16, TestCompletionListInObjectBindingPattern16);
-
 
 static void TestCompletionListInObjectBindingPattern15(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -12229,7 +11693,6 @@ const { /*4*/ } = Foo;)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInObjectBindingPattern15, TestCompletionListInObjectBindingPattern15);
 
-
 static void TestCompletionListInObjectBindingPattern14(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -12242,7 +11705,6 @@ static void TestCompletionListInObjectBindingPattern14(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInObjectBindingPattern14, TestCompletionListInObjectBindingPattern14);
-
 
 static void TestCompletionListInObjectBindingPattern13(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -12265,7 +11727,6 @@ let { /**/ }: I | J = { x: 10 };)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInObjectBindingPattern13, TestCompletionListInObjectBindingPattern13);
 
-
 static void TestCompletionListInObjectBindingPattern12(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -12282,7 +11743,6 @@ function f({ property1, /**/ }: I): void {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInObjectBindingPattern12, TestCompletionListInObjectBindingPattern12);
 
-
 static void TestCompletionListInObjectBindingPattern11(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -12297,7 +11757,6 @@ var { property1: prop1, /**/ }: I;)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInObjectBindingPattern11, TestCompletionListInObjectBindingPattern11);
-
 
 static void TestCompletionListInObjectBindingPattern10(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -12320,7 +11779,6 @@ var [{ property1: { propertyOfI_1, }, /*1*/ }, { /*2*/ }] = foo;)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInObjectBindingPattern10, TestCompletionListInObjectBindingPattern10);
 
-
 static void TestCompletionListInObjectBindingPattern09(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -12340,7 +11798,6 @@ var { property1: { propertyOfI_1, }, /**/ } = foo;)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInObjectBindingPattern09, TestCompletionListInObjectBindingPattern09);
-
 
 static void TestCompletionListInObjectBindingPattern08(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -12362,7 +11819,6 @@ var { property1: { propertyOfI_1, /**/ } } = foo;)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInObjectBindingPattern08, TestCompletionListInObjectBindingPattern08);
 
-
 static void TestCompletionListInObjectBindingPattern07(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -12383,7 +11839,6 @@ var { property1: { /**/ } } = foo;)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInObjectBindingPattern07, TestCompletionListInObjectBindingPattern07);
 
-
 static void TestCompletionListInObjectBindingPattern06(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -12399,7 +11854,6 @@ var { property1, property2, /**/ } = foo;)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInObjectBindingPattern06, TestCompletionListInObjectBindingPattern06);
-
 
 static void TestCompletionListInObjectBindingPattern05(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -12417,7 +11871,6 @@ var { property1/**/ } = foo;)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInObjectBindingPattern05, TestCompletionListInObjectBindingPattern05);
 
-
 static void TestCompletionListInObjectBindingPattern04(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -12433,7 +11886,6 @@ var { prope/**/ } = foo;)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInObjectBindingPattern04, TestCompletionListInObjectBindingPattern04);
-
 
 static void TestCompletionListInObjectBindingPattern03(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -12451,7 +11903,6 @@ var { property1: /**/ } = foo;)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInObjectBindingPattern03, TestCompletionListInObjectBindingPattern03);
 
-
 static void TestCompletionListInObjectBindingPattern02(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -12467,7 +11918,6 @@ var { property1, /**/ } = foo;)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInObjectBindingPattern02, TestCompletionListInObjectBindingPattern02);
-
 
 static void TestCompletionListInObjectBindingPattern01(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -12485,7 +11935,6 @@ var { /**/ } = foo;)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInObjectBindingPattern01, TestCompletionListInObjectBindingPattern01);
 
-
 static void TestCompletionListInNamespaceImportName01(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -12498,7 +11947,6 @@ import * as /**/ from "m1")TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInNamespaceImportName01, TestCompletionListInNamespaceImportName01);
-
 
 static void TestCompletionListInNamedFunctionExpression(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -12525,7 +11973,6 @@ fo/*referenceInGlobalScope*/o;)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInNamedFunctionExpression, TestCompletionListInNamedFunctionExpression);
 
-
 static void TestCompletionListInNamedFunctionExpressionWithShadowing(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"Known failing fourslash test"}); return;
@@ -12545,7 +11992,6 @@ var y = function () {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInNamedFunctionExpressionWithShadowing, TestCompletionListInNamedFunctionExpressionWithShadowing);
 
-
 static void TestCompletionListInNamedFunctionExpression1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"Known failing fourslash test"}); return;
@@ -12558,7 +12004,6 @@ static void TestCompletionListInNamedFunctionExpression1(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInNamedFunctionExpression1, TestCompletionListInNamedFunctionExpression1);
-
 
 static void TestCompletionListInNamedClassExpression(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -12575,7 +12020,6 @@ static void TestCompletionListInNamedClassExpression(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInNamedClassExpression, TestCompletionListInNamedClassExpression);
-
 
 static void TestCompletionListInNamedClassExpressionWithShadowing(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -12603,7 +12047,6 @@ var y = class {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInNamedClassExpressionWithShadowing, TestCompletionListInNamedClassExpressionWithShadowing);
 
-
 static void TestCompletionListInMiddleOfIdentifierInArrowFunction01(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -12613,7 +12056,6 @@ static void TestCompletionListInMiddleOfIdentifierInArrowFunction01(gostd::testi
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInMiddleOfIdentifierInArrowFunction01, TestCompletionListInMiddleOfIdentifierInArrowFunction01);
-
 
 static void TestCompletionListInImportClause06(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -12631,7 +12073,6 @@ export declare let x: number;)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInImportClause06, TestCompletionListInImportClause06);
 
-
 static void TestCompletionListInImportClause05(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -12646,7 +12087,6 @@ export declare let x: number;)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInImportClause05, TestCompletionListInImportClause05);
-
 
 static void TestCompletionListInImportClause04(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -12669,7 +12109,6 @@ import {/*1*/} from './foo';)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInImportClause04, TestCompletionListInImportClause04);
 
-
 static void TestCompletionListInImportClause03(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -12687,7 +12126,6 @@ declare module "M2" {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInImportClause03, TestCompletionListInImportClause03);
 
-
 static void TestCompletionListInImportClause02(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -12703,7 +12141,6 @@ declare module "M2" {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInImportClause02, TestCompletionListInImportClause02);
-
 
 static void TestCompletionListInImportClause01(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -12725,7 +12162,6 @@ import { type b/*9*/ } from "./m1";)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInImportClause01, TestCompletionListInImportClause01);
-
 
 static void TestCompletionListInFunctionDeclaration(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -12749,7 +12185,6 @@ function foo(/**/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInFunctionDeclaration, TestCompletionListInFunctionDeclaration);
 
-
 static void TestCompletionListInFatArrow(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -12765,7 +12200,6 @@ items.forEach((n) => {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInFatArrow, TestCompletionListInFatArrow);
-
 
 static void TestCompletionListInExtendsClause(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -12791,7 +12225,6 @@ interface test4 implements Foo./*4*/ {})TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInExtendsClause, TestCompletionListInExtendsClause);
 
-
 static void TestCompletionListInExtendsClauseAtEOF(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -12804,7 +12237,6 @@ class Bar extends mod./**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInExtendsClauseAtEOF, TestCompletionListInExtendsClauseAtEOF);
-
 
 static void TestCompletionListInExportClause03(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -12823,7 +12255,6 @@ declare module "M2" {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInExportClause03, TestCompletionListInExportClause03);
 
-
 static void TestCompletionListInExportClause02(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -12839,7 +12270,6 @@ declare module "M2" {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInExportClause02, TestCompletionListInExportClause02);
-
 
 static void TestCompletionListInExportClause01(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -12864,7 +12294,6 @@ export {foo, bar, baz as b,/*7*/} from "./m1")TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInExportClause01, TestCompletionListInExportClause01);
 
-
 static void TestCompletionListInEmptyFile(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -12875,7 +12304,6 @@ static void TestCompletionListInEmptyFile(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInEmptyFile, TestCompletionListInEmptyFile);
-
 
 static void TestCompletionListInContextuallyTypedArgument(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -12902,7 +12330,6 @@ var t = new test((e) => {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInContextuallyTypedArgument, TestCompletionListInContextuallyTypedArgument);
 
-
 static void TestCompletionListInComments(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -12913,7 +12340,6 @@ static void TestCompletionListInComments(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInComments, TestCompletionListInComments);
-
 
 static void TestCompletionListInComments3(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -12932,7 +12358,6 @@ static void TestCompletionListInComments3(gostd::testing::T* t) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInComments3, TestCompletionListInComments3);
 
-
 static void TestCompletionListInComments2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -12942,7 +12367,6 @@ static void TestCompletionListInComments2(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInComments2, TestCompletionListInComments2);
-
 
 static void TestCompletionListInClosedObjectTypeLiteralInSignature04(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -12959,7 +12383,6 @@ declare function foo<TString, TNumber>(obj: I<TString, TNumber>): { /*1*/ })TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInClosedObjectTypeLiteralInSignature04, TestCompletionListInClosedObjectTypeLiteralInSignature04);
 
-
 static void TestCompletionListInClosedObjectTypeLiteralInSignature03(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -12974,7 +12397,6 @@ declare function foo<TString, TNumber>(obj: I<TString, TNumber>): { str: TString
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInClosedObjectTypeLiteralInSignature03, TestCompletionListInClosedObjectTypeLiteralInSignature03);
-
 
 static void TestCompletionListInClosedObjectTypeLiteralInSignature02(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -12991,7 +12413,6 @@ declare function foo<TString, TNumber>(obj: I<TString, TNumber>): { str: TStr/*1
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInClosedObjectTypeLiteralInSignature02, TestCompletionListInClosedObjectTypeLiteralInSignature02);
 
-
 static void TestCompletionListInClosedObjectTypeLiteralInSignature01(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -13006,7 +12427,6 @@ declare function foo<TString, TNumber>(obj: I<TString, TNumber>): { str: T/*1*/ 
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInClosedObjectTypeLiteralInSignature01, TestCompletionListInClosedObjectTypeLiteralInSignature01);
-
 
 static void TestCompletionListInClosedFunction07(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -13025,7 +12445,6 @@ function foo(x: string, y: number, z: boolean) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInClosedFunction07, TestCompletionListInClosedFunction07);
 
-
 static void TestCompletionListInClosedFunction06(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -13043,7 +12462,6 @@ function foo(x: string, y: number, z: boolean) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInClosedFunction06, TestCompletionListInClosedFunction06);
 
-
 static void TestCompletionListInClosedFunction05(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -13057,7 +12475,6 @@ static void TestCompletionListInClosedFunction05(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInClosedFunction05, TestCompletionListInClosedFunction05);
-
 
 static void TestCompletionListInClosedFunction04(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -13073,7 +12490,6 @@ static void TestCompletionListInClosedFunction04(gostd::testing::T* t) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInClosedFunction04, TestCompletionListInClosedFunction04);
 
-
 static void TestCompletionListInClosedFunction03(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -13088,7 +12504,6 @@ static void TestCompletionListInClosedFunction03(gostd::testing::T* t) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInClosedFunction03, TestCompletionListInClosedFunction03);
 
-
 static void TestCompletionListInClosedFunction02(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -13102,7 +12517,6 @@ static void TestCompletionListInClosedFunction02(gostd::testing::T* t) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInClosedFunction02, TestCompletionListInClosedFunction02);
 
-
 static void TestCompletionListInClosedFunction01(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -13114,7 +12528,6 @@ static void TestCompletionListInClosedFunction01(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInClosedFunction01, TestCompletionListInClosedFunction01);
-
 
 static void TestCompletionListInClassStaticBlocks(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -13142,7 +12555,6 @@ class Foo {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInClassStaticBlocks, TestCompletionListInClassStaticBlocks);
 
-
 static void TestCompletionListInClassExpressionWithTypeParameter(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -13160,7 +12572,6 @@ static void TestCompletionListInClassExpressionWithTypeParameter(gostd::testing:
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInClassExpressionWithTypeParameter, TestCompletionListInClassExpressionWithTypeParameter);
 
-
 static void TestCompletionListInArrowFunctionInUnclosedCallSite01(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"Known failing fourslash test"}); return;
@@ -13173,7 +12584,6 @@ function getAllFiles(rootFileNames: string[]) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListInArrowFunctionInUnclosedCallSite01, TestCompletionListInArrowFunctionInUnclosedCallSite01);
-
 
 static void TestCompletionListImplementingInterfaceFunctions(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -13198,7 +12608,6 @@ var imp2: I1 = {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListImplementingInterfaceFunctions, TestCompletionListImplementingInterfaceFunctions);
 
-
 static void TestCompletionListFunctionMembers(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -13214,7 +12623,6 @@ fnc1./**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListFunctionMembers, TestCompletionListFunctionMembers);
-
 
 static void TestCompletionListFunctionExpression(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -13241,7 +12649,6 @@ class DataHandler {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListFunctionExpression, TestCompletionListFunctionExpression);
 
-
 static void TestCompletionListForUnicodeEscapeName(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -13256,7 +12663,6 @@ class \u0041 { /*2*/ }
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListForUnicodeEscapeName, TestCompletionListForUnicodeEscapeName);
-
 
 static void TestCompletionListForTransitivelyExportedMembers04(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -13294,7 +12700,6 @@ var x: c.Inner./**/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListForTransitivelyExportedMembers04, TestCompletionListForTransitivelyExportedMembers04);
 
-
 static void TestCompletionListForTransitivelyExportedMembers03(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -13330,7 +12735,6 @@ var x: c./**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListForTransitivelyExportedMembers03, TestCompletionListForTransitivelyExportedMembers03);
-
 
 static void TestCompletionListForTransitivelyExportedMembers02(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -13368,7 +12772,6 @@ var x = c.Inner./**/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListForTransitivelyExportedMembers02, TestCompletionListForTransitivelyExportedMembers02);
 
-
 static void TestCompletionListForTransitivelyExportedMembers01(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -13405,7 +12808,6 @@ var x = c./**/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListForTransitivelyExportedMembers01, TestCompletionListForTransitivelyExportedMembers01);
 
-
 static void TestCompletionListForShorthandPropertyAssignment(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -13416,7 +12818,6 @@ static void TestCompletionListForShorthandPropertyAssignment(gostd::testing::T* 
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListForShorthandPropertyAssignment, TestCompletionListForShorthandPropertyAssignment);
 
-
 static void TestCompletionListForShorthandPropertyAssignment2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -13426,7 +12827,6 @@ static void TestCompletionListForShorthandPropertyAssignment2(gostd::testing::T*
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListForShorthandPropertyAssignment2, TestCompletionListForShorthandPropertyAssignment2);
-
 
 static void TestCompletionListForRest(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -13444,7 +12844,6 @@ rest./*1*/x;)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListForRest, TestCompletionListForRest);
-
 
 static void TestCompletionListForObjectSpread(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -13476,7 +12875,6 @@ spreadUndefined./*4*/a;)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListForObjectSpread, TestCompletionListForObjectSpread);
 
-
 static void TestCompletionListForNonExportedMemberInAmbientModuleWithExportAssignment1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -13493,7 +12891,6 @@ export = x;
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListForNonExportedMemberInAmbientModuleWithExportAssignment1, TestCompletionListForNonExportedMemberInAmbientModuleWithExportAssignment1);
 
-
 static void TestCompletionListForGenericInstance1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -13508,7 +12905,6 @@ i/**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListForGenericInstance1, TestCompletionListForGenericInstance1);
-
 
 static void TestCompletionListForExportEquals(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -13529,7 +12925,6 @@ import { /**/ } from "foo";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListForExportEquals, TestCompletionListForExportEquals);
 
-
 static void TestCompletionListForExportEquals2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -13546,7 +12941,6 @@ import { /**/ } from "foo";)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListForExportEquals2, TestCompletionListForExportEquals2);
-
 
 static void TestCompletionListForDerivedType1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -13568,7 +12962,6 @@ f2./*2*/ // here bar has return type any, but bar2 is Foo2)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListForDerivedType1, TestCompletionListForDerivedType1);
-
 
 static void TestCompletionListEnumValues(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -13592,7 +12985,6 @@ foo()./*callOfEnumReturnType*/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListEnumValues, TestCompletionListEnumValues);
 
-
 static void TestCompletionListEnumMembers(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -13611,7 +13003,6 @@ Foo.bar./*enumValueReference*/;)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListEnumMembers, TestCompletionListEnumMembers);
 
-
 static void TestCompletionListDefaultTypeArgumentPositionTypeOnly(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -13623,7 +13014,6 @@ function test1<T = /*1*/>() {})TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListDefaultTypeArgumentPositionTypeOnly, TestCompletionListDefaultTypeArgumentPositionTypeOnly);
-
 
 static void TestCompletionListClassThisJS(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -13645,7 +13035,6 @@ class Foo {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListClassThisJS, TestCompletionListClassThisJS);
 
-
 static void TestCompletionListClassPrivateFields(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -13661,7 +13050,6 @@ class B extends A {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListClassPrivateFields, TestCompletionListClassPrivateFields);
-
 
 static void TestCompletionListClassMembers(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -13697,7 +13085,6 @@ c./*instanceMembersOutsideClassScope*/privateProperty;)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListClassMembers, TestCompletionListClassMembers);
 
-
 static void TestCompletionListClassMembersWithSuperClassFromUnknownNamespace(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -13709,7 +13096,6 @@ static void TestCompletionListClassMembersWithSuperClassFromUnknownNamespace(gos
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListClassMembersWithSuperClassFromUnknownNamespace, TestCompletionListClassMembersWithSuperClassFromUnknownNamespace);
-
 
 static void TestCompletionListCladule(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -13739,7 +13125,6 @@ f/*c3*/;)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListCladule, TestCompletionListCladule);
 
-
 static void TestCompletionListBuilderLocations_properties(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -13756,7 +13141,6 @@ class A2 {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListBuilderLocations_properties, TestCompletionListBuilderLocations_properties);
 
-
 static void TestCompletionListBuilderLocations_parameters(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -13772,7 +13156,6 @@ class bar7{ constructor(private a, /*6*/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListBuilderLocations_parameters, TestCompletionListBuilderLocations_parameters);
-
 
 static void TestCompletionListBuilderLocations_VariableDeclarations(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -13800,7 +13183,6 @@ var y = 10; y=/*var12*/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListBuilderLocations_VariableDeclarations, TestCompletionListBuilderLocations_VariableDeclarations);
 
-
 static void TestCompletionListBuilderLocations_Modules(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -13813,7 +13195,6 @@ module A./*moduleName2*/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListBuilderLocations_Modules, TestCompletionListBuilderLocations_Modules);
-
 
 static void TestCompletionListBeforeNewScope02(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -13829,7 +13210,6 @@ static void TestCompletionListBeforeNewScope02(gostd::testing::T* t) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListBeforeNewScope02, TestCompletionListBeforeNewScope02);
 
-
 static void TestCompletionListBeforeNewScope01(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -13843,7 +13223,6 @@ function fun(param) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListBeforeNewScope01, TestCompletionListBeforeNewScope01);
-
 
 static void TestCompletionListBeforeKeyword(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -13869,7 +13248,6 @@ namespace TypeModule3 {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListBeforeKeyword, TestCompletionListBeforeKeyword);
 
-
 static void TestCompletionListAtThisType(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -13891,7 +13269,6 @@ class Test {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAtThisType, TestCompletionListAtThisType);
-
 
 static void TestCompletionListAtNodeBoundary(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -13917,7 +13294,6 @@ var e = a.map(x => x./**/);)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAtNodeBoundary, TestCompletionListAtNodeBoundary);
-
 
 static void TestCompletionListAtInvalidLocations(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -13949,7 +13325,6 @@ var v10 = /reg/*inRegExp1*/ex/;)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAtInvalidLocations, TestCompletionListAtInvalidLocations);
 
-
 static void TestCompletionListAtIdentifierDefinitionLocations_varDeclarations(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -13963,7 +13338,6 @@ var a2, a/*varName4*/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAtIdentifierDefinitionLocations_varDeclarations, TestCompletionListAtIdentifierDefinitionLocations_varDeclarations);
-
 
 static void TestCompletionListAtIdentifierDefinitionLocations_properties(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -13996,7 +13370,6 @@ class A7 {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAtIdentifierDefinitionLocations_properties, TestCompletionListAtIdentifierDefinitionLocations_properties);
 
-
 static void TestCompletionListAtIdentifierDefinitionLocations_interfaces(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -14008,7 +13381,6 @@ interface a/*interfaceName2*/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAtIdentifierDefinitionLocations_interfaces, TestCompletionListAtIdentifierDefinitionLocations_interfaces);
-
 
 static void TestCompletionListAtIdentifierDefinitionLocations_infers(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -14023,7 +13395,6 @@ type Bar<T> = T extends { a: (x: infer /*1*/) => void; b: (x: infer U/*2*/) => v
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAtIdentifierDefinitionLocations_infers, TestCompletionListAtIdentifierDefinitionLocations_infers);
 
-
 static void TestCompletionListAtIdentifierDefinitionLocations_functions(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -14035,7 +13406,6 @@ function a/*functionName2*/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAtIdentifierDefinitionLocations_functions, TestCompletionListAtIdentifierDefinitionLocations_functions);
-
 
 static void TestCompletionListAtIdentifierDefinitionLocations_enums(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -14050,7 +13420,6 @@ var x = 0; enum /*enumName4*/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAtIdentifierDefinitionLocations_enums, TestCompletionListAtIdentifierDefinitionLocations_enums);
 
-
 static void TestCompletionListAtIdentifierDefinitionLocations_enumMembers(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -14062,7 +13431,6 @@ enum a { /*enumValueName1*/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAtIdentifierDefinitionLocations_enumMembers, TestCompletionListAtIdentifierDefinitionLocations_enumMembers);
 
-
 static void TestCompletionListAtIdentifierDefinitionLocations_enumMembers2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -14073,7 +13441,6 @@ enum a { foo, /*enumValueName3*/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAtIdentifierDefinitionLocations_enumMembers2, TestCompletionListAtIdentifierDefinitionLocations_enumMembers2);
-
 
 static void TestCompletionListAtIdentifierDefinitionLocations_destructuring(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -14100,7 +13467,6 @@ function func2({ a, b/*parameter2*/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAtIdentifierDefinitionLocations_destructuring, TestCompletionListAtIdentifierDefinitionLocations_destructuring);
 
-
 static void TestCompletionListAtIdentifierDefinitionLocations_classes(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -14113,7 +13479,6 @@ class a/*className2*/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAtIdentifierDefinitionLocations_classes, TestCompletionListAtIdentifierDefinitionLocations_classes);
 
-
 static void TestCompletionListAtIdentifierDefinitionLocations_catch(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -14125,7 +13490,6 @@ static void TestCompletionListAtIdentifierDefinitionLocations_catch(gostd::testi
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAtIdentifierDefinitionLocations_catch, TestCompletionListAtIdentifierDefinitionLocations_catch);
-
 
 static void TestCompletionListAtIdentifierDefinitionLocations_Generics(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -14142,7 +13506,6 @@ function A</*genericName5*/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAtIdentifierDefinitionLocations_Generics, TestCompletionListAtIdentifierDefinitionLocations_Generics);
 
-
 static void TestCompletionListAtEndOfWordInArrowFunction03(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -14152,7 +13515,6 @@ static void TestCompletionListAtEndOfWordInArrowFunction03(gostd::testing::T* t)
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAtEndOfWordInArrowFunction03, TestCompletionListAtEndOfWordInArrowFunction03);
-
 
 static void TestCompletionListAtEndOfWordInArrowFunction02(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -14164,7 +13526,6 @@ static void TestCompletionListAtEndOfWordInArrowFunction02(gostd::testing::T* t)
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAtEndOfWordInArrowFunction02, TestCompletionListAtEndOfWordInArrowFunction02);
 
-
 static void TestCompletionListAtEndOfWordInArrowFunction01(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -14174,7 +13535,6 @@ static void TestCompletionListAtEndOfWordInArrowFunction01(gostd::testing::T* t)
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAtEndOfWordInArrowFunction01, TestCompletionListAtEndOfWordInArrowFunction01);
-
 
 static void TestCompletionListAtEOF(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -14190,7 +13550,6 @@ static void TestCompletionListAtEOF(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAtEOF, TestCompletionListAtEOF);
-
 
 static void TestCompletionListAtEOF2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -14208,7 +13567,6 @@ var p = <Shapes.)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAtEOF2, TestCompletionListAtEOF2);
 
-
 static void TestCompletionListAtEOF1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -14219,7 +13577,6 @@ static void TestCompletionListAtEOF1(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAtEOF1, TestCompletionListAtEOF1);
-
 
 static void TestCompletionListAtDeclarationOfParameterType(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -14239,7 +13596,6 @@ function Blah(x: /**/Bar.Bleah) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAtDeclarationOfParameterType, TestCompletionListAtDeclarationOfParameterType);
 
-
 static void TestCompletionListAtBeginningOfIdentifierInArrowFunction01(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -14249,7 +13605,6 @@ static void TestCompletionListAtBeginningOfIdentifierInArrowFunction01(gostd::te
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAtBeginningOfIdentifierInArrowFunction01, TestCompletionListAtBeginningOfIdentifierInArrowFunction01);
-
 
 static void TestCompletionListAtBeginningOfFile01(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -14265,7 +13620,6 @@ enum E {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAtBeginningOfFile01, TestCompletionListAtBeginningOfFile01);
 
-
 static void TestCompletionListAndMemberListOnCommentedWhiteSpace(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -14273,7 +13627,6 @@ static void TestCompletionListAndMemberListOnCommentedWhiteSpace(gostd::testing:
   export class C { public pub = 0; private priv = 1; }
   export var V = 0;
 }
-
 
 var c = new M.C();
 
@@ -14287,7 +13640,6 @@ c. // test on c.
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAndMemberListOnCommentedWhiteSpace, TestCompletionListAndMemberListOnCommentedWhiteSpace);
 
-
 static void TestCompletionListAndMemberListOnCommentedLine(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -14299,7 +13651,6 @@ var)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAndMemberListOnCommentedLine, TestCompletionListAndMemberListOnCommentedLine);
 
-
 static void TestCompletionListAndMemberListOnCommentedDot(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -14307,7 +13658,6 @@ static void TestCompletionListAndMemberListOnCommentedDot(gostd::testing::T* t) 
   export class C { public pub = 0; private priv = 1; }
   export var V = 0;
 }
-
 
 var c = new M.C();
 
@@ -14320,7 +13670,6 @@ c. // test on c.
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAndMemberListOnCommentedDot, TestCompletionListAndMemberListOnCommentedDot);
-
 
 static void TestCompletionListAlreadyImportedNamespaceExportAlias(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -14346,7 +13695,6 @@ console.log(Grou/**/);)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAlreadyImportedNamespaceExportAlias, TestCompletionListAlreadyImportedNamespaceExportAlias);
 
-
 static void TestCompletionListAfterStringLiteralTypeWithNoSubstitutionTemplateLiteral(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -14357,7 +13705,6 @@ count = `[|/**/|]`)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAfterStringLiteralTypeWithNoSubstitutionTemplateLiteral, TestCompletionListAfterStringLiteralTypeWithNoSubstitutionTemplateLiteral);
-
 
 static void TestCompletionListAfterStringLiteral1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -14370,7 +13717,6 @@ static void TestCompletionListAfterStringLiteral1(gostd::testing::T* t) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAfterStringLiteral1, TestCompletionListAfterStringLiteral1);
 
-
 static void TestCompletionListAfterSpreadOperator01(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -14381,7 +13727,6 @@ let x = [.../**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAfterSpreadOperator01, TestCompletionListAfterSpreadOperator01);
-
 
 static void TestCompletionListAfterSlash(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -14394,7 +13739,6 @@ a/./**/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAfterSlash, TestCompletionListAfterSlash);
 
-
 static void TestCompletionListAfterRegularExpressionLiteral1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -14405,7 +13749,6 @@ static void TestCompletionListAfterRegularExpressionLiteral1(gostd::testing::T* 
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAfterRegularExpressionLiteral1, TestCompletionListAfterRegularExpressionLiteral1);
-
 
 static void TestCompletionListAfterRegularExpressionLiteral05(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -14418,7 +13761,6 @@ let x = /absidey/g/**/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAfterRegularExpressionLiteral05, TestCompletionListAfterRegularExpressionLiteral05);
 
-
 static void TestCompletionListAfterRegularExpressionLiteral04(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -14429,7 +13771,6 @@ let x = /absidey/ /**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAfterRegularExpressionLiteral04, TestCompletionListAfterRegularExpressionLiteral04);
-
 
 static void TestCompletionListAfterRegularExpressionLiteral03(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -14443,7 +13784,6 @@ let x = /absidey/
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAfterRegularExpressionLiteral03, TestCompletionListAfterRegularExpressionLiteral03);
 
-
 static void TestCompletionListAfterRegularExpressionLiteral02(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -14454,7 +13794,6 @@ let x = /absidey//**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAfterRegularExpressionLiteral02, TestCompletionListAfterRegularExpressionLiteral02);
-
 
 static void TestCompletionListAfterRegularExpressionLiteral01(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -14467,7 +13806,6 @@ let v = 100;
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAfterRegularExpressionLiteral01, TestCompletionListAfterRegularExpressionLiteral01);
-
 
 static void TestCompletionListAfterPropertyName(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -14535,7 +13873,6 @@ class Test14 {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAfterPropertyName, TestCompletionListAfterPropertyName);
 
-
 static void TestCompletionListAfterObjectLiteral1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -14545,7 +13882,6 @@ static void TestCompletionListAfterObjectLiteral1(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAfterObjectLiteral1, TestCompletionListAfterObjectLiteral1);
-
 
 static void TestCompletionListAfterNumericLiteral(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -14571,7 +13907,6 @@ static void TestCompletionListAfterNumericLiteral(gostd::testing::T* t) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAfterNumericLiteral, TestCompletionListAfterNumericLiteral);
 
-
 static void TestCompletionListAfterNumericLiteral1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -14581,7 +13916,6 @@ static void TestCompletionListAfterNumericLiteral1(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAfterNumericLiteral1, TestCompletionListAfterNumericLiteral1);
-
 
 static void TestCompletionListAfterInvalidCharacter(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -14597,7 +13931,6 @@ testModule./**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAfterInvalidCharacter, TestCompletionListAfterInvalidCharacter);
-
 
 static void TestCompletionListAfterFunction(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -14622,7 +13955,6 @@ function f4(d: number) { /*4*/})TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAfterFunction, TestCompletionListAfterFunction);
 
-
 static void TestCompletionListAfterFunction3(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -14636,7 +13968,6 @@ var x2 = (b: number) => {/*2*/ };)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAfterFunction3, TestCompletionListAfterFunction3);
-
 
 static void TestCompletionListAfterFunction2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -14653,7 +13984,6 @@ declare var f1: (b: number, b2: /*2*/) => void;)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAfterFunction2, TestCompletionListAfterFunction2);
-
 
 static void TestCompletionListAfterClassExtends(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -14673,7 +14003,6 @@ function Blah(x: Bar.Bleah) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAfterClassExtends, TestCompletionListAfterClassExtends);
 
-
 static void TestCompletionListAfterAnyType(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -14690,7 +14019,6 @@ function bar(a: myString) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionListAfterAnyType, TestCompletionListAfterAnyType);
 
-
 static void TestCompletionJsxNoCrash(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -14703,7 +14031,6 @@ static void TestCompletionJsxNoCrash(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionJsxNoCrash, TestCompletionJsxNoCrash);
-
 
 static void TestCompletionJSDocNoCrash(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -14723,7 +14050,6 @@ class ErrorMap {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionJSDocNoCrash, TestCompletionJSDocNoCrash);
-
 
 static void TestCompletionJSDocNoCrash2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -14745,7 +14071,6 @@ static void TestCompletionJSDocNoCrash2(gostd::testing::T* t) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionJSDocNoCrash2, TestCompletionJSDocNoCrash2);
 
-
 static void TestCompletionJSDocNamePath(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -14761,7 +14086,6 @@ export function cargo() {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionJSDocNamePath, TestCompletionJSDocNamePath);
-
 
 static void TestCompletionInsideObjectLiteralExpressionWithInstantiatedClassType(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -14798,7 +14122,6 @@ f3({ /*3*/ });)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionInsideObjectLiteralExpressionWithInstantiatedClassType, TestCompletionInsideObjectLiteralExpressionWithInstantiatedClassType);
 
-
 static void TestCompletionInsideFunctionContainsArguments(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -14818,7 +14141,6 @@ let g = () => /*5*/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionInsideFunctionContainsArguments, TestCompletionInsideFunctionContainsArguments);
 
-
 static void TestCompletionInfoWithExplicitTypeArguments(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -14835,7 +14157,6 @@ g<I>("[|/*g*/|]");)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionInfoWithExplicitTypeArguments, TestCompletionInfoWithExplicitTypeArguments);
-
 
 static void TestCompletionInUncheckedJSFile(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -14857,7 +14178,6 @@ console./*0*/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionInUncheckedJSFile, TestCompletionInUncheckedJSFile);
 
-
 static void TestCompletionInTypeOf2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -14870,7 +14190,6 @@ var x: typeof m1c./*1*/;)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionInTypeOf2, TestCompletionInTypeOf2);
-
 
 static void TestCompletionInTypeOf1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -14885,13 +14204,11 @@ var x: typeof m1c./*1*/;)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionInTypeOf1, TestCompletionInTypeOf1);
 
-
 static void TestCompletionInTernaryConditional(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
 		const std::string content = R"TS(export enum Bar { }
 export enum Foo { }
-
 
 function foo(x: Foo) { return x; }
 function bar(z: string, x: Foo) { return x; }
@@ -14909,7 +14226,6 @@ bar(a, a == '' ? /*3*/ : /*4*/);)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionInTernaryConditional, TestCompletionInTernaryConditional);
-
 
 static void TestCompletionInNamedImportLocation(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -14938,7 +14254,6 @@ import { x, y, await as await_, interface as interface_, unique, /*6*/ } from ".
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionInNamedImportLocation, TestCompletionInNamedImportLocation);
-
 
 static void TestCompletionInJsDoc(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -15011,7 +14326,6 @@ var v8;
 }
 REGISTER_FOURSLASH_TEST(TestCompletionInJsDoc, TestCompletionInJsDoc);
 
-
 static void TestCompletionInJsDocQualifiedNames(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -15028,7 +14342,6 @@ const x = 0;)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionInJsDocQualifiedNames, TestCompletionInJsDocQualifiedNames);
-
 
 static void TestCompletionInJSDocPropertyWithLinkNoCrash1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -15049,7 +14362,6 @@ export function foo() {}
 }
 REGISTER_FOURSLASH_TEST(TestCompletionInJSDocPropertyWithLinkNoCrash1, TestCompletionInJSDocPropertyWithLinkNoCrash1);
 
-
 static void TestCompletionInJSDocFunctionThis(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -15062,7 +14374,6 @@ var f = function (s) { return this/**/; })TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionInJSDocFunctionThis, TestCompletionInJSDocFunctionThis);
-
 
 static void TestCompletionInJSDocFunctionNew(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -15077,7 +14388,6 @@ var f = function () { return new/**/; })TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionInJSDocFunctionNew, TestCompletionInJSDocFunctionNew);
 
-
 static void TestCompletionInIncompleteCallExpression(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -15090,7 +14400,6 @@ a4(...<crash>/**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionInIncompleteCallExpression, TestCompletionInIncompleteCallExpression);
-
 
 static void TestCompletionInFunctionLikeBody_includesPrimitiveTypes(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -15113,7 +14422,6 @@ function excludesTypes2() {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionInFunctionLikeBody_includesPrimitiveTypes, TestCompletionInFunctionLikeBody_includesPrimitiveTypes);
-
 
 static void TestCompletionInChecks1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -15149,7 +14457,6 @@ if ("/*7*/" in c2) {})TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionInChecks1, TestCompletionInChecks1);
 
-
 static void TestCompletionInAugmentedClassModule(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -15161,7 +14468,6 @@ var x: m3f./**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionInAugmentedClassModule, TestCompletionInAugmentedClassModule);
-
 
 static void TestCompletionInArrayLiteralAfterInvalidToken1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -15176,7 +14482,6 @@ static void TestCompletionInArrayLiteralAfterInvalidToken1(gostd::testing::T* t)
 }
 REGISTER_FOURSLASH_TEST(TestCompletionInArrayLiteralAfterInvalidToken1, TestCompletionInArrayLiteralAfterInvalidToken1);
 
-
 static void TestCompletionImportModuleSpecifierEndingUnsupportedExtension(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -15190,7 +14495,6 @@ import ".//**/")TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionImportModuleSpecifierEndingUnsupportedExtension, TestCompletionImportModuleSpecifierEndingUnsupportedExtension);
-
 
 static void TestCompletionImportModuleSpecifierEndingTsxReact(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -15207,7 +14511,6 @@ import { Test } from ".//**/")TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionImportModuleSpecifierEndingTsxReact, TestCompletionImportModuleSpecifierEndingTsxReact);
 
-
 static void TestCompletionImportModuleSpecifierEndingTsxPreserve(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -15222,7 +14525,6 @@ import { Test } from ".//**/")TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionImportModuleSpecifierEndingTsxPreserve, TestCompletionImportModuleSpecifierEndingTsxPreserve);
-
 
 static void TestCompletionImportModuleSpecifierEndingTs(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -15240,7 +14542,6 @@ import { f } from ".//**/")TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionImportModuleSpecifierEndingTs, TestCompletionImportModuleSpecifierEndingTs);
 
-
 static void TestCompletionImportModuleSpecifierEndingJsx(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -15256,7 +14557,6 @@ import { Test } from ".//**/")TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionImportModuleSpecifierEndingJsx, TestCompletionImportModuleSpecifierEndingJsx);
-
 
 static void TestCompletionImportModuleSpecifierEndingJs(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -15275,7 +14575,6 @@ import { f } from ".//**/")TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionImportModuleSpecifierEndingJs, TestCompletionImportModuleSpecifierEndingJs);
 
-
 static void TestCompletionImportModuleSpecifierEndingDts(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -15289,7 +14588,6 @@ import { Test } from ".//**/")TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionImportModuleSpecifierEndingDts, TestCompletionImportModuleSpecifierEndingDts);
-
 
 static void TestCompletionImportMeta(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -15309,7 +14607,6 @@ import./*3*/meta)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionImportMeta, TestCompletionImportMeta);
-
 
 static void TestCompletionImportMetaWithGlobalDeclaration(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -15337,7 +14634,6 @@ import./*4*/meta)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionImportMetaWithGlobalDeclaration, TestCompletionImportMetaWithGlobalDeclaration);
 
-
 static void TestCompletionImportKeywordNoCrash(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -15357,7 +14653,6 @@ static void TestCompletionImportKeywordNoCrash(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionImportKeywordNoCrash, TestCompletionImportKeywordNoCrash);
-
 
 static void TestCompletionImportAttributes(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -15381,7 +14676,6 @@ export default {};
 }
 REGISTER_FOURSLASH_TEST(TestCompletionImportAttributes, TestCompletionImportAttributes);
 
-
 static void TestCompletionForStringLiteral(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"Known failing fourslash test"}); return;
@@ -15397,7 +14691,6 @@ f("/*2*/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteral, TestCompletionForStringLiteral);
-
 
 static void TestCompletionForStringLiteral_quotePreference(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -15420,7 +14713,6 @@ const b: B = {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteral_quotePreference, TestCompletionForStringLiteral_quotePreference);
 
-
 static void TestCompletionForStringLiteral_quotePreference8(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -15437,7 +14729,6 @@ foo[|./**/|])TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteral_quotePreference8, TestCompletionForStringLiteral_quotePreference8);
-
 
 static void TestCompletionForStringLiteral_quotePreference7(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -15456,7 +14747,6 @@ foo[|./**/|])TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteral_quotePreference7, TestCompletionForStringLiteral_quotePreference7);
 
-
 static void TestCompletionForStringLiteral_quotePreference6(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"Known failing fourslash test"}); return;
@@ -15468,7 +14758,6 @@ const t: T = /**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteral_quotePreference6, TestCompletionForStringLiteral_quotePreference6);
-
 
 static void TestCompletionForStringLiteral_quotePreference5(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -15482,7 +14771,6 @@ const t: T = /**/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteral_quotePreference5, TestCompletionForStringLiteral_quotePreference5);
 
-
 static void TestCompletionForStringLiteral_quotePreference4(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"Known failing fourslash test"}); return;
@@ -15494,7 +14782,6 @@ const t: T = /**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteral_quotePreference4, TestCompletionForStringLiteral_quotePreference4);
-
 
 static void TestCompletionForStringLiteral_quotePreference3(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -15509,7 +14796,6 @@ a[|./**/|])TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteral_quotePreference3, TestCompletionForStringLiteral_quotePreference3);
 
-
 static void TestCompletionForStringLiteral_quotePreference2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -15522,7 +14808,6 @@ a[|./**/|])TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteral_quotePreference2, TestCompletionForStringLiteral_quotePreference2);
-
 
 static void TestCompletionForStringLiteral_quotePreference1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -15545,7 +14830,6 @@ const b: B = {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteral_quotePreference1, TestCompletionForStringLiteral_quotePreference1);
 
-
 static void TestCompletionForStringLiteral_mappedTypeMembers(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -15561,7 +14845,6 @@ type B = A["[|/**/|]"])TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteral_mappedTypeMembers, TestCompletionForStringLiteral_mappedTypeMembers);
-
 
 static void TestCompletionForStringLiteral_details(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -15589,7 +14872,6 @@ o["[|/*prop*/|]"];)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteral_details, TestCompletionForStringLiteral_details);
 
-
 static void TestCompletionForStringLiteralWithDynamicImport(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -15613,7 +14895,6 @@ export var x = 9;)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteralWithDynamicImport, TestCompletionForStringLiteralWithDynamicImport);
-
 
 static void TestCompletionForStringLiteralRelativeImportAllowJSTrue(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -15648,7 +14929,6 @@ var foo6 = require("./f/*require1*/
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteralRelativeImportAllowJSTrue, TestCompletionForStringLiteralRelativeImportAllowJSTrue);
 
-
 static void TestCompletionForStringLiteralRelativeImport6(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -15671,7 +14951,6 @@ var foo3 = require("./dir//*require2*/
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteralRelativeImport6, TestCompletionForStringLiteralRelativeImport6);
-
 
 static void TestCompletionForStringLiteralRelativeImport5(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -15702,7 +14981,6 @@ var foo3 = require(".//*require3*/
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteralRelativeImport5, TestCompletionForStringLiteralRelativeImport5);
-
 
 static void TestCompletionForStringLiteralRelativeImport4(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -15745,7 +15023,6 @@ export const x = 0;
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteralRelativeImport4, TestCompletionForStringLiteralRelativeImport4);
 
-
 static void TestCompletionForStringLiteralNonrelativeImportTypings3(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -15767,7 +15044,6 @@ export var y = 9;
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteralNonrelativeImportTypings3, TestCompletionForStringLiteralNonrelativeImportTypings3);
-
 
 static void TestCompletionForStringLiteralNonrelativeImportTypings2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -15791,7 +15067,6 @@ export var z = 9;)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteralNonrelativeImportTypings2, TestCompletionForStringLiteralNonrelativeImportTypings2);
 
-
 static void TestCompletionForStringLiteralNonrelativeImportTypings1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -15814,7 +15089,6 @@ export var z = 9;)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteralNonrelativeImportTypings1, TestCompletionForStringLiteralNonrelativeImportTypings1);
-
 
 static void TestCompletionForStringLiteralNonrelativeImport9(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -15843,7 +15117,6 @@ export var y = 10;)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteralNonrelativeImport9, TestCompletionForStringLiteralNonrelativeImport9);
 
-
 static void TestCompletionForStringLiteralNonrelativeImport7(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -15863,7 +15136,6 @@ export var x = 5;
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteralNonrelativeImport7, TestCompletionForStringLiteralNonrelativeImport7);
-
 
 static void TestCompletionForStringLiteralNonrelativeImport4(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -15889,7 +15161,6 @@ var foo7 = require("f/*require0*/
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteralNonrelativeImport4, TestCompletionForStringLiteralNonrelativeImport4);
-
 
 static void TestCompletionForStringLiteralNonrelativeImport3(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -15921,7 +15192,6 @@ var foo3 = require("fake-module//*require0*/
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteralNonrelativeImport3, TestCompletionForStringLiteralNonrelativeImport3);
 
-
 static void TestCompletionForStringLiteralNonrelativeImport2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -15951,7 +15221,6 @@ declare module "fake-module/other")TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteralNonrelativeImport2, TestCompletionForStringLiteralNonrelativeImport2);
 
-
 static void TestCompletionForStringLiteralNonrelativeImport18(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -15972,7 +15241,6 @@ export {})TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteralNonrelativeImport18, TestCompletionForStringLiteralNonrelativeImport18);
-
 
 static void TestCompletionForStringLiteralNonrelativeImport17(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -15995,7 +15263,6 @@ export {})TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteralNonrelativeImport17, TestCompletionForStringLiteralNonrelativeImport17);
 
-
 static void TestCompletionForStringLiteralNonrelativeImport12(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -16015,7 +15282,6 @@ var foo3 = require("m/*require0*/
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteralNonrelativeImport12, TestCompletionForStringLiteralNonrelativeImport12);
-
 
 static void TestCompletionForStringLiteralNonrelativeImport10(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -16042,7 +15308,6 @@ var foo9 = require("fake-module/*require1*/
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteralNonrelativeImport10, TestCompletionForStringLiteralNonrelativeImport10);
 
-
 static void TestCompletionForStringLiteralInIndexedAccess01(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -16057,7 +15322,6 @@ let x: Foo["[|/*1*/|]"])TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteralInIndexedAccess01, TestCompletionForStringLiteralInIndexedAccess01);
-
 
 static void TestCompletionForStringLiteralImport2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -16083,7 +15347,6 @@ export var x = 9;)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteralImport2, TestCompletionForStringLiteralImport2);
 
-
 static void TestCompletionForStringLiteralImport1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -16108,7 +15371,6 @@ export var x = 9;)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteralImport1, TestCompletionForStringLiteralImport1);
 
-
 static void TestCompletionForStringLiteralFromSignature(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -16121,7 +15383,6 @@ f("[|/**/|]");)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteralFromSignature, TestCompletionForStringLiteralFromSignature);
 
-
 static void TestCompletionForStringLiteralFromSignature2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -16133,7 +15394,6 @@ f("/**/", 0);)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteralFromSignature2, TestCompletionForStringLiteralFromSignature2);
-
 
 static void TestCompletionForStringLiteralExport(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -16160,7 +15420,6 @@ export var x = 9;)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteralExport, TestCompletionForStringLiteralExport);
 
-
 static void TestCompletionForStringLiteral8(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -16173,7 +15432,6 @@ if (a === '/**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteral8, TestCompletionForStringLiteral8);
-
 
 static void TestCompletionForStringLiteral5(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -16191,7 +15449,6 @@ f("/*1*/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteral5, TestCompletionForStringLiteral5);
-
 
 static void TestCompletionForStringLiteral4(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -16219,7 +15476,6 @@ f/*1*/('literal', 'literal', "[|o/*2*/ther1|]", 12);)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteral4, TestCompletionForStringLiteral4);
 
-
 static void TestCompletionForStringLiteral3(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -16237,7 +15493,6 @@ f("/*2*/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteral3, TestCompletionForStringLiteral3);
-
 
 static void TestCompletionForStringLiteral2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -16259,7 +15514,6 @@ p["[|/*3*/|]"];)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteral2, TestCompletionForStringLiteral2);
-
 
 static void TestCompletionForStringLiteral16(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -16285,7 +15539,6 @@ f2<Foo>("/*8*/", "/*9*/",,,);)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteral16, TestCompletionForStringLiteral16);
 
-
 static void TestCompletionForStringLiteral15(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -16297,7 +15550,6 @@ static void TestCompletionForStringLiteral15(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteral15, TestCompletionForStringLiteral15);
-
 
 static void TestCompletionForStringLiteral14(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -16313,7 +15565,6 @@ type Bar = Record<keyof Foo, any>["[|/**/|]"];)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteral14, TestCompletionForStringLiteral14);
-
 
 static void TestCompletionForStringLiteral13(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -16334,7 +15585,6 @@ Promise["/*1*/"];)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteral13, TestCompletionForStringLiteral13);
 
-
 static void TestCompletionForStringLiteral12(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -16347,7 +15597,6 @@ foo("[|/**/|]"))TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteral12, TestCompletionForStringLiteral12);
-
 
 static void TestCompletionForStringLiteral11(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -16363,7 +15612,6 @@ switch (a) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForStringLiteral11, TestCompletionForStringLiteral11);
-
 
 static void TestCompletionForQuotedPropertyInPropertyAssignment4(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -16383,7 +15631,6 @@ foo({
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForQuotedPropertyInPropertyAssignment4, TestCompletionForQuotedPropertyInPropertyAssignment4);
-
 
 static void TestCompletionForQuotedPropertyInPropertyAssignment3(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -16407,7 +15654,6 @@ static void TestCompletionForQuotedPropertyInPropertyAssignment3(gostd::testing:
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForQuotedPropertyInPropertyAssignment3, TestCompletionForQuotedPropertyInPropertyAssignment3);
-
 
 static void TestCompletionForQuotedPropertyInPropertyAssignment2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -16433,7 +15679,6 @@ config = {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForQuotedPropertyInPropertyAssignment2, TestCompletionForQuotedPropertyInPropertyAssignment2);
 
-
 static void TestCompletionForQuotedPropertyInPropertyAssignment1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -16452,7 +15697,6 @@ files = {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForQuotedPropertyInPropertyAssignment1, TestCompletionForQuotedPropertyInPropertyAssignment1);
-
 
 static void TestCompletionForObjectProperty(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -16489,7 +15733,6 @@ const test8: { foo: string } = { foo/*8*/ })TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForObjectProperty, TestCompletionForObjectProperty);
 
-
 static void TestCompletionForMetaProperty(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"Known failing fourslash test"}); return;
@@ -16504,7 +15747,6 @@ function test() { new./*3*/ })TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForMetaProperty, TestCompletionForMetaProperty);
-
 
 static void TestCompletionForComputedStringProperties(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -16522,7 +15764,6 @@ a[|./**/|])TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionForComputedStringProperties, TestCompletionForComputedStringProperties);
 
-
 static void TestCompletionFilterText4(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -16534,7 +15775,6 @@ x[|.|]/**/;
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionFilterText4, TestCompletionFilterText4);
-
 
 static void TestCompletionFilterText3(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -16567,7 +15807,6 @@ if (true) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionFilterText3, TestCompletionFilterText3);
 
-
 static void TestCompletionFilterText2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -16586,7 +15825,6 @@ else {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionFilterText2, TestCompletionFilterText2);
-
 
 static void TestCompletionFilterText1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -16661,7 +15899,6 @@ class Foo8 {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionFilterText1, TestCompletionFilterText1);
 
-
 static void TestCompletionExportFrom(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -16672,7 +15909,6 @@ export {} /*2*/;)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionExportFrom, TestCompletionExportFrom);
-
 
 static void TestCompletionEntryOnNarrowedType(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -16693,7 +15929,6 @@ static void TestCompletionEntryOnNarrowedType(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionEntryOnNarrowedType, TestCompletionEntryOnNarrowedType);
-
 
 static void TestCompletionEntryForUnionProperty(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -16717,7 +15952,6 @@ x./**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionEntryForUnionProperty, TestCompletionEntryForUnionProperty);
-
 
 static void TestCompletionEntryForUnionProperty2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -16747,7 +15981,6 @@ x.anotherProperty./*2*/;)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionEntryForUnionProperty2, TestCompletionEntryForUnionProperty2);
 
-
 static void TestCompletionEntryForShorthandPropertyAssignment(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -16757,7 +15990,6 @@ static void TestCompletionEntryForShorthandPropertyAssignment(gostd::testing::T*
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionEntryForShorthandPropertyAssignment, TestCompletionEntryForShorthandPropertyAssignment);
-
 
 static void TestCompletionEntryForPropertyFromUnionOfModuleType(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -16778,7 +16010,6 @@ var j = q./*1*/)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionEntryForPropertyFromUnionOfModuleType, TestCompletionEntryForPropertyFromUnionOfModuleType);
 
-
 static void TestCompletionEntryForPropertyConstrainedToString(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -16790,7 +16021,6 @@ test({ type: /*ts*/ }))TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionEntryForPropertyConstrainedToString, TestCompletionEntryForPropertyConstrainedToString);
-
 
 static void TestCompletionEntryForDeferredMappedTypeMembers(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -16810,7 +16040,6 @@ out.a.a./*3*/a)TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionEntryForDeferredMappedTypeMembers, TestCompletionEntryForDeferredMappedTypeMembers);
 
-
 static void TestCompletionEntryForConst(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -16827,7 +16056,6 @@ const e = 1
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionEntryForConst, TestCompletionEntryForConst);
-
 
 static void TestCompletionEntryForClassMembers_StaticWhenBaseTypeIsNotResolved(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -16848,7 +16076,6 @@ class Slider extends React.Component {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionEntryForClassMembers_StaticWhenBaseTypeIsNotResolved, TestCompletionEntryForClassMembers_StaticWhenBaseTypeIsNotResolved);
 
-
 static void TestCompletionEntryForArrayElementConstrainedToString(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"Known failing fourslash test"}); return;
@@ -16861,7 +16088,6 @@ test({ foo: [/*ts*/] }))TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionEntryForArrayElementConstrainedToString, TestCompletionEntryForArrayElementConstrainedToString);
-
 
 static void TestCompletionEntryForArrayElementConstrainedToString2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -16876,7 +16102,6 @@ test({ foo: ['a', /*ts*/] }))TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionEntryForArrayElementConstrainedToString2, TestCompletionEntryForArrayElementConstrainedToString2);
 
-
 static void TestCompletionEntryForArgumentConstrainedToString(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"Known failing fourslash test"}); return;
@@ -16890,7 +16115,6 @@ test(/*ts*/)
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionEntryForArgumentConstrainedToString, TestCompletionEntryForArgumentConstrainedToString);
-
 
 static void TestCompletionEntryClassMembersWithInferredFunctionReturnType1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -16913,7 +16137,6 @@ export default abstract class ExpressionParser extends Tokenizer {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionEntryClassMembersWithInferredFunctionReturnType1, TestCompletionEntryClassMembersWithInferredFunctionReturnType1);
-
 
 static void TestCompletionEntryAfterASIExpressionInClass(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -16940,7 +16163,6 @@ class ChildTwo extends Parent {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionEntryAfterASIExpressionInClass, TestCompletionEntryAfterASIExpressionInClass);
-
 
 static void TestCompletionDetailsOfContextSensitiveParameterNoCrash(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -17038,7 +16260,6 @@ export const createStyling: CurriedFunction3<
 }
 REGISTER_FOURSLASH_TEST(TestCompletionDetailsOfContextSensitiveParameterNoCrash, TestCompletionDetailsOfContextSensitiveParameterNoCrash);
 
-
 static void TestCompletionDetailSignature(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -17057,7 +16278,6 @@ function foo(x: number): number)TS", .SortText = std::string(ls::SortTextLocatio
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionDetailSignature, TestCompletionDetailSignature);
-
 
 static void TestCompletionColonToken(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -17079,7 +16299,6 @@ function c(enum: /*c*/) {}
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionColonToken, TestCompletionColonToken);
-
 
 static void TestCompletionCloneQuestionToken(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -17104,7 +16323,6 @@ class Foo extends Bar<TwoKeys> {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionCloneQuestionToken, TestCompletionCloneQuestionToken);
 
-
 static void TestClassMembersAfterConstAssertionInitializer(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -17124,7 +16342,6 @@ class B implements A {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestClassMembersAfterConstAssertionInitializer, TestClassMembersAfterConstAssertionInitializer);
-
 
 static void TestCompletionClassMemberSnippetCrossFileNodeReuse1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -17159,7 +16376,6 @@ export class CollapsibleContainerNode extends ElementNode {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionClassMemberSnippetCrossFileNodeReuse1, TestCompletionClassMemberSnippetCrossFileNodeReuse1);
 
-
 static void TestCompletionClassMemberAfterJSDocWithInvalidJSDocTagInTheComment1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -17183,7 +16399,6 @@ static void TestCompletionClassMemberAfterJSDocWithInvalidJSDocTagInTheComment1(
 }
 REGISTER_FOURSLASH_TEST(TestCompletionClassMemberAfterJSDocWithInvalidJSDocTagInTheComment1, TestCompletionClassMemberAfterJSDocWithInvalidJSDocTagInTheComment1);
 
-
 static void TestCompletionBeforeSemanticDiagnosticsInArrowFunction1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -17198,7 +16413,6 @@ static void TestCompletionBeforeSemanticDiagnosticsInArrowFunction1(gostd::testi
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionBeforeSemanticDiagnosticsInArrowFunction1, TestCompletionBeforeSemanticDiagnosticsInArrowFunction1);
-
 
 static void TestCompletionAutoInsertQuestionDot(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -17218,7 +16432,6 @@ user.address[|./**/|])TS";
 }
 REGISTER_FOURSLASH_TEST(TestCompletionAutoInsertQuestionDot, TestCompletionAutoInsertQuestionDot);
 
-
 static void TestCompletionAtDottedNamespace(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -17228,7 +16441,6 @@ static void TestCompletionAtDottedNamespace(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionAtDottedNamespace, TestCompletionAtDottedNamespace);
-
 
 static void TestCompletionAtCaseClause(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -17240,7 +16452,6 @@ case /**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionAtCaseClause, TestCompletionAtCaseClause);
-
 
 static void TestCompletionAsKeyword(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -17255,7 +16466,6 @@ function foo() {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionAsKeyword, TestCompletionAsKeyword);
 
-
 static void TestCompletionAmbientPropertyDeclaration(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -17269,7 +16479,6 @@ static void TestCompletionAmbientPropertyDeclaration(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionAmbientPropertyDeclaration, TestCompletionAmbientPropertyDeclaration);
-
 
 static void TestCompletionAfterTrailingAtInJSDoc1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -17300,7 +16509,6 @@ function baz(y) {}
 }
 REGISTER_FOURSLASH_TEST(TestCompletionAfterTrailingAtInJSDoc1, TestCompletionAfterTrailingAtInJSDoc1);
 
-
 static void TestCompletionAfterQuestionDot(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"Known failing fourslash test"}); return;
@@ -17327,7 +16535,6 @@ class User {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionAfterQuestionDot, TestCompletionAfterQuestionDot);
 
-
 static void TestCompletionAfterNewline(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -17342,7 +16549,6 @@ let foo /*1*/
 }
 REGISTER_FOURSLASH_TEST(TestCompletionAfterNewline, TestCompletionAfterNewline);
 
-
 static void TestCompletionAfterNewline2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -17356,7 +16562,6 @@ let foo = 5 as const /*1*/
 }
 REGISTER_FOURSLASH_TEST(TestCompletionAfterNewline2, TestCompletionAfterNewline2);
 
-
 static void TestCompletionAfterImportWithJSDoc(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -17368,7 +16573,6 @@ import /**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionAfterImportWithJSDoc, TestCompletionAfterImportWithJSDoc);
-
 
 static void TestCompletionAfterExtendsL10nInJs(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -17405,7 +16609,6 @@ class GenericL10n extends L10n/*1*/ {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionAfterExtendsL10nInJs, TestCompletionAfterExtendsL10nInJs);
 
-
 static void TestCompletionAfterDotDotDot(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -17417,7 +16620,6 @@ static void TestCompletionAfterDotDotDot(gostd::testing::T* t) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionAfterDotDotDot, TestCompletionAfterDotDotDot);
 
-
 static void TestCompletionAfterCallExpression(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -17427,7 +16629,6 @@ static void TestCompletionAfterCallExpression(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionAfterCallExpression, TestCompletionAfterCallExpression);
-
 
 static void TestCompletionAfterBrace(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -17442,7 +16643,6 @@ static void TestCompletionAfterBrace(gostd::testing::T* t) {
 }
 REGISTER_FOURSLASH_TEST(TestCompletionAfterBrace, TestCompletionAfterBrace);
 
-
 static void TestCompletionAfterBackslashFollowingString(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -17453,7 +16653,6 @@ Harness.newLine = ""\n/**/)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCompletionAfterBackslashFollowingString, TestCompletionAfterBackslashFollowingString);
-
 
 static void TestCompletionAfterAtChar(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {

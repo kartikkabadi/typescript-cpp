@@ -686,7 +686,7 @@ cm::DiagnosticDirectives protocolDiagnosticDirectives(
 	return dd;
 }
 
-cm::Mapper* mapper(std::string name, std::string version = "1.0.0",
+[[maybe_unused]] cm::Mapper* mapper(std::string name, std::string version = "1.0.0",
                    std::vector<std::string> exec = {"mapper"}) {
 	auto* m = new cm::Mapper();
 	m->Manifest.Name = std::move(name);

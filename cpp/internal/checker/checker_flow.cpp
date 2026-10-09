@@ -170,11 +170,11 @@ bool isEqualityOperator(Kind kind) {
 		   kind == Kind::ExclamationEqualsEqualsToken;
 }
 
-bool isEqualityOperatorOrHigher(Kind kind) {
+[[maybe_unused]] bool isEqualityOperatorOrHigher(Kind kind) {
 	return isEqualityOperator(kind) || isRelationalOperatorOrHigher(kind);
 }
 
-bool isBitwiseOperator(Kind kind) {
+[[maybe_unused]] bool isBitwiseOperator(Kind kind) {
 	return kind == Kind::AmpersandToken || kind == Kind::BarToken ||
 		   kind == Kind::CaretToken;
 }
@@ -3024,9 +3024,9 @@ Type* Checker::getExplicitTypeOfSymbol(Symbol* symbol, Diagnostic* diagnostic) {
 
 // isDeclarationWithExplicitTypeAnnotation (flow.go)
 bool Checker::isDeclarationWithExplicitTypeAnnotation(Node* node) {
-	return (isVariableDeclaration(node) || isPropertyDeclaration(node) ||
+	return ((isVariableDeclaration(node) || isPropertyDeclaration(node) ||
 			isPropertySignatureDeclaration(node) || isParameterDeclaration(node)) &&
-			   node->type() != nullptr ||
+			   node->type() != nullptr) ||
 		   isExpandoPropertyFunctionWithReturnTypeAnnotation(node);
 }
 

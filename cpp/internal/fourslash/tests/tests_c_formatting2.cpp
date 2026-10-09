@@ -19,23 +19,7 @@ namespace {
 using namespace tsc;
 namespace tsu = tsc::fourslash::tests::util;
 
-static std::vector<fourslash::MarkerOrRangeOrName> asMonVec(
-	const std::vector<std::any> &v) {
-	std::vector<fourslash::MarkerOrRangeOrName> out;
-	out.reserve(v.size());
-	for (auto &e : v) {
-		if (auto *p = std::any_cast<std::shared_ptr<fourslash::Marker>>(&e))
-			out.push_back(*p);
-		else if (auto *p =
-					 std::any_cast<std::shared_ptr<fourslash::RangeMarker>>(&e))
-			out.push_back(*p);
-		else if (auto *p = std::any_cast<std::string>(&e)) out.push_back(*p);
-	}
-	return out;
-}
-
-
-static std::pair<std::shared_ptr<fourslash::FourslashTest>, std::function<void()>> newContentMapperFourslash(gostd::testing::T* t, std::string content, std::string mapper, const std::vector<std::string>& extensions) {
+[[maybe_unused]] static std::pair<std::shared_ptr<fourslash::FourslashTest>, std::function<void()>> newContentMapperFourslash(gostd::testing::T* t, std::string content, std::string mapper, const std::vector<std::string>& extensions) {
 	t->Helper();
 	auto quotedExtensions = std::vector<std::string>(int(extensions.size()));
 	{
@@ -147,7 +131,6 @@ static void TestFormatAfterWhitespace(gostd::testing::T* t) {
 		f->VerifyCurrentFileContent(t, R"TS(function foo()
 {
     var bar;
-
 
 })TS");
 	});
@@ -990,7 +973,6 @@ static void TestFormatInterfaceWithMissingBraceAndLaterTemplateString1(gostd::te
 interface Props {
   iconOnly?: boolean
 
-
 const ResourceCard: React.FC<Props> = (props) => {
   return (
     <IoLayersOutline
@@ -1005,7 +987,6 @@ export default ResourceCard
 		f->FormatDocument(t, "");
 		f->VerifyCurrentFileContent(t, ((((std::string(R"TS(interface Props {
     iconOnly?: boolean
-
 
 const ResourceCard: React.FC<Props> = (props) => {
     return (
@@ -1388,7 +1369,6 @@ const a2 = )TS")) + std::string("`")) + std::string(R"TS(
     ${ 1 }${ 1 }
 )TS")) + std::string("`")) + std::string(R"TS(;
 const a3 = )TS")) + std::string("`")) + std::string(R"TS(
-
 
     ${ 1 }${ 1 }
 )TS")) + std::string("`")) + std::string(R"TS(;
@@ -2080,7 +2060,6 @@ static void TestFormatSelectionWithTrivia2(gostd::testing::T* t) {
 		f->FormatSelection(t, "begin", "end");
 		f->VerifyCurrentFileContent(t, R"TS(;
 
-
     )TS");
 	});
 }
@@ -2325,7 +2304,6 @@ const a2 = )TS")) + std::string("`")) + std::string(R"TS(
     ${1}${1}
 )TS")) + std::string("`")) + std::string(R"TS(;
 const a3 = )TS")) + std::string("`")) + std::string(R"TS(
-
 
     ${1}${1}
 )TS")) + std::string("`")) + std::string(R"TS(;
@@ -3330,13 +3308,11 @@ static void TestFormattingFatArrowFunctions(gostd::testing::T* t) {
         false        ?        null     :        (        arg    ?           :    number     = 0 )           =>    67  ;/*49*/
     false        ?        null     :        (                 ...     arg    :    number   [      ]    )           =>    68  ;/*50*/
 
-
 // nested ternary expressions
     ((        a    ?        )           =>    { return a  ;    })     ?            (        b    ?         )           =>    { return b  ;    }     :        (        c    ?         )           =>    { return c  ;    }  ;/*51*/
 
 //multiple levels
     ((        a    ?        )           =>    { return a  ;    })     ?            (        b )          =>       (        c )          =>   81     :        (        c )          =>       (        d )          =>   82  ;/*52*/
-
 
 // In Expressions
     (            (        arg )           =>    90 )     instanceof Function  ;/*53*/
@@ -3357,7 +3333,6 @@ static void TestFormattingFatArrowFunctions(gostd::testing::T* t) {
       (            (                 ...     arg    :   number   [      ]    )           =>    0 )        +    ''    +        ((                 ...     arg    :   number   [      ]    )           =>    107)  ;/*67*/
     (            (        arg1   ,    arg2    ?        )           =>    0 )        +    ''    +        ((        arg1   ,   arg2    ?        )           =>    108)  ;/*68*/
       (            (        arg1   ,             ...     arg2    :   number   [      ]    )           =>    0 )        +    ''    +        ((        arg1   ,             ...     arg2    :   number   [      ]    )           =>    108)  ;/*69*/
-
 
 // Function Parameters
 /*70*/function foo    (                 ...     arg    :    any   [      ]    )     { }
@@ -5040,8 +5015,6 @@ static void TestFormattingOnEmptyInterfaceLiteral(gostd::testing::T* t) {
 
 /*2*/foo    (  {     }   )    ;
 
-
-
 /*3*/            interface    bar    {
 /*4*/                x   :    {     }   ;
 /*5*/       y  :       (         )    =>    {     }   ;
@@ -5213,7 +5186,6 @@ static void TestFormattingOnInvalidCodes(gostd::testing::T* t) {
 /*60*/}
 
 /*61*/    $(document).ready ();
-
 
 /*62*/ function  pageLoad() {
 /*63*/ $('#TextBox1' ) .     unbind   (  ) ;
@@ -5676,8 +5648,6 @@ static void TestFormattingOnStatementsWithNoSemicolon(gostd::testing::T* t) {
 /*59*/x+=2
 /*60*/else
 /*61*/x+=2
-
-
 
 /*62*/;
          do do do do/*63*/

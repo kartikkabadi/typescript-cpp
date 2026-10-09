@@ -101,19 +101,19 @@ Type* Checker::parseBigIntLiteralType(const std::string& text) {
 	return getBigIntLiteralType(parseValidBigInt(text));
 }
 
-static std::string getStringLiteralValue(Type* t) {
+[[maybe_unused]] static std::string getStringLiteralValue(Type* t) {
 	return std::get<std::string>(t->AsLiteralType()->value);
 }
 
-static Number getNumberLiteralValue(Type* t) {
+[[maybe_unused]] static Number getNumberLiteralValue(Type* t) {
 	return std::get<Number>(t->AsLiteralType()->value);
 }
 
-static PseudoBigInt getBigIntLiteralValue(Type* t) {
+[[maybe_unused]] static PseudoBigInt getBigIntLiteralValue(Type* t) {
 	return std::get<PseudoBigInt>(t->AsLiteralType()->value);
 }
 
-static bool getBooleanLiteralValue(Type* t) {
+[[maybe_unused]] static bool getBooleanLiteralValue(Type* t) {
 	return std::get<bool>(t->AsLiteralType()->value);
 }
 
@@ -164,7 +164,7 @@ static bool isUnitType(Type* t) {
 	return (t->flags & TypeFlagsUnit) != 0;
 }
 
-static bool isLiteralType(Type* t) {
+[[maybe_unused]] static bool isLiteralType(Type* t) {
 	if (t->flags & TypeFlagsBoolean) {
 		return true;
 	}
@@ -177,7 +177,7 @@ static bool isLiteralType(Type* t) {
 	return isUnitType(t);
 }
 
-static bool isNeitherUnitTypeNorNever(Type* t) {
+[[maybe_unused]] static bool isNeitherUnitTypeNorNever(Type* t) {
 	return (t->flags & (TypeFlagsUnit | TypeFlagsNever)) == 0;
 }
 
@@ -332,29 +332,29 @@ bool Checker::isLiteralOfContextualType(Type* candidateType, Type* contextualTyp
 			if (constraint == nullptr) {
 				constraint = unknownType;
 			}
-			return maybeTypeOfKind(constraint, TypeFlagsString) &&
-					maybeTypeOfKind(candidateType, TypeFlagsStringLiteral) ||
-				maybeTypeOfKind(constraint, TypeFlagsNumber) &&
-					maybeTypeOfKind(candidateType, TypeFlagsNumberLiteral) ||
-				maybeTypeOfKind(constraint, TypeFlagsBigInt) &&
-					maybeTypeOfKind(candidateType, TypeFlagsBigIntLiteral) ||
-				maybeTypeOfKind(constraint, TypeFlagsESSymbol) &&
-					maybeTypeOfKind(candidateType, TypeFlagsUniqueESSymbol) ||
+			return (maybeTypeOfKind(constraint, TypeFlagsString) &&
+					maybeTypeOfKind(candidateType, TypeFlagsStringLiteral)) ||
+				(maybeTypeOfKind(constraint, TypeFlagsNumber) &&
+					maybeTypeOfKind(candidateType, TypeFlagsNumberLiteral)) ||
+				(maybeTypeOfKind(constraint, TypeFlagsBigInt) &&
+					maybeTypeOfKind(candidateType, TypeFlagsBigIntLiteral)) ||
+				(maybeTypeOfKind(constraint, TypeFlagsESSymbol) &&
+					maybeTypeOfKind(candidateType, TypeFlagsUniqueESSymbol)) ||
 				isLiteralOfContextualType(candidateType, constraint);
 		}
 		// If the contextual type is a literal of a particular primitive type, we consider this a
 		// literal context for all literals of that primitive type.
-		return (contextualType->flags & (TypeFlagsStringLiteral | TypeFlagsIndex |
+		return ((contextualType->flags & (TypeFlagsStringLiteral | TypeFlagsIndex |
 					TypeFlagsTemplateLiteral | TypeFlagsStringMapping)) &&
-				maybeTypeOfKind(candidateType, TypeFlagsStringLiteral) ||
-			(contextualType->flags & TypeFlagsNumberLiteral) &&
-				maybeTypeOfKind(candidateType, TypeFlagsNumberLiteral) ||
-			(contextualType->flags & TypeFlagsBigIntLiteral) &&
-				maybeTypeOfKind(candidateType, TypeFlagsBigIntLiteral) ||
-			(contextualType->flags & TypeFlagsBooleanLiteral) &&
-				maybeTypeOfKind(candidateType, TypeFlagsBooleanLiteral) ||
-			(contextualType->flags & TypeFlagsUniqueESSymbol) &&
-				maybeTypeOfKind(candidateType, TypeFlagsUniqueESSymbol);
+				maybeTypeOfKind(candidateType, TypeFlagsStringLiteral)) ||
+			((contextualType->flags & TypeFlagsNumberLiteral) &&
+				maybeTypeOfKind(candidateType, TypeFlagsNumberLiteral)) ||
+			((contextualType->flags & TypeFlagsBigIntLiteral) &&
+				maybeTypeOfKind(candidateType, TypeFlagsBigIntLiteral)) ||
+			((contextualType->flags & TypeFlagsBooleanLiteral) &&
+				maybeTypeOfKind(candidateType, TypeFlagsBooleanLiteral)) ||
+			((contextualType->flags & TypeFlagsUniqueESSymbol) &&
+				maybeTypeOfKind(candidateType, TypeFlagsUniqueESSymbol));
 	}
 	return false;
 }

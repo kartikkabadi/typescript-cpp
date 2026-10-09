@@ -62,7 +62,7 @@ std::string moduleKindString(ModuleKind i) {
 	return "ModuleKind(" + std::to_string(v) + ")";
 }
 
-std::string scriptTargetStringForOptions(ScriptTarget i) {
+[[maybe_unused]] std::string scriptTargetStringForOptions(ScriptTarget i) {
 	static const char* name0 =
 	    "NoneES5ES2015ES2016ES2017ES2018ES2019ES2020ES2021ES2022ES2023ES2024"
 	    "ES2025ES2026";
@@ -2866,9 +2866,6 @@ SimpleProgram* NewProgram(const ProgramOptions& opts) {
 	// program.go: opts.Config — pass the caller's ParsedCommandLine through
 	// to the program (borrowed); the impl ctor stores it in commandLine_ so
 	// loader-time ContentMapperExtensions() sees the real config.
-	{
-		auto& o = *opts.Config->ParsedConfig->CompilerOptions;
-	}
 	auto* p = new SimpleProgram(opts.Host,
 	                            *opts.Config->ParsedConfig->CompilerOptions,
 	                            opts.Config->ParsedConfig->FileNames,
@@ -2930,7 +2927,7 @@ void SimpleProgram::ExplainFiles(std::ostream& w,
 	};
 
 	auto explainSourceFiles = [&](int endIndex) {
-		for (; filesExplained < endIndex;) {
+		while (filesExplained < endIndex) {
 			explainFile(files[sourceFileIndex]->FileName(),
 			            files[sourceFileIndex]->Path());
 			sourceFileIndex++;

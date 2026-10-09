@@ -15,15 +15,8 @@ bool stringsHasPrefix(std::string_view s, std::string_view prefix) {
 	return s.size() >= prefix.size() && s.substr(0, prefix.size()) == prefix;
 }
 
-std::string_view stringsTrimPrefix(std::string_view s, std::string_view prefix) {
-	if (stringsHasPrefix(s, prefix)) {
-		return s.substr(prefix.size());
-	}
-	return s;
-}
-
 // strings.Cut
-inline std::tuple<std::string_view, std::string_view, bool>
+[[maybe_unused]] inline std::tuple<std::string_view, std::string_view, bool>
 stringsCut(std::string_view s, std::string_view sep) {
 	if (auto i = s.find(sep); i != std::string_view::npos) {
 		return {s.substr(0, i), s.substr(i + sep.size()), true};
@@ -32,7 +25,7 @@ stringsCut(std::string_view s, std::string_view sep) {
 }
 
 // strings.CutPrefix
-inline std::pair<std::string_view, bool>
+[[maybe_unused]] inline std::pair<std::string_view, bool>
 stringsCutPrefix(std::string_view s, std::string_view prefix) {
 	if (stringsHasPrefix(s, prefix)) {
 		return {s.substr(prefix.size()), true};
@@ -51,7 +44,7 @@ bool stringsContains(std::string_view s, std::string_view substr) {
 	return s.find(substr) != std::string_view::npos;
 }
 
-std::vector<std::string_view> stringsSplit(std::string_view s, std::string_view sep) {
+[[maybe_unused]] std::vector<std::string_view> stringsSplit(std::string_view s, std::string_view sep) {
 	std::vector<std::string_view> out;
 	size_t pos = 0;
 	while (true) {
@@ -65,7 +58,7 @@ std::vector<std::string_view> stringsSplit(std::string_view s, std::string_view 
 	}
 }
 
-std::string stringsJoin(const std::vector<std::string>& parts, std::string_view sep) {
+[[maybe_unused]] std::string stringsJoin(const std::vector<std::string>& parts, std::string_view sep) {
 	std::string out;
 	for (size_t i = 0; i < parts.size(); i++) {
 		if (i != 0) {
@@ -79,7 +72,7 @@ std::string stringsJoin(const std::vector<std::string>& parts, std::string_view 
 // url.PathEscape (encodePathSegment): escapes everything outside the
 // unreserved set plus '/', ';', ',' and '?' — Go's path-segment mode keeps
 // the sub-delims ("$&+:;=?@" minus the four above, plus "!'()*").
-std::string urlPathEscape(std::string_view s) {
+[[maybe_unused]] std::string urlPathEscape(std::string_view s) {
 	static const char* hex = "0123456789ABCDEF";
 	auto shouldEscape = [](char c) {
 		if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
@@ -108,7 +101,7 @@ std::string urlPathEscape(std::string_view s) {
 }
 
 // extraEscapeReplacer — converters.go:308 (vscode-uri compat).
-std::string extraEscapeReplace(std::string_view s) {
+[[maybe_unused]] std::string extraEscapeReplace(std::string_view s) {
 	static const std::pair<char, const char*> map[] = {
 	    {':', "%3A"}, {'/', "%2F"}, {'?', "%3F"}, {'#', "%23"},
 	    {'[', "%5B"}, {']', "%5D"}, {'@', "%40"}, {'!', "%21"},
@@ -128,8 +121,6 @@ std::string extraEscapeReplace(std::string_view s) {
 }
 
 } // namespace
-
-
 
 namespace tsc::lsp::lspwatcher {
 

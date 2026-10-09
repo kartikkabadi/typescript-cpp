@@ -11,7 +11,7 @@ struct flattenResult {
 };
 
 // isNonNullChain — optionalchain.go:131
-bool isNonNullChain(Node* node) {
+[[maybe_unused]] bool isNonNullChain(Node* node) {
 	return isNonNullExpression(node) &&
 		   (node->flags & NodeFlagsOptionalChain) != 0;
 }
