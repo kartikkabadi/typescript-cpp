@@ -53,19 +53,27 @@ void onTestAlarm(int) {
 int runTestBody(const tsc::fourslash::tests::FourslashTestCase& tc) {
 	signal(SIGALRM, onTestAlarm);
 	alarm(kTestTimeoutSeconds);
-	tsc::gostd::testing::T t;
+	tsc::gostd::testing::T t{std::string(tc.name)};
 	int code = 0;
 	try {
-		// Run as a named subtest, like go test does: t->Name() feeds
-		// getBaseFileNameFromTest for baseline file naming.
-		t.Run(tc.name, tc.fn);
+		// Invoke the test fn on the runner's named T directly (not via
+		// t.Run): T.Run intentionally does not mark the parent skipped for
+		// a skipped subtest, so wrapping would hide this test's Skip from
+		// the runner. t->Name() feeds getBaseFileNameFromTest for baseline
+		// file naming, same as the subtest name did.
+		tc.fn(&t);
+	} catch (const tsc::gostd::testing::testGoexit&) {
 	} catch (const std::exception& e) {
 		t.Errorf("uncaught exception: %s", {e.what()});
 	} catch (...) {
 		t.Errorf("uncaught non-std::exception", {});
 	}
-	if (t.Skipped()) code = 2;
-	else if (t.Failed()) code = 1;
+	// Failed before Skipped: go test reports `--- FAIL` for a test that
+	// called Errorf then Skip — a skip can't mask a failure. Skip is code
+	// 3, not 2: tscUnreachable exits the child with code 2 (Go's panic
+	// contract), which must report as FAIL.
+	if (t.Failed()) code = 1;
+	else if (t.Skipped()) code = 3;
 	fflush(stdout);
 	fflush(stderr);
 	return code;
@@ -210,7 +218,7 @@ int main(int argc, char** argv) {
 		if (code == 0) {
 			++passed;
 			printf("PASS %s\n", name.c_str());
-		} else if (code == 2) {
+		} else if (code == 3) {
 			--total;  // SKIP: like go test, don't count toward N/M pass.
 			// Print the captured skip reason (like `go test -v` does).
 			std::string reason;
