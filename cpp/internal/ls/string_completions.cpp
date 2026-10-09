@@ -1001,7 +1001,7 @@ LanguageService::getCompletionEntriesForNonRelativeModules(
 				    std::string_view ancestor)
 				    -> std::pair<std::monostate, bool> {
 					std::vector<std::string> components =
-					    tspath::getPathComponents(fragment, "");
+					    tspath::resolvePathComponents(fragment, "");
 					components.erase(
 					    components.begin()); // shift off empty root
 					if (components.empty()) {
@@ -2080,7 +2080,7 @@ LanguageService::getModulesForPathsPattern(
 			if (!trimmedWithPattern.empty()) {
 				if (containsSlash(trimmedWithPattern)) {
 					std::vector<std::string> pathComponents =
-					    tspath::getPathComponents(
+					    tspath::resolvePathComponents(
 					        removeLeadingDirectorySeparator(
 					            trimmedWithPattern),
 					        "");

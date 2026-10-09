@@ -212,7 +212,7 @@ std::vector<std::string> addTypingNamesAndGetFilesToWatch(
 			// packages. So that needs this dance here.
 
 			auto pathComponents =
-			    tspath::getPathComponents(manifestPath, "");
+			    tspath::resolvePathComponents(manifestPath, "");
 			size_t lenPathComponents = pathComponents.size();
 			int w = 0;
 			char32_t ch = decodeUtf8RuneStrict(

@@ -78,7 +78,7 @@ bool ShouldIgnoreWatchPath(const std::string& path) {
 
 // CanWatchDirectory — watchbackend.go:74.
 bool CanWatchDirectory(std::string_view dir) {
-	auto components = tspath::getPathComponents(dir, "");
+	auto components = tspath::resolvePathComponents(dir, "");
 	int length = static_cast<int>(components.size());
 	if (length <= 2) {
 		return false;

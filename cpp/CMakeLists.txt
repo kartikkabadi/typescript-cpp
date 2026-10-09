@@ -284,6 +284,7 @@ add_library(tsc STATIC
 	internal/tsoptions/tsconfigparsing.cpp
 	internal/tsoptions/wildcarddirectories.cpp
 	internal/tspath/dynamic.cpp
+	internal/tspath/typed_paths.cpp
 	# === slice: infra ===
 	internal/diagnosticwriter/diagnosticwriter.cpp
 	internal/diagnostics/localize.cpp

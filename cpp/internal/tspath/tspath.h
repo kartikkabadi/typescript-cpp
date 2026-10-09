@@ -25,6 +25,13 @@ inline std::string_view getBaseFileName(std::string_view path) {
 	return i == std::string_view::npos ? path : path.substr(i + 1);
 }
 
+// path.go — getBaseFileNameFromNormalized: base name of an already
+// slash-normalized path (last '/' component).
+inline std::string_view getBaseFileNameFromNormalized(std::string_view path) {
+	auto i = path.find_last_of('/');
+	return i == std::string_view::npos ? path : path.substr(i + 1);
+}
+
 inline bool endsWith(std::string_view s, std::string_view suffix) {
 	return s.size() >= suffix.size() && s.substr(s.size() - suffix.size()) == suffix;
 }
@@ -43,6 +50,21 @@ inline std::string_view getDeclarationFileExtension(std::string_view fileName) {
 
 inline bool isDeclarationFileName(std::string_view fileName) {
 	return !getDeclarationFileExtension(fileName).empty();
+}
+
+// extension.go — getDeclarationFileExtensionFromNormalized: declaration
+// extension of an already slash-normalized path.
+inline std::string_view getDeclarationFileExtensionFromNormalized(
+    std::string_view fileName) {
+	std::string_view base = getBaseFileNameFromNormalized(fileName);
+	for (auto ext : {".d.ts", ".d.cts", ".d.mts"}) {
+		if (endsWith(base, ext)) return {base.end() - std::string_view(ext).size(), base.end()};
+	}
+	if (endsWith(base, ".ts")) {
+		auto idx = base.find(".d.");
+		if (idx != std::string_view::npos) return base.substr(idx);
+	}
+	return {};
 }
 
 // path.go: IsVolumeCharacter / getFileUrlVolumeSeparatorEnd /
@@ -90,6 +112,14 @@ inline int getFileUrlVolumeSeparatorEnd(std::string_view url, int start) {
 }
 
 inline constexpr std::string_view urlSchemeSeparator = "://";
+
+// path.go — DirectorySeparator is the canonical separator used in normalized
+// paths.
+inline constexpr char DirectorySeparator = '/';
+
+inline bool isAnyDirectorySeparator(char ch) {
+	return ch == '/' || ch == '\\';
+}
 
 // Forward declarations for dynamic.go (defined in dynamic.cpp; the
 // canonical declarations live in the "slice: dynamic" block below).
@@ -381,6 +411,18 @@ inline std::string_view getAnyExtensionFromPath(
 	return {};
 }
 
+// path.go — getAnyExtensionFromNormalizedPath: any extension of a slash-
+// normalized path (the no-extensions branch of GetAnyExtensionFromPath).
+inline std::string_view getAnyExtensionFromNormalizedPath(
+    std::string_view path) {
+	std::string_view baseFileName = getBaseFileNameFromNormalized(path);
+	auto extensionIndex = baseFileName.find_last_of('.');
+	if (extensionIndex != std::string_view::npos) {
+		return baseFileName.substr(extensionIndex);
+	}
+	return {};
+}
+
 // path.go — separators, normalization, relative paths.
 inline bool hasTrailingDirectorySeparator(std::string_view path) {
 	return !path.empty() &&
@@ -470,14 +512,22 @@ inline std::vector<std::string_view> pathComponents(std::string_view path,
 	return rest;
 }
 
-// getPathComponents — Go returns substrings of the combined path; copy
-// them since `combined` is a local temporary.
-inline std::vector<std::string> getPathComponents(
+// path.go — GetPathComponents (ed480721): components of a path that is
+// slash-normalized by the callee; no directory resolution.
+inline std::vector<std::string> getPathComponents(std::string_view path) {
+	auto normalized = normalizeSlashes(path);
+	auto views = pathComponents(normalized, getRootLength(normalized));
+	return {views.begin(), views.end()};
+}
+
+// path.go — resolvePathComponents: combine with currentDirectory then split.
+inline std::vector<std::string> resolvePathComponents(
     std::string_view path, std::string_view currentDirectory) {
 	auto combined = combinePaths(currentDirectory, {path});
 	auto views = pathComponents(combined, getRootLength(combined));
 	return {views.begin(), views.end()};
 }
+
 
 inline std::vector<std::string> reducePathComponents(
     const std::vector<std::string>& components) {
@@ -580,6 +630,33 @@ inline std::pair<std::string, bool> simpleNormalizePath(std::string_view path) {
 	return {"", false};
 }
 
+// path.go — getNormalizedAbsolutePathFromNormalizedSlashes: normalize a path
+// that is already slash-normalized.
+inline std::string getNormalizedAbsolutePathFromNormalizedSlashes(
+    std::string_view fileName);
+
+// path.go — getNormalizedAbsolutePathFromDirectory: resolve fileName against
+// currentDirectory (a rooted directory path) and normalize.
+inline std::string getNormalizedAbsolutePathFromDirectory(
+    std::string_view fileName, std::string_view currentDirectory) {
+	int rootLength = getRootLength(fileName);
+	std::string file;
+	if (rootLength == 0 && !currentDirectory.empty()) {
+		if (fileName.empty()) {
+			file = std::string(currentDirectory);
+		} else {
+			file = hasTrailingDirectorySeparator(currentDirectory)
+			       ? std::string(currentDirectory) + std::string(normalizeSlashes(fileName))
+			       : std::string(currentDirectory) + "/" +
+			             std::string(normalizeSlashes(fileName));
+		}
+	} else {
+		// CombinePaths normalizes slashes, so not necessary in other branch
+		file = normalizeSlashes(fileName);
+	}
+	return getNormalizedAbsolutePathFromNormalizedSlashes(file);
+}
+
 inline std::string getNormalizedAbsolutePath(std::string_view fileName,
                                              std::string_view currentDirectory) {
 	std::string file;
@@ -590,7 +667,13 @@ inline std::string getNormalizedAbsolutePath(std::string_view fileName,
 		// CombinePaths normalizes slashes, so not necessary in other branch
 		file = normalizeSlashes(fileName);
 	}
-	rootLength = getRootLength(file);
+	return getNormalizedAbsolutePathFromNormalizedSlashes(file);
+}
+
+inline std::string getNormalizedAbsolutePathFromNormalizedSlashes(
+    std::string_view fileName) {
+	std::string file(fileName);
+	int rootLength = getRootLength(file);
 
 	if (auto [simpleNormalized, ok] = simpleNormalizePath(file); ok) {
 		size_t length = simpleNormalized.size();
@@ -725,28 +808,32 @@ inline std::string getNormalizedAbsolutePath(std::string_view fileName,
 }
 
 inline std::string normalizePath(std::string_view path) {
+	// path.go: NormalizePath — normalizeSlashes then normalize; preserve a
+	// trailing separator.
 	auto p = normalizeSlashes(path);
-	if (auto [normalized, ok] = simpleNormalizePath(p); ok) {
-		return normalized;
-	}
-	auto normalized = getNormalizedAbsolutePath(p, "");
+	auto normalized = getNormalizedAbsolutePathFromNormalizedSlashes(p);
 	if (!normalized.empty() && hasTrailingDirectorySeparator(p)) {
 		normalized = ensureTrailingDirectorySeparator(normalized);
 	}
 	return normalized;
 }
 
-inline std::string getDirectoryPath(std::string_view path) {
-	auto p = normalizeSlashes(path);
-	int rootLength = getRootLength(p);
-	if (rootLength == (int)p.size()) {
-		return p;
+// path.go — getDirectoryPathFromNormalized: inner core of GetDirectoryPath;
+// path must already be slash-normalized.
+inline std::string getDirectoryPathFromNormalized(std::string_view path) {
+	int rootLength = getRootLength(path);
+	if (rootLength == (int)path.size()) {
+		return std::string(path);
 	}
-	auto trimmed = removeTrailingDirectorySeparator(p);
+	auto trimmed = removeTrailingDirectorySeparator(path);
 	auto lastSep = trimmed.find_last_of('/');
 	size_t end = lastSep == std::string_view::npos ? 0 : lastSep;
 	if ((int)end < rootLength) end = rootLength;
 	return std::string(trimmed.substr(0, end));
+}
+
+inline std::string getDirectoryPath(std::string_view path) {
+	return getDirectoryPathFromNormalized(normalizeSlashes(path));
 }
 
 // path.go: ToFileNameLowerCase — ASCII fast path; non-ASCII lowercases all
@@ -841,9 +928,9 @@ inline std::vector<std::string> getPathComponentsRelativeTo(
     std::string_view from, std::string_view to,
     const ComparePathsOptions& options) {
 	auto fromComponents = reducePathComponents(
-	    getPathComponents(from, options.currentDirectory));
+	    resolvePathComponents(from, options.currentDirectory));
 	auto toComponents = reducePathComponents(
-	    getPathComponents(to, options.currentDirectory));
+	    resolvePathComponents(to, options.currentDirectory));
 
 	size_t start = 0;
 	size_t maxCommonComponents =
@@ -1180,6 +1267,18 @@ inline std::string resolvePath(std::string_view path,
 	return normalizePath(combinedPath);
 }
 
+// path.go — ResolvePathWithoutTrailingDirectorySeparator.
+inline std::string resolvePathWithoutTrailingDirectorySeparator(
+    std::string_view path,
+    const std::vector<std::string_view>& paths = {}) {
+	auto resolved = paths.empty() ? resolvePath(path, {})
+	                            : resolvePath(path, paths);
+	if ((int)resolved.size() > getRootLength(resolved)) {
+		return std::string(removeTrailingDirectorySeparator(resolved));
+	}
+	return resolved;
+}
+
 // GetCanonicalFileName — canonicalizes a file name per
 // useCaseSensitiveFileNames.
 inline std::string getCanonicalFileName(std::string_view fileName,
@@ -1265,8 +1364,8 @@ inline int comparePaths(std::string_view a, std::string_view b,
 
 	// The path contains a relative path segment. Normalize the paths and
 	// perform a slower component-by-component comparison.
-	auto aComponents = reducePathComponents(getPathComponents(a, ""));
-	auto bComponents = reducePathComponents(getPathComponents(b, ""));
+	auto aComponents = reducePathComponents(resolvePathComponents(a, ""));
+	auto bComponents = reducePathComponents(resolvePathComponents(b, ""));
 	size_t sharedLength = std::min(aComponents.size(), bComponents.size());
 	for (size_t i = 1; i < sharedLength; i++) {
 		result = comparer(aComponents[i], bComponents[i]);
@@ -1287,9 +1386,9 @@ inline bool containsPath(std::string_view parent, std::string_view child,
 	if (parent.empty() || child.empty()) return false;
 	if (parent == child) return true;
 	auto parentComponents =
-	    reducePathComponents(getPathComponents(parent, ""));
+	    reducePathComponents(resolvePathComponents(parent, ""));
 	auto childComponents =
-	    reducePathComponents(getPathComponents(child, ""));
+	    reducePathComponents(resolvePathComponents(child, ""));
 	(void)ps;
 	(void)cs;
 	if (childComponents.size() < parentComponents.size()) return false;
@@ -1484,7 +1583,7 @@ getCommonParents(
 	}
 	if (paths.size() == 1) {
 		if (reducePathComponents(
-		        getPathComponents(paths[0], options.currentDirectory))
+		        resolvePathComponents(paths[0], options.currentDirectory))
 		        .size() < static_cast<size_t>(minComponents)) {
 			return {{}, {paths[0]}};
 		}
@@ -1496,7 +1595,7 @@ getCommonParents(
 	pathComponents.reserve(paths.size());
 	for (const auto& path : paths) {
 		auto components = reducePathComponents(
-		    getPathComponents(path, options.currentDirectory));
+		    resolvePathComponents(path, options.currentDirectory));
 		if (components.size() < static_cast<size_t>(minComponents)) {
 			ignored.insert(path);
 		} else {

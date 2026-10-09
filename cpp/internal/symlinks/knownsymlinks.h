@@ -211,10 +211,10 @@ public:
 	guessDirectorySymlink(const std::string& a, const std::string& b,
 	                      const std::string& cwd_) {
 		auto aParts =
-		    tspath::getPathComponents(tspath::getNormalizedAbsolutePath(a, cwd_),
+		    tspath::resolvePathComponents(tspath::getNormalizedAbsolutePath(a, cwd_),
 		                              "");
 		auto bParts =
-		    tspath::getPathComponents(tspath::getNormalizedAbsolutePath(b, cwd_),
+		    tspath::resolvePathComponents(tspath::getNormalizedAbsolutePath(b, cwd_),
 		                              "");
 		bool isDirectory = false;
 		while (aParts.size() >= 2 && bParts.size() >= 2 &&

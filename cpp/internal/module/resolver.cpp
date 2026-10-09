@@ -12,6 +12,7 @@
 
 #include "internal/core/version.h"
 #include "internal/module/vfsmatch.h"
+#include "internal/tspath/typed_paths.h"
 #include "internal/stringutil/stringutil.h"
 
 namespace tsc::module {
@@ -161,6 +162,17 @@ DefaultResolver::DefaultResolver(ResolverOptions opts)
 // resolver.go:371 — a fresh resolver over the same resolution data (new
 // per-resolver caches; the package-json cache table is shared).
 DefaultResolver* ResolutionData::NewResolver(ResolutionHost* host_) {
+	auto baseDirectory = host_->GetCurrentDirectory();
+	if (baseDirectory.empty()) {
+		throw std::runtime_error(
+		    "resolver must have a rooted base directory");
+	}
+	if (packageJsonInfoCache->useCaseSensitiveFileNames !=
+	    host_->UseCaseSensitiveFileNames()) {
+		throw std::runtime_error(
+		    "package JSON cache and resolver must use the same case "
+		    "sensitivity");
+	}
 	auto data = shared_from_this();
 	return new DefaultResolver(std::move(data), host_);
 }
@@ -797,8 +809,8 @@ resolutionState::loadModuleFromSelfNameReference() {
 	if (!ok) {
 		return nullptr;
 	}
-	auto parts = tspath::getPathComponents(name, "");
-	auto nameParts = tspath::getPathComponents(pkgName, "");
+	auto parts = tspath::resolvePathComponents(name, "");
+	auto nameParts = tspath::resolvePathComponents(pkgName, "");
 	if (parts.size() < nameParts.size() ||
 	    !std::equal(nameParts.begin(), nameParts.end(), parts.begin())) {
 		return nullptr;
@@ -1074,10 +1086,10 @@ resolutionState::loadModuleFromTargetExportOrImport(
 		}
 		std::vector<std::string> parts;
 		if (tspath::pathIsRelative(targetString)) {
-			auto pc = tspath::getPathComponents(targetString, "");
+			auto pc = tspath::resolvePathComponents(targetString, "");
 			parts.assign(pc.begin() + 1, pc.end());
 		} else {
-			parts = tspath::getPathComponents(targetString, "");
+			parts = tspath::resolvePathComponents(targetString, "");
 		}
 		std::vector<std::string> partsAfterFirst(parts.begin() + 1,
 		                                         parts.end());
@@ -1095,7 +1107,7 @@ resolutionState::loadModuleFromTargetExportOrImport(
 		// package directory? That's what the spec says.... but I'm not
 		// sure we need to be in the business of validating everyone's
 		// import and export map correctness.
-		auto subpathParts = tspath::getPathComponents(subpath, "");
+		auto subpathParts = tspath::resolvePathComponents(subpath, "");
 		if (contains(subpathParts, "..") || contains(subpathParts, ".") ||
 		    contains(subpathParts, "node_modules")) {
 			if (traceBuilder != nullptr) {
@@ -2826,7 +2838,7 @@ std::string normalizePathForCJSResolution(
 	auto combined = tspath::combinePaths(
 	    containingDirectory,
 	    {pathForDynamicResolution(containingDirectory, moduleName, false)});
-	auto parts = tspath::getPathComponents(combined, "");
+	auto parts = tspath::resolvePathComponents(combined, "");
 	auto& lastPart = parts.back();
 	if (lastPart == "." || lastPart == "..") {
 		return tspath::ensureTrailingDirectorySeparator(
@@ -3017,24 +3029,30 @@ DefaultResolver::GetEntrypointsFromPackageJsonInfo(
 		    packageJson->PackageDirectory, extensionsArray(exts),
 		    {"node_modules"}, {"**/*"}, vfsmatch::UnlimitedDepth);
 
-		tspath::ComparePathsOptions comparePathsOptions;
-		comparePathsOptions.useCaseSensitiveFileNames =
-		    host->UseCaseSensitiveFileNames();
+		tspath::CaseSensitivity caseSensitivity{
+		    (uint8_t)(host->UseCaseSensitiveFileNames()
+			          ? tspath::CaseSensitivity::CaseSensitiveV
+			          : tspath::CaseSensitivity::CaseInsensitiveV)};
+		tspath::RootedDirectoryPath packageDirectory(
+		    packageJson->PackageDirectory);
 		for (auto& file : otherFiles) {
 			if (mainResolution != nullptr && mainResolution->isResolved() &&
-			    tspath::comparePaths(file, mainResolution->path,
-			                         comparePathsOptions) == 0) {
+			    caseSensitivity.compareFilePaths(
+				tspath::RootedFilePath(file),
+				tspath::RootedFilePath(mainResolution->path)) == 0) {
 				continue;
 			}
 
-			std::string relative = tspath::getRelativePathFromDirectory(
-			    packageJson->PackageDirectory, file, comparePathsOptions);
+			auto [relative, _relOk] =
+			    caseSensitivity.relativeFilePathFromDirectory(
+				packageDirectory, tspath::RootedFilePath(file));
+			std::string relativeSpecifier = relative;
 			if (dynamicPackage) {
-				relative =
-				    tspath::dynamicURIPathToModuleSpecifier(relative);
+				relativeSpecifier =
+				    tspath::dynamicURIPathToModuleSpecifier(relativeSpecifier);
 			}
 			result.push_back(createResolvedEntrypointHandlingSymlink(
-			    file, tspath::resolvePath(sourcePackageName, {relative}),
+			    file, sourcePackageName + "/" + relativeSpecifier,
 			    nullptr, nullptr, Ending::Changeable));
 		}
 	}
@@ -3140,7 +3158,7 @@ resolutionState::loadEntrypointsFromExportMap(
 				}
 			} else {
 				auto pc =
-				    tspath::getPathComponents(exports_.AsString(), "");
+				    tspath::resolvePathComponents(exports_.AsString(), "");
 				std::vector<std::string> partsAfterFirst(pc.begin() + 2,
 				                                         pc.end());
 				if (contains(partsAfterFirst, "..") ||

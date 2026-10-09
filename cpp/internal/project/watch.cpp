@@ -66,9 +66,9 @@ createResolutionLookupGlobMapper(
 					includeLib = true;
 				} else {
 					auto canonicalComponents =
-					    tspath::getPathComponents(path, "");
+					    tspath::resolvePathComponents(path, "");
 					auto fileNameComponents =
-					    tspath::getPathComponents(fileName, "");
+					    tspath::resolvePathComponents(fileName, "");
 					bool isNodeModules = false;
 					if (canonicalComponents.size() ==
 					    fileNameComponents.size()) {
@@ -204,7 +204,7 @@ PatternsAndIgnored getTypingsLocationsGlobs(
 // getPathComponentsForWatching — watch.go:424.
 std::vector<std::string> getPathComponentsForWatching(
 	std::string_view path, std::string_view currentDirectory) {
-	auto components = tspath::getPathComponents(path, currentDirectory);
+	auto components = tspath::resolvePathComponents(path, currentDirectory);
 	int rootLength = perceivedOsRootLengthForWatching(components);
 	if (rootLength <= 1) {
 		return components;
