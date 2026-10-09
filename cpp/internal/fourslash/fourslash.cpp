@@ -8,6 +8,7 @@
 #include <set>
 
 #include "internal/bundled/bundled.h"
+#include "internal/tspath/typed_paths.h"
 #include "internal/vfs/iovfs/iovfs.h"
 
 namespace tsc::fourslash {
@@ -4911,8 +4912,10 @@ void FourslashTest::verifyBaselineDocumentHighlights(
 			// Multi-file: use the custom method.
 			std::vector<lsproto::DocumentUri> searchURIs;
 			for (auto& file : filesToSearch) {
-				searchURIs.push_back(
-				    lsconv::FileNameToDocumentURI(file));
+				searchURIs.push_back(lsconv::FileNameToDocumentURI(
+				    tspath::toRootedFilePath(
+				        file, tspath::rootedDirectoryPathFromNormalized(
+				                  rootDir))));
 			}
 
 			auto params = std::make_shared<
@@ -6622,7 +6625,9 @@ void FourslashTest::VerifyRename(
 	GoToMarker(t, markerName);
 	RenameAtCaret(t, newName);
 	for (auto& [fileName, expectedContent] : expectedFileContents) {
-		auto* script = getScriptInfo(fileName);
+		auto* script = getScriptInfo(tspath::toRootedFilePath(
+		    fileName,
+		    tspath::rootedDirectoryPathFromNormalized(rootDir)));
 		if (script == nullptr) {
 			t->Fatalf(
 			    "Expected script info for %s, but got nil",
@@ -6656,12 +6661,21 @@ void FourslashTest::VerifyWillRenameFilesEdits(
 	} _reset{reset};
 
 	auto fr = std::make_shared<lsproto::FileRename>();
-	fr->OldUri = lsconv::FileNameToDocumentURI(oldPath);
-	fr->NewUri = lsconv::FileNameToDocumentURI(newPath);
+	fr->OldUri = lsconv::FileNameToDocumentURI(
+	    tspath::toRootedFilePath(
+	        oldPath,
+	        tspath::rootedDirectoryPathFromNormalized(rootDir)));
+	fr->NewUri = lsconv::FileNameToDocumentURI(
+	    tspath::toRootedFilePath(
+	        newPath,
+	        tspath::rootedDirectoryPathFromNormalized(rootDir)));
 	willRenameFilesWorker(t, {fr});
 
 	for (auto& [fileName, expectedContent] : expectedFileContents) {
-		auto* script = getOrLoadScriptInfo(fileName);
+		auto* script = getOrLoadScriptInfo(
+		    tspath::toRootedFilePath(
+		        fileName,
+		        tspath::rootedDirectoryPathFromNormalized(rootDir)));
 		if (script == nullptr) {
 			t->Fatalf(
 			    "Expected script info for %s, but got nil",
