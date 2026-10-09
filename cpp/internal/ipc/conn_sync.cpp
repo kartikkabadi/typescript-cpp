@@ -42,7 +42,7 @@ gostd::Error SyncConn::Run(gostd::Context ctx) {
 		}
 
 		if (msg->IsRequest()) {
-			if (gostd::Error herr = handleRequest(ctx, msg.get());
+			if (gostd::Error herr = handleRequest(ctx, msg.get(), 0);
 			    herr != nullptr) {
 				return herr;
 			}
@@ -57,15 +57,30 @@ gostd::Error SyncConn::Run(gostd::Context ctx) {
 	}
 }
 
+// SyncConn::lockTurn — conn_sync.go:91. Acquires mu once the nested call
+// depth reaches `depth` (stack-ordered turns), then marks reading when
+// nested (depth > 0). Returns with mu held.
+void SyncConn::lockTurn(int depth) {
+	mu.lock();
+	std::unique_lock<std::mutex> lk(mu, std::adopt_lock);
+	while (calls != depth) {
+		turn.wait(lk);
+	}
+	lk.release();
+	reading = depth > 0;
+}
+
 // SyncConn::handleRequest — conn_sync.go:81. Processes an incoming request.
-gostd::Error SyncConn::handleRequest(gostd::Context ctx, Message* msg) {
+gostd::Error SyncConn::handleRequest(gostd::Context ctx, Message* msg,
+                                     int depth) {
 	// Intercept the meta-requests for collected server timing before
 	// dispatching to the handler, so they are answered directly and not
 	// themselves recorded.
 	if (msg->Method == MethodGetServerTiming) {
 		gostd::Error writeErr;
 		{
-			std::lock_guard<std::mutex> lk(mu);
+			lockTurn(depth);
+			std::unique_lock<std::mutex> lk(mu, std::adopt_lock);
 			writeErr = protocol->WriteResponse(
 			    msgID(msg), serverTimingSnapshot(timing.get()));
 		}
@@ -82,7 +97,8 @@ gostd::Error SyncConn::handleRequest(gostd::Context ctx, Message* msg) {
 		}
 		gostd::Error writeErr;
 		{
-			std::lock_guard<std::mutex> lk(mu);
+			lockTurn(depth);
+			std::unique_lock<std::mutex> lk(mu, std::adopt_lock);
 			writeErr = protocol->WriteResponse(msgID(msg), json::Value{});
 		}
 		if (writeErr != nullptr) {
@@ -110,7 +126,8 @@ gostd::Error SyncConn::handleRequest(gostd::Context ctx, Message* msg) {
 
 		gostd::Error writeErr;
 		{
-			std::lock_guard<std::mutex> lk(mu);
+			lockTurn(depth);
+			std::unique_lock<std::mutex> lk(mu, std::adopt_lock);
 			if (err != nullptr) {
 				jsonrpc::ResponseError re;
 				re.Code = jsonrpc::CodeInternalError;
@@ -133,7 +150,8 @@ gostd::Error SyncConn::handleRequest(gostd::Context ctx, Message* msg) {
 
 		gostd::Error writeErr;
 		{
-			std::lock_guard<std::mutex> lk(mu);
+			lockTurn(depth);
+			std::unique_lock<std::mutex> lk(mu, std::adopt_lock);
 			jsonrpc::ResponseError re;
 			re.Code = jsonrpc::CodeInternalError;
 			re.Message = err->Error();
@@ -166,6 +184,20 @@ SyncConn::Call(gostd::Context ctx, std::string_view method,
 	//    filesystem callbacks concurrently
 	// 3. We need to ensure write/read pairs are atomic
 	std::unique_lock<std::mutex> lk(mu);
+	while (reading) {
+		turn.wait(lk);
+	}
+	calls++;
+	reading = true;
+	int depth = calls;
+	struct CallGuard {
+		SyncConn* c;
+		~CallGuard() {
+			c->calls--;
+			c->reading = false;
+			c->turn.notify_all();
+		}
+	} callGuard{this};
 
 	jsonrpc::ID id = jsonrpc::NewIDString(method);
 
@@ -200,8 +232,10 @@ SyncConn::Call(gostd::Context ctx, std::string_view method,
 			// A synchronous client callback may make a nested API request.
 			// Release the protocol lock while handling it so nested
 			// callbacks can proceed.
+			reading = false;
+			turn.notify_all();
 			lk.unlock();
-			gostd::Error herr = handleRequest(ctx, msg.get());
+			gostd::Error herr = handleRequest(ctx, msg.get(), depth);
 			lk.lock();
 			if (herr != nullptr) {
 				return {json::Value{}, herr};
@@ -209,9 +243,11 @@ SyncConn::Call(gostd::Context ctx, std::string_view method,
 			continue;
 		}
 		if (msg->IsNotification()) {
+			reading = false;
+			turn.notify_all();
 			lk.unlock();
 			handleNotification(ctx, msg.get());
-			lk.lock();
+			lockTurn(depth);
 			continue;
 		}
 		return {json::Value{},
