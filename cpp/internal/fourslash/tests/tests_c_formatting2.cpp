@@ -511,7 +511,7 @@ const x = <HangupButton customClass = 'ha
 )TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr, content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
 		f->FormatDocument(t, "");
-		f->VerifyCurrentFileContent(t, R"TS(const x = <HangupButton customClass= 'ha
+		f->VerifyCurrentFileContent(t, R"TS(const x = <HangupButton customClass='ha
 )TS");
 	});
 }
@@ -1382,7 +1382,6 @@ REGISTER_FOURSLASH_TEST(TestFormatNestedClassWithOpenBraceOnNewLines, TestFormat
 // formatNoSpaceAfterTemplateHeadAndMiddle_test.go
 static void TestFormatNoSpaceAfterTemplateHeadAndMiddle(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
-		t->Skip({"Known failing fourslash test"}); return;
 		t->Parallel();
 		const auto content = ((((((((((((((((((((((((std::string(R"TS(const a1 = )TS") + "`") + std::string(R"TS(${ 1 }${ 1 })TS")) + std::string("`")) + std::string(R"TS(;
 const a2 = )TS")) + std::string("`")) + std::string(R"TS(
@@ -2320,7 +2319,6 @@ REGISTER_FOURSLASH_TEST(TestFormatSpaceAfterImplementsExtends, TestFormatSpaceAf
 // formatSpaceAfterTemplateHeadAndMiddle_test.go
 static void TestFormatSpaceAfterTemplateHeadAndMiddle(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
-		t->Skip({"Known failing fourslash test"}); return;
 		t->Parallel();
 		const auto content = ((((((((((((((((((((((((std::string(R"TS(const a1 = )TS") + "`") + std::string(R"TS(${1}${1})TS")) + std::string("`")) + std::string(R"TS(;
 const a2 = )TS")) + std::string("`")) + std::string(R"TS(

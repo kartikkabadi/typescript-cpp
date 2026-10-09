@@ -85,7 +85,7 @@ bool FormattingContext::NextNodeAllOnSameLine() {
 bool FormattingContext::TokensAreOnSameLine() {
 	if (tokensAreOnSameLine == Tristate::Unknown) {
 		tokensAreOnSameLine =
-			rangeIsOnOneLine(TextRange{currentTokenSpan.Loc.pos(), nextTokenSpan.Loc.end()});
+			rangeIsOnOneLine(TextRange{currentTokenSpan.Loc.pos(), nextTokenSpan.Loc.pos()});
 	}
 	return tokensAreOnSameLine == Tristate::True;
 }
