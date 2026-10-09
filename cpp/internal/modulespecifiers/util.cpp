@@ -7,6 +7,7 @@
 
 #include "internal/checker/checker.h"
 #include "internal/collections/collections.h"
+#include "internal/gostd/regexp.h"
 #include "internal/module/resolver.h"
 #include "internal/module/util.h"
 #include "internal/packagejson/packagejson.h"
@@ -15,7 +16,6 @@
 
 #include <algorithm>
 #include <mutex>
-#include <regex>
 #include <shared_mutex>
 #include <string>
 #include <unordered_map>
@@ -87,7 +87,8 @@ struct regexPatternCacheKeyHash {
 // util.go:24 — regexPatternCacheMu + regexPatternCache. Failed compiles are
 // cached as nullptr (Go stores nil *regexp.Regexp).
 static std::shared_mutex regexPatternCacheMu;
-static std::unordered_map<regexPatternCacheKey, std::shared_ptr<std::regex>,
+static std::unordered_map<regexPatternCacheKey,
+                          std::shared_ptr<gostd::regexp::Regexp>,
                           regexPatternCacheKeyHash>
     regexPatternCache;
 
@@ -100,7 +101,8 @@ static std::unordered_map<regexPatternCacheKey, std::shared_ptr<std::regex>,
 #if defined(_WIN32)
 __declspec(noinline)
 #endif
-static std::shared_ptr<std::regex> stringToRegex(std::string pattern);
+static std::shared_ptr<gostd::regexp::Regexp> stringToRegex(
+    std::string pattern);
 // util.go:183 — extensionFromPath (defined below)
 static std::string extensionFromPath(std::string_view path);
 
@@ -127,12 +129,6 @@ bool PathIsBareSpecifier(std::string_view path) {
 	return !tspath::pathIsAbsolute(path) && !tspath::pathIsRelative(path);
 }
 
-// MSVC's std::regex is not safe for concurrent searches on a shared object
-// (its compiled NFA evaluation mutates per-search state without locks) —
-// Go's regexp.Regexp is explicitly safe for concurrent use. Serialize the
-// searches so shared cached patterns behave like Go's.
-static std::mutex regexSearchMu;
-
 // util.go:46 — IsExcludedByRegex
 bool IsExcludedByRegex(const std::string& moduleSpecifier,
                        const std::vector<std::string>& excludes) {
@@ -141,24 +137,21 @@ bool IsExcludedByRegex(const std::string& moduleSpecifier,
 		if (re == nullptr) {
 			continue;
 		}
-		bool matched;
-		try {
-			std::lock_guard<std::mutex> searchLock(regexSearchMu);
-			matched = std::regex_search(moduleSpecifier, *re);
-		} catch (const std::regex_error&) {
-			matched = false;
-		}
-		if (matched) {
+		// RE2 (like Go's regexp.Regexp) is safe for concurrent searches on a
+		// shared object — no lock needed (std::regex required one on MSVC).
+		if (re->MatchString(moduleSpecifier)) {
 			return true;
 		}
 	}
 	return false;
 }
 
-// util.go:59 — stringToRegex. RE2 → std::regex ECMAScript; the "(?i:" flag
-// wrapper becomes std::regex_constants::icase (ECMAScript has no inline
-// flags).
-static std::shared_ptr<std::regex> stringToRegex(std::string pattern) {
+// util.go:59 — stringToRegex. Go compiles "(?i:" + pattern + ")" via
+// regexp.Compile; the identical string is compiled by RE2 here, so the
+// accept/reject decision is byte-identical to Go's (RE2 rejects what Go
+// rejects — look-around, backrefs, unsupported escapes — and vice versa).
+static std::shared_ptr<gostd::regexp::Regexp> stringToRegex(
+    std::string pattern) {
 	bool caseInsensitive = false;
 
 	if (pattern.size() > 2 && pattern[0] == '/') {
@@ -208,52 +201,17 @@ static std::shared_ptr<std::regex> stringToRegex(std::string pattern) {
 
 	// strings.Clone — C++ strings are always owned copies.
 
-	auto rxFlags = std::regex_constants::ECMAScript;
-	if (caseInsensitive) {
-		rxFlags |= std::regex_constants::icase;
-	}
-
-	// Go compiles with RE2, which rejects backreferences and look-around
-	// that ECMAScript accepts; a failed Go compile is cached as nil and
-	// the pattern is skipped. Mirror that here so patterns Go can never
-	// execute (including backrefs, whose matching is NP-complete in a
-	// backtracking engine) are skipped identically. Outside a character
-	// class `\1`–`\9` is a backref; inside one it is an octal escape,
-	// which RE2 accepts, so class membership is tracked.
-	bool re2Unsupported = false;
-	bool inCharClass = false;
-	for (size_t i = 0; i < pattern.size() && !re2Unsupported; i++) {
-		char c = pattern[i];
-		if (c == '\\') {
-			if (i + 1 < pattern.size() && !inCharClass &&
-			    pattern[i + 1] >= '1' && pattern[i + 1] <= '9') {
-				re2Unsupported = true;
-			}
-			i++;  // consume the escaped char (a `\\` pair can't hide a backref)
-		} else if (c == '[') {
-			inCharClass = true;
-		} else if (c == ']') {
-			inCharClass = false;
-		} else if (!inCharClass && c == '(' && i + 2 < pattern.size() &&
-		           pattern[i + 1] == '?') {
-			char g = pattern[i + 2];
-			if (g == '=' || g == '!' ||
-			    (g == '<' && i + 3 < pattern.size() &&
-			     (pattern[i + 3] == '=' || pattern[i + 3] == '!'))) {
-				re2Unsupported = true;
-			}
-		}
-	}
-	if (re2Unsupported) {
-		regexPatternCache[key] = nullptr;
-		return nullptr;
-	}
-
+	// Go: compilePattern = "(?i:" + pattern + ")" for caseInsensitive.
+	// gostd::regexp::Regexp compiles it with RE2 — a bad pattern throws
+	// (MustCompile analog), which is Go's failed Compile -> cached nil.
+	std::string compilePattern =
+	    caseInsensitive ? "(?i:" + pattern + ")" : pattern;
 	try {
-		auto compiled = std::make_shared<std::regex>(pattern, rxFlags);
+		auto compiled =
+		    std::make_shared<gostd::regexp::Regexp>(compilePattern);
 		regexPatternCache[key] = compiled;
 		return compiled;
-	} catch (const std::regex_error&) {
+	} catch (const std::exception&) {
 		regexPatternCache[key] = nullptr;
 		return nullptr;
 	}

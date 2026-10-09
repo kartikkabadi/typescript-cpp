@@ -2,7 +2,6 @@
 // (package diagnostics — uses package-internal helpers).
 #include <filesystem>
 #include <fstream>
-#include <regex>
 #include <set>
 #include <sstream>
 #include <string>
@@ -10,6 +9,7 @@
 #include <vector>
 
 #include "internal/diagnostics/diagnostics.h"
+#include "internal/gostd/regexp.h"
 #include "internal/gostd/testing.h"
 #include "internal/json/json.h"
 #include "internal/locale/locale.h"
@@ -109,11 +109,10 @@ void TestLocalize_ByKey(T* t) {
 }
 
 std::set<std::string> placeholderSet(const std::string& text) {
-	static const std::regex re(R"(\{(\d+)\})");
+	static const gostd::regexp::Regexp re(R"(\{(\d+)\})");
 	std::set<std::string> result;
-	for (std::sregex_iterator it(text.begin(), text.end(), re), end;
-	     it != end; ++it) {
-		result.insert(it->str());
+	for (auto [start, end] : re.FindAllStringIndex(text, -1)) {
+		result.insert(text.substr(start, end - start));
 	}
 	return result;
 }

@@ -12,7 +12,6 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
-#include <regex>
 #include <string>
 #include <vector>
 
@@ -26,6 +25,7 @@
 #endif
 
 #include "internal/fourslash/tests/registry.h"
+#include "internal/gostd/regexp.h"
 #include "internal/gostd/testing.h"
 
 namespace {
@@ -207,11 +207,11 @@ int main(int argc, char** argv) {
 		}
 	}
 
-	std::regex re(runFilter.empty() ? ".*" : runFilter);
+	tsc::gostd::regexp::Regexp re(runFilter.empty() ? ".*" : runFilter);
 	int total = 0, passed = 0;
 	for (auto& tc : tsc::fourslash::tests::fourslashTestRegistry()) {
 		std::string name = tc.name;
-		if (!std::regex_search(name, re)) continue;
+		if (!re.MatchString(name)) continue;
 		++total;
 		std::string output;
 		int code = runOne(tc, output);
