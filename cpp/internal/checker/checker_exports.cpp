@@ -155,6 +155,18 @@ Symbol* Checker::GetMergedSymbol(Symbol* symbol) {
 	return getMergedSymbol(symbol);
 }
 
+Symbol* Checker::GetSymbolOfNode(Node* node) {
+	return getSymbolOfNode(node);
+}
+
+Symbol* Checker::GetSymbolOfDeclaration(Node* node) {
+	return getSymbolOfDeclaration(node);
+}
+
+Symbol* Checker::GetParentOfSymbol(Symbol* symbol) {
+	return getParentOfSymbol(symbol);
+}
+
 Symbol* Checker::TryFindAmbientModule(const std::string& moduleName) {
 	return tryFindAmbientModule(moduleName, true /* withAugmentations */);
 }

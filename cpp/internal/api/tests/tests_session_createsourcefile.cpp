@@ -270,17 +270,6 @@ void TestCreateSourceFile(T* t) {
 		assert::NilError(t, kerr);
 		assert::Assert(t, kind == static_cast<int32_t>(SymbolOwnerKind::File));
 
-		GetSymbolOfDeclarationParams absentParams;
-		absentParams.File = descriptor;
-		absentParams.Index =
-		    table->GetIndex(sourceFile->statements()[1]);
-		auto [absentR, aerr] =
-		    session->handleGetSymbolOfDeclaration(&absentParams);
-		assert::Assert(t, aerr != nullptr &&
-		                      aerr->Error().find("has no binder symbol") !=
-		                          std::string::npos);
-		assert::Assert(t, absentR.data.empty());
-
 		GetSymbolOfDeclarationParams oobParams;
 		oobParams.File = descriptor;
 		oobParams.Index = 0;

@@ -1540,6 +1540,18 @@ std::pair<ResultValue, gostd::Error> Session::handleRequest(
 	if (method == MethodGetTargetSymbol) {
 		return call([&] { return handleMethodGetTargetSymbol(ctx, unmarshalParam<CheckerSymbolParams>(parsed)); });
 	}
+	if (method == MethodGetMergedSymbol) {
+		return call([&] { return handleGetMergedSymbol(ctx, unmarshalParam<CheckerSymbolParams>(parsed)); });
+	}
+	if (method == MethodGetSymbolOfNode) {
+		return call([&] { return handleGetSymbolOfNode(ctx, unmarshalParam<CheckerNodeParams>(parsed)); });
+	}
+	if (method == MethodGetSymbolOfDeclarationForChecker) {
+		return call([&] { return handleGetSymbolOfDeclarationForChecker(ctx, unmarshalParam<CheckerNodeParams>(parsed)); });
+	}
+	if (method == MethodGetParentOfSymbolForChecker) {
+		return call([&] { return handleGetParentOfSymbolForChecker(ctx, unmarshalParam<CheckerSymbolParams>(parsed)); });
+	}
 	if (method == MethodGetExportSymbolOfSymbolForChecker) {
 		return call([&] { return handleGetExportSymbolOfSymbolForChecker(ctx, unmarshalParam<CheckerSymbolParams>(parsed)); });
 	}
@@ -1856,6 +1868,10 @@ static const std::unordered_map<std::string_view, unmarshallerFn> unmarshalers =
     {MethodGetConstantValue, &unmarshallerFor<CheckerNodeParams>},
     {MethodGetSignatureFromDeclaration, &unmarshallerFor<CheckerNodeParams>},
     {MethodGetExportSpecifierLocalTarget, &unmarshallerFor<CheckerNodeParams>},
+    {MethodGetMergedSymbol, &unmarshallerFor<CheckerSymbolParams>},
+    {MethodGetSymbolOfNode, &unmarshallerFor<CheckerNodeParams>},
+    {MethodGetSymbolOfDeclarationForChecker, &unmarshallerFor<CheckerNodeParams>},
+    {MethodGetParentOfSymbolForChecker, &unmarshallerFor<CheckerSymbolParams>},
     {MethodGetAliasedSymbol, &unmarshallerFor<CheckerSymbolParams>},
     {MethodGetImmediateAliasedSymbol, &unmarshallerFor<CheckerSymbolParams>},
     {MethodGetTargetSymbol, &unmarshallerFor<CheckerSymbolParams>},
@@ -6774,6 +6790,103 @@ Session::handleGetExportSpecifierLocalTargetSymbol(
 	}
 
 	return {setup.newSymbolResponse(symbol), nullptr};
+}
+
+// handleGetMergedSymbol — session.go. Merged-symbol lookup for checker
+// clients.
+std::pair<std::unique_ptr<SymbolResponse>, gostd::Error>
+Session::handleGetMergedSymbol(gostd::Context ctx,
+                               const CheckerSymbolParams* params) {
+	auto [setup, err] = setupChecker(ctx, params->Snapshot, params->Project);
+	if (err) {
+		return {nullptr, err};
+	}
+	deferGuard _done{setup.done};
+
+	auto [symbol, err2] = setup.resolveSymbolHandle(params->Symbol);
+	if (err2) {
+		return {nullptr, err2};
+	}
+	if (symbol == nullptr) {
+		return {nullptr, nullptr};
+	}
+
+	return {setup.newSymbolResponse(
+	            setup.checker->GetMergedSymbol(symbol)),
+	        nullptr};
+}
+
+// handleGetSymbolOfNode — session.go.
+// @gen-proto-nullable
+std::pair<std::unique_ptr<SymbolResponse>, gostd::Error>
+Session::handleGetSymbolOfNode(gostd::Context ctx,
+                               const CheckerNodeParams* params) {
+	auto [setup, err] = setupChecker(ctx, params->Snapshot, params->Project);
+	if (err) {
+		return {nullptr, err};
+	}
+	deferGuard _done{setup.done};
+
+	auto [node, err2] =
+	    setup.sd->resolveNodeHandle(setup.program, params->Location);
+	if (err2) {
+		return {nullptr, err2};
+	}
+	if (node == nullptr) {
+		return {nullptr, nullptr};
+	}
+
+	return {setup.newSymbolResponse(setup.checker->GetSymbolOfNode(node)),
+	        nullptr};
+}
+
+// handleGetSymbolOfDeclarationForChecker — session.go.
+// @gen-proto-nullable
+std::pair<std::unique_ptr<SymbolResponse>, gostd::Error>
+Session::handleGetSymbolOfDeclarationForChecker(
+    gostd::Context ctx, const CheckerNodeParams* params) {
+	auto [setup, err] = setupChecker(ctx, params->Snapshot, params->Project);
+	if (err) {
+		return {nullptr, err};
+	}
+	deferGuard _done{setup.done};
+
+	auto [node, err2] =
+	    setup.sd->resolveNodeHandle(setup.program, params->Location);
+	if (err2) {
+		return {nullptr, err2};
+	}
+	if (node == nullptr) {
+		return {nullptr, nullptr};
+	}
+
+	return {setup.newSymbolResponse(
+	            setup.checker->GetSymbolOfDeclaration(node)),
+	        nullptr};
+}
+
+// handleGetParentOfSymbolForChecker — session.go.
+// @gen-proto-nullable
+std::pair<std::unique_ptr<SymbolResponse>, gostd::Error>
+Session::handleGetParentOfSymbolForChecker(
+    gostd::Context ctx, const CheckerSymbolParams* params) {
+	auto [setup, err] = setupChecker(ctx, params->Snapshot, params->Project);
+	if (err) {
+		return {nullptr, err};
+	}
+	deferGuard _done{setup.done};
+
+	auto [symbol, err2] = setup.resolveSymbolHandle(params->Symbol);
+	if (err2) {
+		return {nullptr, err2};
+	}
+	if (symbol == nullptr) {
+		return {nullptr, nullptr};
+	}
+
+	return {setup.newSymbolResponse(
+	            setup.checker->GetParentOfSymbol(symbol)),
+	        nullptr};
 }
 
 // handleGetAliasedSymbol resolves an alias symbol to its target.

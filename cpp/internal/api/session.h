@@ -844,6 +844,18 @@ public:
 	handleMethodGetTargetSymbol(gostd::Context ctx,
 	                            const CheckerSymbolParams* params);
 	std::pair<std::unique_ptr<SymbolResponse>, gostd::Error>
+	handleGetMergedSymbol(gostd::Context ctx,
+	                      const CheckerSymbolParams* params);
+	std::pair<std::unique_ptr<SymbolResponse>, gostd::Error>
+	handleGetSymbolOfNode(gostd::Context ctx,
+	                      const CheckerNodeParams* params);
+	std::pair<std::unique_ptr<SymbolResponse>, gostd::Error>
+	handleGetSymbolOfDeclarationForChecker(gostd::Context ctx,
+	                                       const CheckerNodeParams* params);
+	std::pair<std::unique_ptr<SymbolResponse>, gostd::Error>
+	handleGetParentOfSymbolForChecker(gostd::Context ctx,
+	                                  const CheckerSymbolParams* params);
+	std::pair<std::unique_ptr<SymbolResponse>, gostd::Error>
 	handleGetExportSymbolOfSymbolForChecker(gostd::Context ctx,
 	                                        const CheckerSymbolParams* params);
 	std::pair<std::vector<std::unique_ptr<SymbolResponse>>, gostd::Error>

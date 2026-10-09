@@ -4610,6 +4610,9 @@ public:
 	Symbol* GetGlobalSymbol(const std::string& name, SymbolFlags meaning,
 							const DiagnosticMessage* diagnostic);
 	Symbol* GetMergedSymbol(Symbol* symbol);
+	Symbol* GetSymbolOfNode(Node* node);
+	Symbol* GetSymbolOfDeclaration(Node* node);
+	Symbol* GetParentOfSymbol(Symbol* symbol);
 	Symbol* TryFindAmbientModule(const std::string& moduleName);
 	Symbol* GetImmediateAliasedSymbol(Symbol* symbol);
 	Symbol* GetTargetSymbol(Symbol* symbol);
