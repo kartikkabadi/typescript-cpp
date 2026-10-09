@@ -1,4 +1,4 @@
-// Callback filesystem — callbackfs.go:1-473.
+// Callback filesystem — callbackfs.go.
 #include "internal/api/callbackfs.h"
 
 #include "internal/api/proto.h"
@@ -147,6 +147,8 @@ struct callbackFileInfo : vfs::FileInfo {
 	std::any Sys() const override { return {}; }
 };
 
+} // namespace
+
 // nodeFileModeToGoFileMode — callbackfs.go:407.
 vfs::FileMode nodeFileModeToGoFileMode(uint32_t mode) {
 	vfs::FileMode result{mode & 0777u};
@@ -181,8 +183,6 @@ vfs::FileMode nodeFileModeToGoFileMode(uint32_t mode) {
 	}
 	return result;
 }
-
-} // namespace
 
 // isCallbackName — callbackfs.go:55.
 bool isCallbackName(std::string_view name) {

@@ -33,6 +33,9 @@ inline const std::string callbackRemoveFile = "removeFile";
 // isCallbackName — callbackfs.go:38.
 bool isCallbackName(std::string_view name);
 
+// nodeFileModeToGoFileMode — callbackfs.go:407.
+vfs::FileMode nodeFileModeToGoFileMode(uint32_t mode);
+
 // callbackFS — callbackfs.go:17.
 class callbackFS : public vfs::FS {
 public:
@@ -68,6 +71,10 @@ public:
 	std::string Realpath(const std::string& path) override;
 	bool FileExists(const std::string& path) override;
 
+	// errorCallbacks — callbackfs.go:23. Public for same-package tests
+	// (callbackfs_test.go reads fs.errorCallbacks directly).
+	std::unordered_set<std::string> errorCallbacks;
+
 private:
 	std::shared_ptr<vfs::FS> base;
 	std::unordered_set<std::string> enabledCallbacks;
@@ -75,7 +82,6 @@ private:
 	bool fakeStat = false;
 	bool writeFileNoop = false;
 	bool removeFileNoop = false;
-	std::unordered_set<std::string> errorCallbacks;
 	std::optional<bool> caseSensitive;
 
 	// conn and ctx are set after connection is established
