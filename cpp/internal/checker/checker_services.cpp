@@ -208,8 +208,7 @@ Symbol* Checker::getSymbolAtLocation(Node* node, bool ignoreErrors) {
 		}
 		return nullptr;
 	case Kind::ImportKeyword:
-		if (isMetaProperty(node->parent) &&
-		    node->parent->text() == "defer") {
+		if (isImportPhaseMetaProperty(node->parent)) {
 			return nullptr;
 		}
 		[[fallthrough]];

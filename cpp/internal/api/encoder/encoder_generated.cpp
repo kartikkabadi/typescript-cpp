@@ -1071,6 +1071,7 @@ uint32_t getNodeCommonData(Node* node) {
 		switch (n->PhaseModifier) {
 		case Kind::TypeKeyword: phaseModifierIdx = 1; break;
 		case Kind::DeferKeyword: phaseModifierIdx = 2; break;
+		case Kind::SourceKeyword: phaseModifierIdx = 3; break;
 		default: break;
 		}
 		return phaseModifierIdx << 24;

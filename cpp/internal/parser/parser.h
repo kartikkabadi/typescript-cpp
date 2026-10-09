@@ -251,7 +251,10 @@ struct Parser {
 	Node* parseImportDeclarationOrImportEqualsDeclaration(int pos, JSDocScannerInfo jsdoc, ModifierList* modifiers);
 	bool nextTokenIsFromKeywordOrEqualsToken();
 	bool tokenAfterImportDefinitelyProducesImportDeclaration();
-	bool tokenAfterImportedIdentifierDefinitelyProducesImportDeclaration();
+	bool tokenAfterImportedIdentifierAllowsImportEqualsDeclaration();
+	bool shouldParseImportPhaseModifier();
+	Kind currentImportPhaseModifier();
+	Node* parseImportMetaPropertyName();
 	Node* parseImportEqualsDeclaration(int pos, JSDocScannerInfo jsdoc, ModifierList* modifiers, Node* identifier, bool isTypeOnly);
 	Node* parseModuleReference();
 	Node* parseExternalModuleReference();

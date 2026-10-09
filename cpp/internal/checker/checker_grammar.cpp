@@ -2104,13 +2104,13 @@ bool Checker::checkGrammarMetaProperty(MetaProperty* node) {
 	case Kind::ImportKeyword:
 		if (nameText != "meta") {
 			bool isCallee = isCallExpression(node->parent) && node->parent->expression() == node->asNode();
-			if (nameText == "defer") {
+			if (isImportPhaseMetaProperty(node->asNode())) {
 				if (!isCallee) {
 					return grammarErrorAtPos(node->asNode(), node->asNode()->end(), 0, X_0_expected, {"("});
 				}
 			} else {
 				if (isCallee) {
-					return grammarErrorOnNode(nodeName, X_0_is_not_a_valid_meta_property_for_keyword_import_Did_you_mean_meta_or_defer, {nameText});
+					return grammarErrorOnNode(nodeName, X_0_is_not_a_valid_meta_property_for_keyword_import_Did_you_mean_meta_defer_or_source, {nameText});
 				}
 				return grammarErrorOnNode(nodeName, X_0_is_not_a_valid_meta_property_for_keyword_1_Did_you_mean_2, {nameText, std::string(tokenToString(node->KeywordToken)), "meta"});
 			}
@@ -2417,10 +2417,25 @@ bool Checker::checkGrammarImportClause(ImportClause* node) {
 		if (node->NamedBindings->kind == Kind::NamedImports) {
 			return grammarErrorOnNode(node->asNode(), Named_imports_are_not_allowed_in_a_deferred_import);
 		}
-		if (moduleKind != ModuleKind::ESNext && moduleKind != ModuleKind::Preserve) {
-			return grammarErrorOnNode(node->asNode(), Deferred_imports_are_only_supported_when_the_module_flag_is_set_to_esnext_or_preserve);
+		if (supportsDeferredImports(moduleKind)) {
+			break;
 		}
-		break;
+		return grammarErrorOnNode(node->asNode(), Deferred_imports_are_only_supported_when_the_module_flag_is_set_to_esnext_or_preserve);
+	case Kind::SourceKeyword:
+		if (node->NamedBindings != nullptr) {
+			return grammarErrorOnNode(node->asNode(), Named_and_namespace_imports_are_not_allowed_in_a_source_phase_import);
+		}
+		if (node->name == nullptr) {
+			return grammarErrorOnNode(node->asNode(), A_source_phase_import_must_specify_a_local_binding);
+		}
+		if (supportsSourcePhaseImports(moduleKind)) {
+			Node* moduleSpecifier = getModuleSpecifierFromNode(node->parent);
+			if (getEmitSyntaxForModuleSpecifierExpression(moduleSpecifier) == ModuleKind::CommonJS) {
+				return grammarErrorOnNode(node->asNode(), Source_phase_imports_are_not_allowed_on_statements_that_compile_to_CommonJS_require_calls);
+			}
+			break;
+		}
+		return grammarErrorOnNode(node->asNode(), Source_phase_imports_are_only_supported_when_the_module_option_is_set_to_esnext_nodenext_or_preserve);
 	default:
 		break;
 	}
@@ -2466,8 +2481,12 @@ bool Checker::checkGrammarImportCallExpression(Node* node) {
 		return grammarErrorOnNode(node, getVerbatimModuleSyntaxErrorMessage(node));
 	}
 
-	if (node->expression()->kind == Kind::MetaProperty) {
-		if (moduleKind != ModuleKind::ESNext && moduleKind != ModuleKind::Preserve) {
+	if (isImportSourceMetaProperty(node->expression())) {
+		if (!supportsSourcePhaseImports(moduleKind)) {
+			return grammarErrorOnNode(node, Source_phase_imports_are_only_supported_when_the_module_option_is_set_to_esnext_nodenext_or_preserve);
+		}
+	} else if (isImportDeferMetaProperty(node->expression())) {
+		if (!supportsDeferredImports(moduleKind)) {
 			return grammarErrorOnNode(node, Deferred_imports_are_only_supported_when_the_module_flag_is_set_to_esnext_or_preserve);
 		}
 	} else if (moduleKind == ModuleKind::ES2015) {
@@ -2475,6 +2494,9 @@ bool Checker::checkGrammarImportCallExpression(Node* node) {
 	}
 
 	CallExpression* nodeAsCall = node->as<CallExpression>();
+	if (isSourcePhaseImportCall(node) && nodeAsCall->QuestionDotToken != nullptr) {
+		return grammarErrorOnNode(nodeAsCall->QuestionDotToken, Optional_chaining_cannot_be_used_with_import_source);
+	}
 	if (nodeAsCall->TypeArguments != nullptr) {
 		return grammarErrorOnNode(node, This_use_of_import_is_invalid_import_calls_can_be_written_but_they_must_have_parentheses_and_cannot_have_type_arguments);
 	}

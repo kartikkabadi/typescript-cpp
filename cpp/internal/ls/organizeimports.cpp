@@ -55,6 +55,7 @@ struct importGroup {
 // categorizedImports — organizeimports.go:623.
 struct categorizedImports {
 	Node* importWithoutClause = nullptr;
+	std::vector<Node*> sourcePhaseImports;
 	importGroup typeOnlyImports;
 	importGroup regularImports;
 };
@@ -669,6 +670,25 @@ std::vector<Node*> coalesceImportsWorker(
 		if (categorized.importWithoutClause != nullptr) {
 			coalescedImports.push_back(categorized.importWithoutClause);
 		}
+		std::stable_sort(categorized.sourcePhaseImports.begin(),
+		                 categorized.sourcePhaseImports.end(),
+		                 [&](Node* a, Node* b) {
+			a = a->as<ImportDeclaration>()->ImportClause;
+			b = b->as<ImportDeclaration>()->ImportClause;
+			if (a->name() == nullptr && b->name() == nullptr) {
+				return false;
+			}
+			if (a->name() == nullptr) {
+				return false;
+			}
+			if (b->name() == nullptr) {
+				return true;
+			}
+			return specifierComparer(a, b) < 0;
+		});
+		coalescedImports.insert(coalescedImports.end(),
+		                        categorized.sourcePhaseImports.begin(),
+		                        categorized.sourcePhaseImports.end());
 
 		// See removeUnusedImports: synthesized decls outlive this function
 		// (returned for sorting and emitted by the change tracker), so they
@@ -901,6 +921,7 @@ std::vector<Node*> coalesceImportsWorker(
 categorizedImports getCategorizedImports(
     const std::vector<Node*>& importDecls) {
 	Node* importWithoutClause = nullptr;
+	std::vector<Node*> sourcePhaseImports;
 	importGroup typeOnlyImports;
 	importGroup regularImports;
 
@@ -914,6 +935,10 @@ categorizedImports getCategorizedImports(
 
 		auto* clause = importDecl->as<ImportDeclaration>()
 		                   ->ImportClause->as<ImportClause>();
+		if (clause->PhaseModifier == Kind::SourceKeyword) {
+			sourcePhaseImports.push_back(importDecl);
+			continue;
+		}
 		auto* group = &regularImports;
 		if (clause->isTypeOnly()) {
 			group = &typeOnlyImports;
@@ -942,6 +967,7 @@ categorizedImports getCategorizedImports(
 
 	return categorizedImports{
 	    .importWithoutClause = importWithoutClause,
+	    .sourcePhaseImports = sourcePhaseImports,
 	    .typeOnlyImports = typeOnlyImports,
 	    .regularImports = regularImports,
 	};

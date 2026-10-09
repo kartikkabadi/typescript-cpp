@@ -113,6 +113,14 @@ Node* getJSDocDeprecatedTag(Node* node) {
 	return nullptr;
 }
 
+// checker.go:15947 — isESMFormatImportImportingCommonjsFormatFile
+bool isESMFormatImportImportingCommonjsFormatFile(ResolutionMode usageMode,
+												  ResolutionMode targetMode) {
+	return usageMode == ModuleKind::ESNext && targetMode == ModuleKind::CommonJS;
+}
+
+}  // namespace
+
 // checker.go:15294 — getModuleSpecifierFromNode (free function)
 Node* getModuleSpecifierFromNode(Node* node) {
 	switch (node->kind) {
@@ -126,14 +134,6 @@ Node* getModuleSpecifierFromNode(Node* node) {
 	}
 	TSC_UNREACHABLE("Unhandled case in getModuleSpecifierFromNode");
 }
-
-// checker.go:15947 — isESMFormatImportImportingCommonjsFormatFile
-bool isESMFormatImportImportingCommonjsFormatFile(ResolutionMode usageMode,
-												  ResolutionMode targetMode) {
-	return usageMode == ModuleKind::ESNext && targetMode == ModuleKind::CommonJS;
-}
-
-}  // namespace
 
 // checker.go:14277 — addDeprecatedSuggestionWorker
 Diagnostic* Checker::addDeprecatedSuggestionWorker(const std::vector<Node*>& declarations,
@@ -245,6 +245,19 @@ Node* Checker::getTypeOnlyDeclarationOfEntityName(Node* name) {
 
 // checker.go:14756 — getTargetOfImportClause
 Symbol* Checker::getTargetOfImportClause(Node* node) {
+	if (node->as<ImportClause>()->PhaseModifier == Kind::SourceKeyword) {
+		Symbol* alias = getSymbolOfDeclaration(node);
+		auto* links = aliasSymbolLinks.Get(alias);
+		if (links->immediateTarget == nullptr) {
+			Symbol* symbol = newSymbol(SymbolFlagsFunctionScopedVariable,
+			                           std::string(node->name()->text()));
+			symbol->declarations = alias->declarations;
+			valueSymbolLinks.Get(symbol)->resolvedType =
+				getGlobalAbstractModuleSourceType();
+			links->immediateTarget = symbol;
+		}
+		return links->immediateTarget;
+	}
 	Symbol* moduleSymbol = resolveExternalModuleName(
 		node, getModuleSpecifierFromNode(node->parent), false /*ignoreErrors*/,
 		getTypeFromImportAttributes(getImportAttributes(node->parent)));

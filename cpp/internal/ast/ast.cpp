@@ -2193,10 +2193,39 @@ bool isImportCall(Node* node) {
 		return false;
 	}
 	Node* e = node->expression();
-	return e->kind == Kind::ImportKeyword ||
-	       (isMetaProperty(e) &&
-	        e->as<MetaProperty>()->KeywordToken == Kind::ImportKeyword &&
-	        e->text() == "defer");
+	return e->kind == Kind::ImportKeyword || isImportPhaseMetaProperty(e);
+}
+
+bool isImportPhaseMetaProperty(Node* node) {
+	return isImportDeferMetaProperty(node) || isImportSourceMetaProperty(node);
+}
+
+bool isImportDeferMetaProperty(Node* node) {
+	return isImportMetaProperty(node, "defer");
+}
+
+bool isImportSourceMetaProperty(Node* node) {
+	return isImportMetaProperty(node, "source");
+}
+
+bool isImportMetaProperty(Node* node, std::string_view name) {
+	return isMetaProperty(node) &&
+	       node->as<MetaProperty>()->KeywordToken == Kind::ImportKeyword &&
+	       node->as<MetaProperty>()->name->text() == name;
+}
+
+bool isSourcePhaseImport(Node* node) {
+	if (isImportDeclaration(node)) {
+		Node* clause = node->as<ImportDeclaration>()->ImportClause;
+		return clause != nullptr &&
+		       clause->as<ImportClause>()->PhaseModifier == Kind::SourceKeyword;
+	}
+	return isSourcePhaseImportCall(node);
+}
+
+bool isSourcePhaseImportCall(Node* node) {
+	return isCallExpression(node) &&
+	       isImportSourceMetaProperty(node->expression());
 }
 
 bool isImportMeta(Node* node) {

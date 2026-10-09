@@ -226,6 +226,7 @@ std::tuple<Node*, gostd::Error> astDecoder::createChildrenNode(
 	case Kind::OverrideKeyword:
 	case Kind::OfKeyword:
 	case Kind::DeferKeyword:
+	case Kind::SourceKeyword:
 		return {factory->newToken(kind), nullptr};
 	case Kind::QualifiedName: {
 		childIterator it{childIndices, 0};
@@ -1426,6 +1427,7 @@ std::tuple<Node*, gostd::Error> astDecoder::createChildrenNode(
 		switch (commonData & 3) {
 		case 1: phaseModifier = Kind::TypeKeyword; break;
 		case 2: phaseModifier = Kind::DeferKeyword; break;
+		case 3: phaseModifier = Kind::SourceKeyword; break;
 		default: break;
 		}
 		childIterator it{childIndices, 0};

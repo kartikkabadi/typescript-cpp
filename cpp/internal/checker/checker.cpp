@@ -3443,6 +3443,8 @@ std::vector<Type*> Checker::getInferTypeParameters(Node* node) {
 			result.push_back(getDeclaredTypeOfSymbol(symbol));
 		}
 	}
+	std::sort(result.begin(), result.end(),
+			  [](Type* a, Type* b) { return CompareTypes(a, b) < 0; });
 	return result;
 }
 
@@ -6380,6 +6382,7 @@ void Checker::init(Program* p) {
 	getGlobalPromiseType = getGlobalTypeResolver("Promise", 1, false);
 	getGlobalPromiseTypeChecked = getGlobalTypeResolver("Promise", 1, true);
 	getGlobalPromiseLikeType = getGlobalTypeResolver("PromiseLike", 1, true);
+	getGlobalAbstractModuleSourceType = getGlobalTypeResolver("AbstractModuleSource", 0, true);
 	getGlobalPromiseConstructorSymbol =
 		getGlobalValueSymbolResolver("Promise", true);
 	getGlobalPromiseConstructorSymbolOrNil =
@@ -6511,6 +6514,9 @@ Symbol* Checker::resolveExternalModuleNameWorker(
 	const DiagnosticMessage* moduleNotFoundError, bool ignoreErrors,
 	bool isForAugmentation, Type* importAttributesType) {
 	if (isStringLiteralLike(moduleReferenceExpression)) {
+		if (isSourcePhaseImport(moduleReferenceExpression->parent)) {
+			return nullptr;
+		}
 		return resolveExternalModule(
 		    location, std::string(moduleReferenceExpression->text()),
 		    moduleNotFoundError,

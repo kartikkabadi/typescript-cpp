@@ -747,7 +747,23 @@ void Checker::checkClassDeclaration(Node* node) {
 	}
 	checkClassLikeDeclaration(node);
 	checkSourceElements(node->members());
+	checkConstructorDeclaredProperties(node);
 	registerForUnusedIdentifiersCheck(node);
+}
+
+// checker.go:4321 — checkConstructorDeclaredProperties
+void Checker::checkConstructorDeclaredProperties(Node* node) {
+	if (!isInJSFile(node)) {
+		return;
+	}
+	Type* classType = getDeclaredTypeOfSymbol(getSymbolOfDeclaration(node));
+	for (Symbol* property : getPropertiesOfType(classType)) {
+		auto [kind, constructor] = isConstructorDeclaredThisProperty(property);
+		if (kind == thisAssignmentDeclarationConstructor &&
+		    constructor->parent == node) {
+			getTypeOfSymbol(property);
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------

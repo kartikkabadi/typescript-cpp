@@ -4301,10 +4301,8 @@ Session::handleGetResolvedModuleFromModuleSpecifier(
 		        gostd::errorf("%w: moduleSpecifier must have a SourceFile ancestor or sourceFile must be provided",
 		                      {ErrClientError})};
 	}
-	ResolutionMode mode =
-	    program->GetModeForUsageLocation(sourceFile, node);
-	return {newResolvedModuleResponse(program->getResolvedModuleByPath(
-	            sourceFile->Path(), node->text(), mode)),
+	return {newResolvedModuleResponse(
+	            program->GetResolvedModuleFromModuleSpecifier(sourceFile, node)),
 	        nullptr};
 }
 

@@ -1594,7 +1594,7 @@ bool isExpressionNode(Node* node) {
 	case Kind::AwaitExpression:
 		return true;
 	case Kind::MetaProperty:
-		// `import.defer` in `import.defer(...)` is not an expression
+		// `import.<phase>` in `import.<phase>(...)` is not an expression
 		return !isImportCall(node->parent) ||
 		       node->parent->expression() != node;
 	case Kind::ExpressionWithTypeArguments:

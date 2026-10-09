@@ -904,6 +904,9 @@ Type* Checker::checkImportCallExpression(Node* node) {
 		}
 		importAttributesType = getTypeOfPropertyOfType(optionsType, "with");
 	}
+	if (isSourcePhaseImportCall(node)) {
+		return createPromiseReturnType(node, getGlobalAbstractModuleSourceType());
+	}
 	// resolveExternalModuleName will return undefined if the moduleReferenceExpression is not a string literal
 	Symbol* moduleSymbol = resolveExternalModuleName(node, specifier,
 												   false /*ignoreErrors*/,
@@ -3223,6 +3226,7 @@ void Checker::checkClassExpressionExternalHelpers(ClassExpression* node) {
 // checker.go:10301 — checkClassExpressionDeferred
 void Checker::checkClassExpressionDeferred(Node* node) {
 	checkSourceElements(node->members());
+	checkConstructorDeclaredProperties(node);
 	registerForUnusedIdentifiersCheck(node);
 }
 

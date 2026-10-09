@@ -1684,6 +1684,7 @@ public:
 	std::function<Type*()> getGlobalPromiseType;
 	std::function<Type*()> getGlobalPromiseTypeChecked;
 	std::function<Type*()> getGlobalPromiseLikeType;
+	std::function<Type*()> getGlobalAbstractModuleSourceType;
 	std::function<Symbol*()> getGlobalPromiseConstructorSymbol;
 	std::function<Symbol*()> getGlobalPromiseConstructorSymbolOrNil;
 	std::function<Symbol*()> getGlobalOmitSymbol;
@@ -2439,6 +2440,7 @@ public:
 	void checkVariableDeclaration(Node* node);
 	void checkBindingElement(Node* node);
 	void checkClassDeclaration(Node* node);
+	void checkConstructorDeclaredProperties(Node* node);
 	void checkInterfaceDeclaration(Node* node);
 	void checkTypeAliasDeclaration(Node* node);
 	void checkEnumDeclaration(Node* node);
@@ -5444,6 +5446,7 @@ int compareTypeLists(const std::vector<Type*>& s1, const std::vector<Type*>& s2)
 int compareTypeMappers(TypeMapper* m1, TypeMapper* m2);
 bool isCompoundLikeAssignment(Node* assignment);
 bool isShorthandAmbientModuleSymbol(Symbol* moduleSymbol);
+Node* getModuleSpecifierFromNode(Node* node);
 bool isShorthandAmbientModule(Node* node);
 bool isExponentiationOperator(Kind kind);
 bool isMultiplicativeOperator(Kind kind);

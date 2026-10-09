@@ -149,6 +149,15 @@ inline constexpr bool moduleKindSupportsImportAttributes(ModuleKind k) {
 		   k == ModuleKind::Preserve || k == ModuleKind::ESNext;
 }
 
+// compileroptions.go — SupportsDeferredImports / SupportsSourcePhaseImports
+inline constexpr bool supportsDeferredImports(ModuleKind k) {
+	return k == ModuleKind::ESNext || k == ModuleKind::Preserve;
+}
+inline constexpr bool supportsSourcePhaseImports(ModuleKind k) {
+	return k == ModuleKind::ESNext || k == ModuleKind::NodeNext ||
+		   k == ModuleKind::Preserve;
+}
+
 enum class ModuleResolutionKind : int32_t {
 	Unknown = 0,
 	Classic = 1, // Deprecated

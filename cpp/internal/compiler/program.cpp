@@ -213,6 +213,7 @@ bool isPlainJSError(int32_t code) {
 	    A_return_statement_cannot_be_used_inside_a_class_static_block->code,
 	    A_set_accessor_cannot_have_rest_parameter->code,
 	    A_set_accessor_must_have_exactly_one_parameter->code,
+    A_source_phase_import_must_specify_a_local_binding->code,
 	    An_export_declaration_can_only_be_used_at_the_top_level_of_a_module
 	        ->code,
 	    An_export_declaration_cannot_have_modifiers->code,
@@ -244,14 +245,21 @@ bool isPlainJSError(int32_t code) {
 	    Jump_target_cannot_cross_function_boundary->code,
 	    Line_terminator_not_permitted_before_arrow->code,
 	    Modifiers_cannot_appear_here->code,
+    Named_and_namespace_imports_are_not_allowed_in_a_source_phase_import
+        ->code,
 	    Only_a_single_variable_declaration_is_allowed_in_a_for_in_statement
 	        ->code,
 	    Only_a_single_variable_declaration_is_allowed_in_a_for_of_statement
 	        ->code,
+	    Optional_chaining_cannot_be_used_with_import_source->code,
 	    Private_identifiers_are_not_allowed_outside_class_bodies->code,
 	    Private_identifiers_are_only_allowed_in_class_bodies_and_may_only_be_used_as_part_of_a_class_member_declaration_property_access_or_on_the_left_hand_side_of_an_in_expression
 	        ->code,
 	    Property_0_is_not_accessible_outside_class_1_because_it_has_a_private_identifier
+	        ->code,
+	    Source_phase_imports_are_not_allowed_on_statements_that_compile_to_CommonJS_require_calls
+	        ->code,
+	    Source_phase_imports_are_only_supported_when_the_module_option_is_set_to_esnext_nodenext_or_preserve
 	        ->code,
 	    Tagged_template_expressions_are_not_permitted_in_an_optional_chain
 	        ->code,
@@ -575,6 +583,9 @@ module::ResolvedModule* SimpleProgram::GetResolvedModuleFromModuleSpecifier(
 	if (!isStringLiteralLike(moduleSpecifier)) {
 		TSC_UNREACHABLE(
 		    "moduleSpecifier must be a StringLiteralLike — program slice");
+	}
+	if (isSourcePhaseImport(moduleSpecifier->parent)) {
+		return nullptr;
 	}
 	ResolutionMode mode = GetModeForUsageLocation(file, moduleSpecifier);
 	return getResolvedModuleByPath(file->Path(),
@@ -2992,7 +3003,9 @@ bool SimpleProgram::canReplaceFileInProgram(SourceFile* file1,
 			       auto* n2 = file2->imports[i];
 			       if (!equalModuleSpecifiers(n1, n2) ||
 			           GetModeForUsageLocation(file1, n1) !=
-			               GetModeForUsageLocation(file2, n2)) {
+			               GetModeForUsageLocation(file2, n2) ||
+			           isSourcePhaseImport(n1->parent) !=
+			               isSourcePhaseImport(n2->parent)) {
 				       return false;
 			       }
 		       }
@@ -3586,7 +3599,8 @@ SimpleProgram::packageNamesInfo* SimpleProgram::collectPackageNames() {
 				continue;
 			}
 			for (auto* imp : file->imports) {
-				if (tspath::isExternalModuleNameRelative(imp->text())) {
+				if (isSourcePhaseImport(imp->parent) ||
+				    tspath::isExternalModuleNameRelative(imp->text())) {
 					continue;
 				}
 				auto rmIt = resolvedModules.find(file->Path());

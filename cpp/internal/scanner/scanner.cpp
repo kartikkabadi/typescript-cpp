@@ -78,6 +78,7 @@ static const std::pair<const char*, Kind> kKeywordList[] = {
 	{"return", Kind::ReturnKeyword},
 	{"satisfies", Kind::SatisfiesKeyword},
 	{"set", Kind::SetKeyword},
+	{"source", Kind::SourceKeyword},
 	{"static", Kind::StaticKeyword},
 	{"string", Kind::StringKeyword},
 	{"super", Kind::SuperKeyword},

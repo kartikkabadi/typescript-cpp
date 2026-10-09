@@ -939,7 +939,7 @@ void filesLoader::resolveImportsAndModuleAugmentations(parseTask* t) {
 		for (size_t index = 0; index < moduleNames.size(); index++) {
 			Node* entry = moduleNames[index];
 			std::string moduleName = entry->text();
-			if (moduleName.empty()) {
+			if (moduleName.empty() || isSourcePhaseImport(entry->parent)) {
 				continue;
 			}
 
@@ -2132,7 +2132,8 @@ void filesParser::start(const std::vector<parseTask*>& tasks, int depth) {
 
 			int currentDepth =
 			    task->increaseDepth ? depth + 1 : depth;
-			if (currentDepth < data->lowestDepth) {
+			bool lowered = currentDepth < data->lowestDepth;
+			if (lowered) {
 				// reprocess subtasks to ensure they are loaded
 				data->lowestDepth = currentDepth;
 				startSubtasks = true;
@@ -2153,8 +2154,9 @@ void filesParser::start(const std::vector<parseTask*>& tasks, int depth) {
 						data->startedSubTasks = true;
 					}
 				}
-				if (!taskByFileName->startedSubTasksTask &&
-				    loadSubTasks) {
+				if (loadSubTasks &&
+				    (lowered ||
+				     !taskByFileName->startedSubTasksTask)) {
 					taskByFileName->startedSubTasksTask = true;
 					start(taskByFileName->subTasks,
 					      data->lowestDepth);
@@ -2430,12 +2432,15 @@ ResolutionMode getEmitSyntaxForUsageLocationWorker(
 	}
 	ModuleKind fileEmitMode = getEmitModuleFormatOfFileWorker(
 	    fileName, options, meta);
-	if (isImportCall(walkUpParenthesizedExpressions(usage->parent))) {
+	if (Node* call = walkUpParenthesizedExpressions(usage->parent);
+	    isImportCall(call)) {
+		if (isSourcePhaseImportCall(call)) {
+			return ModuleKind::ESNext;
+		}
 		if (shouldTransformImportCall(fileName, options, fileEmitMode)) {
 			return ResolutionModeCommonJS;
-		} else {
-			return ResolutionModeESM;
 		}
+		return ResolutionModeESM;
 	}
 	// If we're in --module preserve on an input file, we know that an
 	// import is an import. But if this is a declaration file, we'd prefer to

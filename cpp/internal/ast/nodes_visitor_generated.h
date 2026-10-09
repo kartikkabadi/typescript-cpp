@@ -1043,6 +1043,7 @@ inline Node* Node::clone(NodeFactory& f) {
 		case Kind::SingleLineCommentTrivia:
 		case Kind::SlashEqualsToken:
 		case Kind::SlashToken:
+		case Kind::SourceKeyword:
 		case Kind::StaticKeyword:
 		case Kind::SwitchKeyword:
 		case Kind::ThrowKeyword:
@@ -2531,6 +2532,7 @@ inline Node* Node::visitEachChild(NodeVisitor& v) {
 		case Kind::SingleLineCommentTrivia:
 		case Kind::SlashEqualsToken:
 		case Kind::SlashToken:
+		case Kind::SourceKeyword:
 		case Kind::StaticKeyword:
 		case Kind::SwitchKeyword:
 		case Kind::ThrowKeyword:
