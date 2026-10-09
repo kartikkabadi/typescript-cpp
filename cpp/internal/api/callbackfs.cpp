@@ -128,8 +128,8 @@ vfs::TimePoint parseRFC3339Nano(const std::string& s) {
 	};
 	int64_t epochSec = daysFromCivil(year, mon, day) * 86400 + hour * 3600 +
 	                   min * 60 + sec - offsetMinutes * 60;
-	return vfs::TimePoint(std::chrono::seconds(epochSec) +
-	                      std::chrono::nanoseconds(nanos));
+	return vfs::TimePoint(std::chrono::duration_cast<vfs::TimePoint::duration>(
+	    std::chrono::seconds(epochSec) + std::chrono::nanoseconds(nanos)));
 }
 
 // callbackFileInfo — callbackfs.go:309.

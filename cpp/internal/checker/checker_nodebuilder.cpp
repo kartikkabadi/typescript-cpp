@@ -5016,26 +5016,34 @@ Node* NodeBuilderImpl::visitAndTransformType(
 		}
 	}
 
+	bool pushedOriginDepth = false;
+	CompositeSymbolIdentity origin{};
+	int originDepth = 0;
 	if ((t->objectFlags & ObjectFlagsReverseMapped) != 0) {
 		// Growing type arguments can prevent a reverse mapped type
 		// from repeating. Bound expansion by its mapped declaration
 		// as well as its type identity.
-		CompositeSymbolIdentity origin{
+		origin = CompositeSymbolIdentity{
 		    false, 0,
 		    getNodeId(t->AsReverseMappedType()
 		                  ->mappedType->AsMappedType()
 		                  ->declaration)};
-		int originDepth = ctx->symbolDepth[origin];
+		originDepth = ctx->symbolDepth[origin];
 		if (originDepth >= 100) {
 			ctx->truncating = true;
 			return createElidedInformationPlaceholder();
 		}
 		ctx->symbolDepth[origin] = originDepth + 1;
-		auto restoreOriginDepth = scopeExit(
-		    [this, origin, originDepth] {
-			    ctx->symbolDepth[origin] = originDepth;
-		    });
+		pushedOriginDepth = true;
 	}
+	// Go `defer`: restore runs at function exit (after transform), not at
+	// the end of the if-block.
+	auto restoreOriginDepth = scopeExit(
+	    [this, origin, originDepth, pushedOriginDepth] {
+		    if (pushedOriginDepth) {
+			    ctx->symbolDepth[origin] = originDepth;
+		    }
+	    });
 
 	int depth = 0;
 	if (id.has_value()) {

@@ -1431,9 +1431,10 @@ Server::handleInitializeAPISession(
 // generateAPIPipePath — server.go:2352.
 std::string Server::generateAPIPipePath() {
 	// Generate a high-entropy path using time and random source
-	auto now = std::chrono::duration_cast<std::chrono::nanoseconds>(
-	               std::chrono::system_clock::now().time_since_epoch())
-	               .count();
+	auto now = static_cast<int64_t>(
+	    std::chrono::duration_cast<std::chrono::nanoseconds>(
+	        std::chrono::system_clock::now().time_since_epoch())
+	        .count());
 	static std::mt19937_64 rnd{std::random_device{}()};
 	return ipc::GeneratePipePath(
 		gostd::sprintf("tsgo-api-%x-%x",
