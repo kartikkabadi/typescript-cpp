@@ -360,14 +360,13 @@ void Session::DidChangeWatchedFiles(
 					hasRelevantChange =
 					    fs->DirectoryExists(fileName);
 				} else {
+					// Go reads s.snapshot by raw pointer
+					// under RLock (session.go) — a disposed
+					// snapshot stays addressable for these
+					// cache lookups, so no ref is taken.
 					snapshotMu.lock_shared();
 					auto* snapshot = this->snapshot;
-					snapshot->ref();
 					snapshotMu.unlock_shared();
-					struct derefGuard {
-						project::Snapshot* s;
-						~derefGuard() { s->Deref(); }
-					} dg{snapshot};
 					if (snapshot->fs->cacheDirectories.count(
 					        pathStr) ||
 					    snapshot->hasOverlayWithin(
@@ -719,14 +718,12 @@ void Session::sendPerformanceTelemetry(const gostd::Context& ctx) {
 	if (client == nullptr || !options->TelemetryEnabled) {
 		return;
 	}
+	// Go reads s.snapshot by raw pointer under RLock (session.go) —
+	// a disposed snapshot stays addressable for these reads, so no
+	// ref is taken.
 	snapshotMu.lock_shared();
 	auto* snapshot = this->snapshot;
-	snapshot->ref();
 	snapshotMu.unlock_shared();
-	struct derefGuard {
-		project::Snapshot* s;
-		~derefGuard() { s->Deref(); }
-	} dg{snapshot};
 
 	auto* measurements =
 	    new lsp::lsproto::PerformanceStatsTelemetryMeasurements();

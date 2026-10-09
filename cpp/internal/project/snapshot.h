@@ -454,14 +454,20 @@ struct Snapshot {
 // SnapshotLSHost — Go's project.Snapshot satisfies ls.Host structurally;
 // C++ needs an explicit adapter for the interface boundary. In Go the
 // LanguageService's snapshot field keeps the snapshot reachable for the
-// service's lifetime (GC); here the adapter holds a ref so the snapshot
-// outlives every LanguageService built on it (the host is leak-tolerant
-// like the rest of the snapshot graph, so Deref fires only if it is ever
-// destroyed).
+// service's lifetime via GC, and language services keep working even
+// after their backing snapshot has been disposed (session.go). The
+// adapter likewise captures the snapshot by raw pointer — objects are
+// never deleted, only disposed, so a disposed snapshot stays addressable
+// like a GC-kept Go one. Taking a ref here would panic whenever the
+// snapshot was disposed between getSnapshot(callerRef=false) and this
+// construction (a concurrent snapshot adoption releases the session's
+// ref), and since LanguageServices are leak-tolerant the ref would also
+// pin the snapshot forever, deferring Dispose past the session's own
+// release and over-counting every store-owned resource it holds.
 struct SnapshotLSHost : ls::Host {
 	Snapshot* snapshot = nullptr;
-	explicit SnapshotLSHost(Snapshot* s) : snapshot(s) { s->ref(); }
-	~SnapshotLSHost() override { snapshot->Deref(); }
+	explicit SnapshotLSHost(Snapshot* s) : snapshot(s) {}
+	~SnapshotLSHost() override = default;
 
 	bool UseCaseSensitiveFileNames() override {
 		return snapshot->UseCaseSensitiveFileNames();
