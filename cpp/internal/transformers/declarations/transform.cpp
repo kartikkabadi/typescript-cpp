@@ -1107,8 +1107,8 @@ DeclarationTransformerImpl::getReferencedFiles(
 			continue;
 		}
 
-		// isAbsolutePathAnUrl=false (TODO: Probably unsafe to assume this
-		// isn't a URL, but that's what strada does) — identical to
+		// isAbsolutePathAnUrl=false (probably unsafe to assume this isn't
+		// a URL, but that's what strada does) — identical to
 		// getRelativePathFromDirectory in that case.
 		std::string fileName = tspath::getRelativePathFromDirectory(
 			outputFilePath, declFileName,

@@ -356,7 +356,7 @@ bool DirWatchSet::Covered(std::string dir) {
 		return true;
 	}
 	auto rootLength = tspath::getRootLength(dir);
-	for (; dir.size() > rootLength;) {
+	for (; dir.size() > static_cast<size_t>(rootLength);) {
 		dir = tspath::getDirectoryPath(dir);
 		if (auto it = dirs.find(dir); it != dirs.end() && it->second) {
 			return true;

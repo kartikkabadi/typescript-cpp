@@ -668,7 +668,7 @@ std::vector<Node*> Parser::parseListIndex(
 	reparseList.clear();
 	std::vector<Node*> list;
 	list.reserve(16);
-	for (int i = 0; !isListTerminator(kind); i++) {
+	for ([[maybe_unused]] int i = 0; !isListTerminator(kind); i++) {
 		if (isListElement(kind, false)) {
 			Node* elt = (this->*parseElement)(static_cast<int>(list.size()));
 			if (!reparseList.empty()) {

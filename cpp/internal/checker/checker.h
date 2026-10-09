@@ -732,10 +732,10 @@ struct InferenceKey {
 struct InferenceKeyHash {
 	size_t operator()(const InferenceKey& k) const noexcept {
 		return (static_cast<size_t>(k.source) << 32) |
-		       static_cast<size_t>(k.target) ^
+		       (static_cast<size_t>(k.target) ^
 		       ((static_cast<size_t>(k.priority) << 3) |
 		        (static_cast<size_t>(k.contravariant) << 1) |
-		        static_cast<size_t>(k.bivariant));
+		        static_cast<size_t>(k.bivariant)));
 	}
 };
 

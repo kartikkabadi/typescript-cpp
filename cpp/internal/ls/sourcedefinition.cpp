@@ -661,7 +661,7 @@ std::string sourceDefResolver::findImplementationFileFromDtsFileName(
 
 	// Ensure the file only contains one /node_modules/ segment. If there's more
 	// than one, the package name extraction may be incorrect, so bail out.
-	if (dtsFileName.rfind("/node_modules/") != parts->TopLevelNodeModulesIndex) {
+	if (dtsFileName.rfind("/node_modules/") != static_cast<size_t>(parts->TopLevelNodeModulesIndex)) {
 		return "";
 	}
 

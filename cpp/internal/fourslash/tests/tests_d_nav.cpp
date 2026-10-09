@@ -19,22 +19,6 @@ namespace {
 using namespace tsc;
 namespace tsu = tsc::fourslash::tests::util;
 
-static std::vector<fourslash::MarkerOrRangeOrName> asMonVec(
-	const std::vector<std::any> &v) {
-	std::vector<fourslash::MarkerOrRangeOrName> out;
-	out.reserve(v.size());
-	for (auto &e : v) {
-		if (auto *p = std::any_cast<std::shared_ptr<fourslash::Marker>>(&e))
-			out.push_back(*p);
-		else if (auto *p =
-					 std::any_cast<std::shared_ptr<fourslash::RangeMarker>>(&e))
-			out.push_back(*p);
-		else if (auto *p = std::any_cast<std::string>(&e)) out.push_back(*p);
-	}
-	return out;
-}
-
-
 static void TestNavigateToSymbolIterator(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -47,7 +31,6 @@ class C {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestNavigateToSymbolIterator, TestNavigateToSymbolIterator);
-
 
 static void TestNavigateToImport(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -64,7 +47,6 @@ import {foo, bar as [|baz|]} from './library';)TS";
 }
 REGISTER_FOURSLASH_TEST(TestNavigateToImport, TestNavigateToImport);
 
-
 static void TestNavigateItemsLet(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -79,7 +61,6 @@ function foo() {
 }
 REGISTER_FOURSLASH_TEST(TestNavigateItemsLet, TestNavigateItemsLet);
 
-
 static void TestNavbar_let(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -89,7 +70,6 @@ static void TestNavbar_let(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestNavbar_let, TestNavbar_let);
-
 
 static void TestNavbar_exportDefault(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -114,7 +94,6 @@ export default function Func { })TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestNavbar_exportDefault, TestNavbar_exportDefault);
-
 
 static void TestNavbar_contains_no_duplicates(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -152,7 +131,6 @@ namespace ABC {
 }
 REGISTER_FOURSLASH_TEST(TestNavbar_contains_no_duplicates, TestNavbar_contains_no_duplicates);
 
-
 static void TestNavbar_const(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -162,7 +140,6 @@ static void TestNavbar_const(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestNavbar_const, TestNavbar_const);
-
 
 static void TestNavbarNestedCommonJsExports(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -175,7 +152,6 @@ exports.a = exports.b = exports.c = 0;)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestNavbarNestedCommonJsExports, TestNavbarNestedCommonJsExports);
-
 
 static void TestNavbar01(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {

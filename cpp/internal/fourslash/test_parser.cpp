@@ -286,7 +286,7 @@ parseFileContent(
 				difference += 2;
 			} else if (previousCharacter == U'/' &&
 			           currentCharacter == U'*' &&
-			           (i + 1 >= content.size() || content[i + 1] != '/')) {
+			           (i + 1 >= (int)content.size() || content[i + 1] != '/')) {
 				// found a possible marker start
 				state = parserState::stateInSlashStarMarker;
 				openMarkerStorage = locationInformation{
@@ -371,7 +371,7 @@ parseFileContent(
 			             currentCharacter ==
 			                 U'_')) { // Invalid marker character
 				if (currentCharacter == U'*' &&
-				    i < content.size() - 1 && content[i + 1] == '/') {
+				    i < (int)content.size() - 1 && content[i + 1] == '/') {
 					// The marker is about to be closed, ignore the
 					// 'invalid' char
 				} else {

@@ -748,7 +748,6 @@ void Checker::resolveObjectTypeMembers(Type* t, Type* source,
 	std::vector<Signature*> callSignatures;
 	std::vector<Signature*> constructSignatures;
 	std::vector<IndexInfo*> indexInfos;
-	bool instantiated = false;
 	InterfaceType* resolved = resolveDeclaredMembers(source);
 	if (typeParameters == typeArguments) {
 		members = resolved->declaredMembers;
@@ -756,7 +755,6 @@ void Checker::resolveObjectTypeMembers(Type* t, Type* source,
 		constructSignatures = resolved->declaredConstructSignatures;
 		indexInfos = resolved->declaredIndexInfos;
 	} else {
-		instantiated = true;
 		mapper = newTypeMapper(typeParameters, typeArguments);
 		members = instantiateSymbolTable(resolved->declaredMembers, mapper);
 		callSignatures = instantiateSignatures(resolved->declaredCallSignatures, mapper);

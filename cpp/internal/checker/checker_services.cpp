@@ -291,7 +291,7 @@ Symbol* Checker::getSymbolOfNameOrPropertyAccessExpression(Node* name) {
 	           isInRightSideOfImportOrExportAssignment(name)) {
 		// Since we already checked for ExportAssignment, this really could only
 		// be an Import
-		Node* importEqualsDeclaration =
+		[[maybe_unused]] Node* importEqualsDeclaration =
 		    findAncestorKind(name, Kind::ImportEqualsDeclaration);
 		TSC_ASSERT(importEqualsDeclaration != nullptr,
 		           "ImportEqualsDeclaration should be defined");

@@ -19,22 +19,6 @@ namespace {
 using namespace tsc;
 namespace tsu = tsc::fourslash::tests::util;
 
-static std::vector<fourslash::MarkerOrRangeOrName> asMonVec(
-	const std::vector<std::any> &v) {
-	std::vector<fourslash::MarkerOrRangeOrName> out;
-	out.reserve(v.size());
-	for (auto &e : v) {
-		if (auto *p = std::any_cast<std::shared_ptr<fourslash::Marker>>(&e))
-			out.push_back(*p);
-		else if (auto *p =
-					 std::any_cast<std::shared_ptr<fourslash::RangeMarker>>(&e))
-			out.push_back(*p);
-		else if (auto *p = std::any_cast<std::string>(&e)) out.push_back(*p);
-	}
-	return out;
-}
-
-
 static void TestHoverSelfReExportedNamespaceGenericNoCrash(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -87,7 +71,6 @@ const x = b./*1*/content
 }
 REGISTER_FOURSLASH_TEST(TestHoverNamespaceExportGenericNonColliding, TestHoverNamespaceExportGenericNonColliding);
 
-
 static void TestHoverMappedTypePropertyJSDoc(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -130,7 +113,6 @@ declare function uhoh/*1*/<T>(x: { [K in keyof T] }): void;
 }
 REGISTER_FOURSLASH_TEST(TestHoverMappedTypeWithoutPropertyType, TestHoverMappedTypeWithoutPropertyType);
 
-
 static void TestHoverThenDiagnosticsJsxIntrinsic(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -153,7 +135,6 @@ export default function Home() {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestHoverThenDiagnosticsJsxIntrinsic, TestHoverThenDiagnosticsJsxIntrinsic);
-
 
 static void TestHoverQualifiedGenericNames(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -182,7 +163,6 @@ t2./*3*/foo()
 	});
 }
 REGISTER_FOURSLASH_TEST(TestHoverQualifiedGenericNames, TestHoverQualifiedGenericNames);
-
 
 static void TestHoverOverPrivateName(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -214,7 +194,6 @@ static void TestHoverOverPrivateName(gostd::testing::T* t) {
 }
 REGISTER_FOURSLASH_TEST(TestHoverOverPrivateName, TestHoverOverPrivateName);
 
-
 static void TestHoverOverComment(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Skip({"Known failing fourslash test"}); return;
@@ -230,7 +209,6 @@ static void TestHoverOverComment(gostd::testing::T* t) {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestHoverOverComment, TestHoverOverComment);
-
 
 static void TestHoverOptionalMembers(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -312,7 +290,6 @@ foo3./*3k*/m?.("abc")
 }
 REGISTER_FOURSLASH_TEST(TestHoverOptionalMembers, TestHoverOptionalMembers);
 
-
 static void TestHoverNilBaseSymbolIntersection(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -333,7 +310,6 @@ class Derived extends BaseFactory {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestHoverNilBaseSymbolIntersection, TestHoverNilBaseSymbolIntersection);
-
 
 static void TestHoverMixinOverrideDocumentation(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -364,7 +340,6 @@ Mixed./*1*/method;
 }
 REGISTER_FOURSLASH_TEST(TestHoverMixinOverrideDocumentation, TestHoverMixinOverrideDocumentation);
 
-
 static void TestHoverCircularInheritedDocumentation(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -383,7 +358,6 @@ v.hooks/*1*/;)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestHoverCircularInheritedDocumentation, TestHoverCircularInheritedDocumentation);
-
 
 static void TestHoverCallSignatureDocumentation(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -408,7 +382,6 @@ new /*2*/x()
 	});
 }
 REGISTER_FOURSLASH_TEST(TestHoverCallSignatureDocumentation, TestHoverCallSignatureDocumentation);
-
 
 static void TestHoverAliasInImportedFile(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {

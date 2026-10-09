@@ -70,7 +70,7 @@ static void TestImplementationsWorklistDoesNotBlowUp(T* t) {
 		        nullptr);
 		gotest::assert::Equal(t, int(errors.size()), 0);
 		auto* program = compiler::NewProgram(
-		    compiler::ProgramOptions{.Config = parsed, .Host = host});
+		    compiler::ProgramOptions{.Host = host, .Config = parsed});
 		program->BindSourceFiles();
 		program->GetSemanticDiagnostics(
 		    program->GetSourceFile("/repro.ts"));

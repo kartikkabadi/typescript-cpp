@@ -335,7 +335,7 @@ struct toProgramSnapshot {
 	// programtosnapshot.go:220 handlePendingCheck.
 	void handlePendingCheck() {
 		if (oldProgram != nullptr &&
-		    snapshot->semanticDiagnosticsPerFile.Size() !=
+		    static_cast<int64_t>(snapshot->semanticDiagnosticsPerFile.Size()) !=
 		        static_cast<int64_t>(program->GetSourceFiles().size()) &&
 		    oldProgram->snapshot_->checkPending != snapshot->checkPending) {
 			snapshot->buildInfoEmitPending.store(true);

@@ -728,8 +728,7 @@ void TestContentMapperWatchManifestChangeIgnoresCase(T* t) {
 	    "/home/src/workspaces/Mapper/package.json";
 	const std::string manifestEvent =
 	    "/home/src/workspaces/mapper/package.json";
-	auto* input = new tscInput{.ignoreCase = true,
-	                         .files = FileMap{
+	auto* input = new tscInput{.files = FileMap{
 	    {"/home/src/workspaces/project/tsconfig.json",
 	     std::string(R"({
 			"compilerOptions": { "composite": true },
@@ -740,7 +739,7 @@ void TestContentMapperWatchManifestChangeIgnoresCase(T* t) {
 	     vfs::vfstest::Symlink("/home/src/workspaces/Mapper")},
 	    {manifestTarget,
 	     contentmappertest::PackageJSON(contentmappertest::VerbatimMapper)},
-	}};
+	}, .ignoreCase = true};
 	auto testSys = newTestSys(input, false);
 	auto* spawner = new recordingContentMapperSpawner{
 	    .inner = contentmappertest::NewSpawner()};

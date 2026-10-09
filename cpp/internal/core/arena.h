@@ -52,8 +52,8 @@ public:
 	Arena(const Arena&) = delete;
 	Arena& operator=(const Arena&) = delete;
 	Arena(Arena&& o) noexcept
-	    : blockSize_(o.blockSize_), blockBytes_(o.blockBytes_),
-	      maxBlockSize_(o.maxBlockSize_), capacity_(o.capacity_),
+	    : blockSize_(o.blockSize_), maxBlockSize_(o.maxBlockSize_),
+	      blockBytes_(o.blockBytes_), capacity_(o.capacity_),
 	      offset_(o.offset_), cur_(o.cur_), blocks_(std::move(o.blocks_)),
 	      tracked_(o.tracked_), trackedAllocs_(o.trackedAllocs_),
 	      trackedBytesAllocd_(o.trackedBytesAllocd_),

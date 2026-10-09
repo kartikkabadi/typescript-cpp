@@ -299,7 +299,7 @@ bool hasTypeParameterDefault(Type* tp) {
 }
 
 // inference.go:1655 — hasInferenceCandidatesOrDefault
-bool hasInferenceCandidatesOrDefault(InferenceInfo* info) {
+[[maybe_unused]] bool hasInferenceCandidatesOrDefault(InferenceInfo* info) {
 	return hasInferenceCandidates(info) || hasTypeParameterDefault(info->typeParameter);
 }
 

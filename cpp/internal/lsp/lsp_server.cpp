@@ -1040,7 +1040,7 @@ gostd::Error Server::Run(gostd::Context ctx) {
 		bool has = false;
 	};
 	auto rl = std::make_shared<readLoopChan>();
-	g.go([s, gctx, rl] {
+	g.go([gctx, rl] {
 		// select { <-ctx.Done() | err := <-readLoopErr }
 		std::unique_lock<std::mutex> lk(rl->mu);
 		auto disarm = gostd::contextAfterFunc(gctx, [rl] {

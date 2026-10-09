@@ -371,7 +371,7 @@ std::vector<std::string> iterateErrorBaseline(
 
 // ASTDiagnostic instantiation (error_baseline.go:80, T=*ASTDiagnostic) —
 // used by testrunner.
-std::vector<std::string> iterateErrorBaseline(
+[[maybe_unused]] std::vector<std::string> iterateErrorBaseline(
     gostd::testing::T* t,
     const std::vector<harnessutil::TestFile*>& inputFiles,
     const std::vector<

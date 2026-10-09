@@ -2896,12 +2896,12 @@ void TestOmitTrailingSemicolon(T* t) {
 	);
 	auto* file = parsetestutil::ParseTypeScript("interface I {}", false);
 
-	auto* defaultPrinter = printer::NewPrinter(printer::PrinterOptions{NewLine: NewLineKind::LineFeed}, printer::PrintHandlers{}, nullptr);
+	auto* defaultPrinter = printer::NewPrinter(printer::PrinterOptions{.NewLine = NewLineKind::LineFeed}, printer::PrintHandlers{}, nullptr);
 	if (auto got = defaultPrinter->Emit(methodSignature, file); got != "m(): void;") {
 		t->Fatalf("default Emit() = %q, want %q", {got, "m(): void;"});
 	}
 
-	auto* omitPrinter = printer::NewPrinter(printer::PrinterOptions{NewLine: NewLineKind::LineFeed, OmitTrailingSemicolon: true}, printer::PrintHandlers{}, nullptr);
+	auto* omitPrinter = printer::NewPrinter(printer::PrinterOptions{.NewLine = NewLineKind::LineFeed, .OmitTrailingSemicolon = true}, printer::PrintHandlers{}, nullptr);
 	if (auto got = omitPrinter->Emit(methodSignature, file); got != "m(): void") {
 		t->Fatalf("omit Emit() = %q, want %q", {got, "m(): void"});
 	}

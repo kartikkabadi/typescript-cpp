@@ -413,7 +413,7 @@ configFileRegistryBuilder::invalidateCache(logging::LogTree* logger) {
 
 	logging::log(logger, "Too many files changed; marking all configs for "
 	            "reload");
-	configFileNames->Range([&, this](
+	configFileNames->Range([&](
 	    dirty::MapEntry<tspath::Path, project::configFileNames*>* entry) {
 		    if (affectedFiles == nullptr) {
 			    affectedFiles =
@@ -580,7 +580,7 @@ changeFileResult configFileRegistryBuilder::DidChangeFiles(
 			return invalidateCache(logger);
 		}
 		auto directoryPath = tspath::getDirectoryPath(std::string{path});
-		configFileNames->Range([&, this](
+		configFileNames->Range([&](
 		    dirty::MapEntry<tspath::Path,
 		                     project::configFileNames*>* entry) {
 			    if (tspath::pathContainsPath(tspath::Path{directoryPath},
@@ -603,7 +603,7 @@ changeFileResult configFileRegistryBuilder::DidChangeFiles(
 		auto path = deletedFile.first;
 		auto fileName = deletedFile.second;
 		configs->Range(
-		    [&, this](const std::shared_ptr<dirty::SyncMapEntry<
+		    [&](const std::shared_ptr<dirty::SyncMapEntry<
 		            tspath::Path, configFileEntry*>>& entry) {
 			    entry->ChangeIf(
 			        [&](configFileEntry* config) {

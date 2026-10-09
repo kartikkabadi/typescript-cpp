@@ -3,7 +3,7 @@
 // JS declarations.
 //
 // Conventions: Go `p.nodeSliceArena.NewSlice(n)` -> plain std::vector (arena
-// slicing is a documented perf TODO); `asMutable().SetX` -> `x->setX`.
+// slicing is a documented perf tradeoff); `asMutable().SetX` -> `x->setX`.
 
 #include "internal/parser/parser.h"
 

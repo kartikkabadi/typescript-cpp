@@ -35,7 +35,7 @@ std::string getNewLineCharacter(NewLineKind newLine) {
 }
 
 // slices.Collect over the scanner's comment-range iterators.
-std::vector<CommentRange> collectCommentRanges(
+[[maybe_unused]] std::vector<CommentRange> collectCommentRanges(
 	const std::function<void(const std::function<bool(const CommentRange&)>&)>& seq) {
 	std::vector<CommentRange> out;
 	seq([&out](const CommentRange& r) {
@@ -115,11 +115,11 @@ int findIndentationColumn(std::string_view text, int lineStart, int memberStart,
 
 // needSemicolonBetween — trackerimpl.go:392
 bool needSemicolonBetween(Node* a, Node* b) {
-	return (isPropertySignatureDeclaration(a) || isPropertyDeclaration(a)) &&
+	return ((isPropertySignatureDeclaration(a) || isPropertyDeclaration(a)) &&
 			   lsutil::detail::isClassOrTypeElement(b) &&
-			   b->name()->kind == Kind::ComputedPropertyName ||
-		   lsutil::detail::isStatementButNotDeclaration(a) &&
-			   lsutil::detail::isStatementButNotDeclaration(b);
+			   b->name()->kind == Kind::ComputedPropertyName) ||
+		   (lsutil::detail::isStatementButNotDeclaration(a) &&
+			   lsutil::detail::isStatementButNotDeclaration(b));
 }
 
 } // namespace

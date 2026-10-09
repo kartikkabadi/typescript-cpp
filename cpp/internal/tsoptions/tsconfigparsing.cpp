@@ -117,7 +117,7 @@ getSubstitutedStringArrayWithConfigDirTemplate(
     const std::vector<std::string>& list, std::string_view basePath);
 void handleOptionConfigDirTemplateSubstitution(
     CompilerOptions* compilerOptions, std::string_view basePath);
-std::pair<optionParser*, std::vector<Diagnostic*>>
+[[maybe_unused]] std::pair<optionParser*, std::vector<Diagnostic*>>
 convertOptionsFromJsonImpl(const CommandLineOptionNameMap& optionsNameMap,
                            const CompilerOptionsValue& jsonOptions,
                            std::string_view basePath, optionParser* result);
@@ -1939,11 +1939,6 @@ ParsedCommandLine* parseJsonConfigFileContentWorker(
 				contentMapperIndices.push_back((int)i);
 			}
 		}
-	}
-	size_t totalContentMapperExtensions = 0;
-	for (auto* mapper : contentMappers) {
-		totalContentMapperExtensions +=
-		    mapper->Definition.Extensions.size();
 	}
 	collections::Set<std::string> seenContentMapperExtensions;
 	std::vector<std::string> contentMapperExtensions;

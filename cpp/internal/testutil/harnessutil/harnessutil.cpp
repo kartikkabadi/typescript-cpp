@@ -74,7 +74,7 @@ bool cutSuffix(std::string_view s, std::string_view suffix,
 	return false;
 }
 
-std::pair<std::string_view, std::string_view> cut(std::string_view s,
+[[maybe_unused]] std::pair<std::string_view, std::string_view> cut(std::string_view s,
                                                   char sep) {
 	auto i = s.find(sep);
 	if (i == std::string_view::npos) {

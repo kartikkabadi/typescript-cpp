@@ -498,7 +498,7 @@ std::string GetNodeModulesPackageName(
 
 // util.go:350 — allKeysStartWithDot (unused in Go as well — kept for
 // fidelity)
-static bool allKeysStartWithDot(
+[[maybe_unused]] static bool allKeysStartWithDot(
     const collections::OrderedMap<std::string, packagejson::ExportsOrImports>*
         obj) {
 	for (auto& k : obj->Keys()) {

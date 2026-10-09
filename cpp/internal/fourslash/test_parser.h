@@ -59,7 +59,7 @@ struct Marker final : MarkerOrRange {
 	std::string FileName() const override { return fileName; }
 	std::shared_ptr<std::string> GetName() const override { return Name; }
 	// MakerWithSymlink — test_parser.go:75.
-	std::shared_ptr<class Marker> MakerWithSymlink(const std::string& fileName) const;
+	std::shared_ptr<Marker> MakerWithSymlink(const std::string& fileName) const;
 };
 
 // TestData — test_parser.go:91.

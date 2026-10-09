@@ -585,7 +585,7 @@ public:
 	// send blocks while the buffer is full; returns false when closed.
 	bool send(T v) {
 		std::unique_lock<std::mutex> lk(mu_);
-		full_.wait(lk, [&] { return closed_ || (int)q_.size() < cap_ || cap_ == 0 && waiters_ > 0; });
+		full_.wait(lk, [&] { return closed_ || (int)q_.size() < cap_ || (cap_ == 0 && waiters_ > 0); });
 		if (closed_) return false;
 		q_.push_back(std::move(v));
 		lk.unlock();

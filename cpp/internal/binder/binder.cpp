@@ -29,7 +29,7 @@ static bool hasNarrowableArgument(Node* expr);
 static bool isNarrowingTypeOfOperands(Node* expr1, Node* expr2);
 static bool isTopLevelLogicalExpression(Node* node);
 static bool isStatementCondition(Node* node);
-static bool isSignedNumericLiteralBinder(Node* node); // unused; parity note
+[[maybe_unused]] static bool isSignedNumericLiteralBinder(Node* node); // unused; parity note
 static Node* getParentOfPropertyAssignment(Node* node);
 static Symbol* getInitializerSymbol(Symbol* symbol);
 
@@ -723,10 +723,10 @@ FlowNode* Binder::createFlowCondition(FlowFlags flags, FlowNode* antecedent,
 		if (flags & FlowFlagsTrueCondition) return antecedent;
 		return unreachableFlow;
 	}
-	if ((expression->kind == Kind::TrueKeyword &&
-	         flags & FlowFlagsFalseCondition ||
-	     expression->kind == Kind::FalseKeyword &&
-	         flags & FlowFlagsTrueCondition) &&
+	if (((expression->kind == Kind::TrueKeyword &&
+	         flags & FlowFlagsFalseCondition) ||
+	     (expression->kind == Kind::FalseKeyword &&
+	         flags & FlowFlagsTrueCondition)) &&
 	    !isExpressionOfOptionalChainRoot(expression) &&
 	    !isNullishCoalesce(expression->parent)) {
 		return unreachableFlow;
@@ -3114,8 +3114,8 @@ static bool isNarrowingBinaryExpression(BinaryExpression* expr) {
 		return isNarrowableOperand(left) || isNarrowableOperand(right) ||
 		       isNarrowingTypeOfOperands(right, left) ||
 		       isNarrowingTypeOfOperands(left, right) ||
-		       (isBooleanLiteral(right) && isNarrowingExpression(left) ||
-		        isBooleanLiteral(left) && isNarrowingExpression(right));
+		       ((isBooleanLiteral(right) && isNarrowingExpression(left)) ||
+		        (isBooleanLiteral(left) && isNarrowingExpression(right)));
 	}
 	case Kind::InstanceOfKeyword:
 		return isNarrowableOperand(expr->Left);

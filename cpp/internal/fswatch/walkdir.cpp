@@ -123,7 +123,7 @@ gostd::Error iterateDir(walkState* st, int fd, const std::string& dirname,
 std::pair<std::vector<unixDirent>, gostd::Error>
 readDirEntries(int fd, std::vector<char>& buf) {
 	std::vector<unixDirent> entries;
-	long basep = 0; // getdirentries needs an lseek-position out-param
+	[[maybe_unused]] long basep = 0; // getdirentries needs an lseek-position out-param
 	for (;;) {
 #ifdef __APPLE__
 		// walkdir_dirent_darwin.go — getdirentries yields struct dirent.

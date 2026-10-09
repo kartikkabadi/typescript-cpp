@@ -209,14 +209,14 @@ SourceFileMetaData filesLoader::loadSourceFileMetaData(
 	if (packageJsonScope && packageJsonScope->Exists()) {
 		packageJsonDirectory = packageJsonScope->PackageDirectory;
 		const std::string& value = packageJsonScope->GetContents()->Type.Value;
-		if (!value.empty() &&
+		if ((!value.empty() &&
 		    (!tspath::fileExtensionIsOneOf(
 		         fileName,
 		         {".mts", ".cts", ".mjs", ".cjs"}) &&
 			     ModuleResolutionKind::Node16 <=
 			         moduleResolutionKind &&
 			         moduleResolutionKind <=
-			             ModuleResolutionKind::NodeNext) ||
+			             ModuleResolutionKind::NodeNext)) ||
 
 		    fileName.find("/node_modules/") != std::string::npos) {
 			packageJsonType = value;

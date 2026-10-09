@@ -516,7 +516,7 @@ void FourslashTest::printConfigFileRegistryDiff(
 		    }
 		    configDiffsTable->add(
 		        std::string(path),
-		        [this, entry, oldEntry, configChange,
+		        [entry, oldEntry, configChange,
 		         options](gostd::io::Writer* w) {
 			        gostr::fprint(w, gostd::sprintf(
 			                             "  [%s] %s\n",

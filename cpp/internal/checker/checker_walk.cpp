@@ -862,10 +862,10 @@ void Checker::checkConstEnumAccess(Node* node, Type* t) {
 	// - 'left' in property access
 	// - 'object' in indexed access
 	// - target in rhs of import statement
-	bool ok = isPropertyAccessExpression(node->parent) && node->parent->expression() == node ||
-		isElementAccessExpression(node->parent) && node->parent->expression() == node ||
-		((isIdentifier(node) || isQualifiedName(node)) && isInRightSideOfImportOrExportAssignment(node) ||
-		 isTypeQueryNode(node->parent) && node->parent->as<TypeQueryNode>()->ExprName == node) ||
+	bool ok = (isPropertyAccessExpression(node->parent) && node->parent->expression() == node) ||
+		(isElementAccessExpression(node->parent) && node->parent->expression() == node) ||
+		(((isIdentifier(node) || isQualifiedName(node)) && isInRightSideOfImportOrExportAssignment(node)) ||
+		 (isTypeQueryNode(node->parent) && node->parent->as<TypeQueryNode>()->ExprName == node)) ||
 		isExportSpecifier(node->parent); // We allow reexporting const enums
 	if (!ok) {
 		error(node, X_const_enums_can_only_be_used_in_property_or_index_access_expressions_or_the_right_hand_side_of_an_import_declaration_or_export_assignment_or_type_query);

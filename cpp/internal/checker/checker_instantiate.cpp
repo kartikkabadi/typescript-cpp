@@ -160,20 +160,18 @@ const std::vector<Type*>& aliasTypeArguments(TypeAlias* alias) {
 
 template <class R, typename F>
 bool anyOf(R&& v, F&& f) {
-	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	return std::any_of(v.begin(), v.end(), std::forward<F>(f));
 }
 
 template <class R, typename F>
 bool allOf(R&& v, F&& f) {
-	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	return std::all_of(v.begin(), v.end(), std::forward<F>(f));
 }
 
 template <class R, typename F>
 auto mapVec(R&& v, F&& f) -> std::vector<decltype(f(v.front()))> {
-	using T = std::decay_t<std::ranges::range_value_t<R>>;
-	std::vector<decltype(f(v.front()))> out;
+
+	using T = std::decay_t<std::ranges::range_value_t<R>>;	std::vector<decltype(f(v.front()))> out;
 	out.reserve(v.size());
 	for (const T& e : v) {
 		out.push_back(f(e));
@@ -184,8 +182,8 @@ auto mapVec(R&& v, F&& f) -> std::vector<decltype(f(v.front()))> {
 template <class R, typename F>
 auto filterVec(R&& v, F&& f)
 	-> std::vector<std::decay_t<std::ranges::range_value_t<R>>> {
-	using T = std::decay_t<std::ranges::range_value_t<R>>;
-	std::vector<T> out;
+
+	using T = std::decay_t<std::ranges::range_value_t<R>>;	std::vector<T> out;
 	for (const T& e : v) {
 		if (f(e)) {
 			out.push_back(e);
@@ -1300,8 +1298,8 @@ template <class R>
 auto Checker::instantiateList(R&& values, TypeMapper* m,
 										std::decay_t<std::ranges::range_value_t<R>> (Checker::*instantiator)(std::decay_t<std::ranges::range_value_t<R>>, TypeMapper*))
 	-> std::vector<std::decay_t<std::ranges::range_value_t<R>>> {
-	using T = std::decay_t<std::ranges::range_value_t<R>>;
-	for (size_t i = 0; i < values.size(); i++) {
+
+	using T = std::decay_t<std::ranges::range_value_t<R>>;	for (size_t i = 0; i < values.size(); i++) {
 		T mapped = (this->*instantiator)(values[i], m);
 		if (mapped != values[i]) {
 			std::vector<T> result(values.size());

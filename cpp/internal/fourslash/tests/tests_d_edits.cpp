@@ -19,21 +19,6 @@ namespace {
 using namespace tsc;
 namespace tsu = tsc::fourslash::tests::util;
 
-static std::vector<fourslash::MarkerOrRangeOrName> asMonVec(
-	const std::vector<std::any> &v) {
-	std::vector<fourslash::MarkerOrRangeOrName> out;
-	out.reserve(v.size());
-	for (auto &e : v) {
-		if (auto *p = std::any_cast<std::shared_ptr<fourslash::Marker>>(&e))
-			out.push_back(*p);
-		else if (auto *p =
-					 std::any_cast<std::shared_ptr<fourslash::RangeMarker>>(&e))
-			out.push_back(*p);
-		else if (auto *p = std::any_cast<std::string>(&e)) out.push_back(*p);
-	}
-	return out;
-}
-
 static std::string itoaSmall(int32_t n) {
 	if (n == 0) {
 		return "0";
@@ -45,7 +30,6 @@ static std::string itoaSmall(int32_t n) {
 	}
 	return std::string(b.begin(), b.end());
 }
-
 
 static void TestGetEditsForFileRename_duplicateUnresolvedImports(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -83,7 +67,6 @@ export const v)TS" + fi + " = " + fi + R"TS(;
 }
 REGISTER_FOURSLASH_TEST(TestGetEditsForFileRename_duplicateUnresolvedImports, TestGetEditsForFileRename_duplicateUnresolvedImports);
 
-
 static void TestGetEditsForFileRename_cssImport4(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -113,7 +96,6 @@ export default css;)TS"}, {"/app2.css", R"TS(.cookie-banner {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestGetEditsForFileRename_cssImport4, TestGetEditsForFileRename_cssImport4);
-
 
 static void TestGetEditsForFileRenameLoadsUnopenedCompositeProject(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {

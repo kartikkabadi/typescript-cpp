@@ -42,22 +42,20 @@ T orElse(T a, T b) {
 // core.Some
 template <class R, class F>
 bool someRange(R&& v, F f) {
-	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	return std::any_of(v.begin(), v.end(), f);
 }
 
 // core.Every
 template <class R, class F>
 bool everyRange(R&& v, F f) {
-	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	return std::all_of(v.begin(), v.end(), f);
 }
 
 // core.Map
 template <class R, class F>
 auto mapRange(R&& v, F f) -> std::vector<std::invoke_result_t<F, std::decay_t<std::ranges::range_value_t<R>>>> {
-	using T = std::decay_t<std::ranges::range_value_t<R>>;
-	std::vector<std::invoke_result_t<F, T>> out;
+
+	using T = std::decay_t<std::ranges::range_value_t<R>>;	std::vector<std::invoke_result_t<F, T>> out;
 	out.reserve(v.size());
 	for (const T& x : v) {
 		out.push_back(f(x));
@@ -69,8 +67,8 @@ auto mapRange(R&& v, F f) -> std::vector<std::invoke_result_t<F, std::decay_t<st
 template <class R, class F>
 auto filterRange(R&& v, F f)
 	-> std::vector<std::decay_t<std::ranges::range_value_t<R>>> {
-	using T = std::decay_t<std::ranges::range_value_t<R>>;
-	std::vector<T> out;
+
+	using T = std::decay_t<std::ranges::range_value_t<R>>;	std::vector<T> out;
 	for (const T& x : v) {
 		if (f(x)) {
 			out.push_back(x);
@@ -83,15 +81,14 @@ auto filterRange(R&& v, F f)
 template <class R, class F>
 auto findRange(R&& v, F f)
 	-> std::decay_t<std::ranges::range_value_t<R>> {
-	using T = std::decay_t<std::ranges::range_value_t<R>>;
-	auto it = std::find_if(v.begin(), v.end(), f);
+
+	using T = std::decay_t<std::ranges::range_value_t<R>>;	auto it = std::find_if(v.begin(), v.end(), f);
 	return it != v.end() ? *it : T{};
 }
 
 // core.FindIndex — index of first element satisfying pred, or -1.
 template <class R, class F>
 int findIndexRange(R&& v, F f) {
-	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	auto it = std::find_if(v.begin(), v.end(), f);
 	return it != v.end() ? static_cast<int>(it - v.begin()) : -1;
 }
@@ -99,7 +96,6 @@ int findIndexRange(R&& v, F f) {
 // slices.Index — index of the first occurrence of value, or -1.
 template <class R>
 int indexOfRange(R&& v, const auto& value) {
-	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	auto it = std::find(v.begin(), v.end(), value);
 	return it != v.end() ? static_cast<int>(it - v.begin()) : -1;
 }
@@ -108,22 +104,21 @@ int indexOfRange(R&& v, const auto& value) {
 template <class R>
 auto firstOrNil(R&& v)
 	-> std::decay_t<std::ranges::range_value_t<R>> {
-	using T = std::decay_t<std::ranges::range_value_t<R>>;
-	return v.empty() ? T{} : v.front();
+
+	using T = std::decay_t<std::ranges::range_value_t<R>>;	return v.empty() ? T{} : v.front();
 }
 
 // core.LastOrNil
 template <class R>
 auto lastOrNil(R&& v)
 	-> std::decay_t<std::ranges::range_value_t<R>> {
-	using T = std::decay_t<std::ranges::range_value_t<R>>;
-	return v.empty() ? T{} : v.back();
+
+	using T = std::decay_t<std::ranges::range_value_t<R>>;	return v.empty() ? T{} : v.back();
 }
 
 // slices.Contains
 template <class R>
 bool containsElement(R&& v, const auto& value) {
-	using T = std::decay_t<std::ranges::range_value_t<R>>;
 	return std::find(v.begin(), v.end(), value) != v.end();
 }
 
@@ -131,14 +126,14 @@ bool containsElement(R&& v, const auto& value) {
 template <class R>
 auto replaceElement(R&& v, size_t index, std::decay_t<std::ranges::range_value_t<R>> element)
 	-> std::vector<std::decay_t<std::ranges::range_value_t<R>>> {
-	using T = std::decay_t<std::ranges::range_value_t<R>>;
-	std::vector<T> out = v;
+
+	using T = std::decay_t<std::ranges::range_value_t<R>>;	std::vector<T> out = v;
 	out[index] = element;
 	return out;
 }
 
 // isUnitType — checker.go:25878
-bool isUnitType(Type* t) {
+[[maybe_unused]] bool isUnitType(Type* t) {
 	return (t->flags & TypeFlagsUnit) != 0;
 }
 
@@ -579,7 +574,7 @@ int Checker::getCombinedMappedTypeOptionality(Type* t) {
 namespace {
 
 // checker.go:29528 — isPartialMappedType
-bool isPartialMappedType(Type* t) {
+[[maybe_unused]] bool isPartialMappedType(Type* t) {
 	return (t->objectFlags & ObjectFlagsMapped) != 0 &&
 		   (getMappedTypeModifiers(t) & MappedTypeModifiersIncludeOptional) != 0;
 }

@@ -545,13 +545,13 @@ std::vector<Node*> getNewImports(
 		// `verbatimModuleSyntax` should prefer top-level `import type` -
 		// even though it's not an error, it would add unnecessary runtime emit.
 		bool topLevelTypeOnly =
-		    (defaultImport == nullptr ||
+		    ((defaultImport == nullptr ||
 		     needsTypeOnly(defaultImport->addAsTypeOnly)) &&
 		        std::all_of(namedImports.begin(), namedImports.end(),
 		                    [](newImportBinding* i) {
 			                    return needsTypeOnly(i->addAsTypeOnly);
-		                    }) ||
-		    (tristateIsTrue(compilerOptions->VerbatimModuleSyntax) ||
+		                    })) ||
+		    ((tristateIsTrue(compilerOptions->VerbatimModuleSyntax) ||
 		     tristateIsTrue(preferences.PreferTypeOnlyAutoImports)) &&
 		        (defaultImport == nullptr ||
 		         defaultImport->addAsTypeOnly !=
@@ -560,7 +560,7 @@ std::vector<Node*> getNewImports(
 		                     [](newImportBinding* i) {
 			                     return i->addAsTypeOnly ==
 			                            lsp::lsproto::AddAsTypeOnlyNotAllowed;
-		                     });
+		                     }));
 
 		Node* defaultImportNode = nullptr;
 		if (defaultImport != nullptr) {

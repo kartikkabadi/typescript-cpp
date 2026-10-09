@@ -35,7 +35,7 @@ bool isCommonJSModuleExports(Node* node) {
 }
 
 // noopAddVisibleAlias — emitresolver.go:376
-void noopAddVisibleAlias(Node* /*declaration*/, Node* /*aliasingStatement*/) {}
+[[maybe_unused]] void noopAddVisibleAlias(Node* /*declaration*/, Node* /*aliasingStatement*/) {}
 
 // isConstEnumSymbol — emitresolver.go:693 (local replica)
 bool isConstEnumSymbol(Symbol* s) {
@@ -51,12 +51,12 @@ bool isConstEnumOrConstEnumOnlyModule(Symbol* s) {
 // convention as checker_declchecks2.cpp / checker_utilities.cpp).
 
 // utilities.go:298 — isOptionalDeclaration
-bool isOptionalDeclaration(Node* declaration) {
+[[maybe_unused]] bool isOptionalDeclaration(Node* declaration) {
 	return hasQuestionToken(declaration);
 }
 
 // ast/utilities.go:2639 — getDeclarationContainer
-Node* getDeclarationContainer(Node* node) {
+[[maybe_unused]] Node* getDeclarationContainer(Node* node) {
 	return findAncestor(getRootDeclaration(node), [](Node* n) -> bool {
 		switch (n->kind) {
 		case Kind::VariableDeclaration:
@@ -73,7 +73,7 @@ Node* getDeclarationContainer(Node* node) {
 }
 
 // ast/utilities.go:1286 — walkUpBindingElementsAndPatterns
-Node* walkUpBindingElementsAndPatterns(Node* node) {
+[[maybe_unused]] Node* walkUpBindingElementsAndPatterns(Node* node) {
 	node = node->parent;
 	while (isBindingElement(node->parent)) {
 		node = node->parent->parent;

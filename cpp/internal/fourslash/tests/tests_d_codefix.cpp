@@ -19,22 +19,6 @@ namespace {
 using namespace tsc;
 namespace tsu = tsc::fourslash::tests::util;
 
-static std::vector<fourslash::MarkerOrRangeOrName> asMonVec(
-	const std::vector<std::any> &v) {
-	std::vector<fourslash::MarkerOrRangeOrName> out;
-	out.reserve(v.size());
-	for (auto &e : v) {
-		if (auto *p = std::any_cast<std::shared_ptr<fourslash::Marker>>(&e))
-			out.push_back(*p);
-		else if (auto *p =
-					 std::any_cast<std::shared_ptr<fourslash::RangeMarker>>(&e))
-			out.push_back(*p);
-		else if (auto *p = std::any_cast<std::string>(&e)) out.push_back(*p);
-	}
-	return out;
-}
-
-
 static void TestFixingTypeParametersQuickInfo(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -49,7 +33,6 @@ var /*1*/result = /*2*/f(0, /*3*/x => null, /*4*/x => x.blahblah);)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestFixingTypeParametersQuickInfo, TestFixingTypeParametersQuickInfo);
-
 
 static void TestFixExactOptionalUnassignableProperties9(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -71,7 +54,6 @@ iany/**/ = j)TS";
 }
 REGISTER_FOURSLASH_TEST(TestFixExactOptionalUnassignableProperties9, TestFixExactOptionalUnassignableProperties9);
 
-
 static void TestFixExactOptionalUnassignableProperties7(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -89,7 +71,6 @@ class Feh {
 	});
 }
 REGISTER_FOURSLASH_TEST(TestFixExactOptionalUnassignableProperties7, TestFixExactOptionalUnassignableProperties7);
-
 
 static void TestFixExactOptionalUnassignableProperties3(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {

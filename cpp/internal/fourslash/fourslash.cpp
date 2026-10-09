@@ -549,12 +549,6 @@ namespace {
 constexpr bool ptrTrue = true;
 constexpr bool ptrFalse = false;
 
-template <typename T>
-// OLD sliceOf deleted — replaced by shared_ptr<lsproto::Slice<T>> in header.
-std::shared_ptr<std::vector<T>> sliceOfVecDeleted(std::initializer_list<T> items) {
-	return std::make_shared<std::vector<T>>(items);
-}
-
 std::shared_ptr<lsproto::CompletionClientCapabilities>
 defaultCompletionCapabilities() {
 	auto p = std::make_shared<lsproto::CompletionClientCapabilities>(
@@ -1445,7 +1439,7 @@ VerifyCompletionsResult FourslashTest::verifyCompletionsActions(
 		            {expectedAction->Name}));
 	    };
 	result.AndHasNoCodeAction =
-	    [this, list](gostd::testing::T* t,
+	    [list](gostd::testing::T* t,
 	                 const CompletionsExpectedCodeAction*
 	                     unexpectedAction) {
 		    auto item = gostr::coreFind(
@@ -3511,7 +3505,6 @@ void FourslashTest::verifyBaselineDefinitions(
 		if (result.Locations != nullptr) {
 			for (auto& loc : orNilSlice(result.Locations)) {
 				resultAsSpans.push_back(locationToSpan(loc));
-				auto& e = resultAsSpans.back();
 			}
 		} else if (result.Location != nullptr) {
 			resultAsSpans = {locationToSpan(*result.Location)};

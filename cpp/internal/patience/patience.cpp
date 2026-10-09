@@ -168,10 +168,6 @@ std::vector<Hunk> makeHunks(const std::vector<DiffLine>& diffs, int precontext,
 	auto sliceFrom = [](const std::vector<DiffLine>& v, int i) {
 		return std::vector<DiffLine>(v.begin() + i, v.end());
 	};
-	auto sliceTo = [](const std::vector<DiffLine>& v, int i) {
-		return std::vector<DiffLine>(v.begin(), v.begin() + i);
-	};
-
 	auto updateHunks = [&](const Hunk& block, bool lastBlock) {
 		int curHunk = (int)hunks.size() - 1;
 		if (block.Diffs[0].Type == DiffType::Equal) {

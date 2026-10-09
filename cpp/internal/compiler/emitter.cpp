@@ -69,7 +69,7 @@ transformers::declarations::OutputPaths* emitHost::GetOutputPathsFor(SourceFile*
 	// TODO: cache
 	auto* adapter = new outputPathsAdapter;
 	adapter->paths = outputpaths::GetOutputPathsFor(
-	    file, Options(), this, outputpaths::ForceEmitPaths{Dts: forceDtsPaths});
+	    file, Options(), this, outputpaths::ForceEmitPaths{.Dts = forceDtsPaths});
 	return adapter;
 }
 
@@ -458,8 +458,8 @@ void emitter::printSourceFile(printer::EmitContext* emitContext,
 		    getSourceRoot(mapOptions),
 		    getSourceMapDirectory(mapOptions, jsFilePath, sourceFile),
 		    tspath::ComparePathsOptions{
-		        useCaseSensitiveFileNames: host->UseCaseSensitiveFileNames(),
-		        currentDirectory: host->GetCurrentDirectory(),
+		        .useCaseSensitiveFileNames = host->UseCaseSensitiveFileNames(),
+		        .currentDirectory = host->GetCurrentDirectory(),
 		    });
 	}
 
@@ -472,9 +472,9 @@ void emitter::printSourceFile(printer::EmitContext* emitContext,
 		if (mapOptions->SourceMap == Tristate::True ||
 		    mapOptions->InlineSourceMap == Tristate::True) {
 			emitResult.SourceMaps.push_back(SourceMapEmitResult{
-			    InputSourceFileNames: sourceMapGenerator->Sources(),
-			    SourceMap: sourceMapGenerator->RawSourceMap(),
-			    GeneratedFile: jsFilePath,
+			    .InputSourceFileNames = sourceMapGenerator->Sources(),
+			    .SourceMap = sourceMapGenerator->RawSourceMap(),
+			    .GeneratedFile = jsFilePath,
 			});
 		}
 
@@ -639,9 +639,9 @@ std::string emitter::getSourceMappingURL(const CompilerOptions* mapOptions,
 			                          // sourceMap
 			        /*isAbsolutePathAnUrl*/ true,
 			        tspath::ComparePathsOptions{
-			            useCaseSensitiveFileNames:
+			            .useCaseSensitiveFileNames =
 			                host->UseCaseSensitiveFileNames(),
-			            currentDirectory: host->GetCurrentDirectory(),
+			            .currentDirectory = host->GetCurrentDirectory(),
 			        }));
 		}
 		return encodeURI(
@@ -719,9 +719,9 @@ bool sourceFileMayBeEmitted(SourceFile* sourceFile, checker::Program* host,
 		if (tspath::comparePaths(
 		        sourceFile->FileName(), outputPath,
 		        tspath::ComparePathsOptions{
-		            useCaseSensitiveFileNames:
+		            .useCaseSensitiveFileNames =
 		                host->UseCaseSensitiveFileNames(),
-		            currentDirectory: host->GetCurrentDirectory(),
+		            .currentDirectory = host->GetCurrentDirectory(),
 		        }) == 0) {
 			return false;
 		}

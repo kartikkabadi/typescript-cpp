@@ -19,22 +19,6 @@ namespace {
 using namespace tsc;
 namespace tsu = tsc::fourslash::tests::util;
 
-static std::vector<fourslash::MarkerOrRangeOrName> asMonVec(
-	const std::vector<std::any> &v) {
-	std::vector<fourslash::MarkerOrRangeOrName> out;
-	out.reserve(v.size());
-	for (auto &e : v) {
-		if (auto *p = std::any_cast<std::shared_ptr<fourslash::Marker>>(&e))
-			out.push_back(*p);
-		else if (auto *p =
-					 std::any_cast<std::shared_ptr<fourslash::RangeMarker>>(&e))
-			out.push_back(*p);
-		else if (auto *p = std::any_cast<std::string>(&e)) out.push_back(*p);
-	}
-	return out;
-}
-
-
 static void TestPathCompletionsPartialPathRelativeImport(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -162,7 +146,6 @@ import { } from "@typescript/typescript/unstable//*$*/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPartialPathPackageExportsMiddleStar, TestPathCompletionsPartialPathPackageExportsMiddleStar);
 
-
 static void TestPathCompletionsTypesVersionsWildcard6(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -200,7 +183,6 @@ import { } from "foo//**/";)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsTypesVersionsWildcard6, TestPathCompletionsTypesVersionsWildcard6);
-
 
 static void TestPathCompletionsTypesVersionsWildcard5(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -240,7 +222,6 @@ import { } from "foo//**/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsTypesVersionsWildcard5, TestPathCompletionsTypesVersionsWildcard5);
 
-
 static void TestPathCompletionsTypesVersionsWildcard4(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -272,7 +253,6 @@ import { } from "foo//**/";)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsTypesVersionsWildcard4, TestPathCompletionsTypesVersionsWildcard4);
-
 
 static void TestPathCompletionsTypesVersionsWildcard3(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -308,7 +288,6 @@ import { } from "foo//**/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsTypesVersionsWildcard3, TestPathCompletionsTypesVersionsWildcard3);
 
-
 static void TestPathCompletionsTypesVersionsWildcard2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -338,7 +317,6 @@ import { } from "foo//**/";)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsTypesVersionsWildcard2, TestPathCompletionsTypesVersionsWildcard2);
-
 
 static void TestPathCompletionsTypesVersionsWildcard1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -371,7 +349,6 @@ import { } from "foo//**/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsTypesVersionsWildcard1, TestPathCompletionsTypesVersionsWildcard1);
 
-
 static void TestPathCompletionsTypesVersionsLocal(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -392,7 +369,6 @@ import { add } from ".//**/";)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsTypesVersionsLocal, TestPathCompletionsTypesVersionsLocal);
-
 
 static void TestPathCompletionsPackageJsonImportsWildcard9(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -415,7 +391,6 @@ import { } from "/**/";)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonImportsWildcard9, TestPathCompletionsPackageJsonImportsWildcard9);
-
 
 static void TestPathCompletionsPackageJsonImportsWildcard8(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -440,7 +415,6 @@ import { } from "/**/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonImportsWildcard8, TestPathCompletionsPackageJsonImportsWildcard8);
 
-
 static void TestPathCompletionsPackageJsonImportsWildcard7(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -461,7 +435,6 @@ import { } from "/**/";)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonImportsWildcard7, TestPathCompletionsPackageJsonImportsWildcard7);
-
 
 static void TestPathCompletionsPackageJsonImportsWildcard6(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -488,7 +461,6 @@ import { } from "/**/";)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonImportsWildcard6, TestPathCompletionsPackageJsonImportsWildcard6);
-
 
 static void TestPathCompletionsPackageJsonImportsWildcard5(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -537,7 +509,6 @@ import { } from "/**/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonImportsWildcard5, TestPathCompletionsPackageJsonImportsWildcard5);
 
-
 static void TestPathCompletionsPackageJsonImportsWildcard4(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -574,7 +545,6 @@ import { } from "/**/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonImportsWildcard4, TestPathCompletionsPackageJsonImportsWildcard4);
 
-
 static void TestPathCompletionsPackageJsonImportsWildcard3(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -606,7 +576,6 @@ import { } from "/**/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonImportsWildcard3, TestPathCompletionsPackageJsonImportsWildcard3);
 
-
 static void TestPathCompletionsPackageJsonImportsWildcard2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -636,7 +605,6 @@ import { } from "/**/";)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonImportsWildcard2, TestPathCompletionsPackageJsonImportsWildcard2);
-
 
 static void TestPathCompletionsPackageJsonImportsWildcard1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -675,7 +643,6 @@ import { } from "/**/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonImportsWildcard1, TestPathCompletionsPackageJsonImportsWildcard1);
 
-
 static void TestPathCompletionsPackageJsonImportsWildcard12(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -705,7 +672,6 @@ import {} from "#foo/_dir//*3*/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonImportsWildcard12, TestPathCompletionsPackageJsonImportsWildcard12);
 
-
 static void TestPathCompletionsPackageJsonImportsWildcard11(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -728,7 +694,6 @@ import { } from "/**/";)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonImportsWildcard11, TestPathCompletionsPackageJsonImportsWildcard11);
-
 
 static void TestPathCompletionsPackageJsonImportsWildcard10(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -753,7 +718,6 @@ import { } from "/**/";)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonImportsWildcard10, TestPathCompletionsPackageJsonImportsWildcard10);
-
 
 static void TestPathCompletionsPackageJsonImportsSrcNoDistWildcard9(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -785,7 +749,6 @@ import { } from "/**/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonImportsSrcNoDistWildcard9, TestPathCompletionsPackageJsonImportsSrcNoDistWildcard9);
 
-
 static void TestPathCompletionsPackageJsonImportsSrcNoDistWildcard8(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -815,7 +778,6 @@ import { } from "/**/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonImportsSrcNoDistWildcard8, TestPathCompletionsPackageJsonImportsSrcNoDistWildcard8);
 
-
 static void TestPathCompletionsPackageJsonImportsSrcNoDistWildcard7(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -844,7 +806,6 @@ import { } from "/**/";)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonImportsSrcNoDistWildcard7, TestPathCompletionsPackageJsonImportsSrcNoDistWildcard7);
-
 
 static void TestPathCompletionsPackageJsonImportsSrcNoDistWildcard6(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -879,7 +840,6 @@ import { } from "/**/";)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonImportsSrcNoDistWildcard6, TestPathCompletionsPackageJsonImportsSrcNoDistWildcard6);
-
 
 static void TestPathCompletionsPackageJsonImportsSrcNoDistWildcard5(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -937,7 +897,6 @@ import { } from "/**/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonImportsSrcNoDistWildcard5, TestPathCompletionsPackageJsonImportsSrcNoDistWildcard5);
 
-
 static void TestPathCompletionsPackageJsonImportsSrcNoDistWildcard4(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -982,7 +941,6 @@ import { } from "/**/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonImportsSrcNoDistWildcard4, TestPathCompletionsPackageJsonImportsSrcNoDistWildcard4);
 
-
 static void TestPathCompletionsPackageJsonImportsSrcNoDistWildcard3(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -1023,7 +981,6 @@ import { } from "/**/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonImportsSrcNoDistWildcard3, TestPathCompletionsPackageJsonImportsSrcNoDistWildcard3);
 
-
 static void TestPathCompletionsPackageJsonImportsSrcNoDistWildcard2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -1061,7 +1018,6 @@ import { } from "/**/";)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonImportsSrcNoDistWildcard2, TestPathCompletionsPackageJsonImportsSrcNoDistWildcard2);
-
 
 static void TestPathCompletionsPackageJsonImportsSrcNoDistWildcard1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -1108,7 +1064,6 @@ import { } from "/**/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonImportsSrcNoDistWildcard1, TestPathCompletionsPackageJsonImportsSrcNoDistWildcard1);
 
-
 static void TestPathCompletionsPackageJsonImportsOnlyFromClosestScope1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -1134,7 +1089,6 @@ import {} from "/*2*/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonImportsOnlyFromClosestScope1, TestPathCompletionsPackageJsonImportsOnlyFromClosestScope1);
 
-
 static void TestPathCompletionsPackageJsonImportsIgnoreMatchingNodeModule2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -1157,7 +1111,6 @@ import {} from "#internal//*1*/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonImportsIgnoreMatchingNodeModule2, TestPathCompletionsPackageJsonImportsIgnoreMatchingNodeModule2);
 
-
 static void TestPathCompletionsPackageJsonImportsIgnoreMatchingNodeModule1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -1177,7 +1130,6 @@ import {} from "#internal//*1*/";)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonImportsIgnoreMatchingNodeModule1, TestPathCompletionsPackageJsonImportsIgnoreMatchingNodeModule1);
-
 
 static void TestPathCompletionsPackageJsonImportsCustomConditions(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -1202,7 +1154,6 @@ import { } from "/**/";)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonImportsCustomConditions, TestPathCompletionsPackageJsonImportsCustomConditions);
-
 
 static void TestPathCompletionsPackageJsonImportsBundlerNoNodeCondition(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -1230,7 +1181,6 @@ import { } from "/**/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonImportsBundlerNoNodeCondition, TestPathCompletionsPackageJsonImportsBundlerNoNodeCondition);
 
-
 static void TestPathCompletionsPackageJsonExportsWildcard9(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -1253,7 +1203,6 @@ import { } from "foo//**/";)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonExportsWildcard9, TestPathCompletionsPackageJsonExportsWildcard9);
-
 
 static void TestPathCompletionsPackageJsonExportsWildcard8(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -1278,7 +1227,6 @@ import { } from "foo//**/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonExportsWildcard8, TestPathCompletionsPackageJsonExportsWildcard8);
 
-
 static void TestPathCompletionsPackageJsonExportsWildcard7(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -1299,7 +1247,6 @@ import { } from "foo//**/";)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonExportsWildcard7, TestPathCompletionsPackageJsonExportsWildcard7);
-
 
 static void TestPathCompletionsPackageJsonExportsWildcard6(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -1326,7 +1273,6 @@ import { } from "foo//**/";)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonExportsWildcard6, TestPathCompletionsPackageJsonExportsWildcard6);
-
 
 static void TestPathCompletionsPackageJsonExportsWildcard5(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -1385,7 +1331,6 @@ import { } from "foo//**/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonExportsWildcard5, TestPathCompletionsPackageJsonExportsWildcard5);
 
-
 static void TestPathCompletionsPackageJsonExportsWildcard4(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -1422,7 +1367,6 @@ import { } from "foo//**/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonExportsWildcard4, TestPathCompletionsPackageJsonExportsWildcard4);
 
-
 static void TestPathCompletionsPackageJsonExportsWildcard3(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -1454,7 +1398,6 @@ import { } from "foo//**/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonExportsWildcard3, TestPathCompletionsPackageJsonExportsWildcard3);
 
-
 static void TestPathCompletionsPackageJsonExportsWildcard2(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -1484,7 +1427,6 @@ import { } from "salesforce-pageobjects//**/";)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonExportsWildcard2, TestPathCompletionsPackageJsonExportsWildcard2);
-
 
 static void TestPathCompletionsPackageJsonExportsWildcard1(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -1528,7 +1470,6 @@ import { } from "foo//**/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonExportsWildcard1, TestPathCompletionsPackageJsonExportsWildcard1);
 
-
 static void TestPathCompletionsPackageJsonExportsWildcard12(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -1558,7 +1499,6 @@ import {} from "foo/bar/_dir//*3*/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonExportsWildcard12, TestPathCompletionsPackageJsonExportsWildcard12);
 
-
 static void TestPathCompletionsPackageJsonExportsWildcard11(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -1581,7 +1521,6 @@ import { } from "repo//**/";)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonExportsWildcard11, TestPathCompletionsPackageJsonExportsWildcard11);
-
 
 static void TestPathCompletionsPackageJsonExportsWildcard10(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -1607,7 +1546,6 @@ import { } from "repo//**/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonExportsWildcard10, TestPathCompletionsPackageJsonExportsWildcard10);
 
-
 static void TestPathCompletionsPackageJsonExportsCustomConditions(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -1631,7 +1569,6 @@ import { } from "foo//**/";)TS";
 	});
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonExportsCustomConditions, TestPathCompletionsPackageJsonExportsCustomConditions);
-
 
 static void TestPathCompletionsPackageJsonExportsBundlerNoNodeCondition(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
@@ -1659,7 +1596,6 @@ import { } from "foo//**/";)TS";
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsPackageJsonExportsBundlerNoNodeCondition, TestPathCompletionsPackageJsonExportsBundlerNoNodeCondition);
 
-
 static void TestPathCompletionsAllowTsExtensions(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
@@ -1679,7 +1615,6 @@ import {} from "./)TS");
 	});
 }
 REGISTER_FOURSLASH_TEST(TestPathCompletionsAllowTsExtensions, TestPathCompletionsAllowTsExtensions);
-
 
 static void TestPathCompletionsAllowModuleAugmentationExtensions(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {

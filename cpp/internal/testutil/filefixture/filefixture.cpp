@@ -39,7 +39,7 @@ struct fromFile final : Fixture {
 	void SkipIfNotExist(gostd::testing::T* t) override {
 		t->Helper();
 		std::error_code ec;
-		std::filesystem::status(path, ec);
+		(void)std::filesystem::status(path, ec);
 		if (ec) {
 			t->Skipf("Test fixture %q does not exist", {path});
 		}

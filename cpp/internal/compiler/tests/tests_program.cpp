@@ -353,7 +353,7 @@ static void TestImportSourceProgram(T* t) {
 			programOpts.Config = config;
 			programOpts.Host = host;
 			auto* program = compiler::NewProgram(programOpts);
-			auto* file = program->GetSourceFile("/src/index.ts");
+			[[maybe_unused]] auto* file = program->GetSourceFile("/src/index.ts");
 			gotest::assert::Assert(t, program->GetSourceFile("/src/a.ts") ==
 			                    nullptr);
 			gotest::assert::Equal(t, program->GetResolvedModules().size(),

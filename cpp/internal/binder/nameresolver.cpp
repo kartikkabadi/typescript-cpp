@@ -522,7 +522,7 @@ static bool getIsDeferredContext(Node* location, Node* lastLocation) {
 		return false;
 	}
 	// generator functions and async functions are not inlined in control flow when immediately invoked
-	if (location->bodyData().asteriskToken != nullptr && *location->bodyData().asteriskToken != nullptr ||
+	if ((location->bodyData().asteriskToken != nullptr && *location->bodyData().asteriskToken != nullptr) ||
 		hasSyntacticModifier(location, ModifierFlagsAsync)) {
 		return true;
 	}

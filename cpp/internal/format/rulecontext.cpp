@@ -10,7 +10,7 @@ namespace tsc::format {
 static bool isTrivia(Kind kind) {
 	return kind >= KindFirstTriviaToken && kind <= KindLastTriviaToken;
 }
-static bool isTokenKind(Kind kind) {
+[[maybe_unused]] static bool isTokenKind(Kind kind) {
 	return kind >= KindFirstToken && kind <= KindLastToken;
 }
 

@@ -306,7 +306,7 @@ std::pair<lsproto::Position, spanmap::Fidelity> Converters::ToLSPPosition(
 	auto [s, pos, fidelity] =
 	    virtualPositionToOriginal(script, position, nullptr);
 	return {std::visit(
-	            [this, p = pos](auto&& sc) {
+	            [p = pos, this](auto&& sc) {
 		            return positionToLineAndCharacter(scriptArg(sc), p);
 	            },
 	            s),

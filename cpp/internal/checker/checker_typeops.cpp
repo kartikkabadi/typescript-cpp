@@ -151,7 +151,7 @@ static std::string getStringLiteralValue(Type* t) {
 	return std::get<std::string>(t->AsLiteralType()->value);
 }
 
-static PseudoBigInt getBigIntLiteralValue(Type* t) {
+[[maybe_unused]] static PseudoBigInt getBigIntLiteralValue(Type* t) {
 	return std::get<PseudoBigInt>(t->AsLiteralType()->value);
 }
 
@@ -2438,7 +2438,6 @@ bool Checker::isJSLiteralType(Type* t) {
 }
 // checker.go:14288 — isDeprecatedSymbol (symboltype slice owner)
 bool Checker::isDeprecatedSymbol(Symbol* symbol) {
-	auto isDeprecated = [](Node* d, Checker* c) { return c->IsDeprecatedDeclaration(d); };
 	Symbol* parentSymbol = getParentOfSymbol(symbol);
 	if (parentSymbol != nullptr && symbol->data->declarations.size() > 1) {
 		if ((parentSymbol->flags & SymbolFlagsInterface) != 0) {

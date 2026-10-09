@@ -1454,9 +1454,9 @@ bool isPropertyAccessOrQualifiedName(Node* node) {
 
 static bool isPartOfTypeExpressionWithTypeArguments(Node* node) {
 	Node* parent = node->parent;
-	return isHeritageClause(parent) &&
+	return (isHeritageClause(parent) &&
 	           (!isClassLike(parent->parent) ||
-	            parent->as<HeritageClause>()->Token == Kind::ImplementsKeyword) ||
+	            parent->as<HeritageClause>()->Token == Kind::ImplementsKeyword)) ||
 	       isJSDocImplementsTag(parent) || isJSDocAugmentsTag(parent);
 }
 
@@ -1657,15 +1657,15 @@ bool isInExpressionContext(Node* node) {
 		return parent->expression() == node;
 	case Kind::ForStatement: {
 		ForStatement* s = parent->as<ForStatement>();
-		return s->Initializer == node &&
-		               s->Initializer->kind != Kind::VariableDeclarationList ||
+		return (s->Initializer == node &&
+		               s->Initializer->kind != Kind::VariableDeclarationList) ||
 		       s->Condition == node || s->Incrementor == node;
 	}
 	case Kind::ForInStatement:
 	case Kind::ForOfStatement: {
 		ForInOrOfStatement* s = parent->as<ForInOrOfStatement>();
-		return s->Initializer == node &&
-		               s->Initializer->kind != Kind::VariableDeclarationList ||
+		return (s->Initializer == node &&
+		               s->Initializer->kind != Kind::VariableDeclarationList) ||
 		       s->Expression == node;
 	}
 	case Kind::Decorator:
@@ -1771,17 +1771,17 @@ bool nodeCanBeDecorated(bool useLegacyDecorators, Node* node, Node* parent,
 	case Kind::PropertyDeclaration:
 		// property declarations are valid if their parent is a class declaration.
 		return parent != nullptr &&
-		       (useLegacyDecorators && isClassDeclaration(parent) ||
-		        !useLegacyDecorators && isClassLike(parent) &&
-		            !hasAbstractModifier(node) && !hasAmbientModifier(node));
+		       ((useLegacyDecorators && isClassDeclaration(parent)) ||
+		        (!useLegacyDecorators && isClassLike(parent) &&
+		            !hasAbstractModifier(node) && !hasAmbientModifier(node)));
 	case Kind::GetAccessor:
 	case Kind::SetAccessor:
 	case Kind::MethodDeclaration:
 		// if this method has a body and its parent is a class declaration, this
 		// is a valid target.
 		return parent != nullptr && node->body() != nullptr &&
-		       (useLegacyDecorators && isClassDeclaration(parent) ||
-		        !useLegacyDecorators && isClassLike(parent));
+		       ((useLegacyDecorators && isClassDeclaration(parent)) ||
+		        (!useLegacyDecorators && isClassLike(parent)));
 	case Kind::Parameter:
 		// TODO(rbuckton): ParameterDeclaration decorator support for ES decorators
 		// must wait until it is standardized
@@ -2317,10 +2317,10 @@ bool isBindableStaticElementAccessExpression(Node* node, bool excludeThisKeyword
 
 // utilities.go: IsBindableStaticAccessExpression (1375)
 bool isBindableStaticAccessExpression(Node* node, bool excludeThisKeyword) {
-	return isPropertyAccessExpression(node) &&
+	return (isPropertyAccessExpression(node) &&
 		((!excludeThisKeyword && node->expression()->kind == Kind::ThisKeyword) ||
 			(isIdentifier(node->name()) &&
-				isBindableStaticNameExpression(node->expression(), true /*excludeThisKeyword*/))) ||
+				isBindableStaticNameExpression(node->expression(), true /*excludeThisKeyword*/)))) ||
 		isBindableStaticElementAccessExpression(node, excludeThisKeyword);
 }
 

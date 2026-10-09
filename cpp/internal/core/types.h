@@ -732,7 +732,6 @@ std::pair<int, bool> binarySearchUniqueFunc(const std::vector<E>& x, Cmp&& cmp) 
 // backing array is not observable here; the result is a fresh vector).
 template <class T, class F>
 std::vector<T> Filter(const std::vector<T>& slice, F&& f) {
-	bool allMatch = true;
 	for (size_t i = 0; i < slice.size(); i++) {
 		if (!f(slice[i])) {
 			std::vector<T> result(slice.begin(), slice.begin() + i);

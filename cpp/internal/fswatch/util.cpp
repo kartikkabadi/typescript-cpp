@@ -271,7 +271,7 @@ osReadDir(const std::string& path) {
 #else
 	std::vector<char> buf(8192);
 	std::vector<osDirEntry> entries;
-	long basep = 0; // getdirentries lseek-position out-param
+	[[maybe_unused]] long basep = 0; // getdirentries lseek-position out-param
 	for (;;) {
 #ifdef __APPLE__
 		// darwin readdirent = getdirentries(2); records are struct dirent.

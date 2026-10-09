@@ -9,7 +9,7 @@ namespace tsc {
 
 // Deviation note: Go uses unicode.ToLower over all runes; keyword candidates are
 // ASCII so ASCII-folding + Latin-1 letters covers every real comparison here.
-// TODO(conformance): full Unicode case mapping.
+// Full Unicode case mapping remains a documented conformance gap.
 namespace utf8detail {
 inline std::vector<int32_t> decodeUtf8(std::string_view s) {
 	std::vector<int32_t> out;
@@ -44,7 +44,7 @@ inline int32_t runeToLower(int32_t r) {
 		return r + 32;
 	}
 	// Latin-1 supplement letters (upper halves -> lower).
-	if (r >= 0xC0 && r <= 0xD6 || r >= 0xD8 && r <= 0xDE) {
+	if ((r >= 0xC0 && r <= 0xD6) || (r >= 0xD8 && r <= 0xDE)) {
 		return r + 32;
 	}
 	return r;

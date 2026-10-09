@@ -137,7 +137,7 @@ static CacheKey getIntersectionKey(const std::vector<Type*>& types, Intersection
 	return b.hash();
 }
 
-static CacheKey getTupleKey(const std::vector<TupleElementInfo>& elementInfos, bool readonly) {
+[[maybe_unused]] static CacheKey getTupleKey(const std::vector<TupleElementInfo>& elementInfos, bool readonly) {
 	keyBuilder b;
 	for (const TupleElementInfo& e : elementInfos) {
 		if (e.flags & ElementFlagsRequired) {
@@ -175,7 +175,7 @@ bool Checker::isErrorType(Type* t) {
 	// The only 'any' types that have alias symbols are those manufactured by
 	// getTypeFromTypeAliasReference for a reference to an unresolved symbol. We want
 	// those to behave like the errorType.
-	return t == errorType || (t->flags & TypeFlagsAny) != 0 && t->alias != nullptr;
+	return t == errorType || ((t->flags & TypeFlagsAny) != 0 && t->alias != nullptr);
 }
 
 bool maybeTypeOfKind(Type* t, TypeFlags flags) {
@@ -710,15 +710,15 @@ static std::string getStringLiteralValue(Type* t) {
 	return std::get<std::string>(t->AsLiteralType()->value);
 }
 
-static Number getNumberLiteralValue(Type* t) {
+[[maybe_unused]] static Number getNumberLiteralValue(Type* t) {
 	return std::get<Number>(t->AsLiteralType()->value);
 }
 
-static PseudoBigInt getBigIntLiteralValue(Type* t) {
+[[maybe_unused]] static PseudoBigInt getBigIntLiteralValue(Type* t) {
 	return std::get<PseudoBigInt>(t->AsLiteralType()->value);
 }
 
-static bool getBooleanLiteralValue(Type* t) {
+[[maybe_unused]] static bool getBooleanLiteralValue(Type* t) {
 	return std::get<bool>(t->AsLiteralType()->value);
 }
 
@@ -726,7 +726,7 @@ static bool isUnitType(Type* t) {
 	return (t->flags & TypeFlagsUnit) != 0;
 }
 
-static bool isLiteralType(Type* t) {
+[[maybe_unused]] static bool isLiteralType(Type* t) {
 	if (t->flags & TypeFlagsBoolean) {
 		return true;
 	}
@@ -923,7 +923,7 @@ Type* Checker::getUnionTypeWorker(std::vector<Type*> types, UnionReduction union
 		}
 		if (includes & (TypeFlagsEnum | TypeFlagsLiteral | TypeFlagsUniqueESSymbol |
 				 TypeFlagsTemplateLiteral | TypeFlagsStringMapping) ||
-			(includes & TypeFlagsVoid) && (includes & TypeFlagsUndefined)) {
+			((includes & TypeFlagsVoid) && (includes & TypeFlagsUndefined))) {
 			typeSet = removeRedundantLiteralTypes(std::move(typeSet), includes,
 				(unionReduction & UnionReductionSubtype) != 0);
 		}
@@ -1109,13 +1109,13 @@ std::vector<Type*> Checker::removeRedundantLiteralTypes(std::vector<Type*> types
 		Type* t = types[i - 1];
 		TypeFlags flags = t->flags;
 		bool remove =
-			(flags & (TypeFlagsStringLiteral | TypeFlagsTemplateLiteral |
-				  TypeFlagsStringMapping)) && (includes & TypeFlagsString) ||
-			(flags & TypeFlagsNumberLiteral) && (includes & TypeFlagsNumber) ||
-			(flags & TypeFlagsBigIntLiteral) && (includes & TypeFlagsBigInt) ||
-			(flags & TypeFlagsUniqueESSymbol) && (includes & TypeFlagsESSymbol) ||
-			reduceVoidUndefined && (flags & TypeFlagsUndefined) && (includes & TypeFlagsVoid) ||
-			isFreshLiteralType(t) && containsType(types, t->AsLiteralType()->regularType);
+			((flags & (TypeFlagsStringLiteral | TypeFlagsTemplateLiteral |
+				  TypeFlagsStringMapping)) && (includes & TypeFlagsString)) ||
+			((flags & TypeFlagsNumberLiteral) && (includes & TypeFlagsNumber)) ||
+			((flags & TypeFlagsBigIntLiteral) && (includes & TypeFlagsBigInt)) ||
+			((flags & TypeFlagsUniqueESSymbol) && (includes & TypeFlagsESSymbol)) ||
+			(reduceVoidUndefined && (flags & TypeFlagsUndefined) && (includes & TypeFlagsVoid)) ||
+			(isFreshLiteralType(t) && containsType(types, t->AsLiteralType()->regularType));
 		if (remove) {
 			types.erase(types.begin() + (i - 1));
 		}
@@ -1383,15 +1383,15 @@ Type* Checker::getIntersectionTypeEx(std::vector<Type*> types, IntersectionFlags
 		}
 		return nullType;
 	}
-	if ((includes & TypeFlagsString) &&
+	if (((includes & TypeFlagsString) &&
 			(includes & (TypeFlagsStringLiteral | TypeFlagsTemplateLiteral |
-				 TypeFlagsStringMapping)) ||
-		(includes & TypeFlagsNumber) && (includes & TypeFlagsNumberLiteral) ||
-		(includes & TypeFlagsBigInt) && (includes & TypeFlagsBigIntLiteral) ||
-		(includes & TypeFlagsESSymbol) && (includes & TypeFlagsUniqueESSymbol) ||
-		(includes & TypeFlagsVoid) && (includes & TypeFlagsUndefined) ||
-		(includes & TypeFlagsIncludesEmptyObject) &&
-			(includes & TypeFlagsDefinitelyNonNullable)) {
+				 TypeFlagsStringMapping))) ||
+		((includes & TypeFlagsNumber) && (includes & TypeFlagsNumberLiteral)) ||
+		((includes & TypeFlagsBigInt) && (includes & TypeFlagsBigIntLiteral)) ||
+		((includes & TypeFlagsESSymbol) && (includes & TypeFlagsUniqueESSymbol)) ||
+		((includes & TypeFlagsVoid) && (includes & TypeFlagsUndefined)) ||
+		((includes & TypeFlagsIncludesEmptyObject) &&
+			(includes & TypeFlagsDefinitelyNonNullable))) {
 		if (!(flags & IntersectionFlagsNoSupertypeReduction)) {
 			typeSet = removeRedundantSupertypes(std::move(typeSet), includes);
 		}
@@ -1588,14 +1588,14 @@ std::vector<Type*> Checker::removeRedundantSupertypes(std::vector<Type*> types,
 	for (size_t i = types.size(); i > 0; i--) {
 		Type* t = types[i - 1];
 		bool remove =
-			(t->flags & TypeFlagsString) &&
+			((t->flags & TypeFlagsString) &&
 				(includes & (TypeFlagsStringLiteral | TypeFlagsTemplateLiteral |
-					 TypeFlagsStringMapping)) ||
-			(t->flags & TypeFlagsNumber) && (includes & TypeFlagsNumberLiteral) ||
-			(t->flags & TypeFlagsBigInt) && (includes & TypeFlagsBigIntLiteral) ||
-			(t->flags & TypeFlagsESSymbol) && (includes & TypeFlagsUniqueESSymbol) ||
-			(t->flags & TypeFlagsVoid) && (includes & TypeFlagsUndefined) ||
-			IsEmptyAnonymousObjectType(t) && (includes & TypeFlagsDefinitelyNonNullable);
+					 TypeFlagsStringMapping))) ||
+			((t->flags & TypeFlagsNumber) && (includes & TypeFlagsNumberLiteral)) ||
+			((t->flags & TypeFlagsBigInt) && (includes & TypeFlagsBigIntLiteral)) ||
+			((t->flags & TypeFlagsESSymbol) && (includes & TypeFlagsUniqueESSymbol)) ||
+			((t->flags & TypeFlagsVoid) && (includes & TypeFlagsUndefined)) ||
+			(IsEmptyAnonymousObjectType(t) && (includes & TypeFlagsDefinitelyNonNullable));
 		if (remove) {
 			types.erase(types.begin() + (i - 1));
 		}
@@ -3212,7 +3212,7 @@ Type* Checker::tryGetDeclaredTypeOfSymbol(Symbol* symbol) {
 	return nullptr;
 }
 
-static Node* getTypeReferenceName(Node* node) {
+[[maybe_unused]] static Node* getTypeReferenceName(Node* node) {
 	switch (node->kind) {
 	case Kind::TypeReference:
 		return node->as<TypeReferenceNode>()->TypeName;
@@ -4513,7 +4513,7 @@ void Checker::initializeClosures() {
 	};
 	containsMissingType = [this](Type* t) {
 		return t == missingType ||
-		       t->flags & TypeFlagsUnion && t->types()[0] == missingType;
+		       (t->flags & TypeFlagsUnion && t->types()[0] == missingType);
 	};
 	couldContainTypeVariables = [this](Type* t) {
 		return couldContainTypeVariablesWorker(t);
@@ -5702,8 +5702,8 @@ void Checker::onSuccessfullyResolvedSymbol(
 	// we want to check for block-scoped
 	if (errorLocation != nullptr &&
 	    (meaning & SymbolFlagsBlockScopedVariable ||
-	     meaning & (SymbolFlagsClass | SymbolFlagsEnum) &&
-	         (meaning & SymbolFlagsValue) == SymbolFlagsValue)) {
+	     (meaning & (SymbolFlagsClass | SymbolFlagsEnum) &&
+	         (meaning & SymbolFlagsValue) == SymbolFlagsValue))) {
 		Symbol* exportOrLocalSymbol =
 			getExportSymbolOfValueSymbolIfExported(result);
 		if (exportOrLocalSymbol->flags &
@@ -5722,8 +5722,8 @@ void Checker::onSuccessfullyResolvedSymbol(
 		if (!merged->data->declarations.empty() &&
 		    everyList(merged->data->declarations, [](Node* d) {
 			    return isNamespaceExportDeclaration(d) ||
-			           isSourceFile(d) &&
-			               !static_cast<SourceFile*>(d)->GlobalExports.empty();
+			           (isSourceFile(d) &&
+			               !static_cast<SourceFile*>(d)->GlobalExports.empty());
 		    })) {
 			errorOrSuggestion(
 				compilerOptions->AllowUmdGlobalAccess != Tristate::True,

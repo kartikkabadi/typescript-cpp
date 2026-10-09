@@ -370,7 +370,7 @@ Node* getNewTargetContainer(Node* node) {
 // ast/utilities.go:4548 — GetReparsedNodeForNode
 // (deduped: local replica of compareNodePositions removed)
 
-Node* findCloneInNode(Node* node, Node* original) {
+[[maybe_unused]] Node* findCloneInNode(Node* node, Node* original) {
 	for (;;) {
 		if (node->kind == original->kind &&
 		    node->loc.pos() == original->loc.pos() &&
@@ -1076,7 +1076,7 @@ Type* Checker::checkImportMetaProperty(Node* node) {
 		error(node,
 		      The_import_meta_meta_property_is_only_allowed_when_the_module_option_is_es2020_es2022_esnext_system_node16_node18_node20_or_nodenext);
 	}
-	SourceFile* file = getSourceFileOfNode(node);
+	[[maybe_unused]] SourceFile* file = getSourceFileOfNode(node);
 	TSC_ASSERT((file->flags & NodeFlagsPossiblyContainsImportMeta) != 0,
 	           "Containing file is missing import meta node flag.");
 	if (node->name()->text() == "meta") {

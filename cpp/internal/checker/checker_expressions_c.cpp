@@ -137,7 +137,7 @@ int indexOf(R&& values, const auto& v) {
 // ---------------------------------------------------------------------------
 
 // utilities.go:1116 — canHaveFlowNode
-bool canHaveFlowNode(Node* node) {
+[[maybe_unused]] bool canHaveFlowNode(Node* node) {
 	return node->flowNodeData().flowNode != nullptr;
 }
 
@@ -427,7 +427,7 @@ Type* Checker::checkBinaryLikeExpression(Node* left, Node* operatorToken, Node* 
 		bool rightOk = checkArithmeticOperandType(right, rightType, The_right_hand_side_of_an_arithmetic_operation_must_be_of_type_any_number_bigint_or_an_enum_type, true /*isAwaitValid*/);
 		Type* resultType;
 		// If both are any or unknown, allow operation; assume it will resolve to number
-		if (isTypeAssignableToKind(leftType, TypeFlagsAnyOrUnknown) && isTypeAssignableToKind(rightType, TypeFlagsAnyOrUnknown) ||
+		if ((isTypeAssignableToKind(leftType, TypeFlagsAnyOrUnknown) && isTypeAssignableToKind(rightType, TypeFlagsAnyOrUnknown)) ||
 			(!maybeTypeOfKind(leftType, TypeFlagsBigIntLike) && !maybeTypeOfKind(rightType, TypeFlagsBigIntLike))) {
 			resultType = numberType;
 		} else if (bothAreBigIntLike(leftType, rightType)) {
@@ -1348,7 +1348,7 @@ Type* Checker::checkInExpression(Node* left, Node* right, Type* leftType, Type* 
 bool Checker::hasEmptyObjectIntersection(Type* t) {
 	return someType(t, [this](Type* u) {
 		return u == unknownEmptyObjectType ||
-			(u->flags & TypeFlagsIntersection) != 0 && IsEmptyAnonymousObjectType(getBaseConstraintOrType(u));
+			((u->flags & TypeFlagsIntersection) != 0 && IsEmptyAnonymousObjectType(getBaseConstraintOrType(u)));
 	});
 }
 
@@ -1446,7 +1446,7 @@ Type* Checker::checkObjectLiteral(Node* node, CheckMode checkMode) {
 		}
 	}
 	int offset = 0;
-	auto createObjectLiteralType = [this, node, contextualType, inDestructuringPattern, &allPropertiesTable, &propertiesTable, &propertiesArray, &offset, &inConstContext, &objectFlags, &patternWithComputedProperties, &hasComputedStringProperty, &hasComputedNumberProperty, &hasComputedSymbolProperty]() -> Type* {
+	auto createObjectLiteralType = [this, node, contextualType, inDestructuringPattern, &propertiesTable, &propertiesArray, &offset, &objectFlags, &patternWithComputedProperties, &hasComputedStringProperty, &hasComputedNumberProperty, &hasComputedSymbolProperty]() -> Type* {
 		std::vector<IndexInfo*> indexInfos;
 		bool isReadonly = isConstContext(node);
 		if (hasComputedStringProperty) {
@@ -1865,7 +1865,7 @@ Type* Checker::tryMergeUnionOfObjectTypeAndEmptyObject(Type* t, bool readonly) {
 		} else if (isSpreadableProperty(prop)) {
 			bool isSetonlyAccessor = (prop->flags & SymbolFlagsSetAccessor) != 0 && (prop->flags & SymbolFlagsGetAccessor) == 0;
 			SymbolFlags flags = SymbolFlagsProperty | SymbolFlagsOptional;
-			Symbol* result = newSymbolEx(flags, prop->data->name, prop->checkFlags & CheckFlagsLate | ifElse(readonly, CheckFlagsReadonly, CheckFlagsNone));
+			Symbol* result = newSymbolEx(flags, prop->data->name, (prop->checkFlags & CheckFlagsLate) | ifElse(readonly, CheckFlagsReadonly, CheckFlagsNone));
 			ValueSymbolLinks* links = valueSymbolLinks.Get(result);
 			if (isSetonlyAccessor) {
 				links->resolvedType = undefinedType;
@@ -1905,7 +1905,7 @@ Symbol* Checker::getSpreadSymbol(Symbol* prop, bool readonly) {
 		return prop;
 	}
 	SymbolFlags flags = SymbolFlagsProperty | (prop->flags & SymbolFlagsOptional);
-	Symbol* result = newSymbolEx(flags, prop->data->name, prop->checkFlags & CheckFlagsLate | ifElse(readonly, CheckFlagsReadonly, CheckFlagsNone));
+	Symbol* result = newSymbolEx(flags, prop->data->name, (prop->checkFlags & CheckFlagsLate) | ifElse(readonly, CheckFlagsReadonly, CheckFlagsNone));
 	ValueSymbolLinks* links = valueSymbolLinks.Get(result);
 	if (isSetonlyAccessor) {
 		links->resolvedType = undefinedType;

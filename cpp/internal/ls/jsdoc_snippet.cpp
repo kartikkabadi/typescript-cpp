@@ -758,7 +758,7 @@ int skipSingleLineWhitespace(std::string_view text, int pos) {
 }
 
 // jsdoc_snippet.go:575 isOnlySingleLineWhitespace.
-bool isOnlySingleLineWhitespace(std::string_view text) {
+[[maybe_unused]] bool isOnlySingleLineWhitespace(std::string_view text) {
 	return skipSingleLineWhitespace(text, 0) ==
 	       static_cast<int>(text.size());
 }

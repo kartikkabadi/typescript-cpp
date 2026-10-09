@@ -22,13 +22,6 @@ bool expectedEqual(const packagejson::Expected<T>& a,
 	return a.Valid == b.Valid && a.Null == b.Null && a.Value == b.Value;
 }
 
-template <typename T>
-void assertExpectedEqual(T* t, const packagejson::Expected<T>& got,
-                         const packagejson::Expected<T>& want,
-                         const char* field) {
-	assert::Assert(t, expectedEqual(got, want), field);
-}
-
 bool jsonValueEqual(const packagejson::JSONValue& a,
                     const packagejson::JSONValue& b) {
 	if (a.type != b.type || a.str != b.str || a.num != b.num ||
