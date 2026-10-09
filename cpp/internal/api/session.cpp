@@ -1588,11 +1588,11 @@ std::pair<ResultValue, gostd::Error> Session::handleRequest(
 	if (method == MethodGetCompletionsAtPosition) {
 		return call([&] { return handleGetCompletionsAtPosition(ctx, unmarshalParam<GetCompletionsAtPositionParams>(parsed)); });
 	}
-	if (method == MethodPrintNode) {
-		return call([&] { return handlePrintNode(ctx, unmarshalParam<PrintNodeParams>(parsed)); });
-	}
 	if (method == MethodFormatNodeForInsertion) {
 		return call([&] { return handleFormatNodeForInsertion(ctx, unmarshalParam<FormatNodeForInsertionParams>(parsed)); });
+	}
+	if (method == MethodPrintNode) {
+		return call([&] { return handlePrintNode(ctx, unmarshalParam<PrintNodeParams>(parsed)); });
 	}
 	if (method == MethodEmit) {
 		return call([&] { return handleEmit(ctx, unmarshalParam<EmitParams>(parsed)); });
@@ -1892,9 +1892,9 @@ static const std::unordered_map<std::string_view, unmarshallerFn> unmarshalers =
     {MethodGetSignatureUsages, &unmarshallerFor<GetSignatureUsagesParams>},
     {MethodGetCompletionsAtPosition,
      &unmarshallerFor<GetCompletionsAtPositionParams>},
-    {MethodPrintNode, &unmarshallerFor<PrintNodeParams>},
     {MethodFormatNodeForInsertion,
      &unmarshallerFor<FormatNodeForInsertionParams>},
+    {MethodPrintNode, &unmarshallerFor<PrintNodeParams>},
     {MethodEmit, &unmarshallerFor<EmitParams>},
     {MethodEmitToString, &unmarshallerFor<EmitParams>},
     {MethodGetJavaScriptEmit, &unmarshallerFor<SelectedFilesEmitParams>},
