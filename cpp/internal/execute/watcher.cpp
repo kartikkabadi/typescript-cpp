@@ -723,12 +723,29 @@ tsc::CompileAndEmitResult Watcher::compileAndEmit() {
 bool Watcher::contentMapperManifestChanged(
     const std::unordered_map<std::string, fswatch::EventKind>&
         changedPaths) {
+	auto opts = comparePathsOptions();
+	std::unique_ptr<std::unordered_map<tspath::Path, bool>> changedPathKeys;
 	for (auto* mapper : config->ContentMappers()) {
 		if (mapper->PackageDirectory.empty() ||
 		    !mapper->ContributionID.empty()) {
 			continue;
 		}
-		if (changedPaths.count(tspath::combinePaths(mapper->PackageDirectory, {"package.json"})) != 0) {
+		if (changedPathKeys == nullptr) {
+			changedPathKeys = std::make_unique<
+			    std::unordered_map<tspath::Path, bool>>();
+			changedPathKeys->reserve(changedPaths.size());
+			for (auto& [path, _] : changedPaths) {
+				(*changedPathKeys)[tspath::toPath(
+				    path, opts.currentDirectory,
+				    opts.useCaseSensitiveFileNames)] = true;
+			}
+		}
+		std::string manifestPath = tspath::combinePaths(
+		    mapper->PackageDirectory, {"package.json"});
+		tspath::Path manifestKey = tspath::toPath(
+		    manifestPath, opts.currentDirectory,
+		    opts.useCaseSensitiveFileNames);
+		if (changedPathKeys->count(manifestKey) != 0) {
 			return true;
 		}
 	}

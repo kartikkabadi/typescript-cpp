@@ -31,7 +31,8 @@ void SessionUtils::SetupNpmExecutorForTypingsInstaller() {
 	// the time a background ATA task calls NpmInstall.
 	npmExecutor->NpmInstallFunc =
 	    [fs = this->fs,
-	     tiOptions = this->tiOptions](const std::string& cwd,
+	     tiOptions = this->tiOptions](const gostd::Context& ctx,
+	           const std::string& cwd,
 	           const std::vector<std::string>& packageNames)
 	    -> std::pair<std::string, gostd::Error> {
 		// packageNames is actually npmInstallArgs due to interface

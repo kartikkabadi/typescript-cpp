@@ -91,6 +91,12 @@ inline int getFileUrlVolumeSeparatorEnd(std::string_view url, int start) {
 
 inline constexpr std::string_view urlSchemeSeparator = "://";
 
+// Forward declarations for dynamic.go (defined in dynamic.cpp; the
+// canonical declarations live in the "slice: dynamic" block below).
+extern const std::string_view DynamicURIFileNamePrefix;
+bool isEncodedDynamicFileName(std::string_view path);
+std::string canonicalDynamicURIPath(std::string_view path);
+
 // Returns the encoded root length of a path. A positive result is the number
 // of chars in the root; a negative result (~x) marks a URL root whose decoded
 // length is -x-1... mirroring Go's sign-flipped URL encoding, though callers
@@ -128,6 +134,22 @@ inline int getEncodedRootLength(std::string_view path) {
 
 	// Untitled paths (e.g., "^/untitled/ts-nul-authority/Untitled-1")
 	if (ch0 == '^' && ln > 1 && path[1] == '/') {
+		if (path.substr(0, DynamicURIFileNamePrefix.size()) ==
+		    DynamicURIFileNamePrefix) {
+			auto schemeEnd =
+			    path.find('/', DynamicURIFileNamePrefix.size());
+			if (schemeEnd != std::string_view::npos) {
+				// Go: authorityEnd is RELATIVE to
+				// path[authorityStart:]; absolute root length is
+				// authorityStart + authorityEnd + 1 == absolute
+				// index of the '/' + 1.
+				auto authorityEnd = path.find('/', schemeEnd + 1);
+				if (authorityEnd != std::string_view::npos) {
+					return (int)authorityEnd + 1;
+				}
+				return ~ln;
+			}
+		}
 		return 2;  // Untitled: "^/"
 	}
 
@@ -149,8 +171,10 @@ inline int getEncodedRootLength(std::string_view path) {
 			std::string_view scheme = path.substr(0, schemeEnd);
 			std::string_view authority = path.substr(
 				authorityStart, authorityEnd - authorityStart);
-			if (scheme == "file" &&
-			    (authority.empty() || authority == "localhost") &&
+			if (stringutil::EquateStringCaseInsensitive(scheme, "file") &&
+			    (authority.empty() ||
+			     stringutil::EquateStringCaseInsensitive(authority,
+			                                             "localhost")) &&
 			    ((int)path.size() > authorityEnd + 2) &&
 			    isVolumeCharacter(path[authorityEnd + 1])) {
 				int volumeSeparatorEnd = getFileUrlVolumeSeparatorEnd(
@@ -779,6 +803,9 @@ inline Path toPath(std::string_view fileName, std::string_view basePath,
 	} else {
 		nonCanonicalizedPath =
 		    getNormalizedAbsolutePath(fileName, basePath);
+	}
+	if (isEncodedDynamicFileName(nonCanonicalizedPath)) {
+		return canonicalDynamicURIPath(nonCanonicalizedPath);
 	}
 	if (useCaseSensitiveFileNames) {
 		return nonCanonicalizedPath;
@@ -1527,5 +1554,34 @@ inline bool containsIgnoredPath(std::string_view path) {
 	return false;
 }
 // === end slice: project ===
+
+// === slice: dynamic ===
+// dynamic.go — URI-path encoding for dynamic/virtual file names.
+extern const std::string_view DynamicURIFileNamePrefix;
+
+bool isEncodedDynamicFileName(std::string_view path);
+std::string canonicalDynamicURIPath(std::string_view path);
+std::string encodeDynamicURIPath(std::string_view path);
+std::string encodeDynamicURIPathWithSuffix(std::string_view path,
+                                           std::string_view suffix);
+std::string encodeDynamicURIDirectoryPath(std::string_view path);
+std::string encodeDynamicRelativeURIPath(std::string_view path);
+std::string encodeDynamicRelativeURIDirectoryPath(std::string_view path);
+std::string forceEncodeDynamicURIPathSegment(std::string_view segment,
+                                             bool preserveExtension);
+std::string encodeDynamicModuleSpecifier(std::string_view specifier);
+std::string encodeDynamicDirectorySpecifier(std::string_view specifier);
+std::string dynamicURIPathToModuleSpecifier(std::string_view path);
+std::string encodeDynamicLogicalModuleSpecifier(std::string_view specifier);
+std::string encodeDynamicURINoPath(std::string_view suffix);
+std::pair<std::string, bool> decodeDynamicURINoPath(std::string_view path);
+std::pair<std::string, bool> tryDecodeDynamicURIPathSegment(
+    std::string_view segment);
+std::string decodeDynamicURIPathSegment(std::string_view segment);
+std::string decodeDynamicURIPath(std::string_view path);
+std::pair<std::string, bool> tryDecodeDynamicURIPath(std::string_view path);
+std::pair<std::string, bool> decodeDynamicURIPathForDisk(
+    std::string_view path);
+// === end slice: dynamic ===
 
 }  // namespace tsc::tspath

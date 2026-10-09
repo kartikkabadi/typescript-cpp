@@ -131,6 +131,11 @@ using Method = std::string;       // lsp.go:85 (`type Method string`)
 std::string documentUriFileName(DocumentUri uri);
 // lsp.go:52 — DocumentUri.Path(useCaseSensitiveFileNames).
 tspath::Path documentUriPath(DocumentUri uri, bool useCaseSensitiveFileNames);
+// lsp.go:63 — DynamicFileNameToDocumentUri.
+DocumentUri dynamicFileNameToDocumentUri(std::string_view fileName);
+// lsp.go:71 — TryDynamicFileNameToDocumentUri.
+std::pair<DocumentUri, bool> tryDynamicFileNameToDocumentUri(
+    std::string_view fileName);
 
 // ---------------------------------------------------------------------------
 // lsp.go — Null / NoParams / EmptyObject (`struct{}`).

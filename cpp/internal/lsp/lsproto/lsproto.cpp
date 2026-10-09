@@ -516,22 +516,149 @@ std::string documentUriFileName(DocumentUri uri) {
 	std::string scheme = uri.substr(0, colon);
 	std::string path = uri.substr(colon + 1);
 
+	std::string suffix;
+	if (auto suffixStart = path.find_first_of("?#");
+	    suffixStart != std::string::npos) {
+		suffix = path.substr(suffixStart);
+		path = path.substr(0, suffixStart);
+	}
+
 	std::string authority = "ts-nul-authority";
+	bool hasAuthority = false;
+	bool hasPath = true;
 	if (path.starts_with("//")) {
+		hasAuthority = true;
 		std::string_view rest2 = std::string_view(path).substr(2);
 		auto sl = rest2.find('/');
 		if (sl == std::string_view::npos) {
-			lsprotoPanic(gostd::errorf("invalid URI: %s",{ uri})->Error());
+			authority = std::string(rest2);
+			path = "";
+			hasPath = false;
+		} else {
+			authority = std::string(rest2.substr(0, sl));
+			path = std::string(rest2.substr(sl + 1));
 		}
-		authority = std::string(rest2.substr(0, sl));
-		path = std::string(rest2.substr(sl + 1));
 	}
-	return "^/" + scheme + "/" + authority + "/" + path;
+
+	std::string encodedAuthority = authority;
+	if (hasAuthority) {
+		if (authority == "ts-nul-authority") {
+			encodedAuthority = tspath::forceEncodeDynamicURIPathSegment(
+			    authority, false);
+		} else {
+			encodedAuthority = tspath::encodeDynamicURIPath(authority);
+		}
+	}
+	std::string encodedPath;
+	if (hasPath) {
+		encodedPath = tspath::encodeDynamicURIPathWithSuffix(path, suffix);
+	} else {
+		encodedPath = tspath::encodeDynamicURINoPath(suffix);
+	}
+
+	return std::string{tspath::DynamicURIFileNamePrefix} + scheme + "/" +
+	       encodedAuthority + "/" + encodedPath;
+}
+
+namespace {
+
+// canonicalDynamicFileName — lsp.go:57.
+std::string canonicalDynamicFileName(std::string_view fileName) {
+	if (static_cast<size_t>(tspath::getRootLength(fileName)) ==
+	        fileName.size() &&
+	    !tspath::hasTrailingDirectorySeparator(fileName)) {
+		return std::string(fileName) + "/";
+	}
+	return std::string(fileName);
+}
+
+// dynamicFileNameToDocumentUri — lsp.go:72.
+std::pair<DocumentUri, bool> dynamicFileNameToDocumentUriImpl(
+    std::string_view fileName, bool strict) {
+	bool encoded = tspath::isEncodedDynamicFileName(fileName);
+	size_t start = 2;
+	if (encoded) {
+		start = tspath::DynamicURIFileNamePrefix.size();
+	}
+	auto slash1 = fileName.find('/', start);
+	if (slash1 == std::string_view::npos ||
+	    (strict && slash1 == start)) {
+		return {"", false};
+	}
+	std::string_view scheme = fileName.substr(start, slash1 - start);
+	std::string_view rest = fileName.substr(slash1 + 1);
+	auto slash2 = rest.find('/');
+	if (slash2 == std::string_view::npos) {
+		return {"", false};
+	}
+	std::string authority{rest.substr(0, slash2)};
+	std::string uriPath{rest.substr(slash2 + 1)};
+	bool hasAuthority = authority != "ts-nul-authority";
+	if (encoded) {
+		if (strict) {
+			auto [decoded, ok] = tspath::tryDecodeDynamicURIPathSegment(
+			    authority);
+			if (!ok) {
+				return {"", false};
+			}
+			authority = decoded;
+		} else {
+			authority = tspath::decodeDynamicURIPathSegment(authority);
+		}
+	}
+	if (encoded && hasAuthority) {
+		if (auto [suffix, ok] = tspath::decodeDynamicURINoPath(uriPath);
+		    ok) {
+			return {DocumentUri(std::string(scheme) + "://" + authority +
+			                    suffix),
+			        true};
+		}
+	}
+	if (encoded) {
+		if (strict) {
+			auto [decoded, ok] = tspath::tryDecodeDynamicURIPath(uriPath);
+			if (!ok) {
+				return {"", false};
+			}
+			uriPath = decoded;
+		} else {
+			uriPath = tspath::decodeDynamicURIPath(uriPath);
+		}
+	}
+	if (!hasAuthority) {
+		return {DocumentUri(std::string(scheme) + ":" +
+			                    std::string(uriPath)),
+		        true};
+	}
+	return {DocumentUri(std::string(scheme) + "://" + authority + "/" +
+		                    std::string(uriPath)),
+	        true};
+}
+
+} // namespace
+
+// DynamicFileNameToDocumentUri — lsp.go:63.
+DocumentUri dynamicFileNameToDocumentUri(std::string_view fileName) {
+	auto [uri, ok] = dynamicFileNameToDocumentUriImpl(fileName, false);
+	if (!ok) {
+		lsprotoPanic("invalid file name: " + std::string(fileName));
+	}
+	return uri;
+}
+
+// TryDynamicFileNameToDocumentUri — lsp.go:71.
+std::pair<DocumentUri, bool> tryDynamicFileNameToDocumentUri(
+    std::string_view fileName) {
+	return dynamicFileNameToDocumentUriImpl(fileName, true);
 }
 
 // Path — lsp.go:52.
 tspath::Path documentUriPath(DocumentUri uri, bool useCaseSensitiveFileNames) {
-	return tspath::toPath(documentUriFileName(uri), "", useCaseSensitiveFileNames);
+	std::string fileName = documentUriFileName(uri);
+	if (tspath::isEncodedDynamicFileName(fileName)) {
+		return tspath::Path{canonicalDynamicFileName(fileName)};
+	}
+	return tspath::toPath(fileName, "", useCaseSensitiveFileNames);
 }
 
 // ---------------------------------------------------------------------------

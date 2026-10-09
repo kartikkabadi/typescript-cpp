@@ -953,6 +953,76 @@ void TestRefCountingCaches(T* t) {
 			        tsc::Tristate::True);
 		    });
 	});
+
+	t->Run("failed API update preserves API references", [&](T* t) {
+		t->Parallel();
+
+		const std::string configFileName = "/project/tsconfig.json";
+		auto* session = setupRefCountSession(
+		    {{configFileName,
+		      std::string("{\"compilerOptions\":{\"noLib\":true},"
+		                  "\"files\":[\"index.ts\"]}")},
+		     {"/project/index.ts", std::string("export const value = 1;")}});
+		t->Cleanup([session] { session->Close(); });
+
+		project::APISnapshotRequest openRequest;
+		auto openSet = tsc::collections::NewSetFromItems<std::string>(
+		    configFileName);
+		openRequest.OpenProjects = &openSet;
+		auto [snapshot, openErr] = session->APIUpdate(
+		    ctx, project::FileChangeSummary{}, &openRequest);
+		assert::NilError(t, openErr);
+		snapshot->Deref();
+
+		auto configPath = session->toPath(configFileName);
+
+		project::APIReconfigureProgramRequest reconfigure;
+		reconfigure.ProgramID = project::NewSyntheticProjectID(999);
+		project::APISnapshotRequest failRequest;
+		auto closeSet =
+		    tsc::collections::NewSetFromItems<tsc::tspath::Path>(configPath);
+		failRequest.CloseProjects = &closeSet;
+		failRequest.ReconfigurePrograms = {&reconfigure};
+		auto [failedSnapshot, failedErr] = session->APIUpdate(
+		    ctx, project::FileChangeSummary{}, &failRequest);
+		assert::ErrorContains(
+		    t, failedErr, "synthetic program not found for reconfiguration");
+		assert::Assert(t, failedSnapshot == nullptr);
+
+		auto& apiState = session->Snapshot()
+		                     ->ProjectCollection->apiState;
+		auto openIt = apiState.openProjects.find(configPath);
+		assert::Assert(t, openIt != apiState.openProjects.end());
+		assert::Equal(t, openIt->second, 1);
+	});
+
+	t->Run("session close releases the current snapshot", [&](T* t) {
+		t->Parallel();
+
+		const std::string fileName = "/project/index.ts";
+		auto* session = setupRefCountSession(
+		    {{fileName, std::string("export const value = 1;")}});
+		session->DidOpenFile(ctx, "file://" + fileName, 1,
+		                     "export const value = 1;",
+		                     lsproto::LanguageKindTypeScript);
+
+		auto* program = session->Snapshot()
+		                    ->ProjectCollection->InferredProject()
+		                    ->Program;
+		auto* sourceFile = program->GetSourceFile(fileName);
+		auto fileHash = sourceFile->Hash;
+		auto key = project::newParseCacheKey(
+		    sourceFile->ParseOptions(), {fileHash.hi, fileHash.lo},
+		    sourceFile->ScriptKind);
+		assert::Assert(t, session->snapshotHost->parseCache->Has(key));
+
+		session->Close();
+
+		assert::Assert(t, !session->snapshotHost->parseCache->Has(key));
+		assert::Equal(t,
+		              session->snapshotHost->programCounter->Len(),
+		              0);
+	});
 }
 
 void TestParseCacheAcquireExistingUsesFullKey(T* t) {

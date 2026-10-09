@@ -405,8 +405,7 @@ void addReferencedFilesFromImportLiteral(
 // programtosnapshot.go:271 addReferencedFileFromFileName.
 void addReferencedFileFromFileName(
     compiler::SimpleProgram* program, const std::string& fileName,
-    collections::Set<tspath::Path>* referencedFiles,
-    const std::string& sourceFileDirectory) {
+    collections::Set<tspath::Path>* referencedFiles) {
 	auto redirect = program->GetParseFileRedirect(fileName);
 	if (!redirect.empty()) {
 		referencedFiles->Add(tspath::toPath(
@@ -414,7 +413,7 @@ void addReferencedFileFromFileName(
 		    program->UseCaseSensitiveFileNames()));
 	} else {
 		referencedFiles->Add(tspath::toPath(
-		    fileName, sourceFileDirectory,
+		    fileName, program->GetCurrentDirectory(),
 		    program->UseCaseSensitiveFileNames()));
 	}
 }
@@ -437,9 +436,11 @@ collections::Set<tspath::Path>* getReferencedFiles(
 	auto sourceFileDirectory = tspath::getDirectoryPath(file->FileName());
 	// Handle triple slash references
 	for (auto* referencedFile : file->ReferencedFiles) {
-		addReferencedFileFromFileName(program, referencedFile->FileName,
-		                              &referencedFiles,
-		                              sourceFileDirectory);
+		addReferencedFileFromFileName(
+		    program,
+		    tspath::getNormalizedAbsolutePath(referencedFile->FileName,
+		                                      sourceFileDirectory),
+		    &referencedFiles);
 	}
 
 	// Handle type reference directives
@@ -450,7 +451,7 @@ collections::Set<tspath::Path>* getReferencedFiles(
 			if (!typeRef->ResolvedFileName.empty()) {
 				addReferencedFileFromFileName(
 				    program, typeRef->ResolvedFileName,
-				    &referencedFiles, sourceFileDirectory);
+				    &referencedFiles);
 			}
 		}
 	}

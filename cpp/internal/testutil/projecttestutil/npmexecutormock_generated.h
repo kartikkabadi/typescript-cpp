@@ -25,11 +25,14 @@ namespace tsc::testutil::projecttestutil {
 struct NpmExecutorMock final : ata::NpmExecutor {
 	// NpmInstallFunc mocks the NpmInstall method.
 	std::function<std::pair<std::string, gostd::Error>(
-	    const std::string&, const std::vector<std::string>&)>
+	    const gostd::Context&, const std::string&,
+	    const std::vector<std::string>&)>
 	    NpmInstallFunc;
 
 	// calls tracks calls to the methods.
 	struct NpmInstallCall {
+		// Ctx is the ctx argument value.
+		gostd::Context Ctx;
 		// Cwd is the cwd argument value.
 		std::string Cwd;
 		// Args is the args argument value.
@@ -44,7 +47,7 @@ struct NpmExecutorMock final : ata::NpmExecutor {
 
 	// NpmInstall calls NpmInstallFunc — npmexecutormock_generated.go:49.
 	std::pair<std::string, gostd::Error>
-	NpmInstall(const std::string& cwd,
+	NpmInstall(const gostd::Context& ctx, const std::string& cwd,
 	           const std::vector<std::string>& args) override;
 
 	// NpmInstallCalls gets all the calls that were made to NpmInstall —

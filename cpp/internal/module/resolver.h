@@ -50,6 +50,65 @@ inline std::unique_ptr<resolved> unresolved() {
 	return std::make_unique<resolved>();
 }
 
+// resolver.go — dynamic path resolution helpers.
+inline std::string pathForDynamicResolution(std::string_view directory,
+                                            std::string_view path,
+                                            bool directoryOnly) {
+	if (tspath::isEncodedDynamicFileName(directory) &&
+	    !tspath::pathIsAbsolute(path)) {
+		if (directoryOnly) {
+			return tspath::encodeDynamicDirectorySpecifier(path);
+		}
+		return tspath::encodeDynamicModuleSpecifier(path);
+	}
+	return std::string(path);
+}
+
+inline std::string resolvePathForModule(std::string_view directory,
+                                        std::string_view path,
+                                        bool directoryOnly) {
+	std::string resolved = tspath::normalizePath(tspath::combinePaths(
+		directory, {pathForDynamicResolution(directory, path,
+			directoryOnly)}));
+	if (directoryOnly) {
+		return tspath::ensureTrailingDirectorySeparator(resolved);
+	}
+	return resolved;
+}
+
+inline std::string resolveDynamicLogicalPath(std::string_view directory,
+                                             std::string_view path,
+                                             bool directoryOnly) {
+	if (!path.empty() && directoryOnly) {
+		path = tspath::removeTrailingDirectorySeparator(path);
+	}
+	std::string encoded = tspath::encodeDynamicRelativeURIPath(path);
+	if (directoryOnly) {
+		encoded = tspath::encodeDynamicRelativeURIDirectoryPath(path);
+	}
+	std::string resolved =
+	    tspath::normalizePath(tspath::combinePaths(directory, {encoded}));
+	if (directoryOnly) {
+		return tspath::ensureTrailingDirectorySeparator(resolved);
+	}
+	return resolved;
+}
+
+inline std::string dynamicDirectoryCandidate(std::string_view candidate) {
+	if (!tspath::isEncodedDynamicFileName(candidate)) {
+		return std::string(candidate);
+	}
+	std::string directory = tspath::getDirectoryPath(candidate);
+	std::string base = std::string{tspath::getBaseFileName(candidate)};
+	std::string logicalBase = tspath::decodeDynamicURIPathSegment(base);
+	std::string encodedBase =
+	    tspath::encodeDynamicURIDirectoryPath(logicalBase);
+	if (encodedBase == base) {
+		return std::string(candidate);
+	}
+	return tspath::combinePaths(directory, {encodedBase});
+}
+
 using resolutionKindSpecificLoader =
     std::function<std::unique_ptr<resolved>(extensions ext,
                                             const std::string& candidate)>;
@@ -296,8 +355,9 @@ struct resolutionState {
 			}
 			return {"", false};
 		}
-		auto path = tspath::normalizePath(
-		    tspath::combinePaths(directory, {field->Value}));
+		auto path = resolvePathForModule(
+		    directory, field->Value,
+		    tspath::hasTrailingDirectorySeparator(field->Value));
 		if (traceBuilder != nullptr) {
 			traceBuilder->write(
 			    X_package_json_has_0_field_1_that_references_2, fieldName,

@@ -1122,7 +1122,7 @@ void TestSession(T* t) {
 
 					       assert::Check(
 					           t, utils->WatchesFile(
-					                  "/home/projects/ts/x.ts"));
+					                  "/home/projects/TS/x.ts"));
 
 					       auto werr = utils->FS()->WriteFile(
 					           "/home/projects/TS/x.ts",

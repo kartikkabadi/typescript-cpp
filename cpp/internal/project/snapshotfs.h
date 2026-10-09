@@ -349,7 +349,7 @@ struct sourceFS : vfs::FS {
 	std::atomic<bool> tracking{false};
 	std::function<tspath::Path(const std::string&)> toPath;
 	collections::SyncSet<tspath::Path>* missingDirectories = nullptr;
-	collections::SyncSet<tspath::Path>* seenFiles = nullptr;
+	collections::SyncMap<tspath::Path, std::string>* seenFiles = nullptr;
 	FileSource* source = nullptr;
 
 	void DisableTracking() { tracking = false; }
@@ -358,18 +358,18 @@ struct sourceFS : vfs::FS {
 		if (!tracking.load()) {
 			return;
 		}
-		seenFiles->Add(toPath(fileName));
+		seenFiles->Store(toPath(fileName), fileName);
 	}
 
 	bool SeenFile(const tspath::Path& path) {
 		if (seenFiles == nullptr) {
 			return false;
 		}
-		return seenFiles->Has(path);
+		return seenFiles->Load(path).second;
 	}
 
 	bool SeenFileOrMissingParentDirectory(tspath::Path path) {
-		if (seenFiles != nullptr && seenFiles->Has(path)) {
+		if (seenFiles != nullptr && seenFiles->Load(path).second) {
 			return true;
 		}
 		if (missingDirectories != nullptr && !missingDirectories->IsEmpty()) {
@@ -471,7 +471,8 @@ inline sourceFS* newSourceFS(
 	fs->toPath = std::move(toPath);
 	fs->source = source;
 	if (tracking) {
-		fs->seenFiles = new collections::SyncSet<tspath::Path>();
+		fs->seenFiles =
+		    new collections::SyncMap<tspath::Path, std::string>();
 		fs->missingDirectories = new collections::SyncSet<tspath::Path>();
 	}
 	return fs;

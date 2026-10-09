@@ -170,8 +170,7 @@ const DiagnosticMessage* wouldRenameInOtherNodeModules(
 		return nullptr;
 	}
 
-	std::string originalPackage = module::ParseNodeModuleFromPath(
-		originalFile->FileName(), false /*isFolder*/);
+	std::string originalPackage = module::NodeModulePackageRootForFile(originalFile->FileName());
 	if (originalPackage.empty()) {
 		// Original source file is not in node_modules.
 		for (auto* declaration : declarations) {
@@ -186,9 +185,8 @@ const DiagnosticMessage* wouldRenameInOtherNodeModules(
 
 	// Original source file is in node_modules.
 	for (auto* declaration : declarations) {
-		std::string declPackage = module::ParseNodeModuleFromPath(
-			getSourceFileOfNode(declaration)->FileName(),
-			false /*isFolder*/);
+		std::string declPackage = module::NodeModulePackageRootForFile(
+			getSourceFileOfNode(declaration)->FileName());
 		if (!declPackage.empty() && declPackage != originalPackage) {
 			return 
 				You_cannot_rename_elements_that_are_defined_in_another_node_modules_folder;

@@ -373,24 +373,7 @@ lsproto::DocumentUri FileNameToDocumentURI(const std::string& fileName) {
 		return lsproto::DocumentUri(fileName);
 	}
 	if (fileName.rfind("^/", 0) == 0) { // tspath.IsDynamicFileName
-		std::string_view rest = std::string_view(fileName).substr(2);
-		auto slash1 = rest.find('/');
-		if (slash1 == std::string_view::npos) {
-			TSC_UNREACHABLE(("invalid file name: " + fileName).c_str());
-		}
-		std::string_view scheme = rest.substr(0, slash1);
-		std::string_view rest2 = rest.substr(slash1 + 1);
-		auto slash2 = rest2.find('/');
-		if (slash2 == std::string_view::npos) {
-			TSC_UNREACHABLE(("invalid file name: " + fileName).c_str());
-		}
-		std::string_view authority = rest2.substr(0, slash2);
-		std::string_view path = rest2.substr(slash2 + 1);
-		if (authority == "ts-nul-authority") {
-			return lsproto::DocumentUri(std::string(scheme) + ":" + std::string(path));
-		}
-		return lsproto::DocumentUri(std::string(scheme) + "://" + std::string(authority) +
-		                            "/" + std::string(path));
+		return lsproto::dynamicFileNameToDocumentUri(fileName);
 	}
 
 	auto [volume, filePart, _ok] = splitVolumePath(fileName);

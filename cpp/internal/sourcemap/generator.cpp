@@ -77,8 +77,11 @@ std::string marshalRawSourceMap(const RawSourceMap& m) {
 	out += std::to_string(m.Version);
 	out += ",\"file\":";
 	jsonWriteString(out, m.File);
-	out += ",\"sourceRoot\":";
-	jsonWriteString(out, m.SourceRoot);
+	// json:"sourceRoot,omitzero" — omitted when empty.
+	if (!m.SourceRoot.empty()) {
+		out += ",\"sourceRoot\":";
+		jsonWriteString(out, m.SourceRoot);
+	}
 	out += ",\"sources\":";
 	jsonWriteStringArray(out, m.Sources);
 	out += ",\"names\":";

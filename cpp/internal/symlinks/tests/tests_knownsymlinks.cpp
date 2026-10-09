@@ -68,6 +68,10 @@ void TestSetDirectory(T* t) {
 		t->Errorf("Expected RealPath to be '%s', got '%s'",
 		          {realDirectory->RealPath, stored->RealPath});
 	}
+	if (stored->Symlink != "/test/symlink/") {
+		t->Errorf("Expected Symlink to preserve '/test/symlink/', got '%s'",
+		          {stored->Symlink});
+	}
 
 	// Check that realpath mapping was created
 	auto [set, ok2] =
@@ -368,7 +372,41 @@ void TestKnownSymlinksThreadSafety(T* t) {
 } // namespace
 
 REGISTER_UNIT_TEST("symlinks.TestNewKnownSymlink", TestNewKnownSymlink);
+// knownsymlinks_test.go — child paths preserve the presentation spelling.
+void TestKnownDirectoryLinkPreservesChildSpelling(T* t) {
+	t->Parallel();
+
+	std::unique_ptr<KnownSymlinks> cache(
+	    NewKnownSymlink("/test/dir", false));
+	std::string symlink = "/Project/Node_Modules/pkg";
+	auto symlinkPath = tspath::ensureTrailingDirectorySeparator(
+	    tspath::toPath(symlink, "/test/dir", false));
+	cache->SetDirectory(
+	    symlink, symlinkPath,
+	    std::make_shared<KnownDirectoryLink>(KnownDirectoryLink{
+	        {},
+	        "/Real/Package/",
+	        tspath::ensureTrailingDirectorySeparator(
+	            tspath::toPath("/Real/Package", "/test/dir", false))}));
+
+	auto [link, ok] = cache->Directories()->Load(symlinkPath);
+	if (!ok) {
+		t->Fatal({"Expected directory link"});
+	}
+	auto [resolved, resolvedOk] = link->ResolveFileName(
+	    "/PROJECT/node_modules/pkg/Src/File.ts", false);
+	if (!resolvedOk) {
+		t->Fatal({"Expected child path to resolve through directory link"});
+	}
+	if (resolved != "/Real/Package/Src/File.ts") {
+		t->Errorf("Expected child spelling to be preserved, got '%s'",
+		          {resolved});
+	}
+}
+
 REGISTER_UNIT_TEST("symlinks.TestSetDirectory", TestSetDirectory);
+REGISTER_UNIT_TEST("symlinks.TestKnownDirectoryLinkPreservesChildSpelling",
+                   TestKnownDirectoryLinkPreservesChildSpelling);
 REGISTER_UNIT_TEST("symlinks.TestSetFile", TestSetFile);
 REGISTER_UNIT_TEST("symlinks.TestProcessResolution",
                    TestProcessResolution);

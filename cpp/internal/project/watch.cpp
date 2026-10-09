@@ -15,7 +15,7 @@ namespace tsc::project {
 // Complex resolution-lookup glob computation. Given a set of resolution
 // lookup paths, produces glob patterns that capture the locations where
 // file changes could invalidate resolutions.
-std::function<PatternsAndIgnored(collections::SyncSet<tspath::Path>*)>
+std::function<PatternsAndIgnored(collections::SyncMap<tspath::Path, std::string>*)>
 createResolutionLookupGlobMapper(
 	const std::string& workspaceDirectory, const std::string& libDirectory,
 	const std::string& currentDirectory, bool useCaseSensitiveFileNames) {
@@ -27,19 +27,23 @@ createResolutionLookupGlobMapper(
 	    libDirectory, currentDirectory, useCaseSensitiveFileNames);
 
 	return [workspaceDirectoryPath, currentDirectoryPath, libDirectoryPath,
-	        currentDirectory, useCaseSensitiveFileNames](
-	           collections::SyncSet<tspath::Path>* data)
+	        workspaceDirectory, currentDirectory, libDirectory,
+	        useCaseSensitiveFileNames](
+	           collections::SyncMap<tspath::Path, std::string>* data)
 	           -> PatternsAndIgnored {
 		std::unordered_set<std::string> ignored;
 		collections::Set<tspath::Path> seenDirs;
 		bool includeWorkspace = false;
 		bool includeRoot = false;
 		bool includeLib = false;
-		collections::Set<tspath::Path> nodeModulesDirectories;
-		collections::Set<tspath::Path> externalDirectories;
+		std::unordered_map<tspath::Path, std::string>
+		    nodeModulesDirectories;
+		std::unordered_map<tspath::Path, std::string>
+		    externalDirectories;
 
 		if (data != nullptr) {
-			data->Range([&](const tspath::Path& path) -> bool {
+			data->Range([&](const tspath::Path& path,
+		                       const std::string& fileName) -> bool {
 				if (tspath::isDynamicFileName(path)) {
 					return true;
 				}
@@ -60,13 +64,38 @@ createResolutionLookupGlobMapper(
 				} else if (tspath::pathContainsPath(libDirectoryPath,
 				                                    path)) {
 					includeLib = true;
-				} else if (auto idx = path.find("/node_modules/");
-				           idx != std::string::npos) {
-					nodeModulesDirectories.Add(
-					    path.substr(0, idx + strlen("/node_modules")));
 				} else {
-					externalDirectories.Add(
-					    tspath::getDirectoryPath(path));
+					auto canonicalComponents =
+					    tspath::getPathComponents(path, "");
+					auto fileNameComponents =
+					    tspath::getPathComponents(fileName, "");
+					bool isNodeModules = false;
+					if (canonicalComponents.size() ==
+					    fileNameComponents.size()) {
+						for (size_t i = 0;
+						     i < canonicalComponents.size(); i++) {
+							if (canonicalComponents[i] ==
+							    "node_modules") {
+								auto nodeModulesDirectory =
+								    tspath::getPathFromPathComponents(
+								        {fileNameComponents.begin(),
+								         fileNameComponents.begin() +
+								             i + 1});
+								nodeModulesDirectories[tspath::toPath(
+								    nodeModulesDirectory,
+								    currentDirectory,
+								    useCaseSensitiveFileNames)] =
+								    nodeModulesDirectory;
+								isNodeModules = true;
+								break;
+							}
+						}
+					}
+					if (isNodeModules) {
+						return true;
+					}
+					externalDirectories[tspath::getDirectoryPath(
+					    path)] = tspath::getDirectoryPath(fileName);
 				}
 				return true;
 			});
@@ -75,19 +104,18 @@ createResolutionLookupGlobMapper(
 		std::vector<std::string> globs;
 		if (includeWorkspace) {
 			globs.push_back(
-			    getRecursiveGlobPattern(workspaceDirectoryPath));
+			    getRecursiveGlobPattern(workspaceDirectory));
 		}
 		if (includeRoot) {
-			globs.push_back(
-			    getRecursiveGlobPattern(currentDirectoryPath));
+			globs.push_back(getRecursiveGlobPattern(currentDirectory));
 		}
 		if (includeLib) {
-			globs.push_back(getRecursiveGlobPattern(libDirectoryPath));
+			globs.push_back(getRecursiveGlobPattern(libDirectory));
 		}
-		if (nodeModulesDirectories.Len() > 0) {
+		if (!nodeModulesDirectories.empty()) {
 			std::vector<std::string> nodeModulesGlobs;
-			nodeModulesGlobs.reserve(nodeModulesDirectories.Len());
-			for (const auto& dir : nodeModulesDirectories.Keys()) {
+			nodeModulesGlobs.reserve(nodeModulesDirectories.size());
+			for (const auto& [_, dir] : nodeModulesDirectories) {
 				nodeModulesGlobs.push_back(
 				    getRecursiveGlobPattern(dir));
 			}
@@ -97,10 +125,10 @@ createResolutionLookupGlobMapper(
 			             nodeModulesGlobs.end());
 		}
 		std::vector<std::string> outsideDirs;
-		if (externalDirectories.Len() > 0) {
+		if (!externalDirectories.empty()) {
 			std::vector<std::string> externalDirStrings;
-			externalDirStrings.reserve(externalDirectories.Len());
-			for (const auto& dir : externalDirectories.Keys()) {
+			externalDirStrings.reserve(externalDirectories.size());
+			for (const auto& [_, dir] : externalDirectories) {
 				externalDirStrings.push_back(dir);
 			}
 			auto [externalDirectoryParents, ignoredExternalDirs] =
@@ -108,7 +136,7 @@ createResolutionLookupGlobMapper(
 			        externalDirStrings, minWatchLocationDepth,
 			        getPathComponentsForWatching,
 			        tspath::ComparePathsOptions{
-			            true, {}}); // Already using tspath.Path
+			            useCaseSensitiveFileNames, {}});
 			std::sort(externalDirectoryParents.begin(),
 			          externalDirectoryParents.end());
 			ignored = std::move(ignoredExternalDirs);

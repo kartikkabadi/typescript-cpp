@@ -21,8 +21,17 @@ bool IsApplicableVersionedTypesKey(std::string_view key) {
 }
 
 
-// util.go — ParseNodeModuleFromPath.
-std::string ParseNodeModuleFromPath(std::string_view resolved, bool isFolder) {
+// util.go — NodeModulePackageRootForFile/NodeModulePackageRootForDirectory.
+std::string NodeModulePackageRootForFile(std::string_view resolved) {
+	return parseNodeModulePackageRoot(resolved, false /*isDirectory*/);
+}
+
+std::string NodeModulePackageRootForDirectory(std::string_view resolved) {
+	return parseNodeModulePackageRoot(resolved, true /*isDirectory*/);
+}
+
+std::string parseNodeModulePackageRoot(std::string_view resolved,
+                                       bool isDirectory) {
 	std::string path = tspath::normalizePath(resolved);
 	auto idx = path.rfind("/node_modules/");
 	if (idx == std::string::npos) {
@@ -32,13 +41,16 @@ std::string ParseNodeModuleFromPath(std::string_view resolved, bool isFolder) {
 	auto indexAfterNodeModules =
 	    static_cast<int>(idx + std::string("/node_modules/").size());
 	auto indexAfterPackageName = moveToNextDirectorySeparatorIfAvailable(
-	    path, indexAfterNodeModules, isFolder);
+	    path, indexAfterNodeModules, isDirectory);
 	if (indexAfterNodeModules < static_cast<int>(path.size()) &&
 	    path[indexAfterNodeModules] == '@') {
 		indexAfterPackageName = moveToNextDirectorySeparatorIfAvailable(
-		    path, indexAfterPackageName, isFolder);
+		    path, indexAfterPackageName, isDirectory);
 	}
-	return path.substr(0, indexAfterPackageName);
+	// Go wraps the result in RootedDirectoryPathFromAbsolute, which
+	// normalizes away any trailing directory separator.
+	return std::string{tspath::removeTrailingDirectorySeparator(
+	    std::string_view(path).substr(0, indexAfterPackageName))};
 }
 
 // util.go — ParsePackageName.

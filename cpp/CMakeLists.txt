@@ -283,6 +283,7 @@ add_library(tsc STATIC
 	internal/tsoptions/showconfig.cpp
 	internal/tsoptions/tsconfigparsing.cpp
 	internal/tsoptions/wildcarddirectories.cpp
+	internal/tspath/dynamic.cpp
 	# === slice: infra ===
 	internal/diagnosticwriter/diagnosticwriter.cpp
 	internal/diagnostics/localize.cpp

@@ -3507,8 +3507,13 @@ Session::handleTranspile(gostd::Context ctx, const TranspileParams* params,
 // @gen-proto-result: SourceFileResponse
 std::pair<ResultValue, gostd::Error> Session::handleCreateSourceFile(
     gostd::Context ctx, const CreateSourceFileParams* params) {
+	auto [fileName, nameErr] =
+	    resolveCreateSourceFileName(params->FileName);
+	if (nameErr) {
+		return {ResultValue{}, nameErr};
+	}
 	auto [lease, err] =
-	    createSourceFile(params->FileName, params->SourceText, params->Options);
+	    createSourceFile(fileName, params->SourceText, params->Options);
 	if (err) {
 		return {ResultValue{}, err};
 	}
@@ -3518,8 +3523,11 @@ std::pair<ResultValue, gostd::Error> Session::handleCreateSourceFile(
 // @gen-proto-result: SourceFileResponse
 std::pair<ResultValue, gostd::Error> Session::handleCreateSourceFileFromFile(
     gostd::Context ctx, const CreateSourceFileFromFileParams* params) {
-	std::string fileName = tspath::getNormalizedAbsolutePath(
-	    params->FileName, GetCurrentDirectory());
+	auto [fileName, nameErr] =
+	    resolveCreateSourceFileName(params->FileName);
+	if (nameErr) {
+		return {ResultValue{}, nameErr};
+	}
 	auto [sourceText, ok] = snapshotHost->FS()->ReadFile(fileName);
 	if (!ok) {
 		return {ResultValue{},
@@ -3532,6 +3540,18 @@ std::pair<ResultValue, gostd::Error> Session::handleCreateSourceFileFromFile(
 		return {ResultValue{}, err};
 	}
 	return encodeLeasedSourceFile(std::move(lease));
+}
+
+// resolveCreateSourceFileName — session.go:1851.
+std::pair<std::string, gostd::Error> Session::resolveCreateSourceFileName(
+    const std::string& fileName) {
+	if (fileName.empty()) {
+		return {"", gostd::errorf("%w: fileName must not be empty",
+		                          {ErrClientError})};
+	}
+	return {tspath::getNormalizedAbsolutePath(fileName,
+	                                          GetCurrentDirectory()),
+	        nullptr};
 }
 
 // createSourceFile — session.go:1857.
@@ -7081,7 +7101,8 @@ Session::handleGetImportAdderEdits(
 	                                          pid, userPreferences)) {
 		auto* preparedSnapshot = snapshotHost->CloneSnapshotWithAutoImports(
 		    ctx, workingSnapshot,
-		    params->File.ToURI(GetCurrentDirectory()), nullptr);
+		    lsconv::FileNameToDocumentURI(sourceFile->FileName()),
+		    nullptr);
 		if (projectSession != nullptr) {
 			projectSession->TryAdoptSnapshotInBackground(workingSnapshot,
 			                                           preparedSnapshot);
@@ -7341,9 +7362,15 @@ Session::handleGetCompletionsAtPosition(
 			            "%w: snapshot is not prepared for auto-imports for %s",
 			            {ErrClientError, params->File.String()})};
 		}
+		auto* sourceFile2 = program->GetSourceFile(
+		    params->File.ToFileName());
+		if (sourceFile2 == nullptr) {
+			return {nullptr, gostd::Error{}};
+		}
 		auto* preparedSnapshot = snapshotHost->CloneSnapshotWithAutoImports(
 		    ctx, sd->snapshot,
-		    params->File.ToURI(GetCurrentDirectory()), nullptr);
+		    lsconv::FileNameToDocumentURI(sourceFile2->FileName()),
+		    nullptr);
 		if (projectSession != nullptr) {
 			projectSession->TryAdoptSnapshotInBackground(sd->snapshot,
 			                                           preparedSnapshot);

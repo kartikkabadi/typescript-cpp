@@ -434,6 +434,8 @@ public:
 	                bool declaration);
 	std::pair<ResultValue, gostd::Error> handleCreateSourceFile(
 	    gostd::Context ctx, const CreateSourceFileParams* params);
+	std::pair<std::string, gostd::Error> resolveCreateSourceFileName(
+	    const std::string& fileName);
 	std::pair<ResultValue, gostd::Error> handleCreateSourceFileFromFile(
 	    gostd::Context ctx, const CreateSourceFileFromFileParams* params);
 	std::pair<std::shared_ptr<project::SourceFileLease>, gostd::Error>

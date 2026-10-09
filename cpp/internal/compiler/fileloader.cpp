@@ -1286,6 +1286,7 @@ void projectReferenceDtsFakingVfs::handleDirectoryCouldBeSymlink(
 	    directory, directoryPath,
 	    std::make_shared<symlinks::KnownDirectoryLink>(
 	        symlinks::KnownDirectoryLink{
+	            {},
 	            tspath::ensureTrailingDirectorySeparator(realDirectory),
 	            realPath}));
 }
@@ -1309,9 +1310,14 @@ bool projectReferenceDtsFakingVfs::fileOrDirectoryExistsUsingSource(
 		return false;
 	}
 	// Check if the directory or file is a symlinked package.
-	if (std::string packageRoot = module::ParseNodeModuleFromPath(
-	        fileOrDirectory, /*isFolder*/ true);
-	    !packageRoot.empty()) {
+	std::string packageRoot;
+	if (isFile) {
+		packageRoot = module::NodeModulePackageRootForFile(fileOrDirectory);
+	} else {
+		packageRoot =
+		    module::NodeModulePackageRootForDirectory(fileOrDirectory);
+	}
+	if (!packageRoot.empty()) {
 		handleDirectoryCouldBeSymlink(packageRoot);
 	}
 	auto* knownDirectoryLinks = knownSymlinks.Directories();
@@ -1330,19 +1336,20 @@ bool projectReferenceDtsFakingVfs::fileOrDirectoryExistsUsingSource(
 	knownDirectoryLinks->Range(
 	    [&](tspath::Path directoryPath,
 	        std::shared_ptr<symlinks::KnownDirectoryLink> link) -> bool {
-		    std::string_view dirPrefix = directoryPath;
-		    if (fileOrDirectoryPath.compare(0, dirPrefix.size(),
-		                                    dirPrefix) != 0) {
+		    if (!fileOrDirectoryPath.starts_with(directoryPath)) {
 			    return true; // keep ranging
 		    }
-		    std::string relative{
-		        std::string_view(fileOrDirectoryPath)
-		            .substr(dirPrefix.size())};
+		    auto [realFileOrDirectory, resolved] = link->ResolveFileName(
+		        fileOrDirectory, UseCaseSensitiveFileNames());
+		    if (!resolved) {
+			    TSC_UNREACHABLE("canonical symlink path did not match its "
+			                    "presentation path");
+		    }
 		    Tristate sub = isFile
 		                       ? fileExistsIfProjectReferenceDts(
-		                             link->RealPath + relative)
+		                             realFileOrDirectory)
 		                       : directoryExistsIfProjectReferenceDeclDir(
-		                             link->RealPath + relative);
+		                             realFileOrDirectory);
 		    if (tristateIsTrue(sub)) {
 			    exists = true;
 			    if (isFile) {
@@ -1353,8 +1360,7 @@ bool projectReferenceDtsFakingVfs::fileOrDirectoryExistsUsingSource(
 				            host->GetCurrentDirectory());
 				    knownSymlinks.SetFile(
 				        absolutePath, fileOrDirectoryPath,
-				        link->Real +
-				            absolutePath.substr(dirPrefix.size()));
+				        realFileOrDirectory);
 			    }
 			    return false; // stop ranging
 		    }

@@ -59,6 +59,8 @@ static void TestGetRootLength(T* t) {
 	gotest::assert::Equal(t, getRootLength("file://localhost/c%3A"), 21);
 	gotest::assert::Equal(t, getRootLength("file://localhost/c%3Ad"), 17);
 	gotest::assert::Equal(t, getRootLength("file://localhost/c%3A/path"), 22);
+	gotest::assert::Equal(t, getRootLength("FILE:///C:/path"), 11);
+	gotest::assert::Equal(t, getRootLength("file://LOCALHOST/C%3A/path"), 22);
 	gotest::assert::Equal(t, getRootLength("file://server"), 13);
 	gotest::assert::Equal(t, getRootLength("file://server/"), 14);
 	gotest::assert::Equal(t, getRootLength("file://server/path"), 14);
@@ -465,6 +467,7 @@ static void TestToPath(T* t) {
 	gotest::assert::Equal(t, std::string(toPath("file.ext", "path/to", false)), "path/to/file.ext");
 	gotest::assert::Equal(t, std::string(toPath("file.ext", "/path/to", true)), "/path/to/file.ext");
 	gotest::assert::Equal(t, std::string(toPath("/path/to/../file.ext", "path/to", true)), "/path/file.ext");
+	gotest::assert::Equal(t, std::string(toPath("^/~ts-uri~/custom/ts-nul-authority/CaseSensitive.ts", "/", false)), "^/~ts-uri~/custom/ts-nul-authority/CaseSensitive.ts");
 }
 
 static void TestTrimFilePathPrefix(T* t) {

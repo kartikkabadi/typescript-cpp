@@ -74,7 +74,9 @@ struct idleTimer {
 			}
 		}).detach();
 	}
-	void Stop() { stopped.store(true); }
+	// Stop returns true when it cancelled a still-pending fire
+	// (time.Timer.Stop semantics).
+	bool Stop() { return !stopped.exchange(true); }
 };
 
 // Session manages the state of an LSP session. It receives
@@ -96,6 +98,7 @@ struct Session : ata::TypingsInstallerHost {
 	// them (Go relies on GC).
 	std::vector<std::shared_ptr<void>> keepAlive;
 	gostd::Context backgroundCtx;
+	gostd::CancelFunc backgroundCancel;
 	std::function<tspath::Path(const std::string&)> toPath;
 	Client* client = nullptr;
 	// Lifetime pins for client/npmExecutor — keep the server object
@@ -178,6 +181,10 @@ struct Session : ata::TypingsInstallerHost {
 	// inactivity.
 	idleTimer* idleCacheCleanTimer = nullptr;
 	std::mutex idleCacheCleanMu;
+	// idleCacheCleanWG — sync.WaitGroup: outstanding scheduled clean.
+	int idleCacheCleanWG = 0;
+	std::condition_variable idleCacheCleanWGCv;
+	bool idleCacheCleanClosed = false;
 
 	// performanceTelemetryCancel cancels the periodic performance
 	// telemetry ticker.
@@ -253,7 +260,7 @@ struct Session : ata::TypingsInstallerHost {
 
 	// NpmInstall implements ata.NpmExecutor — session.go:1849.
 	std::pair<std::string, gostd::Error> NpmInstall(
-	    const std::string& cwd,
+	    const gostd::Context& ctx, const std::string& cwd,
 	    const std::vector<std::string>& npmInstallArgs) override;
 
 	// Config — session.go:261. Gets a copy of the current
@@ -363,6 +370,8 @@ struct Session : ata::TypingsInstallerHost {
 
 	// cancelIdleCacheClean — session.go:688.
 	void cancelIdleCacheClean();
+	// closeIdleCacheClean — session.go:712.
+	void closeIdleCacheClean();
 
 	// StartPerformanceTelemetry — session.go:733. Begins periodic
 	// collection and sending of performance telemetry. It should be

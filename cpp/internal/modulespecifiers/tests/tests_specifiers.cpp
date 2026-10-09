@@ -201,6 +201,7 @@ void TestGetEachFileNameOfModuleWithSymlinks(T* t) {
 	    tspath::toPath("/project/symlink", "/project", true));
 	auto realDirectory = std::make_shared<tsc::symlinks::KnownDirectoryLink>(
 	    tsc::symlinks::KnownDirectoryLink{
+	        {},
 	        "/real/path/",
 	        tspath::ensureTrailingDirectorySeparator(
 	            tspath::toPath("/real/path", "/project", true))});

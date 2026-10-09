@@ -454,7 +454,7 @@ inline WatchedFiles<std::vector<std::string>>* newWatchedFilesForPaths(
 }
 
 // createResolutionLookupGlobMapper — watch.go:298.
-std::function<PatternsAndIgnored(collections::SyncSet<tspath::Path>*)>
+std::function<PatternsAndIgnored(collections::SyncMap<tspath::Path, std::string>*)>
 createResolutionLookupGlobMapper(const std::string& workspaceDirectory,
                                  const std::string& libDirectory,
                                  const std::string& currentDirectory,

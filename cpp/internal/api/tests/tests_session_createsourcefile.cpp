@@ -389,6 +389,25 @@ void TestCreateSourceFile(T* t) {
 		        err->Error().find("could not read file \"/src/missing.ts\"") !=
 		            std::string::npos);
 	});
+
+	t->Run("empty file name", [session](T* t) {
+		t->Parallel();
+		CreateSourceFileParams params;
+		auto [_r, err] = session->handleCreateSourceFile(
+		    gostd::contextBackground(), &params);
+		assert::Assert(
+		    t, err != nullptr &&
+		           err->Error().find("fileName must not be empty") !=
+		               std::string::npos);
+
+		CreateSourceFileFromFileParams params2;
+		auto [_r2, err2] = session->handleCreateSourceFileFromFile(
+		    gostd::contextBackground(), &params2);
+		assert::Assert(
+		    t, err2 != nullptr &&
+		           err2->Error().find("fileName must not be empty") !=
+		               std::string::npos);
+	});
 }
 REGISTER_UNIT_TEST("api.TestCreateSourceFile", TestCreateSourceFile);
 

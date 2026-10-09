@@ -445,7 +445,7 @@ Project::CreateProgramResult Project::CreateProgram() {
 }
 
 // Project.CloneWatchers — project.go:593.
-WatchedFiles<collections::SyncSet<tspath::Path>*>*
+WatchedFiles<collections::SyncMap<tspath::Path, std::string>*>*
 Project::CloneWatchers() {
 	return programFilesWatch->Clone(host->sourceFS->seenFiles);
 }

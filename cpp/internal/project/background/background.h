@@ -31,11 +31,20 @@ public:
 	// they captured for it.
 	bool Enqueue(const gostd::Context& ctx,
 	             const std::function<void(gostd::Context)>& fn) {
-		{
-			std::shared_lock<std::shared_mutex> lk(mu);
-			if (closed) {
-				return false;
+		mu.lock_shared();
+		struct unlockGuard {
+			std::shared_mutex& m;
+			bool held = true;
+			void release() {
+				if (held) {
+					m.unlock_shared();
+					held = false;
+				}
 			}
+			~unlockGuard() { release(); }
+		} ug{mu};
+		if (closed) {
+			return false;
 		}
 
 		// Don't start new tasks if context is already cancelled
@@ -43,20 +52,27 @@ public:
 			return false;
 		}
 
-		// wg.Go — spawn a detached thread.
+		// wg.Add(1) while still holding the read lock so Close cannot
+		// observe a closed queue with a task it never waited on.
 		{
 			std::lock_guard<std::mutex> lk(wgMu);
 			++wgCount;
 		}
+		ug.release();
 		std::thread([this, ctx, fn] {
+			struct doneGuard {
+				Queue* q;
+				~doneGuard() {
+					std::unique_lock<std::mutex> lk(q->wgMu);
+					if (--q->wgCount == 0) {
+						lk.unlock();
+						q->wgCv.notify_all();
+					}
+				}
+			} dg{this};
 			// Check context again before executing
 			if (gostd::ctxErr(ctx) == nullptr) {
 				fn(ctx);
-			}
-			std::unique_lock<std::mutex> lk(wgMu);
-			if (--wgCount == 0) {
-				lk.unlock();
-				wgCv.notify_all();
 			}
 		}).detach();
 		return true;
@@ -70,8 +86,11 @@ public:
 	}
 
 	void Close() {
-		std::lock_guard<std::shared_mutex> lk(mu);
-		closed = true;
+		{
+			std::lock_guard<std::shared_mutex> lk(mu);
+			closed = true;
+		}
+		Wait();
 	}
 };
 
