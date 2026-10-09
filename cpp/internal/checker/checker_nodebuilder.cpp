@@ -412,9 +412,9 @@ static bool hasTypeAnnotation(Node* declaration) {
 static Symbol* getTypeAliasForTypeLiteral(Checker* c, Type* t) {
 	if (t->symbol != nullptr &&
 	    (t->symbol->flags & SymbolFlagsTypeLiteral) != 0 &&
-	    !t->symbol->declarations.empty()) {
+	    !t->symbol->data->declarations.empty()) {
 		Node* node = walkUpParenthesizedTypes(
-			t->symbol->declarations[0]->parent);
+			t->symbol->data->declarations[0]->parent);
 		if (isTypeAliasDeclaration(node)) {
 			return c->getSymbolOfDeclaration(node);
 		}
@@ -424,9 +424,9 @@ static Symbol* getTypeAliasForTypeLiteral(Checker* c, Type* t) {
 
 // isHashPrivate (nodebuilder_hover.go:603).
 static bool isHashPrivate(Symbol* s) {
-	return s->valueDeclaration != nullptr &&
-	       s->valueDeclaration->name() != nullptr &&
-	       isPrivateIdentifier(s->valueDeclaration->name());
+	return s->data->valueDeclaration != nullptr &&
+	       s->data->valueDeclaration->name() != nullptr &&
+	       isPrivateIdentifier(s->data->valueDeclaration->name());
 }
 
 // isStructuralPseudoType (pseudotypenodebuilder.go:632).
@@ -1248,8 +1248,8 @@ Type* NodeBuilderImpl::getResolvedTypeWithoutAbstractConstructSignatures(
 Node* NodeBuilderImpl::symbolToNode(Symbol* symbol, SymbolFlags meaning) {
 	if ((ctx->internalFlags & nodebuilder::InternalFlagsWriteComputedProps) !=
 	    0) {
-		if (symbol->valueDeclaration != nullptr) {
-			Node* name = getNameOfDeclaration(symbol->valueDeclaration);
+		if (symbol->data->valueDeclaration != nullptr) {
+			Node* name = getNameOfDeclaration(symbol->data->valueDeclaration);
 			if (name != nullptr && isComputedPropertyName(name)) {
 				return name;
 			}
@@ -1261,7 +1261,7 @@ Node* NodeBuilderImpl::symbolToNode(Symbol* symbol, SymbolFlags meaning) {
 			     (TypeFlagsEnumLiteral | TypeFlagsUniqueESSymbol)) != 0) {
 				Node* oldEnclosing = ctx->enclosingDeclaration;
 				ctx->enclosingDeclaration =
-				    nameType->symbol->valueDeclaration;
+				    nameType->symbol->data->valueDeclaration;
 				Node* result = f->newComputedPropertyName(
 					symbolToExpressionWorker(nameType->symbol, meaning));
 				ctx->enclosingDeclaration = oldEnclosing;
@@ -1311,9 +1311,9 @@ Node* NodeBuilderImpl::createEntityNameFromSymbolChain(
 // symbolToName
 // symbolToEntityNameNode (nodebuilderimpl.go:633).
 Node* NodeBuilderImpl::symbolToEntityNameNode(Symbol* symbol) {
-	Node* identifier = newIdentifier(symbol->name, symbol);
-	if (symbol->parent != nullptr) {
-		return f->newQualifiedName(symbolToEntityNameNode(symbol->parent),
+	Node* identifier = newIdentifier(symbol->data->name, symbol);
+	if (symbol->data->parent != nullptr) {
+		return f->newQualifiedName(symbolToEntityNameNode(symbol->data->parent),
 		                           identifier);
 	}
 	return identifier;
@@ -1335,7 +1335,7 @@ Node* NodeBuilderImpl::symbolToTypeNode(Symbol* symbol, SymbolFlags mask,
 	}
 	bool isTypeOf = mask == SymbolFlagsValue;
 	bool rootIsModule = false;
-	for (Node* d : chain[0]->declarations) {
+	for (Node* d : chain[0]->data->declarations) {
 		if (hasNonGlobalAugmentationExternalModuleSymbol(d)) {
 			rootIsModule = true;
 			break;
@@ -1415,7 +1415,7 @@ Node* NodeBuilderImpl::symbolToTypeNode(Symbol* symbol, SymbolFlags mask,
 				// liable to fail when published :(
 				ctx->encounteredError = true;
 				ctx->tracker->ReportLikelyUnsafeImportRequiredError(
-					oldSpecifierResult.specifier, symbol->name);
+					oldSpecifierResult.specifier, symbol->data->name);
 			}
 		}
 
@@ -1490,12 +1490,12 @@ Node* NodeBuilderImpl::createAccessFromSymbolChain(
 			const SymbolTable& exports = ch->getExportsOfSymbol(parent);
 			if (!exports.empty()) {
 				// avoid exhaustive iteration in the common case
-				auto it = exports.find(symbol->name);
+				auto it = exports.find(symbol->data->name);
 				Symbol* res = it != exports.end() ? it->second : nullptr;
-				if (symbol->name != InternalSymbolNameExportEquals &&
-				    !isLateBoundName(symbol->name) && res != nullptr &&
+				if (symbol->data->name != InternalSymbolNameExportEquals &&
+				    !isLateBoundName(symbol->data->name) && res != nullptr &&
 				    ch->getSymbolIfSameReference(res, symbol) != nullptr) {
-					symbolName = symbol->name;
+					symbolName = symbol->data->name;
 				} else {
 					std::vector<std::pair<Symbol*, std::string>> results;
 					for (auto& kv : exports) {
@@ -1530,7 +1530,7 @@ Node* NodeBuilderImpl::createAccessFromSymbolChain(
 
 	if (symbolName.empty()) {
 		Node* name = nullptr;
-		for (Node* d : symbol->declarations) {
+		for (Node* d : symbol->data->declarations) {
 			name = getNameOfDeclaration(d);
 			if (name != nullptr) {
 				break;
@@ -1556,7 +1556,7 @@ Node* NodeBuilderImpl::createAccessFromSymbolChain(
 	     nodebuilder::FlagsForbidIndexedAccessSymbolReferences) == 0 &&
 	    parent != nullptr) {
 		const SymbolTable& members = ch->getMembersOfSymbol(parent);
-		auto mit = members.find(symbol->name);
+		auto mit = members.find(symbol->data->name);
 		if (mit != members.end() && mit->second != nullptr &&
 		    ch->getSymbolIfSameReference(mit->second, symbol) != nullptr) {
 			// Should use an indexed access
@@ -1626,7 +1626,7 @@ Node* NodeBuilderImpl::createExpressionFromSymbolChain(
 
 	if (startsWithSingleOrDoubleQuote(symbolName)) {
 		bool isModule = false;
-		for (Node* d : symbol->declarations) {
+		for (Node* d : symbol->data->declarations) {
 			if (hasNonGlobalAugmentationExternalModuleSymbol(d)) {
 				isModule = true;
 				break;
@@ -1732,7 +1732,7 @@ std::string NodeBuilderImpl::getNameOfSymbolAsWritten(Symbol* symbol) {
 	if (rit != ctx->remappedSymbolReferences.end()) {
 		symbol = rit->second;
 	}
-	if (symbol->name == InternalSymbolNameDefault &&
+	if (symbol->data->name == InternalSymbolNameDefault &&
 	    (ctx->flags &
 	     nodebuilder::FlagsUseAliasDefinedOutsideCurrentScope) == 0 &&
 	    // If it's not the first part of an entity name, it must print as
@@ -1740,18 +1740,18 @@ std::string NodeBuilderImpl::getNameOfSymbolAsWritten(Symbol* symbol) {
 	    ((ctx->flags & nodebuilder::FlagsInInitialEntityName) == 0 ||
 	     // if the symbol is synthesized, it will only be referenced externally
 	     // it must print as `default`
-	     symbol->declarations.empty() ||
+	     symbol->data->declarations.empty() ||
 	     // if not in the same binding context (source file, module
 	     // declaration), it must print as `default`
 	     (ctx->enclosingDeclaration != nullptr &&
-	      findAncestor(symbol->declarations[0], isDefaultBindingContext) !=
+	      findAncestor(symbol->data->declarations[0], isDefaultBindingContext) !=
 	          findAncestor(ctx->enclosingDeclaration,
 	                       isDefaultBindingContext)))) {
 		return "default";
 	}
-	if (!symbol->declarations.empty()) {
+	if (!symbol->data->declarations.empty()) {
 		Node* name = nullptr; // Try using a declaration with a name, first
-		for (Node* d : symbol->declarations) {
+		for (Node* d : symbol->data->declarations) {
 			name = getNameOfDeclaration(d);
 			if (name != nullptr) {
 				break;
@@ -1775,7 +1775,7 @@ std::string NodeBuilderImpl::getNameOfSymbolAsWritten(Symbol* symbol) {
 		}
 		Node* declaration =
 		    symbol
-		        ->declarations[0]; // Declaration may be nameless, but we'll try anyway
+		        ->data->declarations[0]; // Declaration may be nameless, but we'll try anyway
 		if (declaration->parent != nullptr &&
 		    declaration->parent->kind == Kind::VariableDeclaration) {
 			return declarationNameToString(
@@ -1804,7 +1804,7 @@ std::string NodeBuilderImpl::getNameOfSymbolAsWritten(Symbol* symbol) {
 	if (!name.empty()) {
 		return name;
 	}
-	return escapeInternalSymbolName(symbol->name);
+	return escapeInternalSymbolName(symbol->data->name);
 }
 
 // getTypeParametersOfClassOrInterface (nodebuilderimpl.go:1020).
@@ -1909,7 +1909,7 @@ std::vector<Symbol*> NodeBuilderImpl::getSymbolChain(
 			parentSpecifiers.reserve(parents.size());
 			for (Symbol* s : parents) {
 				bool isModule = false;
-				for (Node* d : s->declarations) {
+				for (Node* d : s->data->declarations) {
 					if (hasNonGlobalAugmentationExternalModuleSymbol(d)) {
 						isModule = true;
 						break;
@@ -1936,9 +1936,9 @@ std::vector<Symbol*> NodeBuilderImpl::getSymbolChain(
 					parent, getQualifiedLeftMeaning(meaning), false,
 					yieldModuleSymbol);
 				if (!parentChain.empty()) {
-					auto eit = parent->exports.find(
+					auto eit = parent->data->exports.find(
 						InternalSymbolNameExportEquals);
-					if (eit != parent->exports.end() &&
+					if (eit != parent->data->exports.end() &&
 					    ch->getSymbolIfSameReference(eit->second, symbol) !=
 					        nullptr) {
 						// parentChain root _is_ symbol - symbol is a module
@@ -1979,7 +1979,7 @@ std::vector<Symbol*> NodeBuilderImpl::getSymbolChain(
 		// just `x` vs `"foo/bar".x`.)
 		if (!endOfChain && !yieldModuleSymbol) {
 			bool isModule = false;
-			for (Node* d : symbol->declarations) {
+			for (Node* d : symbol->data->declarations) {
 				if (hasNonGlobalAugmentationExternalModuleSymbol(d)) {
 					isModule = true;
 					break;
@@ -2134,7 +2134,7 @@ moduleSpecifierResult NodeBuilderImpl::getSpecifierForModuleSymbol(
 	Node* file = getDeclarationOfKind(symbol, Kind::SourceFile);
 	if (file == nullptr) {
 		Symbol* equivalentSymbol = nullptr;
-		for (Node* d : symbol->declarations) {
+		for (Node* d : symbol->data->declarations) {
 			equivalentSymbol =
 			    ch->getFileSymbolIfFileSymbolExportEqualsContainer(d, symbol);
 			if (equivalentSymbol != nullptr) {
@@ -2148,7 +2148,7 @@ moduleSpecifierResult NodeBuilderImpl::getSpecifierForModuleSymbol(
 
 	if (file == nullptr) {
 		Node* declaration = nullptr;
-		for (Node* d : symbol->declarations) {
+		for (Node* d : symbol->data->declarations) {
 			if (isModuleWithStringLiteralName(d)) {
 				declaration = d;
 				break;
@@ -2166,14 +2166,14 @@ moduleSpecifierResult NodeBuilderImpl::getSpecifierForModuleSymbol(
 				specifier, ch->getTypeOfModuleImportAttributes(symbol)};
 		}
 		if (auto [specifier, ok] =
-		        tryGetAmbientModuleNameFromSymbolName(symbol->name);
+		        tryGetAmbientModuleNameFromSymbolName(symbol->data->name);
 		    ok) {
 			return moduleSpecifierResult{specifier};
 		}
 	}
 	if (ctx->enclosingFile == nullptr) {
 		if (auto [specifier, ok] =
-		        tryGetAmbientModuleNameFromSymbolName(symbol->name);
+		        tryGetAmbientModuleNameFromSymbolName(symbol->data->name);
 		    ok) {
 			return moduleSpecifierResult{specifier};
 		}
@@ -2278,7 +2278,7 @@ Node* NodeBuilderImpl::createImportAttributesForModuleSpecifier(
 		properties = ch->getPropertiesOfType(result.importAttributesType);
 	}
 	std::sort(properties.begin(), properties.end(),
-	          [](Symbol* a, Symbol* b) { return a->name < b->name; });
+	          [](Symbol* a, Symbol* b) { return a->data->name < b->data->name; });
 	std::vector<Node*> attributes;
 	std::string resolutionMode;
 	if (importModeOverride != ResolutionModeNone) {
@@ -2292,7 +2292,7 @@ Node* NodeBuilderImpl::createImportAttributesForModuleSpecifier(
 		    (int)resolutionMode.size() + 6; // `"resolution-mode": "value"`
 	}
 	for (Symbol* property : properties) {
-		const std::string& name = property->name;
+		const std::string& name = property->data->name;
 		Type* propertyType = ch->getTypeOfSymbol(property);
 		if ((propertyType->flags & TypeFlagsStringLiteral) == 0) {
 			continue;
@@ -2434,8 +2434,8 @@ Node* NodeBuilderImpl::typeParameterToName(Type* typeParameter) {
 		return f->newIdentifier("(Missing type parameter)");
 	}
 	if (typeParameter->symbol != nullptr &&
-	    !typeParameter->symbol->declarations.empty()) {
-		Node* decl = typeParameter->symbol->declarations[0];
+	    !typeParameter->symbol->data->declarations.empty()) {
+		Node* decl = typeParameter->symbol->data->declarations[0];
 		if (decl != nullptr && isTypeParameterDeclaration(decl)) {
 			result = setTextRange(result, decl->name());
 		}
@@ -2723,7 +2723,7 @@ std::vector<Node*> NodeBuilderImpl::typeParametersToTypeParameterDeclarations(
 		std::vector<Node*> results;
 		for (Type* param :
 		     ch->getTypeParametersFromDeclaration(
-			     symbol->valueDeclaration)) {
+			     symbol->data->valueDeclaration)) {
 			results.push_back(typeParameterToDeclaration(param));
 		}
 		return results;
@@ -2777,7 +2777,7 @@ Node* NodeBuilderImpl::symbolToParameterDeclaration(Symbol* parameterSymbol,
 	Node* parameterNode = f->newParameterDeclaration(
 		modifiers, dotDotDotToken, name, questionToken, parameterTypeNode,
 		nullptr /*initializer*/);
-	ctx->approximateLength += (int)parameterSymbol->name.size() + 3;
+	ctx->approximateLength += (int)parameterSymbol->data->name.size() + 3;
 	return parameterNode;
 }
 
@@ -2786,7 +2786,7 @@ Node* NodeBuilderImpl::parameterToParameterDeclarationName(
 	Symbol* parameterSymbol, Node* parameterDeclaration) {
 	if (parameterDeclaration == nullptr ||
 	    parameterDeclaration->name() == nullptr) {
-		return newIdentifier(parameterSymbol->name, parameterSymbol);
+		return newIdentifier(parameterSymbol->data->name, parameterSymbol);
 	}
 
 	Node* name = parameterDeclaration->name();
@@ -3416,14 +3416,14 @@ Node* NodeBuilderImpl::serializeTypeForDeclaration(Node* declaration,
                                                    bool tryReuse) {
 	if (declaration == nullptr) {
 		if (symbol != nullptr) {
-			declaration = symbol->valueDeclaration;
+			declaration = symbol->data->valueDeclaration;
 			if (declaration == nullptr) {
 				// TODO: prefer annotated declarations like in strada (but
 				// does this ever even matter in practice? All callers should
 				// supply a declaration!)
-				declaration = symbol->declarations.empty()
+				declaration = symbol->data->declarations.empty()
 				                  ? nullptr
-				                  : symbol->declarations[0];
+				                  : symbol->data->declarations[0];
 			}
 		}
 	}
@@ -3482,7 +3482,7 @@ Node* NodeBuilderImpl::serializeTypeForDeclaration(Node* declaration,
 	if ((t->flags & TypeFlagsUniqueESSymbol) != 0 && t->symbol == symbol &&
 	    (ctx->enclosingDeclaration == nullptr ||
 	     [&]() {
-			for (Node* d : symbol->declarations) {
+			for (Node* d : symbol->data->declarations) {
 				if (getSourceFileOfNode(d) == ctx->enclosingFile) {
 					return true;
 				}
@@ -3514,7 +3514,7 @@ Node* NodeBuilderImpl::serializeTypeForDeclaration(Node* declaration,
 		     pt->kind == pseudochecker::PseudoTypeKind::NoResult) &&
 		    isBinaryExpression(declaration) && symbol != nullptr) {
 			Node* decl = nullptr;
-			for (Node* d : symbol->declarations) {
+			for (Node* d : symbol->data->declarations) {
 				if (hasTypeAnnotation(d)) {
 					decl = d;
 					break;
@@ -3755,16 +3755,16 @@ Node* NodeBuilderImpl::getPropertyNameNodeForSymbol(
 	Symbol* symbol, Node* enclosingDeclaration) {
 	// For hash-private names, clone the original private identifier from the
 	// declaration
-	if (symbol->valueDeclaration != nullptr) {
-		Node* declName = symbol->valueDeclaration->name();
+	if (symbol->data->valueDeclaration != nullptr) {
+		Node* declName = symbol->data->valueDeclaration->name();
 		if (declName != nullptr && isPrivateIdentifier(declName)) {
 			return deepCloneNode(*f, declName);
 		}
 	}
 	bool stringNamed =
-	    !symbol->declarations.empty() &&
+	    !symbol->data->declarations.empty() &&
 	    [this, symbol]() {
-			for (Node* d : symbol->declarations) {
+			for (Node* d : symbol->data->declarations) {
 				if (!isStringNamed(d)) {
 					return false;
 				}
@@ -3772,9 +3772,9 @@ Node* NodeBuilderImpl::getPropertyNameNodeForSymbol(
 			return true;
 		}();
 	bool singleQuote =
-	    !symbol->declarations.empty() &&
+	    !symbol->data->declarations.empty() &&
 	    [this, symbol]() {
-			for (Node* d : symbol->declarations) {
+			for (Node* d : symbol->data->declarations) {
 				if (!isSingleQuotedStringNamed(d)) {
 					return false;
 				}
@@ -3788,7 +3788,7 @@ Node* NodeBuilderImpl::getPropertyNameNodeForSymbol(
 		return fromNameType;
 	}
 
-	std::string name = symbol->name;
+	std::string name = symbol->data->name;
 	const std::string privateNamePrefix =
 	    std::string(1, kInternalSymbolNamePrefix) + "#";
 	if (name.starts_with(privateNamePrefix)) {
@@ -3822,7 +3822,7 @@ Node* NodeBuilderImpl::getPropertyNameNodeForSymbolFromNameType(
 		enumEnclosingDeclaration = ctx->enclosingFile->asNode();
 	}
 	if ((nameType->flags & TypeFlagsEnumLiteral) != 0) {
-		Symbol* enumSymbol = nameType->symbol->parent;
+		Symbol* enumSymbol = nameType->symbol->data->parent;
 		if (enumSymbol == nullptr) {
 			enumSymbol = nameType->symbol;
 		}
@@ -3888,9 +3888,9 @@ std::vector<Node*> NodeBuilderImpl::addPropertyToElementList(
 	}
 	Node* saveEnclosingDeclaration = ctx->enclosingDeclaration;
 	ctx->enclosingDeclaration = nullptr;
-	if (isLateBoundName(propertySymbol->name)) {
-		if (!propertySymbol->declarations.empty()) {
-			Node* decl = propertySymbol->declarations[0];
+	if (isLateBoundName(propertySymbol->data->name)) {
+		if (!propertySymbol->data->declarations.empty()) {
+			Node* decl = propertySymbol->data->declarations[0];
 			if (ch->hasLateBindableName(decl)) {
 				if (isBinaryExpression(decl)) {
 					Node* name = getNameOfDeclaration(decl);
@@ -3915,11 +3915,11 @@ std::vector<Node*> NodeBuilderImpl::addPropertyToElementList(
 				ch->symbolToString(propertySymbol));
 		}
 	}
-	if (propertySymbol->valueDeclaration != nullptr) {
-		ctx->enclosingDeclaration = propertySymbol->valueDeclaration;
-	} else if (!propertySymbol->declarations.empty() &&
-	           propertySymbol->declarations[0] != nullptr) {
-		ctx->enclosingDeclaration = propertySymbol->declarations[0];
+	if (propertySymbol->data->valueDeclaration != nullptr) {
+		ctx->enclosingDeclaration = propertySymbol->data->valueDeclaration;
+	} else if (!propertySymbol->data->declarations.empty() &&
+	           propertySymbol->data->declarations[0] != nullptr) {
+		ctx->enclosingDeclaration = propertySymbol->data->declarations[0];
 	} else {
 		ctx->enclosingDeclaration = saveEnclosingDeclaration;
 	}
@@ -3935,8 +3935,8 @@ std::vector<Node*> NodeBuilderImpl::addPropertyToElementList(
 			Node* propDeclaration = getDeclarationOfKind(
 				propertySymbol, Kind::PropertyDeclaration);
 			if (propertyType != writeType ||
-			    (propertySymbol->parent != nullptr &&
-			     (propertySymbol->parent->flags & SymbolFlagsClass) != 0 &&
+			    (propertySymbol->data->parent != nullptr &&
+			     (propertySymbol->data->parent->flags & SymbolFlagsClass) != 0 &&
 			     propDeclaration == nullptr)) {
 				TypeMapper* symbolMapper =
 				    ch->valueSymbolLinks.Get(propertySymbol)->mapper;
@@ -3979,8 +3979,8 @@ std::vector<Node*> NodeBuilderImpl::addPropertyToElementList(
 					typeElements.push_back(setter);
 				}
 				return typeElements;
-			} else if (propertySymbol->parent != nullptr &&
-			           (propertySymbol->parent->flags &
+			} else if (propertySymbol->data->parent != nullptr &&
+			           (propertySymbol->data->parent->flags &
 			            SymbolFlagsClass) != 0 &&
 			           propDeclaration != nullptr &&
 			           [propDeclaration]() {
@@ -4046,7 +4046,7 @@ std::vector<Node*> NodeBuilderImpl::addPropertyToElementList(
 				    signature, Kind::MethodSignature, &methodOpts);
 			Node* commentDecl = signature->declaration != nullptr
 			                        ? signature->declaration
-			                        : propertySymbol->valueDeclaration;
+			                        : propertySymbol->data->valueDeclaration;
 			setCommentRange(methodDeclaration, commentDecl);
 			typeElements.push_back(methodDeclaration);
 		}
@@ -4082,7 +4082,7 @@ std::vector<Node*> NodeBuilderImpl::addPropertyToElementList(
 	Node* propertySignature = f->newPropertySignatureDeclaration(
 		modifiers, propertyName, optionalToken, propertyTypeNode, nullptr);
 
-	setCommentRange(propertySignature, propertySymbol->valueDeclaration);
+	setCommentRange(propertySignature, propertySymbol->data->valueDeclaration);
 	typeElements.push_back(propertySignature);
 
 	return typeElements;
@@ -4148,7 +4148,7 @@ NodeList* NodeBuilderImpl::createTypeNodesFromResolvedType(
 			if ((getDeclarationModifierFlagsFromSymbol(propertySymbol) &
 			     (ModifierFlagsPrivate | ModifierFlagsProtected)) != 0) {
 				ctx->tracker->ReportPrivateInBaseOfClassExpression(
-					propertySymbol->name);
+					propertySymbol->data->name);
 			}
 			if (isPrivateIdentifierSymbol(propertySymbol)) {
 				ctx->tracker->ReportPrivateInBaseOfClassExpression(
@@ -4284,9 +4284,9 @@ bool NodeBuilderImpl::shouldWriteTypeOfFunctionSymbol(
 	// identifier
 	bool isStaticMethodSymbol =
 	    (symbol->flags & SymbolFlagsMethod) != 0 &&
-	    isIdentifierText(symbol->name, LanguageVariant::Standard) &&
+	    isIdentifierText(symbol->data->name, LanguageVariant::Standard) &&
 	    [this, symbol]() {
-			for (Node* declaration : symbol->declarations) {
+			for (Node* declaration : symbol->data->declarations) {
 				if (isStatic(declaration) &&
 				    !ch->isLateBindableIndexSignature(
 					    getNameOfDeclaration(declaration))) {
@@ -4298,10 +4298,10 @@ bool NodeBuilderImpl::shouldWriteTypeOfFunctionSymbol(
 	bool isNonLocalFunctionSymbol = false;
 	bool isFunctionExpressionSymbol = false;
 	if ((symbol->flags & SymbolFlagsFunction) != 0) {
-		if (symbol->parent != nullptr) {
+		if (symbol->data->parent != nullptr) {
 			isNonLocalFunctionSymbol = true;
 		} else {
-			for (Node* declaration : symbol->declarations) {
+			for (Node* declaration : symbol->data->declarations) {
 				if (declaration->parent->kind == Kind::SourceFile ||
 				    declaration->parent->kind == Kind::ModuleBlock) {
 					isNonLocalFunctionSymbol = true;
@@ -4328,11 +4328,11 @@ bool NodeBuilderImpl::shouldWriteTypeOfFunctionSymbol(
 	}
 	if (isStaticMethodSymbol || isNonLocalFunctionSymbol) {
 		if (isFunctionExpressionSymbol &&
-		    symbol->valueDeclaration != nullptr &&
-		    symbol->valueDeclaration->parent != nullptr &&
-		    symbol->valueDeclaration->parent != ctx->enclosingDeclaration) {
+		    symbol->data->valueDeclaration != nullptr &&
+		    symbol->data->valueDeclaration->parent != nullptr &&
+		    symbol->data->valueDeclaration->parent != ctx->enclosingDeclaration) {
 			symbol = ch->getMergedSymbol(
-				symbol->valueDeclaration->parent->symbol());
+				symbol->data->valueDeclaration->parent->symbol());
 		}
 		// typeof is allowed only for static/non local functions
 		*outSymbol = symbol;
@@ -4364,11 +4364,11 @@ bool NodeBuilderImpl::shouldEmitTypeOfSymbol(
 	bool nonFunctionResult =
 	    (symbol->flags & SymbolFlagsClass) != 0 && !forceClassExpansion &&
 	    ch->getBaseTypeVariableOfClass(symbol) == nullptr &&
-	    !(symbol->valueDeclaration != nullptr &&
-	      isClassLike(symbol->valueDeclaration) &&
+	    !(symbol->data->valueDeclaration != nullptr &&
+	      isClassLike(symbol->data->valueDeclaration) &&
 	      (ctx->flags &
 	       nodebuilder::FlagsWriteClassExpressionAsTypeLiteral) != 0 &&
-	      (!isClassDeclaration(symbol->valueDeclaration) ||
+	      (!isClassDeclaration(symbol->data->valueDeclaration) ||
 	       ch->IsSymbolAccessible(symbol, ctx->enclosingDeclaration,
 	                              isInstanceType,
 	                              false /*shouldComputeAliasesToMakeVisible*/)
@@ -4810,8 +4810,8 @@ Node* NodeBuilderImpl::typeReferenceToTypeNode(Type* t) {
 	std::vector<Type*> typeArguments = ch->getTypeArguments(t);
 	if ((ctx->flags &
 	            nodebuilder::FlagsWriteClassExpressionAsTypeLiteral) != 0 &&
-	           t->symbol->valueDeclaration != nullptr &&
-	           isClassLike(t->symbol->valueDeclaration) &&
+	           t->symbol->data->valueDeclaration != nullptr &&
+	           isClassLike(t->symbol->data->valueDeclaration) &&
 	           !ch->IsValueSymbolAccessible(t->symbol,
 	                                        ctx->enclosingDeclaration)) {
 		return createAnonymousTypeNode(t);
@@ -5301,7 +5301,7 @@ Node* NodeBuilderImpl::typeToTypeNode(Type* t) {
 			NodeList* typeArgumentNodes =
 			    mapToTypeNodes(t->alias->TypeArguments(),
 			                   false /*isBareList*/);
-			if (isReservedMemberName(sym->name) &&
+			if (isReservedMemberName(sym->data->name) &&
 			    (sym->flags & SymbolFlagsClass) == 0) {
 				return f->newTypeReferenceNode(f->newIdentifier(""),
 				                             typeArgumentNodes);
@@ -5886,11 +5886,11 @@ std::function<void()> NodeBuilderImpl::enterNewScope(
 							// just the original, unless we've expanded the
 							// param list for some reason
 							if (originalParam != nullptr) {
-								add(originalParam->name, originalParam);
+								add(originalParam->data->name, originalParam);
 							}
 						} else {
 							bool handled = false;
-							for (Node* d : param->declarations) {
+							for (Node* d : param->data->declarations) {
 								std::function<void(BindingElement*)>
 								    bindElement;
 								std::function<void(BindingPattern*)>
@@ -5929,7 +5929,7 @@ std::function<void()> NodeBuilderImpl::enterNewScope(
 											           // nameless binding
 											           // patterns and also
 											           // have no symbol
-										    add(symbol->name, symbol);
+										    add(symbol->data->name, symbol);
 									    }
 								    };
 								bindElement = bindElementWorker;
@@ -5947,7 +5947,7 @@ std::function<void()> NodeBuilderImpl::enterNewScope(
 								}
 							}
 							if (!handled) {
-								add(param->name, param);
+								add(param->data->name, param);
 							}
 						}
 					}
@@ -6497,7 +6497,7 @@ bool NodeBuilderImpl::pseudoTypeEquivalentToType(
 		// only one symbol in targetProps.
 		int targetDeclCount = 0;
 		for (Symbol* prop : targetProps) {
-			targetDeclCount += (int)prop->declarations.size();
+			targetDeclCount += (int)prop->data->declarations.size();
 		}
 		if ((int)pt->elements.size() != targetDeclCount) {
 			return false;
@@ -6507,15 +6507,15 @@ bool NodeBuilderImpl::pseudoTypeEquivalentToType(
 			Symbol* elemSymbol = el->name->parent->symbol();
 			if (elemSymbol != nullptr) {
 				targetProp = ch->getPropertyOfType(undefinedStripped,
-				                                   elemSymbol->name);
+				                                   elemSymbol->data->name);
 			}
 			if (targetProp == nullptr) {
 				// Name lookup failed or returned no result; search target
 				// properties for one whose declaration name node matches the
 				// one we have
 				for (Symbol* prop : targetProps) {
-					if (prop->valueDeclaration != nullptr &&
-					    prop->valueDeclaration->name() == el->name) {
+					if (prop->data->valueDeclaration != nullptr &&
+					    prop->data->valueDeclaration->name() == el->name) {
 						targetProp = prop;
 						break;
 					}
@@ -6744,7 +6744,7 @@ bool NodeBuilderImpl::pseudoParametersEquivalentToParameters(
 		pseudochecker::PseudoParameter* p = params[i];
 		Symbol* targetParam = targetSig->parameters[i];
 		if (p->optional !=
-		    ch->isOptionalParameter(targetParam->valueDeclaration)) {
+		    ch->isOptionalParameter(targetParam->data->valueDeclaration)) {
 			if (reportErrors) {
 				ctx->tracker->ReportInferenceFallback(p->name->parent);
 			}
@@ -6958,7 +6958,7 @@ std::vector<Node*> NodeBuilderImpl::expandSymbolForHover(Symbol* symbol) {
 
 // expandEnumDecl produces an EnumDeclaration node with all members.
 Node* NodeBuilderImpl::expandEnumDecl(Symbol* symbol) {
-	const std::string& name = symbol->name;
+	const std::string& name = symbol->data->name;
 	ctx->approximateLength += 9 + (int)name.size();
 	std::vector<Symbol*> memberProps = filterVec(
 		ch->getPropertiesOfType(ch->getTypeOfSymbol(symbol)),
@@ -6979,11 +6979,11 @@ Node* NodeBuilderImpl::expandEnumDecl(Symbol* symbol) {
 					0),
 				nullptr));
 			Symbol* last = memberProps[memberProps.size() - 1];
-			members.push_back(f->newEnumMember(f->newIdentifier(last->name),
+			members.push_back(f->newEnumMember(f->newIdentifier(last->data->name),
 			                                   enumMemberInitializer(last)));
 			break;
 		}
-		Node* memberDecl = findVec(p->declarations, isEnumMember);
+		Node* memberDecl = findVec(p->data->declarations, isEnumMember);
 		Node* initializer = nullptr;
 		if (memberDecl != nullptr &&
 		    memberDecl->as<EnumMember>()->Initializer != nullptr) {
@@ -6992,12 +6992,12 @@ Node* NodeBuilderImpl::expandEnumDecl(Symbol* symbol) {
 		} else {
 			initializer = enumMemberInitializer(p);
 		}
-		ctx->approximateLength += 4 + (int)p->name.size();
+		ctx->approximateLength += 4 + (int)p->data->name.size();
 		if (initializer != nullptr) {
 			ctx->approximateLength += 5; // " = " + value estimate
 		}
 		members.push_back(
-			f->newEnumMember(f->newIdentifier(p->name), initializer));
+			f->newEnumMember(f->newIdentifier(p->data->name), initializer));
 	}
 
 	ModifierFlags constModifier = ModifierFlagsNone;
@@ -7019,7 +7019,7 @@ Node* NodeBuilderImpl::expandEnumDecl(Symbol* symbol) {
 
 // enumMemberInitializer (nodebuilder_hover.go:90).
 Node* NodeBuilderImpl::enumMemberInitializer(Symbol* p) {
-	Node* memberDecl = findVec(p->declarations, isEnumMember);
+	Node* memberDecl = findVec(p->data->declarations, isEnumMember);
 	if (memberDecl == nullptr) {
 		return nullptr;
 	}
@@ -7042,11 +7042,11 @@ static std::vector<Node*> typeElementsToClassElements(
 // expandClassDecl produces a ClassDeclaration node with heritage clauses and
 // members.
 Node* NodeBuilderImpl::expandClassDecl(Symbol* symbol) {
-	const std::string& name = symbol->name;
+	const std::string& name = symbol->data->name;
 	ctx->approximateLength += 9 + (int)name.size();
 
 	std::vector<Node*> classLikeDeclarations =
-	    filterVec(symbol->declarations, isClassLike);
+	    filterVec(symbol->data->declarations, isClassLike);
 	Node* originalDecl = firstOrNilVec(classLikeDeclarations);
 	Node* oldEnclosing = ctx->enclosingDeclaration;
 	if (originalDecl != nullptr) {
@@ -7065,8 +7065,8 @@ Node* NodeBuilderImpl::expandClassDecl(Symbol* symbol) {
 	std::vector<Type*> baseTypes = ch->getBaseTypes(ch->getTargetType(classType));
 	Type* staticType = ch->getTypeOfSymbol(symbol);
 	bool isClass = staticType->symbol != nullptr &&
-	               staticType->symbol->valueDeclaration != nullptr &&
-	               isClassLike(staticType->symbol->valueDeclaration);
+	               staticType->symbol->data->valueDeclaration != nullptr &&
+	               isClassLike(staticType->symbol->data->valueDeclaration);
 	Type* staticBaseType;
 	if (isClass) {
 		staticBaseType = ch->getBaseConstructorTypeOfClass(declaredType);
@@ -7099,7 +7099,7 @@ Node* NodeBuilderImpl::expandClassDecl(Symbol* symbol) {
 	std::vector<Symbol*> staticProps =
 	    filterVec(ch->getPropertiesOfType(staticType), [this](Symbol* p) {
 		    return (p->flags & SymbolFlagsPrototype) == 0 &&
-		           p->name != "prototype" && !isNamespaceMember(p);
+		           p->data->name != "prototype" && !isNamespaceMember(p);
 	    });
 	std::vector<Node*> staticMembers;
 	staticMembers =
@@ -7220,12 +7220,12 @@ static std::vector<Node*> typeElementsToClassElements(
 // Reuses addPropertyToElementList for property serialization and
 // signatureToSignatureDeclarationHelper for signatures.
 Node* NodeBuilderImpl::expandInterfaceDecl(Symbol* symbol) {
-	const std::string& name = symbol->name;
+	const std::string& name = symbol->data->name;
 	ctx->approximateLength += 14 + (int)name.size();
 
 	Type* interfaceType = ch->getDeclaredTypeOfClassOrInterface(symbol);
 	std::vector<Node*> interfaceDeclarations =
-	    filterVec(symbol->declarations, isInterfaceDeclaration);
+	    filterVec(symbol->data->declarations, isInterfaceDeclaration);
 	std::vector<Type*> localParams =
 	    ch->getLocalTypeParametersOfClassOrInterfaceOrTypeAlias(symbol);
 	std::vector<Node*> typeParamDecls = mapVec(
@@ -7334,8 +7334,8 @@ std::vector<Node*> NodeBuilderImpl::serializePropertiesWithTruncation(
 std::vector<Node*> NodeBuilderImpl::serializeConstructors(
 	Type* staticType, Type* staticBaseType, bool isClass, Symbol* symbol) {
 	bool isNonConstructable =
-	    !isClass && symbol->valueDeclaration != nullptr &&
-	    isInJSFile(symbol->valueDeclaration) &&
+	    !isClass && symbol->data->valueDeclaration != nullptr &&
+	    isInJSFile(symbol->data->valueDeclaration) &&
 	    ch->getSignaturesOfType(staticType, SignatureKind::Construct).empty();
 	if (isNonConstructable) {
 		ctx->approximateLength += 21;
@@ -7470,7 +7470,7 @@ Node* NodeBuilderImpl::expandModuleDecl(Symbol* symbol) {
 		if (!isNamespaceMember(sym)) {
 			continue;
 		}
-		if (!isIdentifierText(sym->name,
+		if (!isIdentifierText(sym->data->name,
 		                               LanguageVariant::Standard)) {
 			continue;
 		}
@@ -7530,12 +7530,12 @@ Node* NodeBuilderImpl::expandModuleDecl(Symbol* symbol) {
 						Type* localType = ch->getWidenedType(
 							ch->getTypeOfSymbol(target));
 						ctx->approximateLength +=
-						    (int)target->name.size() + 5;
+						    (int)target->data->name.size() + 5;
 						Node* localStmt = f->newVariableStatement(
 							nullptr,
 							f->newVariableDeclarationList(
 								f->newNodeList({f->newVariableDeclaration(
-									f->newIdentifier(target->name), nullptr,
+									f->newIdentifier(target->data->name), nullptr,
 									serializeTypeForDeclaration(
 										nullptr, localType, target, true),
 									nullptr)}),
@@ -7543,16 +7543,16 @@ Node* NodeBuilderImpl::expandModuleDecl(Symbol* symbol) {
 						bodyStmts.push_back({localStmt, true});
 					}
 				}
-				const std::string& targetName = target->name;
-				ctx->approximateLength += 16 + (int)m->name.size();
+				const std::string& targetName = target->data->name;
+				ctx->approximateLength += 16 + (int)m->data->name.size();
 				Node* propertyName = nullptr;
-				if (m->name != targetName) {
+				if (m->data->name != targetName) {
 					propertyName = f->newIdentifier(targetName);
 				}
 				Node* stmt = f->newExportDeclaration(
 					nullptr, false,
 					f->newNamedExports(f->newNodeList({f->newExportSpecifier(
-						false, propertyName, f->newIdentifier(m->name))})),
+						false, propertyName, f->newIdentifier(m->data->name))})),
 					nullptr, nullptr);
 				bodyStmts.push_back({stmt, false});
 				continue;
@@ -7570,7 +7570,7 @@ Node* NodeBuilderImpl::expandModuleDecl(Symbol* symbol) {
 			for (Signature* sig : sigs) {
 				ctx->approximateLength++;
 				SignatureToSignatureDeclarationOptions options;
-				options.name = f->newIdentifier(m->name);
+				options.name = f->newIdentifier(m->data->name);
 				Node* decl = signatureToSignatureDeclarationHelper(
 					sig, Kind::FunctionDeclaration, &options);
 				bodyStmts.push_back({decl, false});
@@ -7581,12 +7581,12 @@ Node* NodeBuilderImpl::expandModuleDecl(Symbol* symbol) {
 			bool hasModuleExports =
 			    (merged->flags & (SymbolFlagsValueModule |
 			                      SymbolFlagsNamespaceModule)) != 0 &&
-			    !merged->exports.empty();
+			    !merged->data->exports.empty();
 			if (!hasModuleExports) {
 				bodyStmts.push_back(
 					{f->newModuleDeclaration(
 						 nullptr, Kind::NamespaceKeyword,
-						 f->newIdentifier(m->name), nullptr /*attributes*/,
+						 f->newIdentifier(m->data->name), nullptr /*attributes*/,
 						 f->newModuleBlock(f->newNodeList({}))),
 				     false});
 			}
@@ -7595,7 +7595,7 @@ Node* NodeBuilderImpl::expandModuleDecl(Symbol* symbol) {
 
 		// Handle remaining member kinds (type alias, enum, class,
 		// interface, namespace, variable)
-		if (Node* node = serializeNamespaceMember(resolved, m->name);
+		if (Node* node = serializeNamespaceMember(resolved, m->data->name);
 		    node != nullptr) {
 			bodyStmts.push_back({node, false});
 		}
@@ -7655,7 +7655,7 @@ Node* NodeBuilderImpl::expandModuleDecl(Symbol* symbol) {
 		keyword = Kind::ModuleKeyword;
 	}
 	Node* attributes = nullptr;
-	Node* declaration = findVec(symbol->declarations, [](Node* declaration) {
+	Node* declaration = findVec(symbol->data->declarations, [](Node* declaration) {
 		return isModuleDeclaration(declaration) &&
 		       declaration->as<ModuleDeclaration>()->Attributes != nullptr;
 	});
@@ -7701,7 +7701,7 @@ std::vector<Symbol*> NodeBuilderImpl::filterInheritedProperties(
 	std::unordered_map<std::string, Symbol*> propsByName;
 	propsByName.reserve(properties.size());
 	for (Symbol* p : properties) {
-		propsByName[p->name] = p;
+		propsByName[p->data->name] = p;
 	}
 	// Collect names of properties inherited unchanged from base types.
 	collections::Set<std::string> inherited;
@@ -7709,9 +7709,9 @@ std::vector<Symbol*> NodeBuilderImpl::filterInheritedProperties(
 		Type* baseWithThis = ch->getTypeWithThisArgument(
 			base, ch->getTargetType(t)->AsInterfaceType()->thisType, false);
 		for (Symbol* prop : ch->getPropertiesOfType(baseWithThis)) {
-			auto it = propsByName.find(prop->name);
-			if (it != propsByName.end() && prop->parent == it->second->parent) {
-				inherited.Add(prop->name);
+			auto it = propsByName.find(prop->data->name);
+			if (it != propsByName.end() && prop->data->parent == it->second->data->parent) {
+				inherited.Add(prop->data->name);
 			}
 		}
 	}
@@ -7719,7 +7719,7 @@ std::vector<Symbol*> NodeBuilderImpl::filterInheritedProperties(
 		return properties;
 	}
 	return filterVec(properties, [&](Symbol* p) {
-		return !inherited.Has(p->name);
+		return !inherited.Has(p->data->name);
 	});
 }
 
@@ -7728,10 +7728,10 @@ bool NodeBuilderImpl::isNamespaceMember(Symbol* p) {
 	return (p->flags & (SymbolFlagsType | SymbolFlagsNamespace |
 	                  SymbolFlagsAlias)) != 0 ||
 	       !((p->flags & SymbolFlagsPrototype) != 0 ||
-	         p->name == "prototype" ||
-	         (p->valueDeclaration != nullptr &&
-	          hasStaticModifier(p->valueDeclaration) &&
-	          isClassLike(p->valueDeclaration->parent)));
+	         p->data->name == "prototype" ||
+	         (p->data->valueDeclaration != nullptr &&
+	          hasStaticModifier(p->data->valueDeclaration) &&
+	          isClassLike(p->data->valueDeclaration->parent)));
 }
 
 // ===========================================================================
@@ -8060,7 +8060,7 @@ std::vector<Node*> NodeBuilder::ExpandSymbolForHover(Symbol* symbol,
 static Node* simplifyClassDeclaration(NodeFactory* f, Node* classDecl,
                                       Symbol* symbol) {
 	std::vector<Node*> classDeclarations =
-	    filterVec(symbol->declarations, isClassLike);
+	    filterVec(symbol->data->declarations, isClassLike);
 	Node* originalClassDecl;
 	if (!classDeclarations.empty()) {
 		originalClassDecl = classDeclarations[0];
@@ -8090,7 +8090,7 @@ static Node* simplifyClassDeclaration(NodeFactory* f, Node* classDecl,
 static Node* simplifyModifiers(NodeFactory* f, Node* newDecl,
                                bool (*isDeclKind)(const Node*),
                                Symbol* symbol) {
-	std::vector<Node*> decls = filterVec(symbol->declarations, isDeclKind);
+	std::vector<Node*> decls = filterVec(symbol->data->declarations, isDeclKind);
 	Node* declWithModifiers;
 	if (!decls.empty()) {
 		declWithModifiers = decls[0];

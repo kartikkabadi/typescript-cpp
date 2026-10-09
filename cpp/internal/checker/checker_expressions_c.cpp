@@ -895,7 +895,7 @@ void Checker::checkAssignmentOperator(Node* left, Kind operatorKind, Node* right
 			SymbolNodeLinks* leftLinks = symbolNodeLinks.Get(left);
 			if (Symbol* symbol = staleForCheckFile(leftLinks->resolvedSymbolCheckFile)
 									 ? nullptr : leftLinks->resolvedSymbol;
-				symbol != nullptr && symbol->declarations.size() > 1 && (rightType->flags & TypeFlagsUndefined) != 0) {
+				symbol != nullptr && symbol->data->declarations.size() > 1 && (rightType->flags & TypeFlagsUndefined) != 0) {
 				return;
 			}
 		}
@@ -1361,7 +1361,7 @@ std::vector<Symbol*> Checker::getExactOptionalUnassignableProperties(Type* sourc
 		return {};
 	}
 	return filterVec(getPropertiesOfType(target), [this, source](Symbol* targetProp) {
-		return isExactOptionalPropertyMismatch(getTypeOfPropertyOfType(source, targetProp->name), getTypeOfSymbol(targetProp));
+		return isExactOptionalPropertyMismatch(getTypeOfPropertyOfType(source, targetProp->data->name), getTypeOfSymbol(targetProp));
 	});
 }
 
@@ -1397,8 +1397,8 @@ bool Checker::checkReferenceExpression(Node* expr, const DiagnosticMessage* inva
 
 Type* Checker::checkObjectLiteral(Node* node, CheckMode checkMode) {
 	// Expando object literals have empty properties but filled exports
-	if (node->properties().empty() && node->symbol() != nullptr && !node->symbol()->exports.empty()) {
-		Type* result = newAnonymousType(node->symbol(), node->symbol()->exports, {}, {}, {});
+	if (node->properties().empty() && node->symbol() != nullptr && !node->symbol()->data->exports.empty()) {
+		Type* result = newAnonymousType(node->symbol(), node->symbol()->data->exports, {}, {}, {});
 		if (isInJSFile(node) && !isInJsonFile(node)) {
 			result->objectFlags |= ObjectFlagsJSLiteral;
 		}
@@ -1499,7 +1499,7 @@ Type* Checker::checkObjectLiteral(Node* node, CheckMode checkMode) {
 			if (nameType != nullptr) {
 				prop = newSymbolEx(SymbolFlagsProperty | member->flags, getPropertyNameFromType(nameType), checkFlags | CheckFlagsLate);
 			} else {
-				prop = newSymbolEx(SymbolFlagsProperty | member->flags, member->name, checkFlags);
+				prop = newSymbolEx(SymbolFlagsProperty | member->flags, member->data->name, checkFlags);
 			}
 			ValueSymbolLinks* links = valueSymbolLinks.Get(prop);
 			if (nameType != nullptr) {
@@ -1512,21 +1512,21 @@ Type* Checker::checkObjectLiteral(Node* node, CheckMode checkMode) {
 			} else if (contextualTypeHasPattern && (contextualType->objectFlags & ObjectFlagsObjectLiteralPatternWithComputedProperties) == 0) {
 				// If object literal is contextually typed by the implied type of a binding pattern, and if the
 				// binding pattern specifies a default value for the property, make the property optional.
-				Symbol* impliedProp = getPropertyOfType(contextualType, member->name);
+				Symbol* impliedProp = getPropertyOfType(contextualType, member->data->name);
 				if (impliedProp != nullptr) {
 					prop->flags |= impliedProp->flags & SymbolFlagsOptional;
 				} else if (getIndexInfoOfType(contextualType, stringType) == nullptr) {
 					error(memberDecl->name(), Object_literal_may_only_specify_known_properties_and_0_does_not_exist_in_type_1, {symbolToString(member), TypeToString(contextualType)});
 				}
 			}
-			prop->declarations = member->declarations;
-			prop->parent = member->parent;
-			prop->valueDeclaration = member->valueDeclaration;
+			prop->data->declarations = member->data->declarations;
+			prop->data->parent = member->data->parent;
+			prop->data->valueDeclaration = member->data->valueDeclaration;
 			links->resolvedType = t;
 			links->target = member;
 			member = prop;
 			if (strictNullChecks) {
-				allPropertiesTable[prop->name] = prop;
+				allPropertiesTable[prop->data->name] = prop;
 			}
 			if (contextualType != nullptr && (checkMode & CheckModeInferential) != 0 && (checkMode & CheckModeSkipContextSensitive) == 0 &&
 				(isPropertyAssignment(memberDecl) || isMethodDeclaration(memberDecl)) && isContextSensitive(memberDecl)) {
@@ -1586,7 +1586,7 @@ Type* Checker::checkObjectLiteral(Node* node, CheckMode checkMode) {
 				}
 			}
 		} else {
-			propertiesTable[member->name] = member;
+			propertiesTable[member->data->name] = member;
 		}
 		propertiesArray.push_back(member);
 	}
@@ -1638,11 +1638,11 @@ void Checker::checkDeprecatedProperty(Node* name, Type* contextualType) {
 		return;
 	}
 	Symbol* prop = getPropertyOfType(contextualType, name->text());
-	if (prop == nullptr || prop->declarations.empty()) {
+	if (prop == nullptr || prop->data->declarations.empty()) {
 		return;
 	}
 	if (isDeprecatedSymbol(prop)) {
-		addDeprecatedSuggestion(name, prop->declarations, name->text());
+		addDeprecatedSuggestion(name, prop->data->declarations, name->text());
 	}
 }
 
@@ -1653,10 +1653,10 @@ void Checker::checkDeprecatedProperty(Node* name, Type* contextualType) {
 void Checker::checkSpreadPropOverrides(Type* t, const SymbolTable& props, Node* spread) {
 	for (Symbol* right : getPropertiesOfType(t)) {
 		if ((right->flags & SymbolFlagsOptional) == 0 && (right->checkFlags & CheckFlagsPartial) == 0) {
-			auto it = props.find(right->name);
+			auto it = props.find(right->data->name);
 			Symbol* left = it != props.end() ? it->second : nullptr;
 			if (left != nullptr) {
-				Diagnostic* diagnostic = error(left->valueDeclaration, X_0_is_specified_more_than_once_so_this_usage_will_be_overwritten, {left->name});
+				Diagnostic* diagnostic = error(left->data->valueDeclaration, X_0_is_specified_more_than_once_so_this_usage_will_be_overwritten, {left->data->name});
 				diagnostic->AddRelatedInfo(NewDiagnosticForNode(spread, This_spread_always_overwrites_this_property, {}));
 			}
 		}
@@ -1732,24 +1732,24 @@ Type* Checker::getSpreadType(Type* left, Type* right, Symbol* symbol, ObjectFlag
 	}
 	for (Symbol* rightProp : getPropertiesOfType(right)) {
 		if ((getDeclarationModifierFlagsFromSymbol(rightProp) & (ModifierFlagsPrivate | ModifierFlagsProtected)) != 0) {
-			skippedPrivateMembers.insert(rightProp->name);
+			skippedPrivateMembers.insert(rightProp->data->name);
 		} else if (isSpreadableProperty(rightProp)) {
-			members[rightProp->name] = getSpreadSymbol(rightProp, readonly);
+			members[rightProp->data->name] = getSpreadSymbol(rightProp, readonly);
 		}
 	}
 
 	for (Symbol* leftProp : getPropertiesOfType(left)) {
-		if (skippedPrivateMembers.count(leftProp->name) != 0 || !isSpreadableProperty(leftProp)) {
+		if (skippedPrivateMembers.count(leftProp->data->name) != 0 || !isSpreadableProperty(leftProp)) {
 			continue;
 		}
-		auto it = members.find(leftProp->name);
+		auto it = members.find(leftProp->data->name);
 		if (it != members.end() && it->second != nullptr) {
 			Symbol* rightProp = it->second;
 			Type* rightType = getTypeOfSymbol(rightProp);
 			if ((rightProp->flags & SymbolFlagsOptional) != 0) {
-				std::vector<Node*> declarations = concatenate(leftProp->declarations, rightProp->declarations);
+				std::vector<Node*> declarations = concatenate(leftProp->data->declarations, rightProp->data->declarations);
 				SymbolFlags flags = SymbolFlagsProperty | (leftProp->flags & SymbolFlagsOptional);
-				Symbol* result = newSymbol(flags, leftProp->name);
+				Symbol* result = newSymbol(flags, leftProp->data->name);
 				ValueSymbolLinks* links = valueSymbolLinks.Get(result);
 				// Optimization: avoid calculating the union type if spreading into the exact same type.
 				// This is common, e.g. spreading one options bag into another where the bags have the
@@ -1765,12 +1765,12 @@ Type* Checker::getSpreadType(Type* left, Type* right, Symbol* symbol, ObjectFlag
 				}
 				spreadLinks.Get(result)->leftSpread = leftProp;
 				spreadLinks.Get(result)->rightSpread = rightProp;
-				result->declarations = declarations;
+				result->data->declarations = declarations;
 				links->nameType = valueSymbolLinks.Get(leftProp)->nameType;
-				members[leftProp->name] = result;
+				members[leftProp->data->name] = result;
 			}
 		} else {
-			members[leftProp->name] = getSpreadSymbol(leftProp, readonly);
+			members[leftProp->data->name] = getSpreadSymbol(leftProp, readonly);
 		}
 	}
 	std::vector<IndexInfo*> spreadIndexInfos = sameMap(indexInfos, [this, readonly](IndexInfo* info) {
@@ -1865,17 +1865,17 @@ Type* Checker::tryMergeUnionOfObjectTypeAndEmptyObject(Type* t, bool readonly) {
 		} else if (isSpreadableProperty(prop)) {
 			bool isSetonlyAccessor = (prop->flags & SymbolFlagsSetAccessor) != 0 && (prop->flags & SymbolFlagsGetAccessor) == 0;
 			SymbolFlags flags = SymbolFlagsProperty | SymbolFlagsOptional;
-			Symbol* result = newSymbolEx(flags, prop->name, prop->checkFlags & CheckFlagsLate | ifElse(readonly, CheckFlagsReadonly, CheckFlagsNone));
+			Symbol* result = newSymbolEx(flags, prop->data->name, prop->checkFlags & CheckFlagsLate | ifElse(readonly, CheckFlagsReadonly, CheckFlagsNone));
 			ValueSymbolLinks* links = valueSymbolLinks.Get(result);
 			if (isSetonlyAccessor) {
 				links->resolvedType = undefinedType;
 			} else {
 				links->resolvedType = addOptionalityEx(getTypeOfSymbol(prop), true /*isProperty*/, true /*isOptional*/);
 			}
-			result->declarations = prop->declarations;
+			result->data->declarations = prop->data->declarations;
 			links->nameType = valueSymbolLinks.Get(prop)->nameType;
 			mappedSymbolLinks.Get(result)->syntheticOrigin = prop;
-			members[prop->name] = result;
+			members[prop->data->name] = result;
 		}
 	}
 	Type* spread = newAnonymousType(firstType->symbol, members, {}, {}, getIndexInfosOfType(firstType));
@@ -1890,9 +1890,9 @@ Type* Checker::tryMergeUnionOfObjectTypeAndEmptyObject(Type* t, bool readonly) {
 // ---------------------------------------------------------------------------
 
 bool Checker::isSpreadableProperty(Symbol* prop) {
-	return (!someList(prop->declarations, isPrivateIdentifierClassElementDeclaration) &&
+	return (!someList(prop->data->declarations, isPrivateIdentifierClassElementDeclaration) &&
 			(prop->flags & (SymbolFlagsMethod | SymbolFlagsGetAccessor | SymbolFlagsSetAccessor)) == 0) ||
-		!someList(prop->declarations, [](Node* d) { return d->parent != nullptr && isClassLike(d->parent); });
+		!someList(prop->data->declarations, [](Node* d) { return d->parent != nullptr && isClassLike(d->parent); });
 }
 
 // ---------------------------------------------------------------------------
@@ -1905,14 +1905,14 @@ Symbol* Checker::getSpreadSymbol(Symbol* prop, bool readonly) {
 		return prop;
 	}
 	SymbolFlags flags = SymbolFlagsProperty | (prop->flags & SymbolFlagsOptional);
-	Symbol* result = newSymbolEx(flags, prop->name, prop->checkFlags & CheckFlagsLate | ifElse(readonly, CheckFlagsReadonly, CheckFlagsNone));
+	Symbol* result = newSymbolEx(flags, prop->data->name, prop->checkFlags & CheckFlagsLate | ifElse(readonly, CheckFlagsReadonly, CheckFlagsNone));
 	ValueSymbolLinks* links = valueSymbolLinks.Get(result);
 	if (isSetonlyAccessor) {
 		links->resolvedType = undefinedType;
 	} else {
 		links->resolvedType = getTypeOfSymbol(prop);
 	}
-	result->declarations = prop->declarations;
+	result->data->declarations = prop->data->declarations;
 	links->nameType = valueSymbolLinks.Get(prop)->nameType;
 	mappedSymbolLinks.Get(result)->syntheticOrigin = prop;
 	return result;
@@ -2016,7 +2016,7 @@ bool Checker::isConstTypeVariable(Type* t, int depth) {
 		return false;
 	}
 	if ((t->flags & TypeFlagsTypeParameter) != 0) {
-		return t->symbol != nullptr && someList(t->symbol->declarations, [](Node* d) { return hasSyntacticModifier(d, ModifierFlagsConst); });
+		return t->symbol != nullptr && someList(t->symbol->data->declarations, [](Node* d) { return hasSyntacticModifier(d, ModifierFlagsConst); });
 	}
 	if ((t->flags & TypeFlagsUnionOrIntersection) != 0) {
 		return someList(t->types(), [this, depth](Type* s) { return isConstTypeVariable(s, depth); });
@@ -2115,7 +2115,7 @@ bool Checker::isInPropertyInitializerOrClassStaticBlock(Node* node, bool ignoreA
 
 Type* Checker::getNarrowedTypeOfSymbol(Symbol* symbol, Node* location) {
 	Type* t = getTypeOfSymbol(symbol);
-	Node* declaration = symbol->valueDeclaration;
+	Node* declaration = symbol->data->valueDeclaration;
 	if (declaration != nullptr) {
 		// If we have a non-rest binding element with no initializer declared as a const variable or a const-like
 		// parameter (a parameter for which there are no assignments in the function body), and if the parent type
@@ -2195,8 +2195,8 @@ bool Checker::isReadonlyAssignmentDeclaration(Node* node) {
 	if (Type* valueType = getTypeOfPropertyOfType(propertyDescriptorType, "value"); valueType != nullptr) {
 		if (Symbol* writableProp = getPropertyOfType(propertyDescriptorType, "writable"); writableProp != nullptr) {
 			Type* writableType;
-			if (writableProp->valueDeclaration != nullptr && isPropertyAssignment(writableProp->valueDeclaration)) {
-				writableType = checkExpression(writableProp->valueDeclaration->initializer());
+			if (writableProp->data->valueDeclaration != nullptr && isPropertyAssignment(writableProp->data->valueDeclaration)) {
+				writableType = checkExpression(writableProp->data->valueDeclaration->initializer());
 			} else {
 				writableType = getTypeOfSymbol(writableProp);
 			}
@@ -2224,7 +2224,7 @@ bool Checker::isReadonlySymbol(Symbol* symbol) {
 		((symbol->flags & SymbolFlagsVariable) != 0 && (getDeclarationNodeFlagsFromSymbol(symbol) & NodeFlagsConstant) != 0) ||
 		((symbol->flags & SymbolFlagsAccessor) != 0 && (symbol->flags & SymbolFlagsSetAccessor) == 0) ||
 		(symbol->flags & SymbolFlagsEnumMember) != 0 ||
-		someList(symbol->declarations, [this](Node* d) { return isReadonlyAssignmentDeclaration(d); });
+		someList(symbol->data->declarations, [this](Node* d) { return isReadonlyAssignmentDeclaration(d); });
 }
 
 // ---------------------------------------------------------------------------

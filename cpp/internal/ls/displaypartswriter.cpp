@@ -269,7 +269,7 @@ lsproto::ClassificationTypeName classificationForSymbol(Symbol* symbol) {
 // isFirstDeclarationOfSymbolParameter — displaypartswriter.go:211. Checks if
 // the symbol's first declaration is a parameter.
 bool isFirstDeclarationOfSymbolParameter(Symbol* symbol) {
-	auto& declarations = symbol->declarations;
+	auto& declarations = symbol->data->declarations;
 	if (declarations.size() == 0) {
 		return false;
 	}

@@ -548,10 +548,10 @@ std::string getCallHierarchyItemContainerName(
 
 	if (isFunctionDeclaration(node) || isMethodDeclaration(node)) {
 		::tsc::Symbol* symbol = getSymbolOfCallHierarchyDeclaration(c, node);
-		if (symbol != nullptr && symbol->valueDeclaration != nullptr) {
-			if (isFunctionLikeDeclaration(symbol->valueDeclaration) &&
-				symbol->valueDeclaration->body() != nullptr) {
-				return symbol->valueDeclaration;
+		if (symbol != nullptr && symbol->data->valueDeclaration != nullptr) {
+			if (isFunctionLikeDeclaration(symbol->data->valueDeclaration) &&
+				symbol->data->valueDeclaration->body() != nullptr) {
+				return symbol->data->valueDeclaration;
 			}
 		}
 		return nullptr;
@@ -568,7 +568,7 @@ std::vector<::tsc::Node*> findAllInitialDeclarations(checker::Checker* c,
 	}
 
 	::tsc::Symbol* symbol = getSymbolOfCallHierarchyDeclaration(c, node);
-	if (symbol == nullptr || symbol->declarations.empty()) {
+	if (symbol == nullptr || symbol->data->declarations.empty()) {
 		return {};
 	}
 
@@ -577,13 +577,13 @@ std::vector<::tsc::Node*> findAllInitialDeclarations(checker::Checker* c,
 		int pos;
 	};
 
-	std::vector<int> indices(symbol->declarations.size());
+	std::vector<int> indices(symbol->data->declarations.size());
 	for (size_t i = 0; i < indices.size(); i++) {
 		indices[i] = int(i);
 	}
-	std::vector<declKey> keys(symbol->declarations.size());
-	for (size_t i = 0; i < symbol->declarations.size(); i++) {
-		::tsc::Node* decl = symbol->declarations[i];
+	std::vector<declKey> keys(symbol->data->declarations.size());
+	for (size_t i = 0; i < symbol->data->declarations.size(); i++) {
+		::tsc::Node* decl = symbol->data->declarations[i];
 		keys[i] = declKey{getSourceFileOfNode(decl)->FileName(),
 						  int(decl->pos())};
 	}
@@ -599,7 +599,7 @@ std::vector<::tsc::Node*> findAllInitialDeclarations(checker::Checker* c,
 	::tsc::Node* lastDecl = nullptr;
 
 	for (int i : indices) {
-		::tsc::Node* decl = symbol->declarations[i];
+		::tsc::Node* decl = symbol->data->declarations[i];
 		if (isValidCallHierarchyDeclaration(decl)) {
 			if (lastDecl == nullptr ||
 				lastDecl->parent != decl->parent ||
@@ -735,9 +735,9 @@ callHierarchyDeclarationResult resolveCallHierarchyDeclaration(
 				if ((symbol->flags & SymbolFlagsAlias) != 0) {
 					symbol = c->GetAliasedSymbol(symbol);
 				}
-				if (symbol->valueDeclaration != nullptr) {
+				if (symbol->data->valueDeclaration != nullptr) {
 					followingSymbol = true;
-					location = symbol->valueDeclaration;
+					location = symbol->data->valueDeclaration;
 					continue;
 				}
 			}

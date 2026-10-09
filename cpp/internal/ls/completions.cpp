@@ -101,7 +101,7 @@ bool isLateBoundName(const std::string& name) {
 
 // checker/utilities.go:1018 IsKnownSymbol.
 bool isKnownSymbol(Symbol* symbol) {
-	return isLateBoundName(symbol->name);
+	return isLateBoundName(symbol->data->name);
 }
 
 // Iterates utf8.DecodeRuneInString over s (Go range-over-runes).
@@ -191,7 +191,7 @@ Node* getTypeAnnotationNode(Node* node) {
 
 // ast/utilities.go:2994 GetClassLikeDeclarationOfSymbol.
 Node* getClassLikeDeclarationOfSymbol(Symbol* symbol) {
-	return findIn(symbol->declarations, isClassLike);
+	return findIn(symbol->data->declarations, isClassLike);
 }
 
 // ast/utilities.go:3021 nodeHasKind.
@@ -1314,7 +1314,7 @@ std::pair<completionData, gostd::Error> LanguageService::getCompletionData(
 		    // `Symbol` instead of for the property. If this is e.g.
 		    // [Symbol.iterator], add a completion for `Symbol`.
 		    Node* computedPropertyName = firstNonNil(
-		        symbol->declarations, [](Node* decl) -> Node* {
+		        symbol->data->declarations, [](Node* decl) -> Node* {
 			        Node* name = getNameOfDeclaration(decl);
 			        if (name != nullptr &&
 			            name->kind == Kind::ComputedPropertyName) {
@@ -1351,12 +1351,12 @@ std::pair<completionData, gostd::Error> LanguageService::getCompletionData(
 				    symbolToSortTextMap[firstAccessibleSymbolId] =
 				        SortTextGlobalsOrKeywords;
 				    Symbol* moduleSymbol =
-				        firstAccessibleSymbol->parent;
+				        firstAccessibleSymbol->data->parent;
 				    if (moduleSymbol == nullptr ||
 				        !checker::isExternalModuleSymbol(moduleSymbol) ||
 				        typeChecker
 				                ->TryGetMemberInModuleExportsAndProperties(
-				                    firstAccessibleSymbol->name,
+				                    firstAccessibleSymbol->data->name,
 				                    moduleSymbol) !=
 				            firstAccessibleSymbol) {
 					    symbolToOriginInfoMap[int(symbols.size()) - 1] =
@@ -1490,7 +1490,7 @@ std::pair<completionData, gostd::Error> LanguageService::getCompletionData(
 						auto isValidValueAccess =
 						    [&](Symbol* s) {
 							    return typeChecker->IsValidPropertyAccess(
-							        valueAccessNode, s->name);
+							        valueAccessNode, s->data->name);
 						    };
 						auto isValidTypeAccess =
 						    [&](Symbol* s) {
@@ -1507,7 +1507,7 @@ std::pair<completionData, gostd::Error> LanguageService::getCompletionData(
 							    exportedSymbol->flags &
 							        SymbolFlagsNamespace &&
 							    !everyList(
-							        exportedSymbol->declarations,
+							        exportedSymbol->data->declarations,
 							        [&](Node* declaration) {
 								        return declaration->parent ==
 								               node->parent;
@@ -1535,7 +1535,7 @@ std::pair<completionData, gostd::Error> LanguageService::getCompletionData(
 					// type of the class and add its properties (for inherited
 					// static methods).
 					if (!isTypeLocation && !insideJSDocTagTypeExpression &&
-					    someList(symbol->declarations, [](Node* decl) {
+					    someList(symbol->data->declarations, [](Node* decl) {
 						    return decl->kind != Kind::SourceFile &&
 						           decl->kind != Kind::ModuleDeclaration &&
 						           decl->kind != Kind::EnumDeclaration;
@@ -1640,11 +1640,11 @@ std::pair<completionData, gostd::Error> LanguageService::getCompletionData(
 
 		collections::Set<std::string> existingMemberNames;
 		for (Symbol* member : existingMembers) {
-			existingMemberNames.Add(member->name);
+			existingMemberNames.Add(member->data->name);
 		}
 
 		auto filtered = filterList(members, [&](Symbol* member) {
-			return !existingMemberNames.Has(member->name);
+			return !existingMemberNames.Has(member->data->name);
 		});
 		symbols.insert(symbols.end(), filtered.begin(), filtered.end());
 
@@ -1791,7 +1791,7 @@ std::pair<completionData, gostd::Error> LanguageService::getCompletionData(
 			// Set sort texts.
 			for (Symbol* member : filteredMembers) {
 				SymbolId symbolId = getSymbolId(member);
-				if (spreadMemberNames.Has(member->name)) {
+				if (spreadMemberNames.Has(member->data->name)) {
 					symbolToSortTextMap[symbolId] =
 					    SortTextMemberDeclaredBySpreadAssignment;
 				}
@@ -2086,7 +2086,7 @@ std::pair<completionData, gostd::Error> LanguageService::getCompletionData(
 		Symbol* localSymbol = localsContainer->symbol();
 		SymbolTable localExports;
 		if (localSymbol != nullptr) {
-			localExports = localSymbol->exports;
+			localExports = localSymbol->data->exports;
 		}
 		for (auto& [name, symbol] : *localsContainer->locals()) {
 			symbols.push_back(symbol);
@@ -2208,7 +2208,7 @@ std::pair<completionData, gostd::Error> LanguageService::getCompletionData(
 			symbols.insert(symbols.end(), filtered.begin(), filtered.end());
 			for (size_t index = 0; index < symbols.size(); index++) {
 				Symbol* symbol = symbols[index];
-				Node* declaration = symbol->valueDeclaration;
+				Node* declaration = symbol->data->valueDeclaration;
 				if (declaration != nullptr &&
 				    isClassElement(declaration) &&
 				    declaration->name() != nullptr &&
@@ -2352,7 +2352,7 @@ std::pair<completionData, gostd::Error> LanguageService::getCompletionData(
 			Symbol* symbol = symbols[index];
 			SymbolId symbolId = getSymbolId(symbol);
 			if (!typeChecker->IsArgumentsSymbol(symbol) &&
-			    !someList(symbol->declarations, [&](Node* decl) {
+			    !someList(symbol->data->declarations, [&](Node* decl) {
 				    return getSourceFileOfNode(decl) == file;
 			    })) {
 				symbolToSortTextMap[symbolId] = SortTextGlobalsOrKeywords;
@@ -2360,7 +2360,7 @@ std::pair<completionData, gostd::Error> LanguageService::getCompletionData(
 			if (typeOnlyAliasNeedsPromotion &&
 			    !(symbol->flags & SymbolFlagsValue)) {
 				Node* typeOnlyAliasDeclaration =
-				    findIn(symbol->declarations,
+				    findIn(symbol->data->declarations,
 				           isTypeOnlyImportDeclaration);
 				if (typeOnlyAliasDeclaration != nullptr) {
 					symbolToOriginInfoMap[int(index)] =
@@ -2612,10 +2612,10 @@ LanguageService::completionInfoFromData(
 		});
 		data->symbols =
 		    filterList(data->symbols, [&](Symbol* symbol) {
-			    if (symbol->valueDeclaration != nullptr &&
-			        isEnumMember(symbol->valueDeclaration)) {
+			    if (symbol->data->valueDeclaration != nullptr &&
+			        isEnumMember(symbol->data->valueDeclaration)) {
 				    auto value = typeChecker->GetConstantValue(
-				        symbol->valueDeclaration);
+				        symbol->data->valueDeclaration);
 				    if (!std::holds_alternative<std::monostate>(
 				            value) &&
 				        tracker->hasValue(value)) {
@@ -2796,8 +2796,8 @@ LanguageService::getCompletionEntriesFromSymbols(
 		// files, `this.` completions.
 		bool shouldShadowLaterSymbols =
 		    (origin == nullptr || originIsTypeOnlyAlias(origin)) &&
-		    !(symbol->parent == nullptr &&
-		      !someList(symbol->declarations, [&](Node* d) {
+		    !(symbol->data->parent == nullptr &&
+		      !someList(symbol->data->declarations, [&](Node* d) {
 			      return getSourceFileOfNode(d) == file;
 		      }));
 		uniques[name] = shouldShadowLaterSymbols;
@@ -3344,7 +3344,7 @@ Node* LanguageService::createObjectLiteralMethod(
 	NodeFactory* factory = snippetPrinter->factory;
 	printer::EmitContext* emitContext = snippetPrinter->emitContext;
 
-	Node* declaration = firstOrNil(symbol->declarations);
+	Node* declaration = firstOrNil(symbol->data->declarations);
 	if (!isObjectLiteralMethodCompletionCandidateDeclaration(declaration)) {
 		return nullptr;
 	}
@@ -4115,8 +4115,8 @@ bool symbolAppearsToBeTypeOnly(Symbol* symbol,
 	SymbolFlags flags = checker::SkipAlias(symbol, typeChecker)
 	                        ->combinedLocalAndExportSymbolFlags();
 	return !(flags & SymbolFlagsValue) &&
-	    (symbol->declarations.empty() ||
-	     !isInJSFile(symbol->declarations[0]) ||
+	    (symbol->data->declarations.empty() ||
+	     !isInJSFile(symbol->data->declarations[0]) ||
 	     (flags & SymbolFlagsType));
 }
 
@@ -4137,7 +4137,7 @@ bool shouldIncludeSymbol(Symbol* symbol, completionDataData* data,
 	// `const a = /* no 'a' here */`
 	if (closestSymbolDeclaration != nullptr &&
 	    isVariableDeclaration(closestSymbolDeclaration) &&
-	    symbol->valueDeclaration == closestSymbolDeclaration) {
+	    symbol->data->valueDeclaration == closestSymbolDeclaration) {
 		return false;
 	}
 
@@ -4145,10 +4145,10 @@ bool shouldIncludeSymbol(Symbol* symbol, completionDataData* data,
 	// `function f(a = /* no 'a' and 'b' here */, b) { }` or
 	// `function f<T = /* no 'T' and 'T2' here */>(a: T, b: T2) { }`
 	Node* symbolDeclaration = nullptr;
-	if (symbol->valueDeclaration != nullptr) {
-		symbolDeclaration = symbol->valueDeclaration;
-	} else if (!symbol->declarations.empty()) {
-		symbolDeclaration = symbol->declarations[0];
+	if (symbol->data->valueDeclaration != nullptr) {
+		symbolDeclaration = symbol->data->valueDeclaration;
+	} else if (!symbol->data->declarations.empty()) {
+		symbolDeclaration = symbol->data->declarations[0];
 	}
 
 	if (closestSymbolDeclaration != nullptr &&
@@ -4203,8 +4203,8 @@ bool shouldIncludeSymbol(Symbol* symbol, completionDataData* data,
 	    symbol != symbolOrigin &&
 	    sortIt != data->symbolToSortTextMap.end() &&
 	    sortIt->second == SortTextGlobalsOrKeywords &&
-	    symbol->parent != nullptr &&
-	    checker::isExternalModuleSymbol(symbol->parent)) {
+	    symbol->data->parent != nullptr &&
+	    checker::isExternalModuleSymbol(symbol->data->parent)) {
 		return false;
 	}
 
@@ -4263,9 +4263,9 @@ std::pair<std::string, bool> getCompletionEntryDisplayNameForSymbol(
 	    LanguageVariant::Standard);
 	// name is a valid identifier or private identifier text
 	if (isIdentifierText(name, variant) ||
-	    (symbol->valueDeclaration != nullptr &&
+	    (symbol->data->valueDeclaration != nullptr &&
 	     isPrivateIdentifierClassElementDeclaration(
-	         symbol->valueDeclaration))) {
+	         symbol->data->valueDeclaration))) {
 		return {name, false};
 	}
 	if (symbol->flags & SymbolFlagsAlias) {
@@ -4534,8 +4534,8 @@ bool symbolCanBeReferencedAtTypeLocation(
 	                                           seenModules) ||
 	    nonAliasCanBeReferencedAtTypeLocation(
 	        checker::SkipAlias(
-	            ifElse<Symbol*>(symbol->exportSymbol != nullptr,
-	                            symbol->exportSymbol, symbol),
+	            ifElse<Symbol*>(symbol->data->exportSymbol != nullptr,
+	                            symbol->data->exportSymbol, symbol),
 	            typeChecker),
 	        typeChecker, seenModules);
 }
@@ -4593,11 +4593,11 @@ Symbol* getFirstSymbolInChain(Symbol* symbol, Node* enclosingDeclaration,
 	if (!chain.empty()) {
 		return chain[0];
 	}
-	if (symbol->parent != nullptr) {
-		if (isModuleSymbol(symbol->parent)) {
+	if (symbol->data->parent != nullptr) {
+		if (isModuleSymbol(symbol->data->parent)) {
 			return symbol;
 		}
-		return getFirstSymbolInChain(symbol->parent, enclosingDeclaration,
+		return getFirstSymbolInChain(symbol->data->parent, enclosingDeclaration,
 		                             typeChecker);
 	}
 	return nullptr;
@@ -4605,7 +4605,7 @@ Symbol* getFirstSymbolInChain(Symbol* symbol, Node* enclosingDeclaration,
 
 // completions.go:3436
 bool isModuleSymbol(Symbol* symbol) {
-	return someList(symbol->declarations, [](Node* decl) {
+	return someList(symbol->data->declarations, [](Node* decl) {
 		return decl->kind == Kind::SourceFile;
 	});
 }
@@ -4621,10 +4621,10 @@ symbolOriginInfoKind getNullableSymbolOriginInfoKind(
 
 // completions.go:3447
 bool isStaticProperty(Symbol* symbol) {
-	return symbol->valueDeclaration != nullptr &&
-	    (symbol->valueDeclaration->modifierFlags() &
+	return symbol->data->valueDeclaration != nullptr &&
+	    (symbol->data->valueDeclaration->modifierFlags() &
 	     ModifierFlagsStatic) &&
-	    isClassLike(symbol->valueDeclaration->parent);
+	    isClassLike(symbol->data->valueDeclaration->parent);
 }
 
 // completions.go:3455 — getContextualTypeForConditionalExpression handles
@@ -4917,7 +4917,7 @@ bool isInTypeParameterDefault(Node* contextToken) {
 // completions.go:3659
 bool isDeprecated(Symbol* symbol, checker::Checker* typeChecker) {
 	auto declarations =
-	    checker::SkipAlias(symbol, typeChecker)->declarations;
+	    checker::SkipAlias(symbol, typeChecker)->data->declarations;
 	return !declarations.empty() &&
 	    everyList(declarations, [&](Node* decl) {
 		       return typeChecker->IsDeprecatedDeclaration(decl);
@@ -5693,7 +5693,7 @@ checker::Type* getConstraintOfTypeArgumentProperty(
 		Node* reparsed = getReparsedNodeForNode(node);
 		if (Symbol* symbol = reparsed->symbol(); symbol != nullptr) {
 			return typeChecker->GetTypeOfPropertyOfContextualType(
-			    t, symbol->name);
+			    t, symbol->data->name);
 		}
 
 		// In some cases, we won't have a corresponding symbol
@@ -5865,10 +5865,10 @@ std::vector<Symbol*> getPropertiesForObjectExpression(
 	// f({ abc/**/: "" }) // `abc` is a member of `T` but only because it
 	// declares itself
 	auto hasDeclarationOtherThanSelf = [&](Symbol* member) -> bool {
-		if (member->declarations.empty()) {
+		if (member->data->declarations.empty()) {
 			return true;
 		}
-		return someList(member->declarations, [&](Node* decl) {
+		return someList(member->data->declarations, [&](Node* decl) {
 			return decl->parent != obj;
 		});
 	};
@@ -5976,7 +5976,7 @@ filterObjectMembersList(
 
 	std::vector<Symbol*> filteredSymbols =
 	    filterList(contextualMemberSymbols, [&](Symbol* m) {
-		    return !existingMemberNames.Has(m->name);
+		    return !existingMemberNames.Has(m->data->name);
 	    });
 
 	return {filteredSymbols, membersDeclaredBySpreadAssignment};
@@ -6006,7 +6006,7 @@ void setMemberDeclaredBySpreadAssignment(
 		properties = t->AsStructuredType()->properties;
 	}
 	for (Symbol* property : properties) {
-		members->Add(property->name);
+		members->Add(property->data->name);
 	}
 }
 
@@ -6210,13 +6210,13 @@ std::vector<Symbol*> filterClassMembersList(
 
 	return filterList(baseSymbols, [&](Symbol* propertySymbol) {
 		return !existingMemberNames.Has(symbolName(propertySymbol)) &&
-		    !propertySymbol->declarations.empty() &&
+		    !propertySymbol->data->declarations.empty() &&
 		    (checker::GetDeclarationModifierFlagsFromSymbol(
 		         propertySymbol) &
 		     ModifierFlagsPrivate) == 0 &&
-		    !(propertySymbol->valueDeclaration != nullptr &&
+		    !(propertySymbol->data->valueDeclaration != nullptr &&
 		      isPrivateIdentifierClassElementDeclaration(
-		          propertySymbol->valueDeclaration));
+		          propertySymbol->data->valueDeclaration));
 	});
 }
 
@@ -6337,7 +6337,7 @@ filterJsxAttributes(const std::vector<Symbol*>& symbols,
 
 	return {filterList(symbols,
 	                   [&](Symbol* a) {
-		                   return !existingNames.Has(a->name);
+		                   return !existingNames.Has(a->data->name);
 	                   }),
 	        membersDeclaredBySpreadAssignment};
 }
@@ -8276,9 +8276,9 @@ LanguageService::getExhaustiveCaseSnippets(
 				           "symbol (the enum symbol)");
 				// Filter existing enums by their values
 				checker::LiteralValue enumValue;
-				if (t->symbol->valueDeclaration != nullptr) {
+				if (t->symbol->data->valueDeclaration != nullptr) {
 					enumValue = c->GetConstantValue(
-					    t->symbol->valueDeclaration);
+					    t->symbol->data->valueDeclaration);
 				}
 				if (!std::holds_alternative<std::monostate>(
 				        enumValue)) {

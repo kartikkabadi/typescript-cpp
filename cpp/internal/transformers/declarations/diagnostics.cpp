@@ -538,7 +538,7 @@ Diagnostic* createEntityInTypeNodeError(Node* node) {
 Diagnostic* createAccessorTypeError(Node* node) {
 	AllAccessorDeclarations allDeclarations =
 	    getAllAccessorDeclarationsForDeclaration(node,
-	                                             node->symbol()->declarations);
+	                                             node->symbol()->data->declarations);
 	Node* getAccessor = allDeclarations.getAccessor;
 	Node* setAccessor = allDeclarations.setAccessor;
 	Node* targetNode = node;

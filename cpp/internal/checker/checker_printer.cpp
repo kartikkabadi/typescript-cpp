@@ -458,8 +458,8 @@ std::string Checker::ExpandSymbolForHover(Symbol* symbol, SymbolFlags meaning,
 	printer::Printer* p =
 		createPrinterWithRemoveComments(nodeBuilder->EmitContext());
 	SourceFile* sourceFile = nullptr;
-	if (symbol->valueDeclaration != nullptr) {
-		sourceFile = getSourceFileOfNode(symbol->valueDeclaration);
+	if (symbol->data->valueDeclaration != nullptr) {
+		sourceFile = getSourceFileOfNode(symbol->data->valueDeclaration);
 	}
 	std::string b;
 	for (size_t i = 0; i < nodes.size(); i++) {

@@ -243,7 +243,7 @@ printer::SymbolAccessibilityResult* Checker::hasVisibleDeclarations(
 		addVisibleAlias = noopAddVisibleAlias;
 	}
 
-	for (Node* declaration : symbol->declarations) {
+	for (Node* declaration : symbol->data->declarations) {
 		if (isIdentifier(declaration)) {
 			continue;
 		}

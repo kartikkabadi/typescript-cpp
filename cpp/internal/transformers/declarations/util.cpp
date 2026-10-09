@@ -178,7 +178,7 @@ bool shouldEmitFunctionProperties(FunctionDeclaration* input) {
 		return true;
 	}
 	// core.Every
-	for (Node* decl : input->Symbol->declarations) {
+	for (Node* decl : input->Symbol->data->declarations) {
 		if (isFunctionDeclaration(decl) &&
 		    decl->as<FunctionDeclaration>()->Body != nullptr) {
 			return true;

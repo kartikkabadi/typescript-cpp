@@ -36,19 +36,19 @@ bool Export::IsUnresolvedAlias() const {
 
 // SymbolToExport — export.go:96
 std::unique_ptr<Export> SymbolToExport(Symbol* symbol, checker::Checker* ch) {
-	if (symbol->parent != nullptr &&
-	    checker::isExternalModuleSymbol(symbol->parent)) {
-		if (auto res = tryGetModuleIDAndFileNameOfModuleSymbol(symbol->parent)) {
+	if (symbol->data->parent != nullptr &&
+	    checker::isExternalModuleSymbol(symbol->data->parent)) {
+		if (auto res = tryGetModuleIDAndFileNameOfModuleSymbol(symbol->data->parent)) {
 			auto& [moduleID, moduleFileName] = *res;
 			return extractFirstExport(
 			    symbol, ch, moduleID, moduleFileName,
-			    getSourceFileOfModule(symbol->parent));
+			    getSourceFileOfModule(symbol->data->parent));
 		}
 		return nullptr;
 	}
 
 	Node* declaration =
-	    symbol->declarations.empty() ? nullptr : symbol->declarations.front();
+	    symbol->data->declarations.empty() ? nullptr : symbol->data->declarations.front();
 	if (declaration == nullptr) {
 		return nullptr;
 	}
@@ -73,7 +73,7 @@ std::unique_ptr<Export> SymbolToExport(Symbol* symbol, checker::Checker* ch) {
 	                                file)) {
 		return e;
 	}
-	return tryGetModuleExport(symbol->name, target, moduleSymbol, ch, moduleID,
+	return tryGetModuleExport(symbol->data->name, target, moduleSymbol, ch, moduleID,
 	                          moduleFileName, file);
 }
 
@@ -97,7 +97,7 @@ std::unique_ptr<Export> extractFirstExport(
     const std::string& moduleFileName, SourceFile* file) {
 	std::vector<std::shared_ptr<Export>> exports;
 	auto extractor = newSymbolExtractor("", ch, nullptr, nullptr);
-	extractor->extractFromSymbol(symbol->name, symbol, moduleID, moduleFileName,
+	extractor->extractFromSymbol(symbol->data->name, symbol, moduleID, moduleFileName,
 	                             file, &exports);
 	if (exports.empty()) {
 		return nullptr;

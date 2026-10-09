@@ -371,7 +371,7 @@ std::vector<Symbol*> Checker::getSymbolsInScope(Node* location,
 	// meaning and it doesn't already exists in the symbol table.
 	auto copySymbol = [&symbols](Symbol* symbol, SymbolFlags meaning) {
 		if ((symbol->combinedLocalAndExportSymbolFlags() & meaning) != 0) {
-			const std::string& id = symbol->name;
+			const std::string& id = symbol->data->name;
 			// We will copy all symbol regardless of its reserved name because
 			// symbolsToArray will check whether the key is a reserved name and
 			// it will not copy symbol with reserved name to the array
@@ -399,7 +399,7 @@ std::vector<Symbol*> Checker::getSymbolsInScope(Node* location,
 							nullptr &&
 						getDeclarationOfKind(symbol, Kind::NamespaceExport) ==
 							nullptr &&
-						symbol->name != InternalSymbolNameDefault) {
+						symbol->data->name != InternalSymbolNameDefault) {
 						copySymbol(symbol, meaning);
 					}
 				}
@@ -431,11 +431,11 @@ std::vector<Symbol*> Checker::getSymbolsInScope(Node* location,
 				[[fallthrough]];
 			case Kind::ModuleDeclaration:
 				copyLocallyVisibleExportSymbols(
-					getSymbolOfDeclaration(location)->exports,
+					getSymbolOfDeclaration(location)->data->exports,
 					meaning & SymbolFlagsModuleMember);
 				break;
 			case Kind::EnumDeclaration:
-				copySymbols(getSymbolOfDeclaration(location)->exports,
+				copySymbols(getSymbolOfDeclaration(location)->data->exports,
 							meaning & SymbolFlagsEnumMember);
 				break;
 			case Kind::ClassExpression: {
@@ -598,13 +598,13 @@ Checker::GetAllPossiblePropertiesOfTypes(std::vector<Type*> types) {
 		std::vector<Symbol*> augmentedProps =
 			getAugmentedPropertiesOfType(memberType);
 		for (Symbol* p : augmentedProps) {
-			if (props.find(p->name) == props.end()) {
+			if (props.find(p->data->name) == props.end()) {
 				Symbol* prop = createUnionOrIntersectionProperty(
-					unionType, p->name,
+					unionType, p->data->name,
 					false /*skipObjectFunctionPropertyAugment*/);
 				// May be undefined if the property is private
 				if (prop != nullptr) {
-					props[p->name] = prop;
+					props[p->data->name] = prop;
 				}
 			}
 		}
@@ -670,8 +670,8 @@ std::vector<Symbol*> Checker::getAugmentedPropertiesOfType(Type* t) {
 	// is unreachable.)
 	if (functionType != nullptr) {
 		for (Symbol* p : getPropertiesOfType(functionType)) {
-			if (propsByName.find(p->name) == propsByName.end()) {
-				propsByName[p->name] = p;
+			if (propsByName.find(p->data->name) == propsByName.end()) {
+				propsByName[p->data->name] = p;
 			}
 		}
 	}
@@ -827,7 +827,7 @@ std::vector<Symbol*> Checker::getImmediateRootSymbols(Symbol* symbol) {
 		return mapNonNil(
 			valueSymbolLinks.Get(symbol)->containingType->types(),
 			[this, symbol](Type* t) -> Symbol* {
-				return getPropertyOfType(t, symbol->name);
+				return getPropertyOfType(t, symbol->data->name);
 			});
 	}
 	if ((symbol->flags & SymbolFlagsTransient) != 0) {
@@ -873,7 +873,7 @@ Symbol* Checker::tryGetTarget(Symbol* symbol) {
 }
 
 Symbol* Checker::GetExportSymbolOfSymbol(Symbol* symbol) {
-	return getMergedSymbol(orElse(symbol->exportSymbol, symbol));
+	return getMergedSymbol(orElse(symbol->data->exportSymbol, symbol));
 }
 
 Symbol* Checker::GetExportSpecifierLocalTargetSymbol(Node* node) {
@@ -1016,7 +1016,7 @@ bool Checker::IsSymbolReferencedInFile(SourceFile* sourceFile,
 // reference the given symbol.
 std::vector<Node*>
 Checker::GetReferencesToSymbolInFile(SourceFile* sourceFile, Symbol* symbol) {
-	const std::string& identifierText = symbol->name;
+	const std::string& identifierText = symbol->data->name;
 	std::vector<Node*> result;
 	for (Node* token :
 		 getPossibleSymbolReferenceNodes(sourceFile, identifierText,
@@ -1285,7 +1285,7 @@ LiteralValue Checker::GetConstantValue(Node* node) {
 	if (symbol != nullptr &&
 		(symbol->flags & SymbolFlagsEnumMember) != 0) {
 		// inline property\index accesses only for const enums
-		Node* member = symbol->valueDeclaration;
+		Node* member = symbol->data->valueDeclaration;
 		if (isEnumConst(member->parent)) {
 			return getEnumMemberValue(member).Value;
 		}
@@ -1385,16 +1385,16 @@ Type* Checker::GetContextualTypeForArrayLiteralAtPosition(
 
 Type* Checker::GetFirstTypeArgumentFromKnownType(Type* t) {
 	if ((t->objectFlags & ObjectFlagsReference) != 0 && t->symbol != nullptr &&
-		isKnownGenericTypeName(t->symbol->name)) {
+		isKnownGenericTypeName(t->symbol->data->name)) {
 		Symbol* symbol =
-			getGlobalSymbol(t->symbol->name, SymbolFlagsType, nullptr);
+			getGlobalSymbol(t->symbol->data->name, SymbolFlagsType, nullptr);
 		if (symbol != nullptr && symbol == t->Target()->symbol) {
 			return firstOrNil(getTypeArguments(t));
 		}
 	}
-	if (t->alias != nullptr && isKnownGenericTypeName(t->alias->symbol->name)) {
+	if (t->alias != nullptr && isKnownGenericTypeName(t->alias->symbol->data->name)) {
 		Symbol* symbol =
-			getGlobalSymbol(t->alias->symbol->name, SymbolFlagsType, nullptr);
+			getGlobalSymbol(t->alias->symbol->data->name, SymbolFlagsType, nullptr);
 		if (symbol != nullptr && symbol == t->alias->symbol) {
 			return firstOrNil(t->alias->typeArguments);
 		}
@@ -1533,7 +1533,7 @@ bool Checker::IsLibSymbolForHoverVerbosity(Symbol* symbol) {
 	if (symbol == nullptr) {
 		return false;
 	}
-	for (Node* decl : symbol->declarations) {
+	for (Node* decl : symbol->data->declarations) {
 		SourceFile* sf = getSourceFileOfNode(decl);
 		if (sf != nullptr && program->IsSourceFileDefaultLibrary(sf->Path())) {
 			return true;

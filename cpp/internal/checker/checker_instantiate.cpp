@@ -292,7 +292,7 @@ int Checker::getMinTypeArgumentCount(const std::vector<Type*>& typeParameters) {
 // hasTypeParameterDefault — checker.go:22341-22345
 
 bool Checker::hasTypeParameterDefault(Type* t) {
-	return t->symbol != nullptr && anyOf(t->symbol->declarations, [](Node* d) {
+	return t->symbol != nullptr && anyOf(t->symbol->data->declarations, [](Node* d) {
 		return isTypeParameterDeclaration(d) &&
 			d->as<TypeParameterDeclaration>()->DefaultType != nullptr;
 	});
@@ -377,7 +377,7 @@ Type* Checker::getResolvedTypeParameterDefault(Type* t) {
 			Type* defaultType = noConstraintType;
 			if (t->symbol != nullptr) {
 				Node* defaultDeclaration = nullptr;
-				for (Node* decl : t->symbol->declarations) {
+				for (Node* decl : t->symbol->data->declarations) {
 					if (isTypeParameterDeclaration(decl) &&
 						decl->as<TypeParameterDeclaration>()->DefaultType != nullptr) {
 						defaultDeclaration = decl->as<TypeParameterDeclaration>()->DefaultType;
@@ -509,7 +509,7 @@ std::vector<std::string> Checker::getCircularTypeNames() {
 			if (t->alias != nullptr) {
 				symbol = t->alias->symbol;
 			}
-			if (symbol != nullptr && !symbol->name.empty() && symbol->name[0] != '\xFE') {
+			if (symbol != nullptr && !symbol->data->name.empty() && symbol->data->name[0] != '\xFE') {
 				std::string name = symbolToString(symbol);
 				if (std::find(circularTypeNames.begin(), circularTypeNames.end(), name) ==
 					circularTypeNames.end()) {
@@ -590,7 +590,7 @@ bool Checker::couldContainTypeVariablesWorker(Type* t) {
 		   (t->symbol->flags &
 			(SymbolFlagsFunction | SymbolFlagsMethod | SymbolFlagsClass |
 			 SymbolFlagsTypeLiteral | SymbolFlagsObjectLiteral)) != 0 &&
-		   !t->symbol->declarations.empty()) ||
+		   !t->symbol->data->declarations.empty()) ||
 		  (objectFlags & (ObjectFlagsMapped | ObjectFlagsReverseMapped |
 						  ObjectFlagsObjectRestType |
 						  ObjectFlagsInstantiationExpressionType)) != 0)) ||
@@ -740,7 +740,7 @@ Type* Checker::getObjectTypeInstantiation(Type* t, TypeMapper* m, TypeAlias* ali
 	} else if ((t->objectFlags & ObjectFlagsInstantiationExpressionType) != 0) {
 		declaration = t->AsInstantiationExpressionType()->node;
 	} else {
-		declaration = t->symbol->declarations[0];
+		declaration = t->symbol->data->declarations[0];
 	}
 	TypeNodeLinks* links = typeNodeLinks.Get(declaration);
 	if ((t->objectFlags & ObjectFlagsReference) != 0) {  // Deferred type reference
@@ -768,7 +768,7 @@ Type* Checker::getObjectTypeInstantiation(Type* t, TypeMapper* m, TypeAlias* ali
 			} else if ((target->symbol->flags &
 						(SymbolFlagsMethod | SymbolFlagsTypeLiteral)) != 0) {
 				typeParameters = filterVec(typeParameters, [this, t](Type* tp) {
-					return anyOf(t->symbol->declarations, [this, tp](Node* d) {
+					return anyOf(t->symbol->data->declarations, [this, tp](Node* d) {
 						return isTypeParameterPossiblyReferenced(tp, d);
 					});
 				});
@@ -857,7 +857,7 @@ bool Checker::isTypeParameterPossiblyReferenced(Type* tp, Node* node) {
 				Node* firstIdentifier = getFirstIdentifier(entityName);
 				if (!isThisIdentifier(firstIdentifier)) {
 					Symbol* firstIdentifierSymbol = getResolvedSymbol(firstIdentifier);
-					Node* tpDeclaration = tp->symbol->declarations[0];  // There is exactly one declaration, otherwise `containsReference` is not called
+					Node* tpDeclaration = tp->symbol->data->declarations[0];  // There is exactly one declaration, otherwise `containsReference` is not called
 					Node* tpScope = nullptr;
 					if (isTypeParameterDeclaration(tpDeclaration)) {
 						tpScope = tpDeclaration->parent;  // Type parameter is a regular type parameter, e.g. foo<T>
@@ -865,7 +865,7 @@ bool Checker::isTypeParameterPossiblyReferenced(Type* tp, Node* node) {
 						tpScope = tpDeclaration;  // Type parameter is the this type, and its declaration is the class declaration.
 					}
 					if (tpScope != nullptr) {
-						return anyOf(firstIdentifierSymbol->declarations,
+						return anyOf(firstIdentifierSymbol->data->declarations,
 									 [&](Node* d) { return isNodeDescendantOf(d, tpScope); }) ||
 							anyOf(node->typeArguments(), containsReference);
 					}
@@ -887,8 +887,8 @@ bool Checker::isTypeParameterPossiblyReferenced(Type* tp, Node* node) {
 	// between the node and the type parameter declaration, if the node contains actual references to the
 	// type parameter, or if the node contains type queries that we can't prove couldn't contain references to the type parameter,
 	// we consider the type parameter possibly referenced.
-	if (tp->symbol != nullptr && tp->symbol->declarations.size() == 1) {
-		Node* container = tp->symbol->declarations[0]->parent;
+	if (tp->symbol != nullptr && tp->symbol->data->declarations.size() == 1) {
+		Node* container = tp->symbol->data->declarations[0]->parent;
 		for (Node* n = node; n != container; n = n->parent) {
 			if (n == nullptr || isBlock(n) ||
 				(isConditionalTypeNode(n) &&

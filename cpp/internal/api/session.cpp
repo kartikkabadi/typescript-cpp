@@ -183,10 +183,10 @@ std::unordered_map<SymbolID, Symbol*>* getSourceFileSymbolIndex(
 				    return;
 			    }
 			    (*index)[id] = symbol;
-			    addSymbol(symbol->parent);
-			    addSymbol(symbol->exportSymbol);
+			    addSymbol(symbol->data->parent);
+			    addSymbol(symbol->data->exportSymbol);
 			    for (auto* table :
-			         {&symbol->members, &symbol->exports}) {
+			         {&symbol->data->members, &symbol->data->exports}) {
 				    for (auto& entry : *table) {
 					    addSymbol(entry.second);
 				    }
@@ -267,31 +267,31 @@ std::unique_ptr<SymbolResponse> buildSymbolResponse(
     Symbol* symbol, const SymbolReference& reference, SourceFile* owner) {
 	auto resp = std::make_unique<SymbolResponse>();
 	resp->Reference = reference;
-	resp->Name = escapeSymbolName(symbol->name);
+	resp->Name = escapeSymbolName(symbol->data->name);
 	resp->Flags = uint32_t(symbol->flags);
 	resp->CheckFlags = uint32_t(symbol->checkFlags);
-	resp->Parent = newSymbolReference(symbol->parent);
-	resp->ExportSymbol = newSymbolReference(symbol->exportSymbol);
+	resp->Parent = newSymbolReference(symbol->data->parent);
+	resp->ExportSymbol = newSymbolReference(symbol->data->exportSymbol);
 	if (owner != nullptr) {
 		// A client resolves a file-owned symbol's relationships through its
 		// own source file.
-		debug::assert(symbol->parent == nullptr ||
-		               symbolOwnerFile(symbol->parent) == owner,
+		debug::assert(symbol->data->parent == nullptr ||
+		               symbolOwnerFile(symbol->data->parent) == owner,
 		           "File-owned symbol parent belongs to another owner");
-		debug::assert(symbol->exportSymbol == nullptr ||
-		               symbolOwnerFile(symbol->exportSymbol) == owner,
+		debug::assert(symbol->data->exportSymbol == nullptr ||
+		               symbolOwnerFile(symbol->data->exportSymbol) == owner,
 		           "File-owned export symbol belongs to another owner");
 	}
-	if (!symbol->declarations.empty()) {
-		resp->Declarations.resize(symbol->declarations.size());
-		for (size_t i = 0; i < symbol->declarations.size(); ++i) {
+	if (!symbol->data->declarations.empty()) {
+		resp->Declarations.resize(symbol->data->declarations.size());
+		for (size_t i = 0; i < symbol->data->declarations.size(); ++i) {
 			resp->Declarations[i] =
-			    symbolNodeHandleFrom(symbol->declarations[i], owner);
+			    symbolNodeHandleFrom(symbol->data->declarations[i], owner);
 		}
 	}
-	if (symbol->valueDeclaration != nullptr) {
+	if (symbol->data->valueDeclaration != nullptr) {
 		resp->ValueDeclaration =
-		    symbolNodeHandleFrom(symbol->valueDeclaration, owner);
+		    symbolNodeHandleFrom(symbol->data->valueDeclaration, owner);
 	}
 	return resp;
 }
@@ -1588,11 +1588,11 @@ std::pair<ResultValue, gostd::Error> Session::handleRequest(
 	if (method == MethodGetCompletionsAtPosition) {
 		return call([&] { return handleGetCompletionsAtPosition(ctx, unmarshalParam<GetCompletionsAtPositionParams>(parsed)); });
 	}
-	if (method == MethodPrintNode) {
-		return call([&] { return handlePrintNode(ctx, unmarshalParam<PrintNodeParams>(parsed)); });
-	}
 	if (method == MethodFormatNodeForInsertion) {
 		return call([&] { return handleFormatNodeForInsertion(ctx, unmarshalParam<FormatNodeForInsertionParams>(parsed)); });
+	}
+	if (method == MethodPrintNode) {
+		return call([&] { return handlePrintNode(ctx, unmarshalParam<PrintNodeParams>(parsed)); });
 	}
 	if (method == MethodEmit) {
 		return call([&] { return handleEmit(ctx, unmarshalParam<EmitParams>(parsed)); });
@@ -1892,9 +1892,9 @@ static const std::unordered_map<std::string_view, unmarshallerFn> unmarshalers =
     {MethodGetSignatureUsages, &unmarshallerFor<GetSignatureUsagesParams>},
     {MethodGetCompletionsAtPosition,
      &unmarshallerFor<GetCompletionsAtPositionParams>},
-    {MethodPrintNode, &unmarshallerFor<PrintNodeParams>},
     {MethodFormatNodeForInsertion,
      &unmarshallerFor<FormatNodeForInsertionParams>},
+    {MethodPrintNode, &unmarshallerFor<PrintNodeParams>},
     {MethodEmit, &unmarshallerFor<EmitParams>},
     {MethodEmitToString, &unmarshallerFor<EmitParams>},
     {MethodGetJavaScriptEmit, &unmarshallerFor<SelectedFilesEmitParams>},
@@ -4887,7 +4887,7 @@ std::pair<std::unique_ptr<SymbolResponse>, gostd::Error>
 Session::handleGetParentOfSymbol(gostd::Context ctx,
                                  const GetSymbolPropertyParams* params) {
 	return resolveSymbolPropertyOfSymbol(
-	    params, [](Symbol* sym) -> Symbol* { return sym->parent; });
+	    params, [](Symbol* sym) -> Symbol* { return sym->data->parent; });
 }
 
 // @gen-proto-nullable
@@ -4896,7 +4896,7 @@ Session::handleGetMembersOfSymbol(gostd::Context ctx,
                                   const GetSymbolPropertyParams* params) {
 	return resolveSymbolTablePropertyOfSymbol(
 	    ctx, params,
-	    [](Symbol* symbol) -> const SymbolTable* { return &symbol->members; });
+	    [](Symbol* symbol) -> const SymbolTable* { return &symbol->data->members; });
 }
 
 // @gen-proto-nullable
@@ -4905,7 +4905,7 @@ Session::handleGetExportsOfSymbol(gostd::Context ctx,
                                   const GetSymbolPropertyParams* params) {
 	return resolveSymbolTablePropertyOfSymbol(
 	    ctx, params,
-	    [](Symbol* symbol) -> const SymbolTable* { return &symbol->exports; });
+	    [](Symbol* symbol) -> const SymbolTable* { return &symbol->data->exports; });
 }
 
 // @gen-proto-nullable
@@ -4913,7 +4913,7 @@ std::pair<std::unique_ptr<SymbolResponse>, gostd::Error>
 Session::handleGetExportSymbolOfSymbol(
     gostd::Context ctx, const GetSymbolPropertyParams* params) {
 	return resolveSymbolPropertyOfSymbol(
-	    params, [](Symbol* sym) -> Symbol* { return sym->exportSymbol; });
+	    params, [](Symbol* sym) -> Symbol* { return sym->data->exportSymbol; });
 }
 
 // @gen-proto-nullable
@@ -5309,21 +5309,21 @@ Session::resolveSymbolTablePropertyOfSymbol(
 		          [file](Symbol* left, Symbol* right) {
 			          debug::assert(getSourceFileOfSymbol(left) == file);
 			          debug::assert(getSourceFileOfSymbol(right) == file);
-			          bool leftHasDeclaration = !left->declarations.empty();
+			          bool leftHasDeclaration = !left->data->declarations.empty();
 			          bool rightHasDeclaration =
-			              !right->declarations.empty();
+			              !right->data->declarations.empty();
 			          if (leftHasDeclaration != rightHasDeclaration) {
 				          return leftHasDeclaration;
 			          }
 			          if (leftHasDeclaration) {
-				          if (left->declarations[0]->pos() !=
-				              right->declarations[0]->pos()) {
-					          return left->declarations[0]->pos() <
-					                 right->declarations[0]->pos();
+				          if (left->data->declarations[0]->pos() !=
+				              right->data->declarations[0]->pos()) {
+					          return left->data->declarations[0]->pos() <
+					                 right->data->declarations[0]->pos();
 				          }
 			          }
-			          if (left->name != right->name) {
-				          return left->name < right->name;
+			          if (left->data->name != right->data->name) {
+				          return left->data->name < right->data->name;
 			          }
 			          return getSymbolId(left) < getSymbolId(right);
 		          });

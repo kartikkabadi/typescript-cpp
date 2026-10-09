@@ -2993,8 +2993,6 @@ std::string ProjectResponse::marshalJSONTo(json::Encoder& enc) const {
 	w.member("currentDirectory", CurrentDirectory);
 	w.member("dirty", Dirty);
 	w.member("parsedCommandLine", ParsedCommandLine);
-	w.member("rootFiles", RootFiles);
-	w.member("compilerOptions", CompilerOptions);
 	return w.end();
 }
 
@@ -4089,8 +4087,6 @@ std::shared_ptr<ProjectResponse> NewProjectResponse(project::Project* p) {
 	resp->CurrentDirectory = p->CurrentDirectory();
 	resp->Dirty = p->IsDirty();
 	resp->ParsedCommandLine = NewConfigFileResponse(p->CommandLine);
-	resp->RootFiles = p->CommandLine->FileNames();
-	resp->CompilerOptions = p->CommandLine->CompilerOptions();
 	return resp;
 }
 

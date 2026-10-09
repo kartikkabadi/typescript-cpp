@@ -362,7 +362,18 @@ private:
 	// corrupt the stream.
 	std::mutex mu;
 
-	gostd::Error handleRequest(gostd::Context ctx, Message* msg);
+	// calls tracks the nested Call depth on this connection and reading
+	// records whether a call is currently waiting on the wire; turn
+	// orders nested request handling in stack order (conn_sync.go).
+	int calls{0};
+	bool reading{false};
+	std::condition_variable turn;
+
+	// lockTurn — conn_sync.go lockTurn: acquires mu once calls reaches
+	// depth, then marks reading when nested.
+	void lockTurn(int depth);
+
+	gostd::Error handleRequest(gostd::Context ctx, Message* msg, int depth);
 	void handleNotification(gostd::Context ctx, Message* msg);
 };
 

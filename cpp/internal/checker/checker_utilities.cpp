@@ -223,7 +223,7 @@ bool canHaveLocals(Node* node) {
 
 // utilities.go: isShorthandAmbientModuleSymbol (197)
 bool isShorthandAmbientModuleSymbol(Symbol* moduleSymbol) {
-	return isShorthandAmbientModule(moduleSymbol->valueDeclaration);
+	return isShorthandAmbientModule(moduleSymbol->data->valueDeclaration);
 }
 
 // utilities.go: isShorthandAmbientModule (201)
@@ -264,7 +264,7 @@ bool isSyntacticDefault(Node* node) {
 
 // utilities.go: hasExportAssignmentSymbol (256)
 bool hasExportAssignmentSymbol(Symbol* moduleSymbol) {
-	return moduleSymbol->exports.count(InternalSymbolNameExportEquals) != 0;
+	return moduleSymbol->data->exports.count(InternalSymbolNameExportEquals) != 0;
 }
 
 // utilities.go: hasOnlyExpressionInitializer (264)
@@ -345,11 +345,11 @@ int CompareTypes(Type* t1, Type* t2) {
 			if ((t1->objectFlags & ObjectFlagsInstantiationExpressionType) &&
 				(t2->objectFlags & ObjectFlagsInstantiationExpressionType)) {
 				Node *declaration1 = nullptr, *declaration2 = nullptr;
-				if (t1->symbol != nullptr && !t1->symbol->declarations.empty()) {
-					declaration1 = t1->symbol->declarations[0];
+				if (t1->symbol != nullptr && !t1->symbol->data->declarations.empty()) {
+					declaration1 = t1->symbol->data->declarations[0];
 				}
-				if (t2->symbol != nullptr && !t2->symbol->declarations.empty()) {
-					declaration2 = t2->symbol->declarations[0];
+				if (t2->symbol != nullptr && !t2->symbol->data->declarations.empty()) {
+					declaration2 = t2->symbol->data->declarations[0];
 				}
 				// A single instantiation expression can produce multiple types for union constituents,
 				// so compare their source declarations before comparing the shared expression node.
@@ -601,7 +601,7 @@ int compareTypeNames(Type* t1, Type* t2) {
 	if (s2 == nullptr) {
 		return -1;
 	}
-	if (int c = s1->name.compare(s2->name); c != 0) {
+	if (int c = s1->data->name.compare(s2->data->name); c != 0) {
 		return c;
 	}
 	// Keep distinct same-named declarations together before comparing alias arguments or structure.
@@ -851,7 +851,7 @@ bool isPrivateIdentifierSymbol(Symbol* symbol) {
 	if (symbol == nullptr) {
 		return false;
 	}
-	return symbol->name.rfind(std::string(1, kInternalSymbolNamePrefix) + "#", 0) == 0;
+	return symbol->data->name.rfind(std::string(1, kInternalSymbolNamePrefix) + "#", 0) == 0;
 }
 
 // utilities.go: isClassInstanceProperty (1060)
@@ -1082,12 +1082,12 @@ std::string tryGetPropertyAccessOrIdentifierToString(Node* expr) {
 
 // utilities.go: allDeclarationsInSameSourceFile (1633)
 bool allDeclarationsInSameSourceFile(Symbol* symbol) {
-	if (symbol->declarations.size() > 1) {
+	if (symbol->data->declarations.size() > 1) {
 		SourceFile* sourceFile = nullptr;
-		for (size_t i = 0; i < symbol->declarations.size(); i++) {
+		for (size_t i = 0; i < symbol->data->declarations.size(); i++) {
 			if (i == 0) {
-				sourceFile = getSourceFileOfNode(symbol->declarations[i]);
-			} else if (getSourceFileOfNode(symbol->declarations[i]) != sourceFile) {
+				sourceFile = getSourceFileOfNode(symbol->data->declarations[i]);
+			} else if (getSourceFileOfNode(symbol->data->declarations[i]) != sourceFile) {
 				return false;
 			}
 		}
@@ -1412,9 +1412,9 @@ void Checker::reportObjectPossiblyNullOrUndefinedError(Node* node,
 
 // utilities.go:71 — isStaticPrivateIdentifierProperty
 bool isStaticPrivateIdentifierProperty(Symbol* s) {
-	return s->valueDeclaration != nullptr &&
-		isPrivateIdentifierClassElementDeclaration(s->valueDeclaration) &&
-		isStatic(s->valueDeclaration);
+	return s->data->valueDeclaration != nullptr &&
+		isPrivateIdentifierClassElementDeclaration(s->data->valueDeclaration) &&
+		isStatic(s->data->valueDeclaration);
 }
 
 // utilities.go:761 — getDeclarationModifierFlagsFromSymbolEx
@@ -1436,23 +1436,23 @@ ModifierFlags getDeclarationModifierFlagsFromSymbolEx(Symbol* s, bool isWrite) {
 		}
 		return accessModifier;
 	}
-	if (s->valueDeclaration != nullptr) {
+	if (s->data->valueDeclaration != nullptr) {
 		Node* declaration = nullptr;
 		if (isWrite) {
-			auto it = std::find_if(s->declarations.begin(), s->declarations.end(),
+			auto it = std::find_if(s->data->declarations.begin(), s->data->declarations.end(),
 								   isSetAccessorDeclaration);
-			if (it != s->declarations.end()) declaration = *it;
+			if (it != s->data->declarations.end()) declaration = *it;
 		}
 		if (declaration == nullptr && (s->flags & SymbolFlagsGetAccessor) != 0) {
-			auto it = std::find_if(s->declarations.begin(), s->declarations.end(),
+			auto it = std::find_if(s->data->declarations.begin(), s->data->declarations.end(),
 								   isGetAccessorDeclaration);
-			if (it != s->declarations.end()) declaration = *it;
+			if (it != s->data->declarations.end()) declaration = *it;
 		}
 		if (declaration == nullptr) {
-			declaration = s->valueDeclaration;
+			declaration = s->data->valueDeclaration;
 		}
 		ModifierFlags flags = getCombinedModifierFlags(declaration);
-		if (s->parent != nullptr && (s->parent->flags & SymbolFlagsClass) != 0) {
+		if (s->data->parent != nullptr && (s->data->parent->flags & SymbolFlagsClass) != 0) {
 			return flags;
 		}
 		return flags & ~ModifierFlagsAccessibilityModifier;
@@ -1470,9 +1470,9 @@ ModifierFlags getDeclarationModifierFlagsFromSymbol(Symbol* s) {
 
 // ast/utilities.go:2994 — GetClassLikeDeclarationOfSymbol
 Node* getClassLikeDeclarationOfSymbol(Symbol* symbol) {
-	auto it = std::find_if(symbol->declarations.begin(), symbol->declarations.end(),
+	auto it = std::find_if(symbol->data->declarations.begin(), symbol->data->declarations.end(),
 						   isClassLike);
-	return it == symbol->declarations.end() ? nullptr : *it;
+	return it == symbol->data->declarations.end() ? nullptr : *it;
 }
 
 // utilities.go:302 — isOptionalParameter (this file's owner; was a dep-stub

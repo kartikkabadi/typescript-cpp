@@ -287,13 +287,13 @@ bool isModuleSpecifierLike(Node* node) {
 
 // utilities.go:62 getNonModuleSymbolOfMergedModuleSymbol.
 Symbol* getNonModuleSymbolOfMergedModuleSymbol(Symbol* symbol) {
-	if (symbol->declarations.empty() ||
+	if (symbol->data->declarations.empty() ||
 	    (symbol->flags &
 	     (SymbolFlagsModule | SymbolFlagsTransient)) == 0) {
 		return nullptr;
 	}
 
-	if (Node* decl = findRange(symbol->declarations, [](Node* d) {
+	if (Node* decl = findRange(symbol->data->declarations, [](Node* d) {
 		    return !isSourceFile(d) && !isModuleDeclaration(d);
 	    });
 	    decl != nullptr) {
@@ -713,11 +713,11 @@ bool isRightSideOfPropertyAccess(Node* node) {
 
 // utilities.go:388 isStaticSymbol.
 bool isStaticSymbol(Symbol* symbol) {
-	if (symbol->valueDeclaration == nullptr) {
+	if (symbol->data->valueDeclaration == nullptr) {
 		return false;
 	}
 	ModifierFlags modifierFlags =
-	    symbol->valueDeclaration->modifierFlags();
+	    symbol->data->valueDeclaration->modifierFlags();
 	return (modifierFlags & ModifierFlagsStatic) != 0;
 }
 
@@ -1401,7 +1401,7 @@ SemanticMeaning getIntersectingMeaningFromDeclarations(
 	}
 
 	SemanticMeaning meaning = getMeaningFromLocation(node);
-	const std::vector<Node*>& declarations = symbol->declarations;
+	const std::vector<Node*>& declarations = symbol->data->declarations;
 	if (declarations.empty()) {
 		return meaning;
 	}
@@ -1472,7 +1472,7 @@ std::vector<Symbol*> getParentSymbolsOfPropertyAccess(Node* location,
 	std::vector<checker::Type*> possibleSymbols;
 	if ((lhsType->flags & checker::TypeFlagsUnionOrIntersection) != 0) {
 		possibleSymbols = lhsType->types();
-	} else if (lhsType->symbol != symbol->parent) {
+	} else if (lhsType->symbol != symbol->data->parent) {
 		possibleSymbols = {lhsType};
 	}
 	return mapNonNil(possibleSymbols, [](checker::Type* t) -> Symbol* {
@@ -1508,7 +1508,7 @@ Symbol* getPropertySymbolsFromBaseTypes(
 		    !seen.AddIfAbsent(symbol)) {
 			return nullptr;
 		}
-		for (Node* declaration : symbol->declarations) {
+		for (Node* declaration : symbol->data->declarations) {
 			for (Node* typeReference :
 			     getAllSuperTypeNodes(declaration)) {
 				checker::Type* propertyType =
@@ -1656,10 +1656,10 @@ caseClauseTracker* newCaseClauseTracker(checker::Checker* typeChecker,
 				Symbol* symbol =
 				    typeChecker->GetSymbolAtLocation(clause->expression());
 				if (symbol != nullptr &&
-				    symbol->valueDeclaration != nullptr &&
-				    isEnumMember(symbol->valueDeclaration)) {
+				    symbol->data->valueDeclaration != nullptr &&
+				    isEnumMember(symbol->data->valueDeclaration)) {
 					checker::LiteralValue enumValue = typeChecker->GetConstantValue(
-					    symbol->valueDeclaration);
+					    symbol->data->valueDeclaration);
 					if (!std::holds_alternative<std::monostate>(
 					        enumValue)) {
 						c->addValue(enumValue);

@@ -177,7 +177,7 @@ Node* createDeclarationName(NodeFactory* factory, checker::Checker* typeChecker,
 		return declaration->name()->clone(*factory);
 	}
 	if (symbol != nullptr) {
-		return factory->newIdentifier(symbol->name);
+		return factory->newIdentifier(symbol->data->name);
 	}
 	return nullptr;
 }
@@ -228,7 +228,7 @@ missingMemberFixer::createNodeBuilder() {
 std::vector<Node*> missingMemberFixer::createMemberFromSymbol(
     Symbol* symbol, Node* enclosingDeclaration, SourceFile* sourceFile,
     Node* body, preserveOptionalFlags preserveOptional, bool abstract) {
-	auto declarations = symbol->declarations;
+	auto declarations = symbol->data->declarations;
 	auto* declaration = firstOrNil(declarations);
 
 	auto quotePreference =
@@ -278,7 +278,7 @@ std::vector<Node*> missingMemberFixer::createMemberFromSymbol(
 	case Kind::SetAccessor: {
 		auto [nodeBuilder, idToSymbol] = createNodeBuilder();
 		auto accessors =
-		    getAllAccessorDeclarations(symbol->declarations, declaration);
+		    getAllAccessorDeclarations(symbol->data->declarations, declaration);
 		std::vector<Node*> orderedAccessors;
 		if (accessors.secondAccessor == nullptr) {
 			orderedAccessors.push_back(accessors.firstAccessor);
@@ -654,7 +654,7 @@ Node* missingMemberFixer::createSignatureDeclarationFromSignatures(
 	std::vector<std::string> parameterNames;
 	parameterNames.reserve(maxArgsSignature->parameters.size());
 	for (auto* symbol : maxArgsSignature->parameters) {
-		parameterNames.push_back(symbol->name);
+		parameterNames.push_back(symbol->data->name);
 	}
 	auto* parameters = createDummyParameters(
 	    changeTracker->nodeFactory, maxNonRestArgs, parameterNames,
@@ -771,7 +771,7 @@ Node* missingMemberFixer::importTypeNode(
 // getExportedSymbol — codeactions_missingmemberfixer.go:405.
 Symbol* missingMemberFixer::getExportedSymbol(Symbol* symbol) {
 	symbol = typeChecker->GetExportSymbolOfSymbol(symbol);
-	if (symbol == nullptr || symbol->parent == nullptr) {
+	if (symbol == nullptr || symbol->data->parent == nullptr) {
 		return nullptr;
 	}
 	return symbol;

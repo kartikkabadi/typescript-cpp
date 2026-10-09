@@ -274,7 +274,7 @@ std::pair<std::vector<Node*>, std::vector<SourceFile*>> getImportersForExport(
 	auto markSeenDirectImport = nodeSeenTracker();
 	auto markSeenIndirectUser = nodeSeenTracker();
 	bool isAvailableThroughGlobal = isSourceFileWithGlobalExports(
-	    exportInfo->exportingModuleSymbol->valueDeclaration);
+	    exportInfo->exportingModuleSymbol->data->valueDeclaration);
 
 	auto getDirectImports = [&](Symbol* moduleSymbol) -> std::vector<Node*> {
 		auto it = allDirectImports.find(moduleSymbol);
@@ -470,7 +470,7 @@ std::pair<std::vector<Node*>, std::vector<SourceFile*>> getImportersForExport(
 		}
 		// Module augmentations may use this module's exports without
 		// importing it.
-		for (auto* decl : exportInfo->exportingModuleSymbol->declarations) {
+		for (auto* decl : exportInfo->exportingModuleSymbol->data->declarations) {
 			if (isExternalModuleAugmentation(decl) &&
 			    sourceFilesSet->Has(
 			        getSourceFileOfNode(decl)->FileName())) {
@@ -538,7 +538,7 @@ getSearchesFromDirectImports(const std::vector<Node*>& directImports,
 	auto isNameMatch = [&](const std::string& name) {
 		// Use name of "default" even in `export =` case because we may
 		// have allowSyntheticDefaultImports
-		return name == exportSymbol->name ||
+		return name == exportSymbol->data->name ||
 		       (exportKind != ExportKindNamed &&
 		        name == InternalSymbolNameDefault);
 	};
@@ -581,7 +581,7 @@ getSearchesFromDirectImports(const std::vector<Node*>& directImports,
 				// But do rename `foo` in ` { default as foo }` if
 				// that's the original export name.
 				if (!isForRename ||
-				    name->text() == exportSymbol->name) {
+				    name->text() == exportSymbol->data->name) {
 					// Search locally for `bar`.
 					addSearch(name, ch->getSymbolAtLocation(name,
 					                                        false));
@@ -709,7 +709,7 @@ ImportExportSymbol* getImportOrExportSymbol(Node* node, Symbol* symbol,
 		    [&](Node* ex) -> ImportExportSymbol* {
 			// Get the symbol for the `export =` node; its parent is
 			// the module it's the export of.
-			if (ex->symbol()->parent == nullptr) {
+			if (ex->symbol()->data->parent == nullptr) {
 				return nullptr;
 			}
 			auto exportKind =
@@ -720,7 +720,7 @@ ImportExportSymbol* getImportOrExportSymbol(Node* node, Symbol* symbol,
 			    .kind = ImpExpKindExport,
 			    .symbol = symbol,
 			    .exportInfo = new ExportInfo{
-			        .exportingModuleSymbol = ex->symbol()->parent,
+			        .exportingModuleSymbol = ex->symbol()->data->parent,
 			        .exportKind = exportKind,
 			    },
 			};
@@ -758,20 +758,20 @@ ImportExportSymbol* getImportOrExportSymbol(Node* node, Symbol* symbol,
 
 		auto* parent = node->parent;
 		auto* grandparent = parent->parent;
-		if (symbol->exportSymbol != nullptr) {
+		if (symbol->data->exportSymbol != nullptr) {
 			if (isPropertyAccessExpression(parent)) {
 				// When accessing an export of a JS module, there's
 				// no alias. The symbol will still be flagged as an
 				// export even though we're at the use.
 				// So check that we are at the declaration.
 				if (isBinaryExpression(grandparent) &&
-				    contains(symbol->declarations, parent)) {
+				    contains(symbol->data->declarations, parent)) {
 					return getSpecialPropertyExport(
 					    grandparent, false /*useLhsSymbol*/);
 				}
 				return nullptr;
 			}
-			return exportInfo(symbol->exportSymbol,
+			return exportInfo(symbol->data->exportSymbol,
 			                  getExportKindForDeclaration(parent));
 		} else {
 			auto* exportNode = getExportNode(parent, node);
@@ -844,7 +844,7 @@ ImportExportSymbol* getImportOrExportSymbol(Node* node, Symbol* symbol,
 			return nullptr;
 		}
 		// Similarly, skip past the symbol for 'export ='
-		if (importedSymbol->name == "export=") {
+		if (importedSymbol->data->name == "export=") {
 			importedSymbol =
 			    getExportEqualsLocalSymbol(importedSymbol, ch);
 			if (importedSymbol == nullptr) {
@@ -861,7 +861,7 @@ ImportExportSymbol* getImportOrExportSymbol(Node* node, Symbol* symbol,
 		auto importedName = symbolNameNoDefault(importedSymbol);
 		if (importedName == "" ||
 		    importedName == InternalSymbolNameDefault ||
-		    importedName == symbol->name) {
+		    importedName == symbol->data->name) {
 			return new ImportExportSymbol{
 			    .kind = ImpExpKindImport,
 			    .symbol = importedSymbol,
@@ -882,9 +882,9 @@ ExportInfo* getExportInfo(Symbol* exportSymbol, ExportKind exportKind,
                           checker::Checker* ch) {
 	// Parent can be nil if an `export` is not at the top-level (which is
 	// a compile error).
-	if (exportSymbol->parent != nullptr) {
+	if (exportSymbol->data->parent != nullptr) {
 		auto* exportingModuleSymbol =
-		    ch->getMergedSymbol(exportSymbol->parent);
+		    ch->getMergedSymbol(exportSymbol->data->parent);
 		// `export` may appear in a namespace. In that case, just rely
 		// on global search.
 		if (checker::isExternalModuleSymbol(exportingModuleSymbol)) {
@@ -954,7 +954,7 @@ bool isExternalModuleImportEquals(Node* node) {
 Symbol* skipExportSpecifierSymbol(Symbol* symbol, checker::Checker* ch) {
 	// For `export { foo } from './bar", there's nothing to skip, because
 	// it does not create a new alias. But `export { foo } does.
-	for (auto* declaration : symbol->declarations) {
+	for (auto* declaration : symbol->data->declarations) {
 		if (isExportSpecifier(declaration) &&
 		    declaration->propertyName() == nullptr &&
 		    declaration->parent->parent->moduleSpecifier() == nullptr) {
@@ -988,7 +988,7 @@ Symbol* getExportEqualsLocalSymbol(Symbol* importedSymbol,
 	if (importedSymbol->flags & SymbolFlagsAlias) {
 		return ch->GetImmediateAliasedSymbol(importedSymbol);
 	}
-	auto* decl = importedSymbol->valueDeclaration;
+	auto* decl = importedSymbol->data->valueDeclaration;
 	debug::assert(decl != nullptr);
 	if (isExportAssignment(decl)) {
 		return decl->expression()->symbol();
@@ -1004,10 +1004,10 @@ Symbol* getExportEqualsLocalSymbol(Symbol* importedSymbol,
 
 // symbolNameNoDefault — importTracker.go:701.
 std::string symbolNameNoDefault(Symbol* symbol) {
-	if (symbol->name != InternalSymbolNameDefault) {
-		return symbol->name;
+	if (symbol->data->name != InternalSymbolNameDefault) {
+		return symbol->data->name;
 	}
-	for (auto* decl : symbol->declarations) {
+	for (auto* decl : symbol->data->declarations) {
 		auto* name = getNameOfDeclaration(decl);
 		if (name != nullptr && isIdentifier(name)) {
 			return name->text();
@@ -1028,7 +1028,7 @@ std::vector<ModuleReference> findModuleReferences(
 
 	for (auto* referencingFile : sourceFiles) {
 		auto* searchSourceFile =
-		    searchModuleSymbol->valueDeclaration;
+		    searchModuleSymbol->data->valueDeclaration;
 		if (searchSourceFile != nullptr &&
 		    searchSourceFile->kind == Kind::SourceFile) {
 			// Check <reference path> directives

@@ -499,8 +499,8 @@ LanguageService::getStringLiteralCompletionEntries(
 		}
 		std::vector<Symbol*> uniques =
 		    filterList(exports_, [&](Symbol* e) {
-			    return e->name != InternalSymbolNameDefault &&
-			           !existing.Has(e->name);
+			    return e->data->name != InternalSymbolNameDefault &&
+			           !existing.Has(e->data->name);
 		    });
 		auto* fromProperties = new completionsFromProperties();
 		fromProperties->symbols = uniques;
@@ -519,9 +519,9 @@ LanguageService::getStringLiteralCompletionEntries(
 			auto* fromProperties = new completionsFromProperties();
 			fromProperties->symbols = filterList(
 			    properties, [](Symbol* s) {
-				    return s->valueDeclaration == nullptr ||
+				    return s->data->valueDeclaration == nullptr ||
 				           !isPrivateIdentifierClassElementDeclaration(
-				               s->valueDeclaration);
+				               s->data->valueDeclaration);
 			    });
 			fromProperties->hasIndexSignature = false;
 			auto* result = new stringLiteralCompletions();
@@ -649,7 +649,7 @@ stringLiteralCompletions* fromUnionableLiteralType(
 			filtered->symbols =
 			    filterList(fromProperties->symbols, [&](Symbol* s) {
 				    return !containsElem(alreadyUsedTypes,
-				                         s->name);
+				                         s->data->name);
 			    });
 			filtered->hasIndexSignature =
 			    fromProperties->hasIndexSignature;
@@ -717,9 +717,9 @@ completionsFromProperties* stringLiteralCompletionsFromProperties(
 	auto* result = new completionsFromProperties();
 	result->symbols = filterList(
 	    typeChecker->GetApparentProperties(t), [](Symbol* s) {
-		    return !(s->valueDeclaration != nullptr &&
+		    return !(s->data->valueDeclaration != nullptr &&
 		             isPrivateIdentifierClassElementDeclaration(
-		                 s->valueDeclaration));
+		                 s->data->valueDeclaration));
 	    });
 	result->hasIndexSignature = hasIndexSignature(t, typeChecker);
 	return result;
@@ -1143,7 +1143,7 @@ std::string getAmbientModuleName(Symbol* symbol) {
 	    isModuleWithStringLiteralName(declaration)) {
 		return std::string(declaration->name()->text());
 	}
-	return stripQuotes(symbol->name);
+	return stripQuotes(symbol->data->name);
 }
 
 // string_completions.go:931 getCompletionEntriesFromTypings.
@@ -2500,7 +2500,7 @@ lsproto::CompletionItem* LanguageService::stringLiteralCompletionDetails(
 		completionsFromProperties* properties =
 		    completion->fromProperties;
 		for (Symbol* symbol : properties->symbols) {
-			if (symbol->name == name) {
+			if (symbol->data->name == name) {
 				return createCompletionDetailsForSymbol(
 				    item, symbol, checker, location, position,
 				    docFormat);

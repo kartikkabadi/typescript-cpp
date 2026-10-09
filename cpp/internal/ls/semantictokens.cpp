@@ -237,9 +237,9 @@ std::pair<tokenType, bool> classifySymbol(Symbol* symbol,
 	}
 
 	// Check the value declaration
-	::tsc::Node* decl = symbol->valueDeclaration;
-	if (decl == nullptr && !symbol->declarations.empty()) {
-		decl = symbol->declarations[0];
+	::tsc::Node* decl = symbol->data->valueDeclaration;
+	if (decl == nullptr && !symbol->data->declarations.empty()) {
+		decl = symbol->data->declarations[0];
 	}
 	if (decl != nullptr) {
 		if (isBindingElement(decl)) {
@@ -539,7 +539,7 @@ std::vector<semanticToken> LanguageService::collectSemanticTokensInRange(
 					tt = reclassifyByType(c, node, tt);
 
 					// Get the value declaration to check modifiers
-					if (::tsc::Node* decl = symbol->valueDeclaration;
+					if (::tsc::Node* decl = symbol->data->valueDeclaration;
 						decl != nullptr) {
 						ModifierFlags modifiers = getCombinedModifierFlags(decl);
 						NodeFlags nodeFlags = getCombinedNodeFlags(decl);
@@ -567,8 +567,8 @@ std::vector<semanticToken> LanguageService::collectSemanticTokensInRange(
 								declSourceFile->Path())) {
 							mod |= tokenModifierDefaultLibrary;
 						}
-					} else if (!symbol->declarations.empty()) {
-						for (auto* decl : symbol->declarations) {
+					} else if (!symbol->data->declarations.empty()) {
+						for (auto* decl : symbol->data->declarations) {
 							SourceFile* declSourceFile =
 								getSourceFileOfNode(decl);
 							if (declSourceFile != nullptr &&

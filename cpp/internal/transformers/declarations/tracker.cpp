@@ -131,7 +131,7 @@ void SymbolTrackerImpl::ReportNonlocalAugmentation(
 	Symbol* augmentingSymbol) {
 	// core.Find
 	Node* primaryDeclaration = nullptr;
-	for (Node* d : parentSymbol->declarations) {
+	for (Node* d : parentSymbol->data->declarations) {
 		if (getSourceFileOfNode(d) == containingFile) {
 			primaryDeclaration = d;
 			break;
@@ -139,7 +139,7 @@ void SymbolTrackerImpl::ReportNonlocalAugmentation(
 	}
 	// core.Filter
 	std::vector<Node*> augmentingDeclarations;
-	for (Node* d : augmentingSymbol->declarations) {
+	for (Node* d : augmentingSymbol->data->declarations) {
 		if (getSourceFileOfNode(d) != containingFile) {
 			augmentingDeclarations.push_back(d);
 		}

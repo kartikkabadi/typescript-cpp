@@ -298,8 +298,8 @@ void clearCachedInferences(std::vector<InferenceInfo*>& inferences) {
 }
 
 Node* getFirstDeclaration(Symbol* symbol) {
-	if (!symbol->declarations.empty()) {
-		return symbol->declarations[0];
+	if (!symbol->data->declarations.empty()) {
+		return symbol->data->declarations[0];
 	}
 	return nullptr;
 }
@@ -1285,7 +1285,7 @@ std::vector<Type*> Checker::removeSubtypes(std::vector<Type*> types, bool hasObj
 					if (keyProperty != nullptr &&
 						(target->flags & (TypeFlagsObject | TypeFlagsIntersection |
 							 TypeFlagsInstantiableNonPrimitive))) {
-						Type* t = getTypeOfPropertyOfType(target, keyProperty->name);
+						Type* t = getTypeOfPropertyOfType(target, keyProperty->data->name);
 						if (t != nullptr && isUnitType(t) &&
 							getRegularTypeOfLiteralType(t) != keyPropertyType) {
 							continue;
@@ -2020,7 +2020,7 @@ Type* Checker::getStringMappingType(Symbol* symbol, Type* t) {
 }
 
 std::string Checker::applyStringMapping(Symbol* symbol, const std::string& str) {
-	auto it = intrinsicTypeKinds.find(symbol->name);
+	auto it = intrinsicTypeKinds.find(symbol->data->name);
 	if (it == intrinsicTypeKinds.end()) {
 		return str;
 	}
@@ -2044,7 +2044,7 @@ std::string Checker::applyStringMapping(Symbol* symbol, const std::string& str) 
 
 std::pair<std::vector<std::string>, std::vector<Type*>> Checker::applyTemplateStringMapping(
 	Symbol* symbol, const std::vector<std::string>& texts, const std::vector<Type*>& types) {
-	auto it = intrinsicTypeKinds.find(symbol->name);
+	auto it = intrinsicTypeKinds.find(symbol->data->name);
 	if (it == intrinsicTypeKinds.end()) {
 		return {texts, types};
 	}
@@ -2203,7 +2203,7 @@ void Checker::mergeSymbolTable(SymbolTable& target, const SymbolTable& source,
 			// should be the merged module symbol. But the symbol for `B` has only one declaration, so its parent should
 			// be the module augmentation symbol, which contains its only declaration.
 			if (merged->flags & SymbolFlagsTransient) {
-				merged->parent = mergedParent;
+				merged->data->parent = mergedParent;
 			}
 		}
 		target[id] = merged;
@@ -2244,16 +2244,16 @@ Symbol* Checker::mergeSymbol(Symbol* target, Symbol* source, bool unidirectional
 			sourceFlags &= ~SymbolFlagsConstEnumOnlyModule;
 		}
 		target->flags |= sourceFlags;
-		if (source->valueDeclaration != nullptr) {
-			setValueDeclaration(target, source->valueDeclaration);
+		if (source->data->valueDeclaration != nullptr) {
+			setValueDeclaration(target, source->data->valueDeclaration);
 		}
-		target->declarations.insert(target->declarations.end(), source->declarations.begin(),
-									source->declarations.end());
-		if (!source->members.empty()) {
-			mergeSymbolTable(getSymbolTable(target->members), source->members, unidirectional, nullptr);
+		target->data->declarations.insert(target->data->declarations.end(), source->data->declarations.begin(),
+									source->data->declarations.end());
+		if (!source->data->members.empty()) {
+			mergeSymbolTable(getSymbolTable(target->data->members), source->data->members, unidirectional, nullptr);
 		}
-		if (!source->exports.empty()) {
-			mergeSymbolTable(getSymbolTable(target->exports), source->exports, unidirectional, target);
+		if (!source->data->exports.empty()) {
+			mergeSymbolTable(getSymbolTable(target->data->exports), source->data->exports, unidirectional, target);
 		}
 		if (!unidirectional) {
 			recordMergedSymbol(target, source);
@@ -2300,8 +2300,8 @@ void Checker::reportMergeSymbolError(Symbol* target, Symbol* source) {
 
 void Checker::addDuplicateDeclarationErrorsForSymbols(Symbol* target, const DiagnosticMessage* message,
 													  const std::string& symbolName, Symbol* source) {
-	for (Node* node : target->declarations) {
-		addDuplicateDeclarationError(node, message, symbolName, source->declarations);
+	for (Node* node : target->data->declarations) {
+		addDuplicateDeclarationError(node, message, symbolName, source->data->declarations);
 	}
 }
 
@@ -2337,12 +2337,12 @@ void Checker::addDuplicateDeclarationError(Node* node, const DiagnosticMessage* 
 }
 
 Symbol* Checker::cloneSymbol(Symbol* symbol) {
-	Symbol* result = newSymbol(symbol->flags, symbol->name);
-	result->declarations = symbol->declarations;
-	result->parent = symbol->parent;
-	result->valueDeclaration = symbol->valueDeclaration;
-	result->members = symbol->members;
-	result->exports = symbol->exports;
+	Symbol* result = newSymbol(symbol->flags, symbol->data->name);
+	result->data->declarations = symbol->data->declarations;
+	result->data->parent = symbol->data->parent;
+	result->data->valueDeclaration = symbol->data->valueDeclaration;
+	result->data->members = symbol->data->members;
+	result->data->exports = symbol->data->exports;
 	recordMergedSymbol(result, symbol);
 	return result;
 }
@@ -2358,8 +2358,8 @@ Symbol* Checker::getMergedSymbol(Symbol* symbol) {
 }
 
 Symbol* Checker::getParentOfSymbol(Symbol* symbol) {
-	if (symbol->parent != nullptr) {
-		return getMergedSymbol(getLateBoundSymbol(symbol->parent));
+	if (symbol->data->parent != nullptr) {
+		return getMergedSymbol(getLateBoundSymbol(symbol->data->parent));
 	}
 	return nullptr;
 }
@@ -2380,8 +2380,8 @@ Symbol* Checker::getSymbolIfSameReference(Symbol* s1, Symbol* s2) {
 }
 
 Symbol* Checker::getExportSymbolOfValueSymbolIfExported(Symbol* symbol) {
-	if (symbol != nullptr && (symbol->flags & SymbolFlagsExportValue) && symbol->exportSymbol != nullptr) {
-		symbol = symbol->exportSymbol;
+	if (symbol != nullptr && (symbol->flags & SymbolFlagsExportValue) && symbol->data->exportSymbol != nullptr) {
+		symbol = symbol->data->exportSymbol;
 	}
 	return getMergedSymbol(symbol);
 }
@@ -2414,15 +2414,15 @@ static void extendExportSymbols(Checker* c, SymbolTable& target, const SymbolTab
 								ExportCollisionTable* lookupTable, Node* exportNode);
 
 Symbol* Checker::getLateBoundSymbol(Symbol* symbol) {
-	if (!(symbol->flags & SymbolFlagsClassMember) || symbol->name != InternalSymbolNameComputed) {
+	if (!(symbol->flags & SymbolFlagsClassMember) || symbol->data->name != InternalSymbolNameComputed) {
 		return symbol;
 	}
 	LateBoundLinks* links = lateBoundLinks.Get(symbol);
 	if (links->lateSymbol == nullptr &&
-		someList(symbol->declarations, [this](Node* d) { return hasLateBindableName(d); })) {
+		someList(symbol->data->declarations, [this](Node* d) { return hasLateBindableName(d); })) {
 		// force late binding of members/exports. This will set the late-bound symbol
-		Symbol* parent = getMergedSymbol(symbol->parent);
-		if (someList(symbol->declarations, hasStaticModifier)) {
+		Symbol* parent = getMergedSymbol(symbol->data->parent);
+		if (someList(symbol->data->declarations, hasStaticModifier)) {
 			getExportsOfSymbol(parent);
 		} else {
 			getMembersOfSymbol(parent);
@@ -2541,7 +2541,7 @@ const SymbolTable& Checker::getExportsOfSymbol(Symbol* symbol) {
 	if (symbol->flags & SymbolFlagsModule) {
 		return getExportsOfModule(symbol);
 	}
-	return symbol->exports;
+	return symbol->data->exports;
 }
 
 const SymbolTable& Checker::getResolvedMembersOrExportsOfSymbol(Symbol* symbol,
@@ -2553,9 +2553,9 @@ const SymbolTable& Checker::getResolvedMembersOrExportsOfSymbol(Symbol* symbol,
 		// read (lateBindMember looks up, combineSymbolTables builds a new map)
 		// so a const-ref is equivalent and skips the deep copy.
 		std::pair<SymbolTable, std::unordered_map<std::string, Node*>> moduleWorker;
-		const SymbolTable* earlySymbols = &symbol->exports;
+		const SymbolTable* earlySymbols = &symbol->data->exports;
 		if (!isStatic) {
-			earlySymbols = &symbol->members;
+			earlySymbols = &symbol->data->members;
 		} else if (symbol->flags & SymbolFlagsModule) {
 			moduleWorker = getExportsOfModuleWorker(symbol);
 			earlySymbols = &moduleWorker.first;
@@ -2563,7 +2563,7 @@ const SymbolTable& Checker::getResolvedMembersOrExportsOfSymbol(Symbol* symbol,
 		(*links)[resolutionKind] = *earlySymbols;
 		// fill in any as-yet-unresolved late-bound members.
 		SymbolTable lateSymbols;
-		for (Node* decl : symbol->declarations) {
+		for (Node* decl : symbol->data->declarations) {
 			for (Node* member : getMembersOfDeclaration(decl)) {
 				if (isStatic == static_cast<bool>(hasStaticModifier(member))) {
 					if (hasLateBindableName(member)) {
@@ -2575,10 +2575,10 @@ const SymbolTable& Checker::getResolvedMembersOrExportsOfSymbol(Symbol* symbol,
 			}
 		}
 		if (isStatic) {
-			auto it = symbol->exports.find(InternalSymbolNameAssignmentDeclaration);
-			if (it != symbol->exports.end()) {
+			auto it = symbol->data->exports.find(InternalSymbolNameAssignmentDeclaration);
+			if (it != symbol->data->exports.end()) {
 				Symbol* assignmentSymbol = it->second;
-				for (Node* member : assignmentSymbol->declarations) {
+				for (Node* member : assignmentSymbol->data->declarations) {
 					if (hasLateBindableName(member)) {
 						lateBindMember(symbol, *earlySymbols, lateSymbols, member);
 					}
@@ -2636,11 +2636,11 @@ Symbol* Checker::lateBindMember(Symbol* parent, const SymbolTable& earlySymbols,
 				// report an error at each declaration.
 				std::vector<Node*> declarations;
 				if (earlySymbol != nullptr) {
-					declarations = earlySymbol->declarations;
-					declarations.insert(declarations.end(), lateSymbol->declarations.begin(),
-										lateSymbol->declarations.end());
+					declarations = earlySymbol->data->declarations;
+					declarations.insert(declarations.end(), lateSymbol->data->declarations.begin(),
+										lateSymbol->data->declarations.end());
 				} else {
-					declarations = lateSymbol->declarations;
+					declarations = lateSymbol->data->declarations;
 				}
 				std::string name = memberName;
 				if (t->flags & TypeFlagsUniqueESSymbol) {
@@ -2659,8 +2659,8 @@ Symbol* Checker::lateBindMember(Symbol* parent, const SymbolTable& earlySymbols,
 			}
 			valueSymbolLinks.Get(lateSymbol)->nameType = t;
 			addDeclarationToLateBoundSymbol(lateSymbol, decl, symbolFlags);
-			if (lateSymbol->parent == nullptr) {
-				lateSymbol->parent = parent;
+			if (lateSymbol->data->parent == nullptr) {
+				lateSymbol->data->parent = parent;
 			}
 			links->resolvedSymbol = lateSymbol;
 			links->resolvedSymbolCheckFile = checkFileTag();
@@ -2693,9 +2693,9 @@ void Checker::lateBindIndexSignature(Symbol* parent, const SymbolTable& earlySym
 	// Then just add the computed name as a late bound declaration
 	// (note: unlike `addDeclarationToLateBoundSymbol` we do not set up a `.lateSymbol` on `decl`'s links,
 	// since that would point at an index symbol and not a single property symbol, like most consumers would expect)
-	if (indexSymbol->declarations.empty() ||
+	if (indexSymbol->data->declarations.empty() ||
 		!(decl->symbol()->flags & SymbolFlagsReplaceableByMethod)) {
-		indexSymbol->declarations.push_back(decl);
+		indexSymbol->data->declarations.push_back(decl);
 	}
 }
 
@@ -2709,20 +2709,20 @@ static bool isNotReplacableByMethod(Node* decl) {
 void Checker::addDeclarationToLateBoundSymbol(Symbol* symbol, Node* member, SymbolFlags symbolFlags) {
 	TSC_ASSERT(symbol->checkFlags & CheckFlagsLate, "Expected a late-bound symbol.");
 	lateBoundLinks.Get(member->symbol())->lateSymbol = symbol;
-	if (symbol->declarations.empty() ||
+	if (symbol->data->declarations.empty() ||
 		!(member->symbol()->flags & SymbolFlagsReplaceableByMethod)) {
 		symbol->flags |= symbolFlags;
-		symbol->declarations.push_back(member);
+		symbol->data->declarations.push_back(member);
 	} else if ((symbol->flags & SymbolFlagsReplaceableByMethod) &&
 			   (member->symbol()->flags & SymbolFlagsMethod)) {
 		// Remove all replacable-by-method members, along with their flags.
-		symbol->declarations.erase(
-			std::remove_if(symbol->declarations.begin(), symbol->declarations.end(), isNotReplacableByMethod),
-			symbol->declarations.end());
-		symbol->declarations.push_back(member);
+		symbol->data->declarations.erase(
+			std::remove_if(symbol->data->declarations.begin(), symbol->data->declarations.end(), isNotReplacableByMethod),
+			symbol->data->declarations.end());
+		symbol->data->declarations.push_back(member);
 		SymbolFlags oldFlags = symbol->flags;
 		symbol->flags = SymbolFlagsTransient;
-		for (Node* d : symbol->declarations) {
+		for (Node* d : symbol->data->declarations) {
 			symbol->flags |= d->symbol()->flags;
 		}
 		if (oldFlags & SymbolFlagsAccessor) {
@@ -2739,7 +2739,7 @@ const SymbolTable& Checker::getMembersOfSymbol(Symbol* symbol) {
 	if (symbol->flags & SymbolFlagsLateBindingContainer) {
 		return getResolvedMembersOrExportsOfSymbol(symbol, MembersOrExportsResolutionKindResolvedMembers);
 	}
-	return symbol->members;
+	return symbol->data->members;
 }
 
 const SymbolTable& Checker::getExportsOfModule(Symbol* moduleSymbol) {
@@ -2766,25 +2766,25 @@ Checker::getExportsOfModuleWorker(Symbol* moduleSymbol) {
 			// Add non-type-only names before checking if we've visited this module,
 			// because we might have visited it via an 'export type *', and visiting
 			// again with 'export *' will override the type-onlyness of its exports.
-			for (auto& [name, _] : symbol->exports) {
+			for (auto& [name, _] : symbol->data->exports) {
 				nonTypeOnlyNames.Add(name);
 			}
 		}
-		if (symbol == nullptr || symbol->exports.empty() ||
+		if (symbol == nullptr || symbol->data->exports.empty() ||
 			std::find(visitedSymbols.begin(), visitedSymbols.end(), symbol) != visitedSymbols.end()) {
 			return {};
 		}
 		visitedSymbols.push_back(symbol);
-		SymbolTable symbols = symbol->exports;
+		SymbolTable symbols = symbol->data->exports;
 		// All export * declarations are collected in an __export symbol by the binder
 		Symbol* exportStars = nullptr;
-		if (auto it = symbol->exports.find(InternalSymbolNameExportStar); it != symbol->exports.end()) {
+		if (auto it = symbol->data->exports.find(InternalSymbolNameExportStar); it != symbol->data->exports.end()) {
 			exportStars = it->second;
 		}
 		if (exportStars != nullptr) {
 			SymbolTable nestedSymbols;
 			ExportCollisionTable lookupTable;
-			for (Node* node : exportStars->declarations) {
+			for (Node* node : exportStars->data->declarations) {
 				Symbol* resolvedModule = resolveExternalModuleName(
 					node, node->moduleSpecifier(), false /*ignoreErrors*/,
 					getTypeFromImportAttributes(getImportAttributes(node)));
@@ -2815,8 +2815,8 @@ Checker::getExportsOfModuleWorker(Symbol* moduleSymbol) {
 	};
 	Symbol* originalModule = nullptr;
 	if (moduleSymbol != nullptr) {
-		auto it = moduleSymbol->exports.find(InternalSymbolNameExportEquals);
-		if (it != moduleSymbol->exports.end() &&
+		auto it = moduleSymbol->data->exports.find(InternalSymbolNameExportEquals);
+		if (it != moduleSymbol->data->exports.end() &&
 			resolveSymbolEx(it->second, false /*dontResolveAlias*/) != nullptr) {
 			originalModule = moduleSymbol;
 		}
@@ -2828,16 +2828,16 @@ Checker::getExportsOfModuleWorker(Symbol* moduleSymbol) {
 		exports = SymbolTable{};
 	}
 	// A CommonJS module defined by an 'export=' might also export typedefs, stored on the original module
-	if (originalModule != nullptr && originalModule->exports.size() > 1) {
-		for (auto& [name, symbol] : originalModule->exports) {
-			if (symbol->name == InternalSymbolNameExportEquals ||
-				symbol->name == InternalSymbolNameExportStar) {
+	if (originalModule != nullptr && originalModule->data->exports.size() > 1) {
+		for (auto& [name, symbol] : originalModule->data->exports) {
+			if (symbol->data->name == InternalSymbolNameExportEquals ||
+				symbol->data->name == InternalSymbolNameExportStar) {
 				continue;
 			}
 			SymbolFlags flags = getSymbolFlags(symbol);
 			if ((flags & (SymbolFlagsType | SymbolFlagsNamespace)) &&
-				!(flags & SymbolFlagsValue) && exports.count(symbol->name) == 0) {
-				exports[symbol->name] = symbol;
+				!(flags & SymbolFlagsValue) && exports.count(symbol->data->name) == 0) {
+				exports[symbol->data->name] = symbol;
 			}
 		}
 	}
@@ -2946,7 +2946,7 @@ Symbol* Checker::tryResolveAlias(Symbol* symbol) {
 }
 
 Node* Checker::getDeclarationOfAliasSymbol(Symbol* symbol) {
-	for (auto it = symbol->declarations.rbegin(); it != symbol->declarations.rend(); ++it) {
+	for (auto it = symbol->data->declarations.rbegin(); it != symbol->data->declarations.rend(); ++it) {
 		if (isAliasSymbolDeclaration(*it)) {
 			return *it;
 		}
@@ -3030,18 +3030,18 @@ bool Checker::typeResolutionHasProperty(TypeResolution* r) {
 }
 
 Type* Checker::reportCircularityError(Symbol* symbol) {
-	Node* declaration = symbol->valueDeclaration;
+	Node* declaration = symbol->data->valueDeclaration;
 	// Check if variable has type annotation that circularly references the variable itself
 	if (declaration != nullptr) {
 		if (declaration->type() != nullptr) {
-			error(symbol->valueDeclaration,
+			error(symbol->data->valueDeclaration,
 				  X_0_is_referenced_directly_or_indirectly_in_its_own_type_annotation,
 				  {symbolToString(symbol)});
 			return errorType;
 		}
 		// Check if variable has initializer that circularly references the variable itself
 		if (noImplicitAny && (!isParameterDeclaration(declaration) || declaration->initializer() != nullptr)) {
-			error(symbol->valueDeclaration,
+			error(symbol->data->valueDeclaration,
 				  X_0_implicitly_has_type_any_because_it_does_not_have_a_type_annotation_and_is_referenced_directly_or_indirectly_in_its_own_initializer,
 				  {symbolToString(symbol)});
 		}
@@ -3301,7 +3301,7 @@ Type* Checker::getDeclaredTypeOfClassOrInterface(Symbol* symbol) {
 // to "this" in its body, if all base types are interfaces, and if none of the base
 // interfaces have a "this" type.
 bool Checker::isThislessInterface(Symbol* symbol) {
-	for (Node* declaration : symbol->declarations) {
+	for (Node* declaration : symbol->data->declarations) {
 		if (isInterfaceDeclaration(declaration)) {
 			if (declaration->flags & NodeFlagsContainsThis) {
 				return false;
@@ -3329,9 +3329,9 @@ bool Checker::isThislessInterface(Symbol* symbol) {
 // outer type parameters.
 Node* Checker::getClassOrInterfaceLikeDeclaration(Symbol* symbol) {
 	if (symbol->flags & (SymbolFlagsClass | SymbolFlagsFunction)) {
-		return symbol->valueDeclaration;
+		return symbol->data->valueDeclaration;
 	}
-	for (Node* d : symbol->declarations) {
+	for (Node* d : symbol->data->declarations) {
 		if (isInterfaceDeclaration(d)) {
 			return d;
 		}
@@ -3457,7 +3457,7 @@ std::vector<Type*> Checker::getLocalTypeParametersOfClassOrInterfaceOrTypeAlias(
 
 std::vector<Type*> Checker::appendLocalTypeParametersOfClassOrInterfaceOrTypeAlias(
 	std::vector<Type*> types, Symbol* symbol) {
-	for (Node* node : symbol->declarations) {
+	for (Node* node : symbol->data->declarations) {
 		if (nodeKindIs(node, Kind::InterfaceDeclaration, Kind::ClassDeclaration,
 					   Kind::ClassExpression) ||
 			isTypeAlias(node)) {
@@ -3499,7 +3499,7 @@ Type* Checker::getDeclaredTypeOfTypeAlias(Symbol* symbol) {
 			return errorType;
 		}
 		Node* declaration = nullptr;
-		for (Node* d : symbol->declarations) {
+		for (Node* d : symbol->data->declarations) {
 			if (isTypeOrJSTypeAliasDeclaration(d)) {
 				declaration = d;
 				break;
@@ -3518,7 +3518,7 @@ Type* Checker::getDeclaredTypeOfTypeAlias(Symbol* symbol) {
 				links->instantiations = CacheMap<Type*>{};
 				links->instantiations[getTypeListKey(typeParameters)] = t;
 			}
-			if (t == intrinsicMarkerType && symbol->name == "BuiltinIteratorReturn") {
+			if (t == intrinsicMarkerType && symbol->data->name == "BuiltinIteratorReturn") {
 				t = getBuiltinIteratorReturnType();
 			}
 		} else {
@@ -3541,7 +3541,7 @@ Type* Checker::getDeclaredTypeOfEnum(Symbol* symbol) {
 	DeclaredTypeLinks* links = declaredTypeLinks.Get(symbol);
 	if (links->declaredType == nullptr) {
 		std::vector<Type*> memberTypeList;
-		for (Node* declaration : symbol->declarations) {
+		for (Node* declaration : symbol->data->declarations) {
 			if (declaration->kind == Kind::EnumDeclaration) {
 				for (Node* member : declaration->members()) {
 					if (!hasDynamicName(member)) {
@@ -3730,10 +3730,10 @@ EvalResult Checker::evaluateEntity(Node* expr, Node* location) {
 			if (location != nullptr) {
 				return evaluateEnumMember(expr, symbol, location);
 			}
-			return getEnumMemberValue(symbol->valueDeclaration);
+			return getEnumMemberValue(symbol->data->valueDeclaration);
 		}
 		if (isConstantVariable(symbol)) {
-			Node* declaration = symbol->valueDeclaration;
+			Node* declaration = symbol->data->valueDeclaration;
 			if (declaration != nullptr && isVariableDeclaration(declaration) &&
 				declaration->type() == nullptr &&
 				declaration->initializer() != nullptr &&
@@ -3764,13 +3764,13 @@ EvalResult Checker::evaluateEntity(Node* expr, Node* location) {
 				rootSymbol->flags & SymbolFlagsEnum) {
 				std::string name =
 					expr->as<ElementAccessExpression>()->ArgumentExpression->text();
-				auto it = rootSymbol->exports.find(name);
-				if (it != rootSymbol->exports.end() && it->second != nullptr) {
+				auto it = rootSymbol->data->exports.find(name);
+				if (it != rootSymbol->data->exports.end() && it->second != nullptr) {
 					Symbol* member = it->second;
 					if (location != nullptr) {
 						return evaluateEnumMember(expr, member, location);
 					}
-					return getEnumMemberValue(member->valueDeclaration);
+					return getEnumMemberValue(member->data->valueDeclaration);
 				}
 			}
 		}
@@ -3784,7 +3784,7 @@ EvalResult Checker::evaluateEntity(Node* expr, Node* location) {
 
 EvalResult Checker::evaluateEnumMember(Node* expr, Symbol* symbol,
 									   Node* location) {
-	Node* declaration = symbol->valueDeclaration;
+	Node* declaration = symbol->data->valueDeclaration;
 	if (declaration == nullptr || declaration == location) {
 		error(expr, Property_0_is_used_before_being_assigned,
 			  std::vector<std::string>{symbolToString(symbol)});
@@ -3842,8 +3842,8 @@ bool Checker::isConstantVariable(Symbol* symbol) {
 bool Checker::isParameterOrMutableLocalVariable(Symbol* symbol) {
 	// Return true if symbol is a parameter, a catch clause variable, or a mutable
 	// local variable
-	if (symbol->valueDeclaration != nullptr) {
-		Node* declaration = getRootDeclaration(symbol->valueDeclaration);
+	if (symbol->data->valueDeclaration != nullptr) {
+		Node* declaration = getRootDeclaration(symbol->data->valueDeclaration);
 		return declaration != nullptr &&
 			   (isParameterDeclaration(declaration) ||
 				(isVariableDeclaration(declaration) &&
@@ -3893,8 +3893,8 @@ static bool isInTypeQuery(Node* node) {
 }
 
 NodeFlags Checker::getDeclarationNodeFlagsFromSymbol(Symbol* s) {
-	if (s->valueDeclaration != nullptr) {
-		return getCombinedNodeFlagsCached(s->valueDeclaration);
+	if (s->data->valueDeclaration != nullptr) {
+		return getCombinedNodeFlagsCached(s->data->valueDeclaration);
 	}
 	return NodeFlagsNone;
 }
@@ -4428,7 +4428,7 @@ Symbol* Checker::getGlobalTypeAliasSymbol(const std::string& name, int arity,
 	    arity) {
 		if (reportErrors) {
 			Node* decl = nullptr;
-			for (Node* d : symbol->declarations) {
+			for (Node* d : symbol->data->declarations) {
 				if (isTypeAliasDeclaration(d)) {
 					decl = d;
 					break;
@@ -4453,7 +4453,7 @@ std::vector<Type*> Checker::getTypeAliasTypeParameters(Symbol* symbol) {
 }
 
 static Node* getGlobalTypeDeclaration(Symbol* symbol) {
-	for (Node* declaration : symbol->declarations) {
+	for (Node* declaration : symbol->data->declarations) {
 		switch (declaration->kind) {
 		case Kind::ClassDeclaration:
 		case Kind::InterfaceDeclaration:
@@ -4600,7 +4600,7 @@ void Checker::initializeChecker() {
 			// its own `globalThis`.
 			auto git = file->Locals.find("globalThis");
 			if (git != file->Locals.end()) {
-				for (Node* d : git->second->declarations) {
+				for (Node* d : git->second->data->declarations) {
 					addDiagnostic(NewDiagnosticForNode(
 						d, Declaration_name_conflicts_with_built_in_global_identifier_0,
 						std::vector<std::string>{"globalThis"}));
@@ -4610,7 +4610,7 @@ void Checker::initializeChecker() {
 				// We defer merging of global ambient module declarations since
 				// they may require other global symbols and types to be resolved.
 				if (symbol->flags & SymbolFlagsModule &&
-				    isAmbientModuleSymbolName(symbol->name)) {
+				    isAmbientModuleSymbolName(symbol->data->name)) {
 					ambientModuleSymbols.push_back(symbol);
 				} else {
 					mergeGlobalSymbol(symbol);
@@ -4699,14 +4699,14 @@ void Checker::initializeChecker() {
 }
 
 void Checker::mergeGlobalSymbol(Symbol* symbol) {
-	auto it = globals.find(symbol->name);
+	auto it = globals.find(symbol->data->name);
 	Symbol* merged;
 	if (it != globals.end()) {
 		merged = mergeSymbol(it->second, symbol, false /*unidirectional*/);
 	} else {
 		merged = getMergedSymbol(symbol);
 	}
-	globals[symbol->name] = merged;
+	globals[symbol->data->name] = merged;
 }
 
 // Pattern ambient modules are merged together if they have the same pattern and
@@ -4738,8 +4738,8 @@ void Checker::mergePatternAmbientModules() {
 		}
 	}
 	for (auto& module : patternAmbientModules) {
-		if (globals.find(module.symbol->name) != globals.end()) {
-			globals[module.symbol->name] = getMergedSymbol(module.symbol);
+		if (globals.find(module.symbol->data->name) != globals.end()) {
+			globals[module.symbol->data->name] = getMergedSymbol(module.symbol);
 		}
 	}
 	patternAmbientModules = grouped;
@@ -4748,7 +4748,7 @@ void Checker::mergePatternAmbientModules() {
 void Checker::mergeModuleAugmentation(Node* moduleName) {
 	Node* moduleNode = moduleName->parent;
 	ModuleDeclaration* moduleAugmentation = moduleNode->as<ModuleDeclaration>();
-	if (moduleAugmentation->Symbol->declarations[0] != moduleNode) {
+	if (moduleAugmentation->Symbol->data->declarations[0] != moduleNode) {
 		// this is a combined symbol for multiple augmentations within the same
 		// file. its symbol already has accumulated information for all
 		// declarations so we need to add it just once - do the work only for
@@ -4756,7 +4756,7 @@ void Checker::mergeModuleAugmentation(Node* moduleName) {
 		return;
 	}
 	if (isGlobalScopeAugmentation(moduleNode)) {
-		mergeSymbolTable(globals, moduleAugmentation->Symbol->exports,
+		mergeSymbolTable(globals, moduleAugmentation->Symbol->data->exports,
 		                 false /*unidirectional*/, nullptr /*parent*/);
 	} else {
 		// find a module that about to be augmented
@@ -4798,9 +4798,9 @@ void Checker::mergeModuleAugmentation(Node* moduleName) {
 				patternAmbientModuleAugmentationTargets[moduleName->text()] =
 					mainModule;
 			} else {
-				if (mainModule->exports.find(InternalSymbolNameExportStar) !=
-				        mainModule->exports.end() &&
-				    !moduleAugmentation->Symbol->exports.empty()) {
+				if (mainModule->data->exports.find(InternalSymbolNameExportStar) !=
+				        mainModule->data->exports.end() &&
+				    !moduleAugmentation->Symbol->data->exports.empty()) {
 					// We may need to merge the module augmentation's exports into
 					// the target symbols of the resolved exports
 					SymbolTable resolvedExports =
@@ -4808,10 +4808,10 @@ void Checker::mergeModuleAugmentation(Node* moduleName) {
 							mainModule,
 							MembersOrExportsResolutionKindResolvedExports);
 					for (auto& [key, value] :
-					     moduleAugmentation->Symbol->exports) {
+					     moduleAugmentation->Symbol->data->exports) {
 						if (resolvedExports.find(key) != resolvedExports.end() &&
-						    mainModule->exports.find(key) ==
-						        mainModule->exports.end()) {
+						    mainModule->data->exports.find(key) ==
+						        mainModule->data->exports.end()) {
 							mergeSymbol(getSymbolFromTable(resolvedExports, key), value,
 							            false /*unidirectional*/);
 						}
@@ -4831,10 +4831,10 @@ void Checker::mergeModuleAugmentation(Node* moduleName) {
 }
 
 void Checker::addUndefinedToGlobalsOrErrorOnRedeclaration() {
-	const std::string& name = undefinedSymbol->name;
+	const std::string& name = undefinedSymbol->data->name;
 	auto it = globals.find(name);
 	if (it != globals.end()) {
-		for (Node* declaration : it->second->declarations) {
+		for (Node* declaration : it->second->data->declarations) {
 			if (!isTypeDeclaration(declaration)) {
 				addDiagnostic(createDiagnosticForNode(
 					declaration,
@@ -5465,7 +5465,7 @@ std::string Checker::getSuggestedLibForNonExistentProperty(
 	Symbol* container = getApparentType(containingType)->symbol;
 	if (container != nullptr) {
 		const auto& featureMap = getFeatureMap();
-		auto it = featureMap.find(container->name);
+		auto it = featureMap.find(container->data->name);
 		if (it != featureMap.end()) {
 			for (const FeatureMapEntry& entry : it->second) {
 				if (std::find(entry.props.begin(), entry.props.end(),
@@ -5534,7 +5534,7 @@ primitiveTypeAliasSuggestions() {
 		         {"bigint", "BigInt"}, {"symbol", "Symbol"}}) {
 			Symbol* sym = new Symbol();
 			sym->flags = SymbolFlagsTypeAlias | SymbolFlagsTransient;
-			sym->name = e.first;
+			sym->data->name = e.first;
 			(*result)[e.second] = sym;
 		}
 	}
@@ -5584,22 +5584,22 @@ bool Checker::isUncheckedJSSuggestion(Node* node, Symbol* suggestion,
 			SourceFile* declarationFile = nullptr;
 			if (suggestion != nullptr) {
 				Node* firstDeclaration =
-					suggestion->declarations.empty()
+					suggestion->data->declarations.empty()
 					    ? nullptr
-					    : suggestion->declarations[0];
+					    : suggestion->data->declarations[0];
 				if (firstDeclaration != nullptr) {
 					declarationFile = getSourceFileOfNode(firstDeclaration);
 				}
 			}
 			bool suggestionHasNoExtendsOrDecorators =
 				suggestion == nullptr ||
-				suggestion->valueDeclaration == nullptr ||
-				!isClassLike(suggestion->valueDeclaration) ||
+				suggestion->data->valueDeclaration == nullptr ||
+				!isClassLike(suggestion->data->valueDeclaration) ||
 				!getExtendsHeritageClauseElements(
-				     suggestion->valueDeclaration)
+				     suggestion->data->valueDeclaration)
 				     .empty() ||
 				classOrConstructorParameterIsDecorated(
-					false, suggestion->valueDeclaration);
+					false, suggestion->data->valueDeclaration);
 			return !(file != declarationFile && declarationFile != nullptr &&
 			         isGlobalSourceFile(static_cast<Node*>(declarationFile))) &&
 			       !(excludeClasses && suggestion != nullptr &&
@@ -5653,9 +5653,9 @@ void Checker::onFailedToResolveSymbol(
 	Symbol* suggestion =
 		getSuggestedSymbolForNonexistentSymbol(errorLocation, name, meaning);
 	if (suggestion != nullptr &&
-	    !(suggestion->valueDeclaration != nullptr &&
-	      isAmbientModule(suggestion->valueDeclaration) &&
-	      isGlobalScopeAugmentation(suggestion->valueDeclaration))) {
+	    !(suggestion->data->valueDeclaration != nullptr &&
+	      isAmbientModule(suggestion->data->valueDeclaration) &&
+	      isGlobalScopeAugmentation(suggestion->data->valueDeclaration))) {
 		std::string suggestionName = symbolToString(suggestion);
 		bool isUncheckedJS =
 			isUncheckedJSSuggestion(errorLocation, suggestion,
@@ -5668,9 +5668,9 @@ void Checker::onFailedToResolveSymbol(
 		Diagnostic* diagnostic = NewDiagnosticForNode(
 			errorLocation, message,
 			std::vector<std::string>{declarationName, suggestionName});
-		if (suggestion->valueDeclaration != nullptr) {
+		if (suggestion->data->valueDeclaration != nullptr) {
 			diagnostic->AddRelatedInfo(NewDiagnosticForNode(
-				suggestion->valueDeclaration, X_0_is_declared_here,
+				suggestion->data->valueDeclaration, X_0_is_declared_here,
 				{suggestionName}));
 		}
 		addErrorOrSuggestion(!isUncheckedJS, diagnostic);
@@ -5685,7 +5685,7 @@ void Checker::onSuccessfullyResolvedSymbol(
 	Node* lastLocation,
 	Node* associatedDeclarationForContainingInitializerOrBindingName,
 	bool withinDeferredContext) {
-	std::string name = result->name;
+	std::string name = result->data->name;
 	bool isInExternalModule =
 		lastLocation != nullptr && isSourceFile(lastLocation) &&
 		isExternalOrCommonJSModule(static_cast<SourceFile*>(lastLocation));
@@ -5719,8 +5719,8 @@ void Checker::onSuccessfullyResolvedSymbol(
 	    (meaning & SymbolFlagsValue) == SymbolFlagsValue &&
 	    !(errorLocation->flags & NodeFlagsJSDoc)) {
 		Symbol* merged = getMergedSymbol(result);
-		if (!merged->declarations.empty() &&
-		    everyList(merged->declarations, [](Node* d) {
+		if (!merged->data->declarations.empty() &&
+		    everyList(merged->data->declarations, [](Node* d) {
 			    return isNamespaceExportDeclaration(d) ||
 			           isSourceFile(d) &&
 			               !static_cast<SourceFile*>(d)->GlobalExports.empty();
@@ -5750,12 +5750,12 @@ void Checker::onSuccessfullyResolvedSymbol(
 			      declarationNameToString(
 			          associatedDeclarationForContainingInitializerOrBindingName
 			              ->name()));
-		} else if (candidate->valueDeclaration != nullptr &&
-		           candidate->valueDeclaration->pos() >
+		} else if (candidate->data->valueDeclaration != nullptr &&
+		           candidate->data->valueDeclaration->pos() >
 		               associatedDeclarationForContainingInitializerOrBindingName
 		                   ->pos() &&
 		           root->parent->locals() != nullptr &&
-		           getSymbol(*root->parent->locals(), candidate->name, meaning) ==
+		           getSymbol(*root->parent->locals(), candidate->data->name, meaning) ==
 		               candidate) {
 			error(errorLocation,
 			      Parameter_0_cannot_reference_identifier_1_declared_after_it,
@@ -5797,7 +5797,7 @@ void Checker::onSuccessfullyResolvedSymbol(
 		}
 		if (nonValueSymbol != nullptr) {
 			Node* importDecl = nullptr;
-			for (Node* d : nonValueSymbol->declarations) {
+			for (Node* d : nonValueSymbol->data->declarations) {
 				if (nodeKindIs(d, {Kind::ImportSpecifier, Kind::ImportClause,
 				                   Kind::NamespaceImport,
 				                   Kind::ImportEqualsDeclaration})) {
@@ -5830,7 +5830,7 @@ void Checker::checkResolvedBlockScopedVariable(Symbol* result,
 	}
 	// Block-scoped variables cannot be used before their definition
 	Node* declaration = nullptr;
-	for (Node* d : result->declarations) {
+	for (Node* d : result->data->declarations) {
 		if (isBlockOrCatchScoped(d) || isClassLike(d) ||
 		    isEnumDeclaration(d)) {
 			declaration = d;
@@ -6088,17 +6088,17 @@ int Checker::compareSymbolsWorker(Symbol* s1, Symbol* s2) {
 	if (s2 == nullptr) {
 		return -1;
 	}
-	if (!s1->declarations.empty() && !s2->declarations.empty()) {
-		if (int r = compareNodes(s1->declarations[0], s2->declarations[0]);
+	if (!s1->data->declarations.empty() && !s2->data->declarations.empty()) {
+		if (int r = compareNodes(s1->data->declarations[0], s2->data->declarations[0]);
 		    r != 0) {
 			return r;
 		}
-	} else if (!s1->declarations.empty()) {
+	} else if (!s1->data->declarations.empty()) {
 		return -1;
-	} else if (!s2->declarations.empty()) {
+	} else if (!s2->data->declarations.empty()) {
 		return 1;
 	}
-	if (int r = s1->name.compare(s2->name); r != 0) {
+	if (int r = s1->data->name.compare(s2->data->name); r != 0) {
 		return r < 0 ? -1 : 1;
 	}
 	// Fall back to symbol IDs. This is a last resort that should happen only
@@ -6206,8 +6206,8 @@ void Checker::init(Program* p) {
 	unknownSymbol = newSymbol(SymbolFlagsProperty, "unknown");
 	globalThisSymbol =
 		newSymbolEx(SymbolFlagsModule, "globalThis", CheckFlagsReadonly);
-	globalThisSymbol->exports = globals;
-	globals[globalThisSymbol->name] = globalThisSymbol;
+	globalThisSymbol->data->exports = globals;
+	globals[globalThisSymbol->data->name] = globalThisSymbol;
 	binder::NameResolver* nr = newNameResolverImpl(this, false);
 	resolveName = [nr](Node* location, std::string_view name,
 	                   SymbolFlags meaning,
@@ -6446,9 +6446,9 @@ void Checker::init(Program* p) {
 	// `namespace globalThis` in a `declare global` block) never reach
 	// `globals`, and copies of `globals` lack them. Merge both tables to a
 	// union first, then refresh the alias.
-	mergeSymbolTable(globals, globalThisSymbol->exports,
+	mergeSymbolTable(globals, globalThisSymbol->data->exports,
 	                 false /*unidirectional*/, nullptr /*parent*/);
-	globalThisSymbol->exports = globals;
+	globalThisSymbol->data->exports = globals;
 }
 
 Type* Checker::getGlobalStrictFunctionType(const std::string& name) {
@@ -6482,7 +6482,7 @@ Type* Checker::getTypeOfModuleImportAttributes(Symbol* symbol) {
 	}
 	Type* result;
 	Node* moduleDecl = nullptr;
-	for (Node* d : symbol->declarations) {
+	for (Node* d : symbol->data->declarations) {
 		if (isModuleWithStringLiteralName(d)) {
 			moduleDecl = d;
 			break;
@@ -7488,10 +7488,10 @@ Symbol* Checker::resolveEntityName(Node* name, SymbolFlags meaning,
 				    SymbolFlagsAlias, nullptr, true /*isUse*/,
 				    false /*excludeGlobals*/));
 				if (alias != nullptr &&
-				    alias->name == InternalSymbolNameExportEquals) {
+				    alias->data->name == InternalSymbolNameExportEquals) {
 					// resolve typedefs exported from commonjs,
 					// stored on the module symbol
-					symbol = alias->parent;
+					symbol = alias->data->parent;
 				}
 			}
 			if (symbol == nullptr && message != nullptr) {
@@ -7554,16 +7554,16 @@ Symbol* Checker::resolveQualifiedName(Node* name, Node* left, Node* right,
 	if (namespace_ == unknownSymbol) {
 		return namespace_;
 	}
-	if (namespace_->valueDeclaration != nullptr &&
-	    isInJSFile(namespace_->valueDeclaration) &&
+	if (namespace_->data->valueDeclaration != nullptr &&
+	    isInJSFile(namespace_->data->valueDeclaration) &&
 	    compilerOptions->GetModuleResolutionKind() !=
 	        ModuleResolutionKind::Bundler &&
-	    isVariableDeclaration(namespace_->valueDeclaration) &&
-	    namespace_->valueDeclaration->initializer() != nullptr &&
+	    isVariableDeclaration(namespace_->data->valueDeclaration) &&
+	    namespace_->data->valueDeclaration->initializer() != nullptr &&
 	    isCommonJSRequire(
-	        namespace_->valueDeclaration->initializer())) {
+	        namespace_->data->valueDeclaration->initializer())) {
 		Node* moduleName =
-		    namespace_->valueDeclaration->initializer()->arguments()[0];
+		    namespace_->data->valueDeclaration->initializer()->arguments()[0];
 		Symbol* moduleSym = resolveExternalModuleName(
 		    moduleName, moduleName, false /*ignoreErrors*/, nullptr);
 		if (moduleSym != nullptr) {
@@ -7754,8 +7754,8 @@ const DiagnosticMessage* Checker::getCannotFindNameDiagnosticForName(
 
 std::string Checker::getFullyQualifiedName(Symbol* symbol,
                                            Node* containingLocation) {
-	if (symbol->parent != nullptr) {
-		return getFullyQualifiedName(symbol->parent, containingLocation) +
+	if (symbol->data->parent != nullptr) {
+		return getFullyQualifiedName(symbol->data->parent, containingLocation) +
 		       "." + symbolToString(symbol);
 	}
 	return symbolToStringEx(symbol, containingLocation, SymbolFlagsAll,
@@ -7793,9 +7793,9 @@ bool Checker::isNamedMember(Symbol* symbol, const std::string& id) {
 
 // checker.go:22468 isDeclarationContainedBy
 bool Checker::isDeclarationContainedBy(Symbol* symbol, Symbol* container) {
-	if (Node* declaration = symbol->valueDeclaration;
+	if (Node* declaration = symbol->data->valueDeclaration;
 	    declaration != nullptr) {
-		for (Node* d : container->declarations) {
+		for (Node* d : container->data->declarations) {
 			// text.go:58 TextRange.ContainedBy
 			if (d->loc.pos() <= declaration->loc.pos() &&
 			    d->loc.end() >= declaration->loc.end()) {
@@ -7975,9 +7975,19 @@ bool Checker::isGenericMappedType(Type* t) {
 // checker.go:14304 newSymbol
 Symbol* Checker::newSymbol(SymbolFlags flags, const std::string& name) {
 	SymbolCount++;
-	Symbol* result = symbolArena.alloc<Symbol>();
+	Symbol* result = symbolWithDataArena.alloc<SymbolWithData>()->initialize();
 	result->flags = flags | SymbolFlagsTransient;
-	result->name = name;
+	result->data->name = name;
+	return result;
+}
+
+// checker.go:14349 newSharedDataSymbol: a new transient symbol that shares the
+// underlying SymbolData with the original symbol.
+Symbol* Checker::newSharedDataSymbol(Symbol* symbol) {
+	SymbolCount++;
+	Symbol* result = symbolArena.alloc<Symbol>();
+	result->flags = symbol->flags | SymbolFlagsTransient;
+	result->setSymbolData(symbol);
 	return result;
 }
 
@@ -7994,7 +8004,7 @@ Symbol* Checker::resolveExternalModuleSymbol(Symbol* moduleSymbol,
                                              bool dontResolveAlias) {
 	if (moduleSymbol != nullptr) {
 		Symbol* exportEquals = resolveSymbolEx(
-			getSymbolFromTable(moduleSymbol->exports, InternalSymbolNameExportEquals),
+			getSymbolFromTable(moduleSymbol->data->exports, InternalSymbolNameExportEquals),
 			dontResolveAlias);
 		if (exportEquals != nullptr) {
 			return getMergedSymbol(exportEquals);

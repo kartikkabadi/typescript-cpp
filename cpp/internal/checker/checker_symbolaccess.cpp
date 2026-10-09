@@ -61,7 +61,7 @@ std::invoke_result_t<F, T> firstNonNil(const std::vector<T>& ts, F&& f) {
 // declchecks slice keeps a `static` one).
 std::vector<Node*> getDeclarationsOfKind(Symbol* symbol, Kind kind) {
 	std::vector<Node*> result;
-	for (Node* d : symbol->declarations) {
+	for (Node* d : symbol->data->declarations) {
 		if (d->kind == kind) {
 			result.push_back(d);
 		}
@@ -94,9 +94,9 @@ bool hasExternalModuleSymbol(Node* declaration) {
 
 // --- isUMDExportSymbol — symbolaccessibility.go:612 --------------------------
 bool isUMDExportSymbol(Symbol* symbol) {
-	return symbol != nullptr && !symbol->declarations.empty() &&
-	       symbol->declarations[0] != nullptr &&
-	       isNamespaceExportDeclaration(symbol->declarations[0]);
+	return symbol != nullptr && !symbol->data->declarations.empty() &&
+	       symbol->data->declarations[0] != nullptr &&
+	       isNamespaceExportDeclaration(symbol->data->declarations[0]);
 }
 
 // --- isNamespaceReexportDeclaration — symbolaccessibility.go:616 -------------
@@ -106,8 +106,8 @@ bool isNamespaceReexportDeclaration(Node* node) {
 
 // --- isPropertyOrMethodDeclarationSymbol — symbolaccessibility.go:728 --------
 bool isPropertyOrMethodDeclarationSymbol(Symbol* symbol) {
-	if (!symbol->declarations.empty()) {
-		for (Node* declaration : symbol->declarations) {
+	if (!symbol->data->declarations.empty()) {
+		for (Node* declaration : symbol->data->declarations) {
 			switch (declaration->kind) {
 			case Kind::PropertyDeclaration:
 			case Kind::MethodDeclaration:
@@ -225,7 +225,7 @@ printer::SymbolAccessibilityResult* Checker::IsAnySymbolAccessible(
 			}
 		}
 		if (allowModules) {
-			if (someList(symbol->declarations,
+			if (someList(symbol->data->declarations,
 			             hasNonGlobalAugmentationExternalModuleSymbol)) {
 				if (shouldComputeAliasesToMakeVisible) {
 					earlyModuleBail = true;
@@ -298,7 +298,7 @@ std::vector<Symbol*> Checker::getWithAlternativeContainers(
 	Symbol* container, Symbol* symbol, Node* enclosingDeclaration,
 	SymbolFlags meaning) {
 	std::vector<Symbol*> additionalContainers = mapNonNil(
-		container->declarations, [this, container](Node* d) -> Symbol* {
+		container->data->declarations, [this, container](Node* d) -> Symbol* {
 			return getFileSymbolIfFileSymbolExportEqualsContainer(d, container);
 		});
 	std::vector<Symbol*> reexportContainers;
@@ -453,7 +453,7 @@ void Checker::buildExternalModuleContainerIndex() {
 		for (auto& [name, exported] : getExportsOfSymbol(container)) {
 			index->add(getResolvedTarget(exported), container);
 		}
-		if (Symbol* exportEquals = getSymbolFromTable(container->exports, InternalSymbolNameExportEquals)) {
+		if (Symbol* exportEquals = getSymbolFromTable(container->data->exports, InternalSymbolNameExportEquals)) {
 			index->add(getResolvedTarget(exportEquals), container);
 		}
 	}
@@ -484,10 +484,10 @@ Symbol* Checker::getVariableDeclarationOfObjectLiteral(Symbol* symbol,
 	if ((meaning & SymbolFlagsValue) == 0) {
 		return nullptr;
 	}
-	if (symbol->declarations.empty()) {
+	if (symbol->data->declarations.empty()) {
 		return nullptr;
 	}
-	Node* firstDecl = symbol->declarations[0];
+	Node* firstDecl = symbol->data->declarations[0];
 	if (firstDecl->parent == nullptr) {
 		return nullptr;
 	}
@@ -519,8 +519,8 @@ Symbol* Checker::getFileSymbolIfFileSymbolExportEqualsContainer(Node* d,
 	if (fileSymbol == nullptr) {
 		return nullptr;
 	}
-	auto it = fileSymbol->exports.find(InternalSymbolNameExportEquals);
-	if (it == fileSymbol->exports.end() || it->second == nullptr) {
+	auto it = fileSymbol->data->exports.find(InternalSymbolNameExportEquals);
+	if (it == fileSymbol->data->exports.end() || it->second == nullptr) {
 		return nullptr;
 	}
 	if (getSymbolIfSameReference(it->second, container) != nullptr) {
@@ -545,7 +545,7 @@ std::vector<Symbol*> Checker::getContainersOfSymbol(Symbol* symbol,
 		                                    enclosingDeclaration, meaning);
 	}
 	std::vector<Symbol*> candidates;
-	for (Node* d : symbol->declarations) {
+	for (Node* d : symbol->data->declarations) {
 		if (!isAmbientModule(d) && d->parent != nullptr) {
 			// direct children of a module
 			if (hasNonGlobalAugmentationExternalModuleSymbol(d->parent)) {
@@ -635,13 +635,13 @@ Symbol* Checker::getAliasForSymbolInContainer(Symbol* container, Symbol* symbol)
 	}
 	// Check if container is a thing with an `export=` which points directly at `symbol`, and if so, return
 	// the container itself as the alias for the symbol
-	if (auto it = container->exports.find(InternalSymbolNameExportEquals);
-	    it != container->exports.end() && it->second != nullptr &&
+	if (auto it = container->data->exports.find(InternalSymbolNameExportEquals);
+	    it != container->data->exports.end() && it->second != nullptr &&
 	    getSymbolIfSameReference(it->second, symbol) != nullptr) {
 		return container;
 	}
 	const SymbolTable& exports = getExportsOfSymbol(container);
-	if (auto it = exports.find(symbol->name);
+	if (auto it = exports.find(symbol->data->name);
 	    it != exports.end() && it->second != nullptr &&
 	    getSymbolIfSameReference(it->second, symbol) != nullptr) {
 		return it->second;
@@ -789,7 +789,7 @@ std::vector<Symbol*> Checker::trySymbolTable(accessibleSymbolChainContext ctx,
                                            bool isLocalNameLookup) {
 	bool isGlobals = tableId == stKindGlobals;
 	// If symbol is directly available by its name in the symbol table
-	auto nameIt = symbols.find(ctx.symbol->name);
+	auto nameIt = symbols.find(ctx.symbol->data->name);
 	bool ok = nameIt != symbols.end();
 	Symbol* res = ok ? nameIt->second : nullptr;
 	if (ok && res != nullptr &&
@@ -803,8 +803,8 @@ std::vector<Symbol*> Checker::trySymbolTable(accessibleSymbolChainContext ctx,
 	// Check for ExportSymbol by direct name lookup rather than discovering it during
 	// the alias iteration below (where it would never match, since only alias-flagged
 	// symbols are iterated).
-	if (ok && res != nullptr && res->exportSymbol != nullptr) {
-		if (isAccessible(ctx, getMergedSymbol(res->exportSymbol),
+	if (ok && res != nullptr && res->data->exportSymbol != nullptr) {
+		if (isAccessible(ctx, getMergedSymbol(res->data->exportSymbol),
 		                 /*resolvedAliasSymbol*/ nullptr, ignoreQualification)) {
 			candidateChains.push_back({ctx.symbol});
 		}
@@ -815,18 +815,18 @@ std::vector<Symbol*> Checker::trySymbolTable(accessibleSymbolChainContext ctx,
 	for (Symbol* symbolFromSymbolTable :
 	     getSymbolTableAliases(symbols, tableId)) {
 		// for every non-default, non-export= alias symbol in scope, check if it refers to or can chain to the target symbol
-		if (symbolFromSymbolTable->name != InternalSymbolNameExportEquals &&
-		    symbolFromSymbolTable->name != InternalSymbolNameDefault &&
+		if (symbolFromSymbolTable->data->name != InternalSymbolNameExportEquals &&
+		    symbolFromSymbolTable->data->name != InternalSymbolNameDefault &&
 		    !(isUMDExportSymbol(symbolFromSymbolTable) &&
 		      ctx.enclosingDeclaration != nullptr &&
 		      isExternalModule(getSourceFileOfNode(ctx.enclosingDeclaration))) &&
 		    // If `!useOnlyExternalAliasing`, we can use any type of alias to get the name
 		    (!ctx.useOnlyExternalAliasing ||
-		     someList(symbolFromSymbolTable->declarations,
+		     someList(symbolFromSymbolTable->data->declarations,
 		              isExternalModuleImportEqualsDeclaration)) &&
 		    // If we're looking up a local name to reference directly, omit namespace reexports, otherwise when we're trawling through an export list to make a dotted name, we can keep it
 		    ((isLocalNameLookup &&
-		      !someList(symbolFromSymbolTable->declarations,
+		      !someList(symbolFromSymbolTable->data->declarations,
 		                isNamespaceReexportDeclaration)) ||
 		     !isLocalNameLookup) &&
 		    // While exports are generally considered to be in scope, export-specifier declared symbols are _not_
@@ -938,7 +938,7 @@ bool Checker::isAccessible(accessibleSymbolChainContext ctx,
 	// if the symbolFromSymbolTable is not external module (it could be if it was determined as ambient external module and would be in globals table)
 	// and if symbolFromSymbolTable or alias resolution matches the symbol,
 	// check the symbol can be qualified, it is only then this symbol is accessible
-	return !someList(symbolFromSymbolTable->declarations,
+	return !someList(symbolFromSymbolTable->data->declarations,
 	                 hasNonGlobalAugmentationExternalModuleSymbol) &&
 	       (ignoreQualification ||
 	        canQualifySymbol(ctx, getMergedSymbol(symbolFromSymbolTable),
@@ -954,7 +954,7 @@ bool Checker::canQualifySymbol(accessibleSymbolChainContext ctx,
 	                           meaning) ||
 	       // If symbol needs qualification, make sure that parent is accessible, if it is then this symbol is accessible too
 	       !getAccessibleSymbolChainEx(accessibleSymbolChainContext{
-	            symbolFromSymbolTable->parent, ctx.enclosingDeclaration,
+	            symbolFromSymbolTable->data->parent, ctx.enclosingDeclaration,
 	            getQualifiedLeftMeaning(meaning), ctx.useOnlyExternalAliasing,
 	            ctx.visitedSymbolTablesMap})
 	            .empty();
@@ -970,7 +970,7 @@ bool Checker::needsQualification(Symbol* symbol, Node* enclosingDeclaration,
 		                                  symbolTableID, bool, bool,
 		                                  Node*) -> bool {
 			// If symbol of this name is not available in the symbol table we are ok
-			auto it = symbolTable.find(symbol->name);
+			auto it = symbolTable.find(symbol->data->name);
 			if (it == symbolTable.end() || it->second == nullptr) {
 				return false;
 			}
@@ -1035,7 +1035,7 @@ bool Checker::someSymbolTableInScope(
 			{
 				Symbol* sym =
 					getSymbolOfDeclaration(getReparsedNodeForNode(location));
-				if (callback(sym->exports, symbolTableIDFromExports(sym), false,
+				if (callback(sym->data->exports, symbolTableIDFromExports(sym), false,
 				             true, location)) {
 					return true;
 				}
@@ -1054,7 +1054,7 @@ bool Checker::someSymbolTableInScope(
 			SymbolTable table;
 			Symbol* sym = getSymbolOfDeclaration(location);
 			// TODO: Should this filtered table be cached in some way?
-			for (const auto& [key, memberSymbol] : sym->members) {
+			for (const auto& [key, memberSymbol] : sym->data->members) {
 				if ((memberSymbol->flags &
 				     (SymbolFlagsType & ~SymbolFlagsAssignment)) != 0) {
 					table[key] = memberSymbol;
@@ -1144,7 +1144,7 @@ printer::SymbolAccessibilityResult Checker::isSymbolAccessibleWorker(
 		// This could be a symbol that is not exported in the external module
 		// or it could be a symbol from different external module that is not aliased and hence cannot be named
 		Symbol* symbolExternalModule = firstNonNil(
-			symbol->declarations,
+			symbol->data->declarations,
 			[this](Node* d) -> Symbol* { return getExternalModuleContainer(d); });
 		if (symbolExternalModule != nullptr) {
 			Symbol* enclosingExternalModule =

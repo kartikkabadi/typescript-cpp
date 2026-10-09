@@ -786,7 +786,7 @@ Type* Checker::narrowType(FlowState* f, Type* t, Node* expr, bool assumeTrue) {
 		if (!isMatchingReference(f->reference, expr) && inlineLevel < 5) {
 			Symbol* symbol = getResolvedSymbol(expr);
 			if (isConstantVariable(symbol)) {
-				Node* declaration = symbol->valueDeclaration;
+				Node* declaration = symbol->data->valueDeclaration;
 				if (declaration != nullptr && isVariableDeclaration(declaration) &&
 					declaration->type() == nullptr && declaration->initializer() != nullptr &&
 					isConstantReference(f->reference)) {
@@ -1501,9 +1501,9 @@ Type* Checker::narrowTypeByPrivateIdentifierInInExpression(FlowState* f, Type* t
 	if (symbol == nullptr) {
 		return t;
 	}
-	Symbol* classSymbol = symbol->parent;
+	Symbol* classSymbol = symbol->data->parent;
 	Type* targetType;
-	if (hasStaticModifier(symbol->valueDeclaration)) {
+	if (hasStaticModifier(symbol->data->valueDeclaration)) {
 		targetType = getTypeOfSymbol(classSymbol);
 	} else {
 		targetType = getDeclaredTypeOfSymbol(classSymbol);
@@ -2074,7 +2074,7 @@ Node* Checker::getCandidateDiscriminantPropertyAccess(FlowState* f, Node* expr) 
 		// parameter declared in the same parameter list is a candidate.
 		if (isIdentifier(expr)) {
 			Symbol* symbol = getResolvedSymbol(expr);
-			Node* declaration = getExportSymbolOfValueSymbolIfExported(symbol)->valueDeclaration;
+			Node* declaration = getExportSymbolOfValueSymbolIfExported(symbol)->data->valueDeclaration;
 			if (declaration != nullptr &&
 				(isBindingElement(declaration) || isParameterDeclaration(declaration)) &&
 				f->reference == declaration->parent &&
@@ -2090,7 +2090,7 @@ Node* Checker::getCandidateDiscriminantPropertyAccess(FlowState* f, Node* expr) 
 	} else if (isIdentifier(expr)) {
 		Symbol* symbol = getResolvedSymbol(expr);
 		if (isConstantVariable(symbol)) {
-			Node* declaration = symbol->valueDeclaration;
+			Node* declaration = symbol->data->valueDeclaration;
 			Node* initializer = getCandidateVariableDeclarationInitializer(declaration);
 			// Given 'const x = obj.kind', allow 'x' as an alias for 'obj.kind'
 			if (initializer != nullptr && isAccessExpression(initializer) &&
@@ -2461,7 +2461,7 @@ std::pair<std::string, bool> Checker::tryGetNameFromEntityNameExpression(Node* n
 		!(isConstantVariable(symbol) || (symbol->flags & SymbolFlagsEnumMember) != 0)) {
 		return {"", false};
 	}
-	Node* declaration = symbol->valueDeclaration;
+	Node* declaration = symbol->data->valueDeclaration;
 	if (declaration == nullptr) {
 		return {"", false};
 	}
@@ -2541,8 +2541,8 @@ bool Checker::isConstantReference(Node* node) {
 			Symbol* symbol = getResolvedSymbol(node);
 			return isConstantVariable(symbol) ||
 				   (isParameterOrMutableLocalVariable(symbol) && !isSymbolAssigned(symbol)) ||
-				   (symbol->valueDeclaration != nullptr &&
-					isFunctionExpression(symbol->valueDeclaration));
+				   (symbol->data->valueDeclaration != nullptr &&
+					isFunctionExpression(symbol->data->valueDeclaration));
 		}
 		break;
 	case Kind::PropertyAccessExpression:
@@ -2991,7 +2991,7 @@ Type* Checker::getExplicitTypeOfSymbol(Symbol* symbol, Diagnostic* diagnostic) {
 				return getTypeOfSymbol(symbol);
 			}
 		}
-		Node* declaration = symbol->valueDeclaration;
+		Node* declaration = symbol->data->valueDeclaration;
 		if (declaration != nullptr) {
 			if (isDeclarationWithExplicitTypeAnnotation(declaration)) {
 				return getTypeOfSymbol(symbol);
@@ -3353,11 +3353,11 @@ Node* Checker::getTypePredicateArgument(TypePredicate* predicate, Node* callExpr
 Type* Checker::getFlowTypeInConstructor(Symbol* symbol, Node* constructor) {
 	Node* accessName;
 	std::string prefixHash = std::string(1, kInternalSymbolNamePrefix) + "#";
-	if (symbol->name.rfind(prefixHash, 0) == 0) {
+	if (symbol->data->name.rfind(prefixHash, 0) == 0) {
 		accessName = factory.newPrivateIdentifier(
-			symbol->name.substr(symbol->name.find('@') + 1));
+			symbol->data->name.substr(symbol->data->name.find('@') + 1));
 	} else {
-		accessName = factory.newIdentifier(symbol->name);
+		accessName = factory.newIdentifier(symbol->data->name);
 	}
 	Node* reference = factory.newPropertyAccessExpression(
 		factory.newKeywordExpression(Kind::ThisKeyword), nullptr, accessName,
@@ -3368,7 +3368,7 @@ Type* Checker::getFlowTypeInConstructor(Symbol* symbol, Node* constructor) {
 		constructor->as<ConstructorDeclaration>()->ReturnFlowNode;
 	Type* flowType = getFlowTypeOfProperty(reference, symbol);
 	if (noImplicitAny && (flowType == autoType || flowType == autoArrayType)) {
-		error(symbol->valueDeclaration, Member_0_implicitly_has_an_1_type,
+		error(symbol->data->valueDeclaration, Member_0_implicitly_has_an_1_type,
 			  {symbolToString(symbol), TypeToString(flowType)});
 	}
 	// We don't infer a type if assignments are only null or undefined.
@@ -3384,11 +3384,11 @@ Type* Checker::getFlowTypeInStaticBlocks(Symbol* symbol,
 	std::string prefixHash = std::string(1, kInternalSymbolNamePrefix) + "#";
 	for (Node* staticBlock : staticBlocks) {
 		Node* accessName;
-		if (symbol->name.rfind(prefixHash, 0) == 0) {
+		if (symbol->data->name.rfind(prefixHash, 0) == 0) {
 			accessName = factory.newPrivateIdentifier(
-				symbol->name.substr(symbol->name.find('@') + 1));
+				symbol->data->name.substr(symbol->data->name.find('@') + 1));
 		} else {
-			accessName = factory.newIdentifier(symbol->name);
+			accessName = factory.newIdentifier(symbol->data->name);
 		}
 		Node* reference = factory.newPropertyAccessExpression(
 			factory.newKeywordExpression(Kind::ThisKeyword), nullptr, accessName,
@@ -3399,7 +3399,7 @@ Type* Checker::getFlowTypeInStaticBlocks(Symbol* symbol,
 			staticBlock->as<ClassStaticBlockDeclaration>()->ReturnFlowNode;
 		Type* flowType = getFlowTypeOfProperty(reference, symbol);
 		if (noImplicitAny && (flowType == autoType || flowType == autoArrayType)) {
-			error(symbol->valueDeclaration, Member_0_implicitly_has_an_1_type,
+			error(symbol->data->valueDeclaration, Member_0_implicitly_has_an_1_type,
 				  {symbolToString(symbol), TypeToString(flowType)});
 		}
 		// We don't infer a type if assignments are only null or undefined.
@@ -3599,7 +3599,7 @@ bool Checker::isPastLastAssignment(Symbol* symbol, Node* location) {
 
 // ensureAssignmentsMarked (flow.go)
 void Checker::ensureAssignmentsMarked(Symbol* symbol) {
-	Node* parent = findAncestor(symbol->valueDeclaration, isFunctionOrSourceFile);
+	Node* parent = findAncestor(symbol->data->valueDeclaration, isFunctionOrSourceFile);
 	if (parent == nullptr) {
 		return;
 	}
@@ -3641,10 +3641,10 @@ bool Checker::markNodeAssignmentsWorker(Node* node) {
 					Node* referencingFunction =
 						findAncestor(node, isFunctionOrSourceFile);
 					Node* declaringFunction =
-						findAncestor(symbol->valueDeclaration, isFunctionOrSourceFile);
+						findAncestor(symbol->data->valueDeclaration, isFunctionOrSourceFile);
 					if (referencingFunction == declaringFunction) {
 						links->lastAssignmentPos = static_cast<int32_t>(
-							extendAssignmentPosition(node, symbol->valueDeclaration));
+							extendAssignmentPosition(node, symbol->data->valueDeclaration));
 					} else {
 						links->lastAssignmentPos = INT32_MAX;
 					}

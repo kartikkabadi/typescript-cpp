@@ -582,9 +582,9 @@ PseudoType* PseudoChecker::typeFromVariable(Node* declaration) {
 	}
 	Node* init = d->Initializer;
 	if (init != nullptr && d->Symbol != nullptr &&
-	    (d->Symbol->declarations.size() == 1 ||
+	    (d->Symbol->data->declarations.size() == 1 ||
 	     static_cast<int>(std::count_if(
-		     d->Symbol->declarations.begin(), d->Symbol->declarations.end(),
+		     d->Symbol->data->declarations.begin(), d->Symbol->data->declarations.end(),
 		     [](Node* n) { return isVariableDeclaration(n); })) == 1)) {
 		if (!isContextuallyTyped(declaration)) { // TODO: also should bail on
 			// expando declarations; reuse syntactic expando check used in
@@ -612,7 +612,7 @@ PseudoType* PseudoChecker::typeFromVariable(Node* declaration) {
 PseudoType* PseudoChecker::typeFromAccessor(Node* accessor) {
 	AllAccessorDeclarations accessorDeclarations =
 		getAllAccessorDeclarationsForDeclaration(
-			accessor, (*accessor->declarationData().symbol)->declarations);
+			accessor, (*accessor->declarationData().symbol)->data->declarations);
 	Node* accessorType = getTypeAnnotationFromAllAccessorDeclarations(
 		accessor, accessorDeclarations);
 	if (accessorType != nullptr && !isTypePredicateNode(accessorType)) {
@@ -875,7 +875,7 @@ PseudoObjectElement* PseudoChecker::getAccessorMember(Node* accessor,
                                                     Node* name) {
 	AllAccessorDeclarations allAccessors =
 		getAllAccessorDeclarationsForDeclaration(
-			accessor, accessor->symbol()->declarations); // TODO: node
+			accessor, accessor->symbol()->data->declarations); // TODO: node
 	// preservation for late-bound accessor pairs?
 
 	// TODO: handle pseudo-annotations from get accessor return positions?

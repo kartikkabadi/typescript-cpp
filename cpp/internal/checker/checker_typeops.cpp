@@ -263,7 +263,7 @@ static bool isLateBoundName(const std::string& name) {
 
 // utilities.go:1018 — IsKnownSymbol
 static bool IsKnownSymbol(Symbol* symbol) {
-	return isLateBoundName(symbol->name);
+	return isLateBoundName(symbol->data->name);
 }
 
 // tryGetPropertyAccessOrIdentifierToString is shared (checker_utilities.cpp).
@@ -289,10 +289,10 @@ static ModifierFlags getDeclarationModifierFlagsFromSymbolEx(Symbol* s, bool isW
 		}
 		return accessModifier;
 	}
-	if (s->valueDeclaration != nullptr) {
+	if (s->data->valueDeclaration != nullptr) {
 		Node* declaration = nullptr;
 		if (isWrite) {
-			for (Node* d : s->declarations) {
+			for (Node* d : s->data->declarations) {
 				if (isSetAccessorDeclaration(d)) {
 					declaration = d;
 					break;
@@ -300,7 +300,7 @@ static ModifierFlags getDeclarationModifierFlagsFromSymbolEx(Symbol* s, bool isW
 			}
 		}
 		if (declaration == nullptr && (s->flags & SymbolFlagsGetAccessor)) {
-			for (Node* d : s->declarations) {
+			for (Node* d : s->data->declarations) {
 				if (isGetAccessorDeclaration(d)) {
 					declaration = d;
 					break;
@@ -308,10 +308,10 @@ static ModifierFlags getDeclarationModifierFlagsFromSymbolEx(Symbol* s, bool isW
 			}
 		}
 		if (declaration == nullptr) {
-			declaration = s->valueDeclaration;
+			declaration = s->data->valueDeclaration;
 		}
 		ModifierFlags flags = getCombinedModifierFlags(declaration);
-		if (s->parent != nullptr && (s->parent->flags & SymbolFlagsClass)) {
+		if (s->data->parent != nullptr && (s->data->parent->flags & SymbolFlagsClass)) {
 			return flags;
 		}
 		return flags & ~ModifierFlagsAccessibilityModifier;
@@ -329,7 +329,7 @@ static ModifierFlags getDeclarationModifierFlagsFromSymbol(Symbol* s) {
 
 // ast/utilities.go:2994 — getClassLikeDeclarationOfSymbol
 static Node* getClassLikeDeclarationOfSymbol(Symbol* symbol) {
-	for (Node* d : symbol->declarations) {
+	for (Node* d : symbol->data->declarations) {
 		if (isClassLike(d)) {
 			return d;
 		}
@@ -562,10 +562,10 @@ Type* Checker::getLiteralTypeFromProperty(Symbol* prop, TypeFlags include,
 		 ModifierFlagsNonPublicAccessibilityModifier) == 0) {
 		Type* t = valueSymbolLinks.Get(getLateBoundSymbol(prop))->nameType;
 		if (t == nullptr) {
-			if (prop->name == InternalSymbolNameDefault) {
+			if (prop->data->name == InternalSymbolNameDefault) {
 				t = getStringLiteralType("default");
 			} else {
-				Node* name = getNameOfDeclaration(prop->valueDeclaration);
+				Node* name = getNameOfDeclaration(prop->data->valueDeclaration);
 				if (name != nullptr) {
 					t = getLiteralTypeFromPropertyName(name);
 				}
@@ -907,7 +907,7 @@ Type* Checker::getPropertyTypeForIndexType(Type* originalObjectType,
 		Symbol* prop = getPropertyOfType(objectType, propName);
 		if (prop != nullptr) {
 			if ((accessFlags & AccessFlagsReportDeprecated) && accessNode != nullptr &&
-				!prop->declarations.empty() && isDeprecatedSymbol(prop) &&
+				!prop->data->declarations.empty() && isDeprecatedSymbol(prop) &&
 				isUncalledFunctionReference(accessNode, prop)) {
 				Node* deprecatedNode;
 				if (accessExpression != nullptr) {
@@ -918,7 +918,7 @@ Type* Checker::getPropertyTypeForIndexType(Type* originalObjectType,
 				} else {
 					deprecatedNode = accessNode;
 				}
-				addDeprecatedSuggestion(deprecatedNode, prop->declarations, propName);
+				addDeprecatedSuggestion(deprecatedNode, prop->data->declarations, propName);
 			}
 			if (accessExpression != nullptr) {
 				markPropertyAsReferenced(
@@ -1065,9 +1065,9 @@ Type* Checker::getPropertyTypeForIndexType(Type* originalObjectType,
 				}
 			}
 			auto globalIt = (objectType->symbol == globalThisSymbol && hasPropName)
-								? globalThisSymbol->exports.find(propName)
-								: globalThisSymbol->exports.end();
-			if (globalIt != globalThisSymbol->exports.end() &&
+								? globalThisSymbol->data->exports.find(propName)
+								: globalThisSymbol->data->exports.end();
+			if (globalIt != globalThisSymbol->data->exports.end() &&
 				(globalIt->second->flags & SymbolFlagsBlockScoped)) {
 				error(accessExpression, Property_0_does_not_exist_on_type_1,
 					  {propName, TypeToString(objectType)});
@@ -1177,8 +1177,8 @@ Type* Checker::getPropertyTypeForIndexType(Type* originalObjectType,
 bool Checker::typeHasStaticProperty(const std::string& propName, Type* containingType) {
 	if (containingType->symbol != nullptr) {
 		Symbol* prop = getPropertyOfType(getTypeOfSymbol(containingType->symbol), propName);
-		return prop != nullptr && prop->valueDeclaration != nullptr &&
-			isStatic(prop->valueDeclaration);
+		return prop != nullptr && prop->data->valueDeclaration != nullptr &&
+			isStatic(prop->data->valueDeclaration);
 	}
 	return false;
 }
@@ -1189,7 +1189,7 @@ std::string Checker::getSuggestionForNonexistentProperty(const std::string& name
 	Symbol* symbol = getSpellingSuggestionForName(name, getPropertiesOfType(containingType),
 												SymbolFlagsValue);
 	if (symbol != nullptr) {
-		return symbol->name;
+		return symbol->data->name;
 	}
 	return "";
 }
@@ -1291,15 +1291,15 @@ bool Checker::isAssignmentToReadonlyEntity(Node* expr, Symbol* symbol,
 			if (ctor == nullptr || !isConstructorDeclaration(ctor)) {
 				return true;
 			}
-			if (symbol->valueDeclaration != nullptr) {
-				bool isAssignmentDeclaration = isBinaryExpression(symbol->valueDeclaration);
+			if (symbol->data->valueDeclaration != nullptr) {
+				bool isAssignmentDeclaration = isBinaryExpression(symbol->data->valueDeclaration);
 				bool isLocalPropertyDeclaration =
-					ctor->parent == symbol->valueDeclaration->parent;
-				bool isLocalParameterProperty = ctor == symbol->valueDeclaration->parent;
+					ctor->parent == symbol->data->valueDeclaration->parent;
+				bool isLocalParameterProperty = ctor == symbol->data->valueDeclaration->parent;
 				bool isLocalThisPropertyAssignment =
-					isAssignmentDeclaration && symbol->parent->valueDeclaration == ctor->parent;
+					isAssignmentDeclaration && symbol->data->parent->data->valueDeclaration == ctor->parent;
 				bool isLocalThisPropertyAssignmentConstructorFunction =
-					isAssignmentDeclaration && symbol->parent->valueDeclaration == ctor;
+					isAssignmentDeclaration && symbol->data->parent->data->valueDeclaration == ctor;
 				bool isWriteableSymbol = isLocalPropertyDeclaration ||
 					isLocalParameterProperty || isLocalThisPropertyAssignment ||
 					isLocalThisPropertyAssignmentConstructorFunction;
@@ -1339,7 +1339,7 @@ bool Checker::isThisPropertyAccessInConstructor(Node* node, Symbol* prop) {
 bool Checker::isAutoTypedProperty(Symbol* symbol) {
 	// A property is auto-typed when its declaration has no type annotation or initializer and we're in
 	// noImplicitAny mode or a .js file.
-	Node* declaration = symbol->valueDeclaration;
+	Node* declaration = symbol->data->valueDeclaration;
 	return declaration != nullptr && isPropertyDeclaration(declaration) &&
 		declaration->type() == nullptr && declaration->initializer() == nullptr &&
 		noImplicitAny;
@@ -1347,7 +1347,7 @@ bool Checker::isAutoTypedProperty(Symbol* symbol) {
 
 // checker.go:27811
 Node* Checker::getDeclaringConstructor(Symbol* symbol) {
-	for (Node* declaration : symbol->declarations) {
+	for (Node* declaration : symbol->data->declarations) {
 		Node* container = tsc::getThisContainer(declaration, false /*includeArrowFunctions*/,
 												  false /*includeClassComputedPropertyName*/);
 		if (container != nullptr && isConstructorDeclaration(container)) {
@@ -1806,12 +1806,12 @@ Ternary Checker::compareProperties(Symbol* sourceProp, Symbol* targetProp,
 // checker.go:28172
 void Checker::markPropertyAsReferenced(Symbol* prop, Node* nodeForCheckWriteOnly,
 									   bool isSelfTypeAccess) {
-	if (!(prop->flags & SymbolFlagsClassMember) || prop->valueDeclaration == nullptr) {
+	if (!(prop->flags & SymbolFlagsClassMember) || prop->data->valueDeclaration == nullptr) {
 		return;
 	}
-	bool hasPrivateModifier = hasModifier(prop->valueDeclaration, ModifierFlagsPrivate);
-	bool hasPrivateIdentifier = prop->valueDeclaration->name() != nullptr &&
-		isPrivateIdentifier(prop->valueDeclaration->name());
+	bool hasPrivateModifier = hasModifier(prop->data->valueDeclaration, ModifierFlagsPrivate);
+	bool hasPrivateIdentifier = prop->data->valueDeclaration->name() != nullptr &&
+		isPrivateIdentifier(prop->data->valueDeclaration->name());
 	if (!hasPrivateModifier && !hasPrivateIdentifier) {
 		return;
 	}
@@ -2393,7 +2393,7 @@ SymbolTable Checker::transformTypeOfMembers(Type* t,
 		if (updated != original) {
 			property = createSymbolWithType(property, updated);
 		}
-		members[property->name] = property;
+		members[property->data->name] = property;
 	}
 	return members;
 }
@@ -2440,17 +2440,17 @@ bool Checker::isJSLiteralType(Type* t) {
 bool Checker::isDeprecatedSymbol(Symbol* symbol) {
 	auto isDeprecated = [](Node* d, Checker* c) { return c->IsDeprecatedDeclaration(d); };
 	Symbol* parentSymbol = getParentOfSymbol(symbol);
-	if (parentSymbol != nullptr && symbol->declarations.size() > 1) {
+	if (parentSymbol != nullptr && symbol->data->declarations.size() > 1) {
 		if ((parentSymbol->flags & SymbolFlagsInterface) != 0) {
-			return std::any_of(symbol->declarations.begin(), symbol->declarations.end(),
+			return std::any_of(symbol->data->declarations.begin(), symbol->data->declarations.end(),
 							   [&](Node* d) { return IsDeprecatedDeclaration(d); });
 		}
-		return std::all_of(symbol->declarations.begin(), symbol->declarations.end(),
+		return std::all_of(symbol->data->declarations.begin(), symbol->data->declarations.end(),
 						   [&](Node* d) { return IsDeprecatedDeclaration(d); });
 	}
-	return (symbol->valueDeclaration != nullptr && IsDeprecatedDeclaration(symbol->valueDeclaration)) ||
-		(!symbol->declarations.empty() &&
-		 std::all_of(symbol->declarations.begin(), symbol->declarations.end(),
+	return (symbol->data->valueDeclaration != nullptr && IsDeprecatedDeclaration(symbol->data->valueDeclaration)) ||
+		(!symbol->data->declarations.empty() &&
+		 std::all_of(symbol->data->declarations.begin(), symbol->data->declarations.end(),
 					 [&](Node* d) { return IsDeprecatedDeclaration(d); }));
 }
 

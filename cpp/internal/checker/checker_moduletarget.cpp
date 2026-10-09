@@ -251,7 +251,7 @@ Symbol* Checker::getTargetOfImportClause(Node* node) {
 		if (links->immediateTarget == nullptr) {
 			Symbol* symbol = newSymbol(SymbolFlagsFunctionScopedVariable,
 			                           std::string(node->name()->text()));
-			symbol->declarations = alias->declarations;
+			symbol->data->declarations = alias->data->declarations;
 			valueSymbolLinks.Get(symbol)->resolvedType =
 				getGlobalAbstractModuleSourceType();
 			links->immediateTarget = symbol;
@@ -270,7 +270,7 @@ Symbol* Checker::getTargetOfImportClause(Node* node) {
 // checker.go:14764 — getTargetOfModuleDefault
 Symbol* Checker::getTargetOfModuleDefault(Symbol* moduleSymbol, Node* node,
 										  bool dontResolveAlias) {
-	Node* file = findOrNull(moduleSymbol->declarations, [](Node* d) { return isSourceFile(d); });
+	Node* file = findOrNull(moduleSymbol->data->declarations, [](Node* d) { return isSourceFile(d); });
 	Node* specifier = getModuleSpecifierForImportOrExport(node);
 	Symbol* exportDefaultSymbol = nullptr;
 	Symbol* exportModuleDotExportsSymbol = nullptr;
@@ -342,7 +342,7 @@ Symbol* Checker::getTargetOfModuleDefault(Symbol* moduleSymbol, Node* node,
 
 // checker.go:14828 — reportNonDefaultExport
 void Checker::reportNonDefaultExport(Symbol* moduleSymbol, Node* node) {
-	if (getSymbolFromTable(moduleSymbol->exports, node->symbol()->name) != nullptr) {
+	if (getSymbolFromTable(moduleSymbol->data->exports, node->symbol()->data->name) != nullptr) {
 		error(node,
 			  Module_0_has_no_default_export_Did_you_mean_to_use_import_1_from_0_instead,
 			  {symbolToString(moduleSymbol), symbolToString(node->symbol())});
@@ -351,12 +351,12 @@ void Checker::reportNonDefaultExport(Symbol* moduleSymbol, Node* node) {
 									   Module_0_has_no_default_export,
 									   {symbolToString(moduleSymbol)});
 		Symbol* exportStar = nullptr;
-		auto it = moduleSymbol->exports.find(InternalSymbolNameExportStar);
-		if (it != moduleSymbol->exports.end()) {
+		auto it = moduleSymbol->data->exports.find(InternalSymbolNameExportStar);
+		if (it != moduleSymbol->data->exports.end()) {
 			exportStar = it->second;
 		}
 		if (exportStar != nullptr) {
-			Node* defaultExport = findOrNull(exportStar->declarations, [&](Node* decl) {
+			Node* defaultExport = findOrNull(exportStar->data->declarations, [&](Node* decl) {
 				if (!(isExportDeclaration(decl) && decl->moduleSpecifier() != nullptr)) {
 					return false;
 				}
@@ -364,7 +364,7 @@ void Checker::reportNonDefaultExport(Symbol* moduleSymbol, Node* node) {
 					decl, decl->moduleSpecifier(), false /*ignoreErrors*/,
 					getTypeFromImportAttributes(getImportAttributes(decl)));
 				return resolvedExternalModuleName != nullptr &&
-					   getSymbolFromTable(resolvedExternalModuleName->exports,
+					   getSymbolFromTable(resolvedExternalModuleName->data->exports,
 										  InternalSymbolNameDefault) != nullptr;
 			});
 			if (defaultExport != nullptr) {
@@ -380,8 +380,8 @@ void Checker::reportNonDefaultExport(Symbol* moduleSymbol, Node* node) {
 Symbol* Checker::resolveExportByName(Symbol* moduleSymbol, const std::string& name,
 									 Node* sourceNode, bool dontResolveAlias) {
 	Symbol* exportValue = nullptr;
-	auto it = moduleSymbol->exports.find(InternalSymbolNameExportEquals);
-	if (it != moduleSymbol->exports.end()) {
+	auto it = moduleSymbol->data->exports.find(InternalSymbolNameExportEquals);
+	if (it != moduleSymbol->data->exports.end()) {
 		exportValue = it->second;
 	}
 	Symbol* exportSymbol = nullptr;
@@ -390,8 +390,8 @@ Symbol* Checker::resolveExportByName(Symbol* moduleSymbol, const std::string& na
 										   true /*skipObjectFunctionPropertyAugment*/,
 										   false /*includeTypeOnlyMembers*/);
 	} else {
-		auto it2 = moduleSymbol->exports.find(name);
-		if (it2 != moduleSymbol->exports.end()) {
+		auto it2 = moduleSymbol->data->exports.find(name);
+		if (it2 != moduleSymbol->data->exports.end()) {
 			exportSymbol = it2->second;
 		}
 	}
@@ -492,7 +492,7 @@ Symbol* Checker::getExternalModuleMember(Node* node, Node* specifier,
 			// First check if module was specified with "export=". If so, get the
 			// member from the resolved type
 			if (moduleSymbol != nullptr &&
-				getSymbolFromTable(moduleSymbol->exports,
+				getSymbolFromTable(moduleSymbol->data->exports,
 								   InternalSymbolNameExportEquals) != nullptr) {
 				symbolFromVariable = getPropertyOfTypeEx(
 					getTypeOfSymbol(targetSymbol), nameText,
@@ -505,7 +505,7 @@ Symbol* Checker::getExternalModuleMember(Node* node, Node* specifier,
 			symbolFromVariable = resolveSymbolEx(symbolFromVariable, dontResolveAlias);
 			Symbol* exportContainer = targetSymbol;
 			if (moduleSymbol != nullptr &&
-				getSymbolFromTable(moduleSymbol->exports,
+				getSymbolFromTable(moduleSymbol->data->exports,
 								   InternalSymbolNameExportEquals) != nullptr) {
 				// For `export =` modules, supplemental type/namespace exports live on
 				// the original module symbol.
@@ -514,7 +514,7 @@ Symbol* Checker::getExternalModuleMember(Node* node, Node* specifier,
 			Symbol* symbolFromModule = getExportOfModule(exportContainer, nameText,
 													   specifier, dontResolveAlias);
 			if (symbolFromModule == nullptr && nameText == InternalSymbolNameDefault) {
-				Node* file = findOrNull(moduleSymbol->declarations,
+				Node* file = findOrNull(moduleSymbol->data->declarations,
 										[](Node* d) { return isSourceFile(d); });
 				if (isOnlyImportableAsDefault(moduleSpecifier, moduleSymbol,
 											  importAttributesType) ||
@@ -554,7 +554,7 @@ Symbol* Checker::getExternalModuleMember(Node* node, Node* specifier,
 // checker.go:14980 — getPropertyOfVariable
 Symbol* Checker::getPropertyOfVariable(Symbol* symbol, const std::string& name) {
 	if (symbol->flags & SymbolFlagsVariable) {
-		Node* typeAnnotation = symbol->valueDeclaration->type();
+		Node* typeAnnotation = symbol->data->valueDeclaration->type();
 		if (typeAnnotation != nullptr) {
 			return resolveSymbol(
 				getPropertyOfType(getTypeFromTypeNode(typeAnnotation), name));
@@ -574,22 +574,22 @@ Symbol* Checker::combineValueAndTypeSymbols(Symbol* valueSymbol, Symbol* typeSym
 	if (valueSymbol->flags & (SymbolFlagsType | SymbolFlagsNamespace)) {
 		return valueSymbol;
 	}
-	Symbol* result = newSymbol(valueSymbol->flags | typeSymbol->flags, valueSymbol->name);
+	Symbol* result = newSymbol(valueSymbol->flags | typeSymbol->flags, valueSymbol->data->name);
 	TSC_ASSERT(!valueSymbol->declarations.empty() || !typeSymbol->declarations.empty(),
 			   "declarations");
-	result->declarations = valueSymbol->declarations;
-	for (Node* d : typeSymbol->declarations) {
-		result->declarations.push_back(d);
+	result->data->declarations = valueSymbol->data->declarations;
+	for (Node* d : typeSymbol->data->declarations) {
+		result->data->declarations.push_back(d);
 	}
-	auto last = std::unique(result->declarations.begin(), result->declarations.end());
-	result->declarations.erase(last, result->declarations.end());
-	result->parent = valueSymbol->parent;
-	if (result->parent == nullptr) {
-		result->parent = typeSymbol->parent;
+	auto last = std::unique(result->data->declarations.begin(), result->data->declarations.end());
+	result->data->declarations.erase(last, result->data->declarations.end());
+	result->data->parent = valueSymbol->data->parent;
+	if (result->data->parent == nullptr) {
+		result->data->parent = typeSymbol->data->parent;
 	}
-	result->valueDeclaration = valueSymbol->valueDeclaration;
-	result->members = typeSymbol->members;
-	result->exports = valueSymbol->exports;
+	result->data->valueDeclaration = valueSymbol->data->valueDeclaration;
+	result->data->members = typeSymbol->data->members;
+	result->data->exports = valueSymbol->data->exports;
 	return result;
 }
 
@@ -692,7 +692,7 @@ bool Checker::canHaveSyntheticDefault(Node* file, Symbol* moduleSymbol,
 								nullptr /*sourceNode*/, true /*dontResolveAlias*/);  // Dont resolve alias because we want the immediately exported symbol's declaration
 		if (defaultExportSymbol != nullptr) {
 			bool anySyntactic = false;
-			for (Node* d : defaultExportSymbol->declarations) {
+			for (Node* d : defaultExportSymbol->data->declarations) {
 				if (isSyntacticDefault(d)) {
 					anySyntactic = true;
 					break;
@@ -758,13 +758,13 @@ void Checker::errorNoModuleMemberSymbol(Symbol* moduleSymbol, Symbol* targetSymb
 		Diagnostic* diagnostic =
 			error(name, X_0_has_no_exported_member_named_1_Did_you_mean_2,
 				  {moduleName, declarationName, suggestionName});
-		if (suggestion->valueDeclaration != nullptr) {
+		if (suggestion->data->valueDeclaration != nullptr) {
 			diagnostic->AddRelatedInfo(createDiagnosticForNode(
-				suggestion->valueDeclaration, X_0_is_declared_here,
+				suggestion->data->valueDeclaration, X_0_is_declared_here,
 				{suggestionName}));
 		}
 	} else {
-		if (getSymbolFromTable(moduleSymbol->exports,
+		if (getSymbolFromTable(moduleSymbol->data->exports,
 								  InternalSymbolNameDefault) != nullptr) {
 			error(name,
 				  
@@ -781,13 +781,13 @@ void Checker::reportNonExportedMember(Node* name, const std::string& declaration
 									  Symbol* moduleSymbol,
 									  const std::string& moduleName) {
 	Symbol* localSymbol = nullptr;
-	if (SymbolTable* locals = moduleSymbol->valueDeclaration->locals()) {
+	if (SymbolTable* locals = moduleSymbol->data->valueDeclaration->locals()) {
 		auto it = locals->find(name->text());
 		if (it != locals->end()) {
 			localSymbol = it->second;
 		}
 	}
-	SymbolTable& exports = moduleSymbol->exports;
+	SymbolTable& exports = moduleSymbol->data->exports;
 	if (localSymbol != nullptr) {
 		Symbol* exportedEqualsSymbol = nullptr;
 		auto it = exports.find(InternalSymbolNameExportEquals);
@@ -817,7 +817,7 @@ void Checker::reportNonExportedMember(Node* name, const std::string& declaration
 					{moduleName, declarationName});
 			}
 			int i = 0;
-			for (Node* decl : localSymbol->declarations) {
+			for (Node* decl : localSymbol->data->declarations) {
 				diagnostic->AddRelatedInfo(createDiagnosticForNode(
 					decl,
 					i == 0 ? X_0_is_declared_here : X_and_here,
@@ -1024,7 +1024,7 @@ Symbol* Checker::resolveESModuleSymbol(Symbol* moduleSymbol, Node* node,
 				return cloneTypeAsModuleType(symbol, defaultOnlyType, referenceParent);
 			}
 
-			Node* targetFile = findOrNull(moduleSymbol->declarations,
+			Node* targetFile = findOrNull(moduleSymbol->data->declarations,
 										  [](Node* d) { return isSourceFile(d); });
 			ResolutionMode usageMode =
 				getEmitSyntaxForModuleSpecifierExpression(reference);
@@ -1062,7 +1062,7 @@ Symbol* Checker::resolveESModuleSymbol(Symbol* moduleSymbol, Node* node,
 						typ, symbol, moduleSymbol, reference);
 				} else {
 					moduleType = createDefaultPropertyWrapperForModule(
-						symbol, symbol->parent, nullptr);
+						symbol, symbol->data->parent, nullptr);
 				}
 				return cloneTypeAsModuleType(symbol, moduleType, referenceParent);
 			}
@@ -1106,7 +1106,7 @@ Type* Checker::getTypeWithSyntheticDefaultImportType(Type* t, Symbol* symbol,
 		if (auto it = cachedTypes.find(key); it != cachedTypes.end()) {
 			return it->second;
 		}
-		Node* file = findOrNull(originalSymbol->declarations,
+		Node* file = findOrNull(originalSymbol->data->declarations,
 								[](Node* d) { return isSourceFile(d); });
 		bool hasSyntheticDefault = canHaveSyntheticDefault(
 			file, originalSymbol, false /*dontResolveAlias*/, moduleSpecifier);
@@ -1114,7 +1114,7 @@ Type* Checker::getTypeWithSyntheticDefaultImportType(Type* t, Symbol* symbol,
 		if (hasSyntheticDefault) {
 			Symbol* anonymousSymbol =
 				newSymbol(SymbolFlagsTypeLiteral, InternalSymbolNameType);
-			anonymousSymbol->declarations = originalSymbol->declarations;
+			anonymousSymbol->data->declarations = originalSymbol->data->declarations;
 			Type* defaultContainingObject = createDefaultPropertyWrapperForModule(
 				symbol, originalSymbol, anonymousSymbol);
 			valueSymbolLinks.Get(anonymousSymbol)->resolvedType =
@@ -1141,13 +1141,13 @@ Type* Checker::createDefaultPropertyWrapperForModule(Symbol* symbol,
 													 Symbol* anonymousSymbol) {
 	SymbolTable memberTable;
 	Symbol* newSym = newSymbol(SymbolFlagsAlias, InternalSymbolNameDefault);
-	newSym->parent = originalSymbol;
+	newSym->data->parent = originalSymbol;
 	valueSymbolLinks.Get(newSym)->nameType = getStringLiteralType("default");
 	aliasSymbolLinks.Get(newSym)->aliasTarget = resolveSymbol(symbol);
 	memberTable[InternalSymbolNameDefault] = newSym;
 	if (anonymousSymbol == nullptr && originalSymbol != nullptr) {
 		anonymousSymbol = newSymbol(SymbolFlagsObjectLiteral, InternalSymbolNameObject);
-		anonymousSymbol->declarations = originalSymbol->declarations;
+		anonymousSymbol->data->declarations = originalSymbol->data->declarations;
 	}
 	return newAnonymousType(anonymousSymbol, memberTable, {}, {}, {});
 }
@@ -1155,12 +1155,12 @@ Type* Checker::createDefaultPropertyWrapperForModule(Symbol* symbol,
 // checker.go:16040 — cloneTypeAsModuleType
 Symbol* Checker::cloneTypeAsModuleType(Symbol* symbol, Type* moduleType,
 									   Node* referenceParent) {
-	Symbol* result = newSymbol(symbol->flags, symbol->name);
-	result->declarations = symbol->declarations;
-	result->valueDeclaration = symbol->valueDeclaration;
-	result->members = symbol->members;
-	result->exports = symbol->exports;
-	result->parent = symbol->parent;
+	Symbol* result = newSymbol(symbol->flags, symbol->data->name);
+	result->data->declarations = symbol->data->declarations;
+	result->data->valueDeclaration = symbol->data->valueDeclaration;
+	result->data->members = symbol->data->members;
+	result->data->exports = symbol->data->exports;
+	result->data->parent = symbol->data->parent;
 	ExportTypeLinks* links = exportTypeLinks.Get(result);
 	links->target = symbol;
 	links->originatingImport = referenceParent;
@@ -1196,9 +1196,9 @@ Symbol* Checker::resolveAliasWithDeprecationCheck(Symbol* symbol, Node* location
 			if (target == targetSymbol) {
 				break;
 			}
-			if (!target->declarations.empty()) {
+			if (!target->data->declarations.empty()) {
 				if (isDeprecatedSymbol(target)) {
-					addDeprecatedSuggestion(location, target->declarations, target->name);
+					addDeprecatedSuggestion(location, target->data->declarations, target->data->name);
 					break;
 				} else {
 					if (symbol == targetSymbol) {

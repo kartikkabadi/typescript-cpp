@@ -240,6 +240,7 @@ inline const Method MethodGetSignatureUsages = "getSignatureUsages";
 
 // Language service methods
 inline const Method MethodGetCompletionsAtPosition = "getCompletionsAtPosition";
+inline const Method MethodFormatNodeForInsertion = "formatNodeForInsertion";
 
 // Diagnostic methods
 inline const Method MethodGetSyntacticDiagnostics = "getSyntacticDiagnostics";
@@ -252,7 +253,6 @@ inline const Method MethodGetGlobalDiagnostics = "getGlobalDiagnostics";
 inline const Method MethodGetConfigFileParsingDiagnostics = "getConfigFileParsingDiagnostics";
 // Printer methods
 inline const Method MethodPrintNode = "printNode";
-inline const Method MethodFormatNodeForInsertion = "formatNodeForInsertion";
 inline const Method MethodEmit = "emit";
 inline const Method MethodEmitToString = "emitToString";
 inline const Method MethodGetJavaScriptEmit = "getJavaScriptEmit";
@@ -952,10 +952,6 @@ struct ProjectResponse {
     std::string CurrentDirectory;
     bool Dirty{};
     std::shared_ptr<ConfigFileResponse> ParsedCommandLine; // nonnil
-    // Deprecated: Use parsedCommandLine.fileNames.
-    std::vector<std::string> RootFiles; // nonnil
-    // Deprecated: Use parsedCommandLine.options.
-    ::tsc::CompilerOptions* CompilerOptions = nullptr; // nonnil (borrowed)
 
     std::string marshalJSONTo(json::Encoder& enc) const;
 };
@@ -1486,6 +1482,19 @@ struct GetCompletionsAtPositionParams {
     std::string unmarshalJSONFrom(json::Decoder& dec);
 };
 
+// FormatNodeForInsertionParams are the parameters for the formatNodeForInsertion method.
+struct FormatNodeForInsertionParams {
+    SnapshotID Snapshot{};
+    project::ID Project;
+    DocumentIdentifier File;   // target file where the node will be inserted
+    uint32_t Position{};       // UTF-16 code-unit offset of the insertion position in the target file
+    std::string Data;          // base64-encoded binary AST data for the synthesized node
+
+	std::pair<bool, std::string> unmarshalField(std::string_view n, json::Decoder& d);
+    std::string marshalJSONTo(json::Encoder& enc) const;
+    std::string unmarshalJSONFrom(json::Decoder& dec);
+};
+
 // CompletionEntryLabelDetailsResponse holds additional label display text for a completion entry.
 struct CompletionEntryLabelDetailsResponse {
     std::optional<std::string> Detail;
@@ -1805,19 +1814,6 @@ struct EmitOutputResponse {
     std::vector<std::shared_ptr<EmitOutputFile>> OutputFiles; // nonnil
 
     std::string marshalJSONTo(json::Encoder& enc) const;
-};
-
-// FormatNodeForInsertionParams are the parameters for the formatNodeForInsertion method.
-struct FormatNodeForInsertionParams {
-    SnapshotID Snapshot{};
-    project::ID Project;
-    DocumentIdentifier File;   // target file where the node will be inserted
-    uint32_t Position{};       // UTF-16 code-unit offset of the insertion position in the target file
-    std::string Data;          // base64-encoded binary AST data for the synthesized node
-
-	std::pair<bool, std::string> unmarshalField(std::string_view n, json::Decoder& d);
-    std::string marshalJSONTo(json::Encoder& enc) const;
-    std::string unmarshalJSONFrom(json::Decoder& dec);
 };
 
 // CheckerTypeParams are parameters for checker methods that operate on a type.

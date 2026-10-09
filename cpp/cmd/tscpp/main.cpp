@@ -181,21 +181,21 @@ static void dumpDiags(char tag, const std::vector<Diagnostic*>& ds,
 
 static void dumpSymbol(const Symbol* s, std::string& out) {
 	int vpos = -1, vend = -1;
-	if (s->valueDeclaration) {
-		vpos = s->valueDeclaration->pos();
-		vend = s->valueDeclaration->end();
+	if (s->data->valueDeclaration) {
+		vpos = s->data->valueDeclaration->pos();
+		vend = s->data->valueDeclaration->end();
 	}
 	std::string pname = "-";
 	uint32_t pflags = 0;
-	if (s->parent) {
-		pname = escapeAllInternalSymbolNames(symbolName(s->parent));
-		pflags = static_cast<uint32_t>(s->parent->flags);
+	if (s->data->parent) {
+		pname = escapeAllInternalSymbolNames(symbolName(s->data->parent));
+		pflags = static_cast<uint32_t>(s->data->parent->flags);
 	}
 	char buf[128];
 	out += "S ";
 	out += escapeAllInternalSymbolNames(symbolName(s));
 	std::snprintf(buf, sizeof(buf), " %u %zu %d:%d ",
-	              static_cast<unsigned>(s->flags), s->declarations.size(),
+	              static_cast<unsigned>(s->flags), s->data->declarations.size(),
 	              vpos, vend);
 	out += buf;
 	out += pname;

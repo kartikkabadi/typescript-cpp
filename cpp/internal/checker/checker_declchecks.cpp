@@ -116,7 +116,7 @@ static Node* getEnclosingContainer(Node* node) {
 // checker/utilities.go:1304 — getDeclarationsOfKind
 static std::vector<Node*> getDeclarationsOfKind(Symbol* symbol, Kind kind) {
 	std::vector<Node*> result;
-	for (Node* d : symbol->declarations) {
+	for (Node* d : symbol->data->declarations) {
 		if (d->kind == kind) {
 			result.push_back(d);
 		}
@@ -682,15 +682,15 @@ void Checker::checkTypeReferenceOrImport(Node* node) {
 		Symbol* symbol = getResolvedSymbolOrNil(node);
 		if (symbol != nullptr) {
 			bool anyDeprecated = false;
-			for (Node* d : symbol->declarations) {
+			for (Node* d : symbol->data->declarations) {
 				if (isTypeDeclaration(d) && IsDeprecatedDeclaration(d)) {
 					anyDeprecated = true;
 					break;
 				}
 			}
 			if (anyDeprecated) {
-				addDeprecatedSuggestion(getDeprecatedSuggestionNode(node), symbol->declarations,
-				                        symbol->name);
+				addDeprecatedSuggestion(getDeprecatedSuggestionNode(node), symbol->data->declarations,
+				                        symbol->data->name);
 			}
 		}
 	}
@@ -874,7 +874,7 @@ void Checker::checkObjectTypeForDuplicateDeclarations(Node* node, bool checkPriv
 	std::unordered_map<std::string, int> privateNames;
 	bool nodeInAmbientContext = (node->flags & NodeFlagsAmbient) != 0;
 	auto checkPropertyOrAccessor = [&](Symbol* symbol, int kind, bool isStaticMember) {
-		if (symbol->declarations.size() > 1) {
+		if (symbol->data->declarations.size() > 1) {
 			std::unordered_map<std::string, int>* names;
 			if (isStaticMember) {
 				names = &staticNames;
@@ -882,19 +882,19 @@ void Checker::checkObjectTypeForDuplicateDeclarations(Node* node, bool checkPriv
 				names = &instanceNames;
 			}
 			int state = 0;
-			auto it = names->find(symbol->name);
+			auto it = names->find(symbol->data->name);
 			if (it != names->end()) {
 				state = it->second;
 			}
 			if (state == 0) {
 				// On first occurrence just record the kind
-				(*names)[symbol->name] = kind;
+				(*names)[symbol->data->name] = kind;
 			} else if (state == 1 || (state == 2 && kind != 2)) {
 				// Error on second property or combination of property and accessor
-				reportDuplicateMemberErrors(node, symbol->name, true, isStaticMember,
+				reportDuplicateMemberErrors(node, symbol->data->name, true, isStaticMember,
 				                            Duplicate_identifier_0);
 				// Record that errors have been reported
-				(*names)[symbol->name] = 3;
+				(*names)[symbol->data->name] = 3;
 			}
 		}
 	};
@@ -911,10 +911,10 @@ void Checker::checkObjectTypeForDuplicateDeclarations(Node* node, bool checkPriv
 			bool isStatic = hasStaticModifier(member);
 			// In non-ambient contexts, check that static members are not named 'prototype'.
 			if (!nodeInAmbientContext && isStatic && symbol != nullptr &&
-			    symbol->name == "prototype") {
+			    symbol->data->name == "prototype") {
 				error(member->name(),
 				      Static_property_0_conflicts_with_built_in_property_Function_0_of_constructor_function_1,
-				      {symbol->name, symbolToString(getSymbolOfDeclaration(node))});
+				      {symbol->data->name, symbolToString(getSymbolOfDeclaration(node))});
 			}
 			// Check that this object type declaration doesn't contain multiple declarations of the same property,
 			// or accessor and property declarations with the same name.
@@ -930,16 +930,16 @@ void Checker::checkObjectTypeForDuplicateDeclarations(Node* node, bool checkPriv
 			if (checkPrivateNames && member->name() != nullptr &&
 			    isPrivateIdentifier(member->name())) {
 				int flags = 0;
-				auto it = privateNames.find(symbol->name);
+				auto it = privateNames.find(symbol->data->name);
 				if (it != privateNames.end()) {
 					flags = it->second;
 				}
 				if (flags != 3) {
 					flags |= tsc::isStatic(member) ? 2 : 1;
-					privateNames[symbol->name] = flags;
+					privateNames[symbol->data->name] = flags;
 					if (flags == 3) {
 						reportDuplicateMemberErrors(
-						    node, symbol->name, false, false,
+						    node, symbol->data->name, false, false,
 						    Duplicate_identifier_0_Static_and_instance_elements_cannot_share_the_same_private_name);
 					}
 				}
@@ -958,13 +958,13 @@ void Checker::reportDuplicateMemberErrors(Node* node, const std::string& name,
 				if (isParameterPropertyDeclaration(param, member) &&
 				    !isBindingPattern(param->name())) {
 					if (Symbol* symbol = getSymbolOfDeclaration(param);
-					    symbol->name == name) {
+					    symbol->data->name == name) {
 						error(param->name(), message, {symbolToString(symbol)});
 					}
 				}
 			}
 		} else if (Symbol* symbol = getSymbolOfDeclaration(member);
-		           symbol != nullptr && symbol->name == name &&
+		           symbol != nullptr && symbol->data->name == name &&
 		           (!checkStatic || isStaticMember == isStatic(member))) {
 			error(member->name(), message, {symbolToString(symbol)});
 		}
@@ -1057,7 +1057,7 @@ void Checker::checkInferType(Node* node) {
 	Node* typeParameterDeclarationNode = node->as<InferTypeNode>()->TypeParameter;
 	checkSourceElement(typeParameterDeclarationNode);
 	Symbol* symbol = getSymbolOfDeclaration(typeParameterDeclarationNode);
-	if (symbol->declarations.size() > 1) {
+	if (symbol->data->declarations.size() > 1) {
 		DeclaredTypeLinks* links = declaredTypeLinks.Get(symbol);
 		// Per-checker once-flag: re-run under each distinct check file so the
 		// errors below re-fire on declarations owned by that file.
@@ -1200,7 +1200,7 @@ void Checker::checkFunctionOrMethodDeclaration(Node* node) {
 		if ((node->flags & NodeFlagsJavaScriptFile) == 0) {
 			checkFunctionOrConstructorSymbol(localSymbol);
 		}
-		if (symbol->parent != nullptr) {
+		if (symbol->data->parent != nullptr) {
 			// run check on export symbol to check that modifiers agree across all exported declarations
 			checkFunctionOrConstructorSymbol(symbol);
 		}
@@ -1256,7 +1256,7 @@ void Checker::checkFunctionOrConstructorSymbolWorker(Symbol* symbol) {
 	Node* bodyDeclaration = nullptr;
 	Node* lastSeenNonAmbientDeclaration = nullptr;
 	Node* previousDeclaration = nullptr;
-	std::vector<Node*> declarations = symbol->declarations;
+	std::vector<Node*> declarations = symbol->data->declarations;
 	bool isConstructor = (symbol->flags & SymbolFlagsConstructor) != 0;
 	bool duplicateFunctionDeclaration = false;
 	bool multipleConstructorImplementation = false;
@@ -1511,7 +1511,7 @@ void Checker::checkFunctionOrConstructorSymbolWorker(Symbol* symbol) {
 				Node* errNode = getNameOfDeclaration(declaration) != nullptr
 				                    ? getNameOfDeclaration(declaration)
 				                    : declaration;
-				error(errNode, diagnostic, {symbol->name})
+				error(errNode, diagnostic, {symbol->data->name})
 				    ->SetRelatedInfo(relatedDiagnostics);
 			}
 		}

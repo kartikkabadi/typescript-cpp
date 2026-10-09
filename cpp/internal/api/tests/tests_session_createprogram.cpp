@@ -115,11 +115,11 @@ void TestCreateSnapshotCreatesPrograms(T* t) {
 	              std::string());
 	assert::Equal(t, response->Projects[1]->ConfigFileName,
 	              std::string());
-	assert::DeepEqual(t, response->Projects[0]->RootFiles,
+	assert::DeepEqual(t, response->Projects[0]->ParsedCommandLine->FileNames,
 	                  std::vector<std::string>({fileA, fileB}));
-	assert::Equal(t, response->Projects[0]->CompilerOptions->Strict,
+	assert::Equal(t, response->Projects[0]->ParsedCommandLine->Options->Strict,
 	              Tristate::True);
-	assert::DeepEqual(t, response->Projects[1]->RootFiles,
+	assert::DeepEqual(t, response->Projects[1]->ParsedCommandLine->FileNames,
 	                  std::vector<std::string>{fileB});
 
 	auto [snapshot, err2] =
@@ -261,9 +261,9 @@ void TestUpdateSnapshotReconfiguresSyntheticProgram(T* t) {
 	assert::NilError(t, err2);
 	assert::Equal(t, reconfigured->Projects[0]->Id,
 	              project::ID(programID));
-	assert::DeepEqual(t, reconfigured->Projects[0]->RootFiles,
+	assert::DeepEqual(t, reconfigured->Projects[0]->ParsedCommandLine->FileNames,
 	                  std::vector<std::string>{"/home/projects/p/b.ts"});
-	assert::Equal(t, reconfigured->Projects[0]->CompilerOptions->Strict,
+	assert::Equal(t, reconfigured->Projects[0]->ParsedCommandLine->Options->Strict,
 	              Tristate::True);
 }
 REGISTER_UNIT_TEST("api.TestUpdateSnapshotReconfiguresSyntheticProgram",
