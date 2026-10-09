@@ -205,10 +205,10 @@ Signature* Checker::getSignatureFromDeclaration(Node* declaration) {
 		Node* typeNode = param->type();
 		// Include parameter symbol instead of property symbol in the signature
 		if (paramSymbol != nullptr && (paramSymbol->flags & SymbolFlagsProperty) != 0 && !isBindingPattern(param->name())) {
-			Symbol* resolvedSymbol = resolveName(param, paramSymbol->name, SymbolFlagsValue, nullptr /*nameNotFoundMessage*/, false /*isUse*/, false /*excludeGlobals*/);
+			Symbol* resolvedSymbol = resolveName(param, paramSymbol->data->name, SymbolFlagsValue, nullptr /*nameNotFoundMessage*/, false /*isUse*/, false /*excludeGlobals*/);
 			paramSymbol = resolvedSymbol;
 		}
-		if (i == 0 && paramSymbol->name == InternalSymbolNameThis) {
+		if (i == 0 && paramSymbol->data->name == InternalSymbolNameThis) {
 			hasThisParameter = true;
 			thisParameter = param->symbol();
 		} else {
@@ -570,7 +570,7 @@ std::pair<std::vector<Type*>, bool> Checker::checkAndAggregateReturnExpressionTy
 			expr = skipParentheses(expr->expression());
 		}
 		if (isCallExpression(expr) && isIdentifier(expr->expression()) && checkExpressionCached(expr->expression())->symbol == getMergedSymbol(fn->symbol()) &&
-			(!isFunctionExpressionOrArrowFunction(fn->symbol()->valueDeclaration) || isConstantReference(expr->expression()))) {
+			(!isFunctionExpressionOrArrowFunction(fn->symbol()->data->valueDeclaration) || isConstantReference(expr->expression()))) {
 			hasReturnOfTypeNever = true;
 			return false;
 		}
@@ -826,9 +826,9 @@ bool Checker::reportWideningErrorsInType(Type* t) {
 					if (!errorReported) {
 						// we need to account for property types coming from object literal type normalization in unions
 						Node* valueDeclaration = nullptr;
-						for (Node* d : p->declarations) {
-							Node* vd = d->symbol() != nullptr ? d->symbol()->valueDeclaration : nullptr;
-							if (vd != nullptr && vd->parent == t->symbol->valueDeclaration) {
+						for (Node* d : p->data->declarations) {
+							Node* vd = d->symbol() != nullptr ? d->symbol()->data->valueDeclaration : nullptr;
+							if (vd != nullptr && vd->parent == t->symbol->data->valueDeclaration) {
 								valueDeclaration = d;
 								break;
 							}

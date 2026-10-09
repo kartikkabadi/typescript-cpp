@@ -72,7 +72,7 @@ static auto findFirstOrNil(R&& v, Pred pred)
 
 // ast/utilities.go:2994
 static Node* getClassLikeDeclarationOfSymbol(Symbol* symbol) {
-	return findFirstOrNil(symbol->declarations, [](Node* d) { return isClassLike(d); });
+	return findFirstOrNil(symbol->data->declarations, [](Node* d) { return isClassLike(d); });
 }
 
 // utilities.go:757 + :760
@@ -94,19 +94,19 @@ static ModifierFlags getDeclarationModifierFlagsFromSymbolEx(Symbol* s, bool isW
 		}
 		return accessModifier;
 	}
-	if (s->valueDeclaration != nullptr) {
+	if (s->data->valueDeclaration != nullptr) {
 		Node* declaration = nullptr;
 		if (isWrite) {
-			declaration = findFirstOrNil(s->declarations, isSetAccessorDeclaration);
+			declaration = findFirstOrNil(s->data->declarations, isSetAccessorDeclaration);
 		}
 		if (declaration == nullptr && (s->flags & SymbolFlagsGetAccessor)) {
-			declaration = findFirstOrNil(s->declarations, isGetAccessorDeclaration);
+			declaration = findFirstOrNil(s->data->declarations, isGetAccessorDeclaration);
 		}
 		if (declaration == nullptr) {
-			declaration = s->valueDeclaration;
+			declaration = s->data->valueDeclaration;
 		}
 		ModifierFlags flags = getCombinedModifierFlags(declaration);
-		if (s->parent != nullptr && (s->parent->flags & SymbolFlagsClass)) {
+		if (s->data->parent != nullptr && (s->data->parent->flags & SymbolFlagsClass)) {
 			return flags;
 		}
 		return flags & ~ModifierFlagsAccessibilityModifier;
@@ -703,10 +703,10 @@ void Checker::checkCatchClause(Node* node) {
 					if (it != blockLocals->end()) {
 						blockLocal = it->second;
 					}
-					if (blockLocal != nullptr && blockLocal->valueDeclaration != nullptr &&
+					if (blockLocal != nullptr && blockLocal->data->valueDeclaration != nullptr &&
 					    (blockLocal->flags & SymbolFlagsBlockScopedVariable)) {
 						grammarErrorOnNode(
-						    blockLocal->valueDeclaration,
+						    blockLocal->data->valueDeclaration,
 						    Cannot_redeclare_identifier_0_in_catch_clause, {caughtName});
 					}
 				}
@@ -966,7 +966,7 @@ void Checker::checkClassForStaticPropertyNameConflicts(Node* node) {
 // Check that type parameter lists are identical across multiple declarations
 // checker.go:4473
 void Checker::checkTypeParameterListsIdentical(Symbol* symbol) {
-	if (symbol->declarations.size() == 1) {
+	if (symbol->data->declarations.size() == 1) {
 		return;
 	}
 	auto* links = declaredTypeLinks.Get(symbol);
@@ -998,7 +998,7 @@ void Checker::checkTypeParameterListsIdentical(Symbol* symbol) {
 // checker.go:4495
 std::vector<Node*> Checker::getClassOrInterfaceDeclarationsOfSymbol(Symbol* symbol) {
 	std::vector<Node*> result;
-	for (Node* d : symbol->declarations) {
+	for (Node* d : symbol->data->declarations) {
 		if (isClassDeclaration(d) || isInterfaceDeclaration(d)) {
 			result.push_back(d);
 		}
@@ -1024,7 +1024,7 @@ bool Checker::areTypeParametersIdentical(
 			Type* target = targetParameters[i];
 			// If the type parameter node does not have the same name as the resolved type
 			// parameter at this position, we report an error.
-			if (source->name()->text() != target->symbol->name) {
+			if (source->name()->text() != target->symbol->data->name) {
 				return false;
 			}
 			// If the type parameter node does not have an identical constraintNode as the resolved
@@ -1074,9 +1074,9 @@ void Checker::issueMemberSpecificError(Node* node, Type* typeWithThis,
 			continue;
 		}
 		Symbol* declaredProp = getSymbolOfDeclaration(member);
-		if (declaredProp != nullptr && declaredProp->name != InternalSymbolNameComputed) {
-			Symbol* prop = getPropertyOfType(typeWithThis, declaredProp->name);
-			Symbol* baseProp = getPropertyOfType(baseWithThis, declaredProp->name);
+		if (declaredProp != nullptr && declaredProp->data->name != InternalSymbolNameComputed) {
+			Symbol* prop = getPropertyOfType(typeWithThis, declaredProp->data->name);
+			Symbol* baseProp = getPropertyOfType(baseWithThis, declaredProp->data->name);
 			if (prop != nullptr && baseProp != nullptr) {
 				std::vector<Diagnostic*> diags;
 				if (!checkTypeAssignableToEx(
@@ -1152,7 +1152,7 @@ void Checker::checkKindsOfPropertyMemberOverrides(Type* t, Type* baseType) {
 		if (base->flags & SymbolFlagsPrototype) {
 			continue;
 		}
-		Symbol* baseSymbol = getPropertyOfObjectType(t, base->name);
+		Symbol* baseSymbol = getPropertyOfObjectType(t, base->data->name);
 		if (baseSymbol == nullptr) {
 			continue;
 		}
@@ -1178,7 +1178,7 @@ void Checker::checkKindsOfPropertyMemberOverrides(Type* t, Type* baseType) {
 							continue;
 						}
 						Symbol* otherBaseSymbol =
-						    getPropertyOfObjectType(otherBaseType, base->name);
+						    getPropertyOfObjectType(otherBaseType, base->data->name);
 						if (otherBaseSymbol != nullptr &&
 						    base != getTargetSymbol(otherBaseSymbol)) {
 							// Derived property exists elsewhere.
@@ -1217,8 +1217,8 @@ void Checker::checkKindsOfPropertyMemberOverrides(Type* t, Type* baseType) {
 			if (basePropertyFlags != 0 && derivedPropertyFlags != 0) {
 				// property/accessor is overridden with property/accessor
 				if ((base->checkFlags & CheckFlagsMapped) ||
-				    (derived->valueDeclaration != nullptr &&
-				     isBinaryExpression(derived->valueDeclaration)) ||
+				    (derived->data->valueDeclaration != nullptr &&
+				     isBinaryExpression(derived->data->valueDeclaration)) ||
 				    arePropertiesAbstractOrInterface(base, baseDeclarationFlags)) {
 					// when the base property is abstract or from an interface, base/derived flags don't need to match
 					// for intersection properties, this must be true of *any* of the declarations, for others it must be true of *all*
@@ -1235,20 +1235,20 @@ void Checker::checkKindsOfPropertyMemberOverrides(Type* t, Type* baseType) {
 					const DiagnosticMessage* msg = overriddenInstanceProperty
 					    ? X_0_is_defined_as_an_accessor_in_class_1_but_is_overridden_here_in_2_as_an_instance_property
 					    : X_0_is_defined_as_a_property_in_class_1_but_is_overridden_here_in_2_as_an_accessor;
-					error(derived->valueDeclaration != nullptr &&
-					              getNameOfDeclaration(derived->valueDeclaration) != nullptr
-					          ? getNameOfDeclaration(derived->valueDeclaration)
-					          : derived->valueDeclaration,
+					error(derived->data->valueDeclaration != nullptr &&
+					              getNameOfDeclaration(derived->data->valueDeclaration) != nullptr
+					          ? getNameOfDeclaration(derived->data->valueDeclaration)
+					          : derived->data->valueDeclaration,
 					      msg, {symbolToString(base), TypeToString(baseType),
 					            TypeToString(t)});
 				} else if (compilerOptions->GetUseDefineForClassFields()) {
 					Node* uninitialized = findFirstOrNil(
-					    derived->declarations, [](Node* d) {
+					    derived->data->declarations, [](Node* d) {
 						    return isPropertyDeclaration(d) &&
 						           d->initializer() == nullptr;
 					    });
 					bool anyAmbient = false;
-					for (Node* d : derived->declarations) {
+					for (Node* d : derived->data->declarations) {
 						if (d->flags & NodeFlagsAmbient) {
 							anyAmbient = true;
 							break;
@@ -1268,11 +1268,11 @@ void Checker::checkKindsOfPropertyMemberOverrides(Type* t, Type* baseType) {
 						    !strictNullChecks ||
 						    !isPropertyInitializedInConstructor(propName, t,
 						                                        constructor)) {
-							error(derived->valueDeclaration != nullptr &&
+							error(derived->data->valueDeclaration != nullptr &&
 							              getNameOfDeclaration(
-							                  derived->valueDeclaration) != nullptr
-							          ? getNameOfDeclaration(derived->valueDeclaration)
-							          : derived->valueDeclaration,
+							                  derived->data->valueDeclaration) != nullptr
+							          ? getNameOfDeclaration(derived->data->valueDeclaration)
+							          : derived->data->valueDeclaration,
 							      Property_0_will_overwrite_the_base_property_in_1_If_this_is_intentional_add_an_initializer_Otherwise_add_a_declare_modifier_or_remove_the_redundant_declaration,
 							      {symbolToString(base), TypeToString(baseType)});
 						}
@@ -1296,10 +1296,10 @@ void Checker::checkKindsOfPropertyMemberOverrides(Type* t, Type* baseType) {
 				errorMessage =
 				    Class_0_defines_instance_member_property_1_but_extended_class_2_defines_it_as_instance_member_function;
 			}
-			error(derived->valueDeclaration != nullptr &&
-			              getNameOfDeclaration(derived->valueDeclaration) != nullptr
-			          ? getNameOfDeclaration(derived->valueDeclaration)
-			          : derived->valueDeclaration,
+			error(derived->data->valueDeclaration != nullptr &&
+			              getNameOfDeclaration(derived->data->valueDeclaration) != nullptr
+			          ? getNameOfDeclaration(derived->data->valueDeclaration)
+			          : derived->data->valueDeclaration,
 			      errorMessage,
 			      {TypeToString(baseType), symbolToString(base), TypeToString(t)});
 		}
@@ -1356,14 +1356,14 @@ void Checker::checkKindsOfPropertyMemberOverrides(Type* t, Type* baseType) {
 bool Checker::arePropertiesAbstractOrInterface(Symbol* base,
                                                ModifierFlags baseDeclarationFlags) {
 	if (base->checkFlags & CheckFlagsSynthetic) {
-		for (Node* d : base->declarations) {
+		for (Node* d : base->data->declarations) {
 			if (isPropertyAbstractOrInterface(d, baseDeclarationFlags)) {
 				return true;
 			}
 		}
 		return false;
 	}
-	for (Node* d : base->declarations) {
+	for (Node* d : base->data->declarations) {
 		if (!isPropertyAbstractOrInterface(d, baseDeclarationFlags)) {
 			return false;
 		}
@@ -1464,10 +1464,10 @@ MemberOverrideStatus Checker::checkMemberForOverrideModifierWorker(
     bool memberHasAbstractModifier, bool memberIsStatic,
     bool memberIsParameterProperty, Symbol* member, Node* errorNode) {
 	bool isJs = isInJSFile(node);
-	if (memberHasOverrideModifier && member->valueDeclaration != nullptr &&
-	    isClassElement(member->valueDeclaration) &&
-	    member->valueDeclaration->name() != nullptr &&
-	    isNonBindableDynamicName(member->valueDeclaration->name())) {
+	if (memberHasOverrideModifier && member->data->valueDeclaration != nullptr &&
+	    isClassElement(member->data->valueDeclaration) &&
+	    member->data->valueDeclaration->name() != nullptr &&
+	    isNonBindableDynamicName(member->data->valueDeclaration->name())) {
 		if (errorNode != nullptr) {
 			error(errorNode,
 			      isJs ? This_member_cannot_have_a_JSDoc_comment_with_an_override_tag_because_its_name_is_dynamic
@@ -1481,14 +1481,14 @@ MemberOverrideStatus Checker::checkMemberForOverrideModifierWorker(
 	     tristateIsTrue(compilerOptions->NoImplicitOverride))) {
 		Type* thisType = memberIsStatic ? staticType : typeWithThis;
 		Type* baseType = memberIsStatic ? baseStaticType : baseWithThis;
-		Symbol* prop = getPropertyOfType(thisType, member->name);
-		Symbol* baseProp = getPropertyOfType(baseType, member->name);
+		Symbol* prop = getPropertyOfType(thisType, member->data->name);
+		Symbol* baseProp = getPropertyOfType(baseType, member->data->name);
 
 		if (prop != nullptr && baseProp == nullptr && memberHasOverrideModifier) {
 			if (errorNode != nullptr) {
 				Symbol* suggestion =
 				    getSuggestedSymbolForNonexistentClassMember(
-				        member->name, baseType);
+				        member->data->name, baseType);
 				if (suggestion != nullptr) {
 					error(errorNode,
 					      isJs ? This_member_cannot_have_a_JSDoc_comment_with_an_override_tag_because_it_is_not_declared_in_the_base_class_0_Did_you_mean_1
@@ -1506,11 +1506,11 @@ MemberOverrideStatus Checker::checkMemberForOverrideModifierWorker(
 		}
 
 		if (prop != nullptr && baseProp != nullptr &&
-		    !baseProp->declarations.empty() &&
+		    !baseProp->data->declarations.empty() &&
 		    tristateIsTrue(compilerOptions->NoImplicitOverride) &&
 		    !(node->flags & NodeFlagsAmbient)) {
 			bool baseHasAbstract = false;
-			for (Node* d : baseProp->declarations) {
+			for (Node* d : baseProp->data->declarations) {
 				if (hasAbstractModifier(d)) {
 					baseHasAbstract = true;
 					break;
@@ -1576,7 +1576,7 @@ void Checker::checkIndexConstraints(Type* t, Symbol* symbol, bool isStaticIndex)
 			    getNonMissingTypeOfSymbol(prop));
 		}
 	}
-	Node* typeDeclaration = symbol->valueDeclaration;
+	Node* typeDeclaration = symbol->data->valueDeclaration;
 	if (typeDeclaration != nullptr && isClassLike(typeDeclaration)) {
 		for (Node* member : typeDeclaration->members()) {
 			// Only process instance properties against instance index signatures and static properties against static index signatures
@@ -1598,7 +1598,7 @@ void Checker::checkIndexConstraints(Type* t, Symbol* symbol, bool isStaticIndex)
 // checker.go:4904
 void Checker::checkIndexConstraintForProperty(Type* t, Symbol* prop,
                                               Type* propNameType, Type* propType) {
-	Node* declaration = prop->valueDeclaration;
+	Node* declaration = prop->data->valueDeclaration;
 	Node* name = getNameOfDeclaration(declaration);
 	if (name != nullptr && isPrivateIdentifier(name)) {
 		return;
@@ -1636,7 +1636,7 @@ void Checker::checkIndexConstraintForProperty(Type* t, Symbol* prop,
 		if (errorNode == nullptr && interfaceDeclaration != nullptr) {
 			bool anyBaseHasBoth = false;
 			for (Type* base : getBaseTypes(t)) {
-				if (getPropertyOfObjectType(base, prop->name) != nullptr &&
+				if (getPropertyOfObjectType(base, prop->data->name) != nullptr &&
 				    getIndexTypeOfType(base, info->keyType) != nullptr) {
 					anyBaseHasBoth = true;
 					break;
@@ -1740,11 +1740,11 @@ void Checker::checkTypeForDuplicateIndexSignatures(Node* node) {
 	// 3.7.4: An object type can contain at most one string index signature and one numeric index signature.
 	// 8.5: A class declaration can have at most one string index member declaration and one numeric index member declaration
 	Symbol* indexSymbol = getIndexSymbol(getSymbolOfDeclaration(node));
-	if (indexSymbol == nullptr || indexSymbol->declarations.size() <= 1) {
+	if (indexSymbol == nullptr || indexSymbol->data->declarations.size() <= 1) {
 		return;
 	}
 	std::unordered_map<Type*, std::vector<Node*>> indexSignatureMap;
-	for (Node* declaration : indexSymbol->declarations) {
+	for (Node* declaration : indexSymbol->data->declarations) {
 		if (isIndexSignatureDeclaration(declaration)) {
 			auto parameters = declaration->parameters();
 			if (parameters.size() == 1 && parameters[0]->type() != nullptr) {

@@ -513,9 +513,9 @@ private:
 
         // Symbol name — escape the internal symbol name prefix for valid JSON
         if (tsc::Symbol* sym = aliasSymbol; sym != nullptr) {
-            desc.SymbolName = tsc::escapeAllInternalSymbolNames(sym->name);
+            desc.SymbolName = tsc::escapeAllInternalSymbolNames(sym->data->name);
         } else if (symbol != nullptr) {
-            desc.SymbolName = tsc::escapeAllInternalSymbolNames(symbol->name);
+            desc.SymbolName = tsc::escapeAllInternalSymbolNames(symbol->data->name);
         }
 
         // Tuple flag
@@ -620,8 +620,8 @@ private:
         if (firstDeclSymbol == nullptr) {
             firstDeclSymbol = symbol;
         }
-        if (firstDeclSymbol != nullptr && !firstDeclSymbol->declarations.empty()) {
-            desc.FirstDeclaration = getLocation(firstDeclSymbol->declarations[0]);
+        if (firstDeclSymbol != nullptr && !firstDeclSymbol->data->declarations.empty()) {
+            desc.FirstDeclaration = getLocation(firstDeclSymbol->data->declarations[0]);
         }
 
         // Display text

@@ -169,7 +169,7 @@ std::unique_ptr<collections::Set<std::string>> getPackageNamesInNodeModules(
 
 // getDefaultLikeExportNameFromDeclaration — util.go:118
 std::string getDefaultLikeExportNameFromDeclaration(Symbol* symbol) {
-	for (Node* d : symbol->declarations) {
+	for (Node* d : symbol->data->declarations) {
 		// "export default" in this case. See `ExportAssignment`for more details.
 		if (isExportAssignment(d)) {
 			Node* innerExpression = skipOuterExpressions(d->expression(), OEKAll);
@@ -193,9 +193,9 @@ std::string getDefaultLikeExportNameFromDeclaration(Symbol* symbol) {
 		if (name != nullptr && name->kind == Kind::Identifier) {
 			return name->text();
 		}
-		if (symbol->parent != nullptr &&
-		    !checker::isExternalModuleSymbol(symbol->parent)) {
-			return symbol->parent->name;
+		if (symbol->data->parent != nullptr &&
+		    !checker::isExternalModuleSymbol(symbol->data->parent)) {
+			return symbol->data->parent->data->name;
 		}
 	}
 	return "";

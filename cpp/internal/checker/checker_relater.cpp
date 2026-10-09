@@ -537,7 +537,7 @@ struct TypeDiscriminator : Discriminator {
 		: c(c), props(std::move(props)), isRelatedTo(isRelatedTo) {}
 
 	int len() override { return static_cast<int>(props.size()); }
-	std::string name(int index) override { return props[index]->name; }
+	std::string name(int index) override { return props[index]->data->name; }
 	bool matches(int index, Type* t) override {
 		Type* propType = c->getTypeOfSymbol(props[index]);
 		for (Type* s : propType->Distributed()) {
@@ -690,7 +690,7 @@ bool Checker::isSimpleTypeRelatedTo(Type* source, Type* target, Relation* relati
 		return true;
 	}
 	if ((s & TypeFlagsEnum) && (t & TypeFlagsEnum) &&
-		source->symbol->name == target->symbol->name &&
+		source->symbol->data->name == target->symbol->data->name &&
 		isEnumTypeRelatedTo(source->symbol, target->symbol, errorReporter)) {
 		return true;
 	}
@@ -762,7 +762,7 @@ bool Checker::isEnumTypeRelatedTo(Symbol* source, Symbol* target,
 	if (sourceSymbol == targetSymbol) {
 		return true;
 	}
-	if (sourceSymbol->name != targetSymbol->name ||
+	if (sourceSymbol->data->name != targetSymbol->data->name ||
 		!(sourceSymbol->flags & SymbolFlagsRegularEnum) ||
 		!(targetSymbol->flags & SymbolFlagsRegularEnum)) {
 		return false;
@@ -785,7 +785,7 @@ bool Checker::isEnumTypeRelatedTo(Symbol* source, Symbol* target,
 		 getPropertiesOfType(getTypeOfSymbol(sourceSymbol))) {
 		if (sourceProperty->flags & SymbolFlagsEnumMember) {
 			Symbol* targetProperty =
-				getPropertyOfType(targetEnumType, sourceProperty->name);
+				getPropertyOfType(targetEnumType, sourceProperty->data->name);
 			if (targetProperty == nullptr ||
 				!(targetProperty->flags & SymbolFlagsEnumMember)) {
 				if (errorReporter) {
@@ -1254,13 +1254,13 @@ bool Checker::elaborateElement(
 		}
 	}
 	if (!issuedElaboration &&
-		((targetProp != nullptr && !targetProp->declarations.empty()) ||
-		 (target->symbol != nullptr && !target->symbol->declarations.empty()))) {
+		((targetProp != nullptr && !targetProp->data->declarations.empty()) ||
+		 (target->symbol != nullptr && !target->symbol->data->declarations.empty()))) {
 		Node* targetNode = nullptr;
-		if (targetProp != nullptr && !targetProp->declarations.empty()) {
-			targetNode = targetProp->declarations[0];
+		if (targetProp != nullptr && !targetProp->data->declarations.empty()) {
+			targetNode = targetProp->data->declarations[0];
 		} else {
-			targetNode = target->symbol->declarations[0];
+			targetNode = target->symbol->data->declarations[0];
 		}
 		if (propertyName.empty() || (nameType->flags & TypeFlagsUniqueESSymbol)) {
 			propertyName = TypeToString(nameType);
@@ -1341,9 +1341,9 @@ bool Checker::elaborateArrowFunction(Node* node, Type* source, Type* target,
 						 nullptr /*headMessage*/, &diags);
 	if (!diags.empty()) {
 		Diagnostic* diagnostic = diags[0];
-		if (target->symbol != nullptr && !target->symbol->declarations.empty()) {
+		if (target->symbol != nullptr && !target->symbol->data->declarations.empty()) {
 			diagnostic->AddRelatedInfo(createDiagnosticForNode(
-				target->symbol->declarations[0],
+				target->symbol->data->declarations[0],
 				
 					The_expected_type_comes_from_the_return_type_of_this_signature,
 				{}));
@@ -1383,7 +1383,7 @@ bool Checker::isWeakType(Type* t) {
 bool Checker::hasCommonProperties(Type* source, Type* target,
 								  bool isComparingJsxAttributes) {
 	for (Symbol* prop : getPropertiesOfType(source)) {
-		if (isKnownProperty(target, prop->name, isComparingJsxAttributes)) {
+		if (isKnownProperty(target, prop->data->name, isComparingJsxAttributes)) {
 			return true;
 		}
 	}
@@ -1636,7 +1636,7 @@ static std::vector<Symbol*> excludeProperties(
 	bool excluded = false;
 	for (size_t i = 0; i < properties.size(); i++) {
 		Symbol* prop = properties[i];
-		if (!excludedProperties.count(prop->name)) {
+		if (!excludedProperties.count(prop->data->name)) {
 			if (excluded) {
 				reduced.push_back(prop);
 			}
@@ -1854,7 +1854,7 @@ Symbol* Checker::getUnmatchedPropertiesWorker(Type* source, Type* target,
 		if (requireOptionalProperties ||
 			((targetProp->flags & SymbolFlagsOptional) == 0 &&
 			 (targetProp->checkFlags & CheckFlagsPartial) == 0)) {
-			Symbol* sourceProp = getPropertyOfType(source, targetProp->name);
+			Symbol* sourceProp = getPropertyOfType(source, targetProp->data->name);
 			if (sourceProp == nullptr) {
 				if (propsOut == nullptr) {
 					return targetProp;
@@ -1909,7 +1909,7 @@ std::vector<Symbol*> Checker::findDiscriminantProperties(
 	const std::vector<Symbol*>& sourceProperties, Type* target) {
 	std::vector<Symbol*> result;
 	for (Symbol* sourceProperty : sourceProperties) {
-		if (isDiscriminantProperty(target, sourceProperty->name)) {
+		if (isDiscriminantProperty(target, sourceProperty->data->name)) {
 			result.push_back(sourceProperty);
 		}
 	}
@@ -2008,7 +2008,7 @@ std::string Checker::getKeyPropertyCandidateName(const std::vector<Type*>& types
 		if ((t->flags & (TypeFlagsObject | TypeFlagsInstantiableNonPrimitive)) != 0) {
 			for (Symbol* p : getPropertiesOfType(t)) {
 				if (isUnitType(getTypeOfSymbol(p))) {
-					return p->name;
+					return p->data->name;
 				}
 			}
 		}
@@ -2133,13 +2133,13 @@ std::pair<std::string, std::string> Checker::getTypeNamesForErrorDisplay(
 	Type* left, Type* right) {
 	std::string leftStr;
 	if (symbolValueDeclarationIsContextSensitive(left->symbol)) {
-		leftStr = typeToString(left, left->symbol->valueDeclaration);
+		leftStr = typeToString(left, left->symbol->data->valueDeclaration);
 	} else {
 		leftStr = TypeToString(left);
 	}
 	std::string rightStr;
 	if (symbolValueDeclarationIsContextSensitive(right->symbol)) {
-		rightStr = typeToString(right, right->symbol->valueDeclaration);
+		rightStr = typeToString(right, right->symbol->data->valueDeclaration);
 	} else {
 		rightStr = TypeToString(right);
 	}
@@ -2158,9 +2158,9 @@ std::string Checker::getTypeNameForErrorDisplay(Type* t) {
 
 // relater.go:1294
 bool Checker::symbolValueDeclarationIsContextSensitive(Symbol* symbol) {
-	return symbol != nullptr && symbol->valueDeclaration != nullptr &&
-		   isExpression(symbol->valueDeclaration) &&
-		   !isContextSensitive(symbol->valueDeclaration);
+	return symbol != nullptr && symbol->data->valueDeclaration != nullptr &&
+		   isExpression(symbol->data->valueDeclaration) &&
+		   !isContextSensitive(symbol->data->valueDeclaration);
 }
 
 // relater.go:1298
@@ -2411,7 +2411,7 @@ bool Checker::isMarkerType(Type* t) {
 ModifierFlags Checker::getTypeParameterModifiers(Type* tp) {
 	ModifierFlags flags = 0;
 	if (tp->symbol != nullptr) {
-		for (Node* d : tp->symbol->declarations) {
+		for (Node* d : tp->symbol->data->declarations) {
 			flags |= d->modifierFlags();
 		}
 	}
@@ -2952,7 +2952,7 @@ Node* Checker::getNameableDeclarationAtPosition(Signature* signature, int pos) {
 	int paramCount = static_cast<int>(signature->parameters.size()) -
 					 (signatureHasRestParameter(signature) ? 1 : 0);
 	if (pos < paramCount) {
-		Node* decl = signature->parameters[pos]->valueDeclaration;
+		Node* decl = signature->parameters[pos]->data->valueDeclaration;
 		if (decl != nullptr && isValidDeclarationForTupleLabel(decl)) {
 			return decl;
 		}
@@ -2970,9 +2970,9 @@ Node* Checker::getNameableDeclarationAtPosition(Signature* signature, int pos) {
 			}
 			return nullptr;
 		}
-		if (restParameter->valueDeclaration != nullptr &&
-			isValidDeclarationForTupleLabel(restParameter->valueDeclaration)) {
-			return restParameter->valueDeclaration;
+		if (restParameter->data->valueDeclaration != nullptr &&
+			isValidDeclarationForTupleLabel(restParameter->data->valueDeclaration)) {
+			return restParameter->data->valueDeclaration;
 		}
 	}
 	return nullptr;
@@ -3081,7 +3081,7 @@ std::string Checker::getParameterNameAtPosition(Signature* signature, int pos) {
 	int paramCount = static_cast<int>(signature->parameters.size()) -
 					 (signatureHasRestParameter(signature) ? 1 : 0);
 	if (pos < paramCount) {
-		return signature->parameters[pos]->name;
+		return signature->parameters[pos]->data->name;
 	}
 	Symbol* restParameter = signature->parameters[paramCount];
 	Type* restType = getTypeOfSymbol(restParameter);
@@ -3091,7 +3091,7 @@ std::string Checker::getParameterNameAtPosition(Signature* signature, int pos) {
 			restType->TargetTupleType()->elementInfos[index], restParameter,
 			index);
 	}
-	return restParameter->name;
+	return restParameter->data->name;
 }
 
 // relater.go:1976
@@ -3100,14 +3100,14 @@ std::string Checker::getTupleElementLabel(const TupleElementInfo& elementInfo,
 	if (elementInfo.labeledDeclaration != nullptr) {
 		return elementInfo.labeledDeclaration->name()->text();
 	}
-	if (restSymbol != nullptr && restSymbol->valueDeclaration != nullptr &&
-		isParameterDeclaration(restSymbol->valueDeclaration)) {
+	if (restSymbol != nullptr && restSymbol->data->valueDeclaration != nullptr &&
+		isParameterDeclaration(restSymbol->data->valueDeclaration)) {
 		return getTupleElementLabelFromBindingElement(
-			restSymbol->valueDeclaration, index, elementInfo.flags);
+			restSymbol->data->valueDeclaration, index, elementInfo.flags);
 	}
 	std::string rootName;
 	if (restSymbol != nullptr) {
-		rootName = restSymbol->name;
+		rootName = restSymbol->data->name;
 	} else {
 		rootName = "arg";
 	}
@@ -3292,7 +3292,7 @@ TypePredicate* Checker::createTypePredicateFromTypePredicateNode(
 								 : TypePredicateKind::Identifier;
 	std::string name = predicateNode->ParameterName->text();
 	int index = findIndexOf(signature->parameters, [&](Symbol* p) {
-		return p->name == name;
+		return p->data->name == name;
 	});
 	return newTypePredicate(kind, name, index, t);
 }
@@ -4018,15 +4018,15 @@ bool isObjectLiteralElement(Node* node) {
 
 // relater.go:2855
 bool shouldCheckAsExcessProperty(Symbol* prop, Symbol* container) {
-	return prop->valueDeclaration != nullptr &&
-		   container->valueDeclaration != nullptr &&
-		   prop->valueDeclaration->parent == container->valueDeclaration;
+	return prop->data->valueDeclaration != nullptr &&
+		   container->data->valueDeclaration != nullptr &&
+		   prop->data->valueDeclaration->parent == container->data->valueDeclaration;
 }
 
 // relater.go:2859
 bool isIgnoredJsxProperty(Type* source, Symbol* sourceProp) {
 	return (source->objectFlags & ObjectFlagsJsxAttributes) != 0 &&
-		   isHyphenatedJsxName(sourceProp->name);
+		   isHyphenatedJsxName(sourceProp->data->name);
 }
 
 // relater.go:4912
@@ -4331,7 +4331,7 @@ bool Relater::hasExcessProperties(Type* source, Type* target, bool reportErrors)
 	for (Symbol* prop : c->getPropertiesOfType(source)) {
 		if (shouldCheckAsExcessProperty(prop, source->symbol) &&
 			!isIgnoredJsxProperty(source, prop)) {
-			if (!c->isKnownProperty(reducedTarget, prop->name,
+			if (!c->isKnownProperty(reducedTarget, prop->data->name,
 									isComparingJsxAttributes)) {
 				if (reportErrors) {
 					// Report error in terms of object types in the target as those are the only ones
@@ -4351,14 +4351,14 @@ bool Relater::hasExcessProperties(Type* source, Type* target, bool reportErrors)
 						isJsxOpeningLikeElement(errorNode->parent)) {
 						// JsxAttributes has an object-literal flag and undergo same type-assignablity check as normal object-literal.
 						// However, using an object-literal error message will be very confusing to the users so we give different a message.
-						if (prop->valueDeclaration != nullptr &&
-							isJsxAttribute(prop->valueDeclaration) &&
+						if (prop->data->valueDeclaration != nullptr &&
+							isJsxAttribute(prop->data->valueDeclaration) &&
 							getSourceFileOfNode(errorNode) ==
 								getSourceFileOfNode(
-									prop->valueDeclaration->name())) {
+									prop->data->valueDeclaration->name())) {
 							// Note that extraneous children (as in `<NoChild>extra</NoChild>`) don't pass this check,
 							// since `children` is a Kind::PropertySignature instead of a Kind::JsxAttribute.
-							errorNode = prop->valueDeclaration->name();
+							errorNode = prop->data->valueDeclaration->name();
 						}
 						std::string propName = c->symbolToString(prop);
 						Symbol* suggestionSymbol =
@@ -4380,21 +4380,21 @@ bool Relater::hasExcessProperties(Type* source, Type* target, bool reportErrors)
 						Node* objectLiteralDeclaration = nullptr;
 						if (source->symbol != nullptr) {
 							objectLiteralDeclaration =
-								source->symbol->declarations.empty()
+								source->symbol->data->declarations.empty()
 									? nullptr
-									: source->symbol->declarations[0];
+									: source->symbol->data->declarations[0];
 						}
 						std::string suggestion;
-						if (prop->valueDeclaration != nullptr &&
-							isObjectLiteralElement(prop->valueDeclaration) &&
+						if (prop->data->valueDeclaration != nullptr &&
+							isObjectLiteralElement(prop->data->valueDeclaration) &&
 							findAncestor(
-								prop->valueDeclaration,
+								prop->data->valueDeclaration,
 								[objectLiteralDeclaration](Node* d) {
 									return d == objectLiteralDeclaration;
 								}) != nullptr &&
 							getSourceFileOfNode(objectLiteralDeclaration) ==
 								getSourceFileOfNode(errorNode)) {
-							Node* name = prop->valueDeclaration->name();
+							Node* name = prop->data->valueDeclaration->name();
 							errorNode = name;
 							if (isIdentifier(name)) {
 								suggestion =
@@ -4421,7 +4421,7 @@ bool Relater::hasExcessProperties(Type* source, Type* target, bool reportErrors)
 			}
 			if (!checkTypes.empty() &&
 				isRelatedTo(c->getTypeOfSymbol(prop),
-							c->getTypeOfPropertyInTypes(checkTypes, prop->name),
+							c->getTypeOfPropertyInTypes(checkTypes, prop->data->name),
 							RecursionFlagsBoth,
 							reportErrors) == Ternary::False) {
 				if (reportErrors) {
@@ -5256,7 +5256,7 @@ Ternary Relater::structuredTypeRelatedToWorker(Type* source, Type* target,
 			c->typeAliasLinks.Get(source->alias->symbol)->typeParameters;
 		int minParams = c->getMinTypeArgumentCount(params);
 		bool nodeIsInJsFile =
-			isInJSFile(source->alias->symbol->valueDeclaration);
+			isInJSFile(source->alias->symbol->data->valueDeclaration);
 		std::vector<Type*> sourceTypes = c->fillMissingTypeArguments(
 			source->alias->typeArguments, params, minParams, nodeIsInJsFile);
 		std::vector<Type*> targetTypes = c->fillMissingTypeArguments(
@@ -6137,7 +6137,7 @@ Ternary Relater::typeRelatedToDiscriminatedType(Type* source, Type* target) {
 		Type* sourcePropertyType =
 			c->getNonMissingTypeOfSymbol(sourceProperty);
 		sourceDiscriminantTypes[i] = sourcePropertyType->Distributed();
-		excludedProperties.insert(sourceProperty->name);
+		excludedProperties.insert(sourceProperty->data->name);
 	}
 	// Build the cartesian product
 	std::vector<std::vector<Type*>> discriminantCombinations(numCombinations);
@@ -6163,7 +6163,7 @@ Ternary Relater::typeRelatedToDiscriminatedType(Type* source, Type* target) {
 			for (size_t i = 0; i < sourcePropertiesFiltered.size(); i++) {
 				Symbol* sourceProperty = sourcePropertiesFiltered[i];
 				Symbol* targetProperty =
-					c->getPropertyOfType(t, sourceProperty->name);
+					c->getPropertyOfType(t, sourceProperty->data->name);
 				if (targetProperty == nullptr) {
 					tMatched = false;
 					break;
@@ -6465,7 +6465,7 @@ Ternary Relater::propertiesRelatedTo(
 		for (Symbol* sourceProp :
 			 excludeProperties(c->getPropertiesOfType(source),
 							   excludedProperties)) {
-			if (c->getPropertyOfObjectType(target, sourceProp->name) ==
+			if (c->getPropertyOfObjectType(target, sourceProp->data->name) ==
 				nullptr) {
 				if (reportErrors) {
 					reportError(
@@ -6482,7 +6482,7 @@ Ternary Relater::propertiesRelatedTo(
 	bool numericNamesOnly = isTupleType(source) && isTupleType(target);
 	for (Symbol* targetProp :
 		 excludeProperties(properties, excludedProperties)) {
-		const std::string& name = targetProp->name;
+		const std::string& name = targetProp->data->name;
 		if ((targetProp->flags & SymbolFlagsPrototype) == 0 &&
 			(!numericNamesOnly || isNumericLiteralName(name) ||
 			 name == "length") &&
@@ -6518,7 +6518,7 @@ Ternary Relater::propertyRelatedTo(
 		getDeclarationModifierFlagsFromSymbol(targetProp);
 	if ((sourcePropFlags & ModifierFlagsPrivate) != 0 ||
 		(targetPropFlags & ModifierFlagsPrivate) != 0) {
-		if (sourceProp->valueDeclaration != targetProp->valueDeclaration) {
+		if (sourceProp->data->valueDeclaration != targetProp->data->valueDeclaration) {
 			if (reportErrors) {
 				if ((sourcePropFlags & ModifierFlagsPrivate) != 0 &&
 					(targetPropFlags & ModifierFlagsPrivate) != 0) {
@@ -6644,13 +6644,13 @@ void Relater::reportUnmatchedProperty(Type* source, Type* target,
 									  Symbol* unmatchedProperty,
 									  bool requireOptionalProperties) {
 	// give specific error in case where private names have the same description
-	if (unmatchedProperty->valueDeclaration != nullptr &&
-		unmatchedProperty->valueDeclaration->name() != nullptr &&
-		isPrivateIdentifier(unmatchedProperty->valueDeclaration->name()) &&
+	if (unmatchedProperty->data->valueDeclaration != nullptr &&
+		unmatchedProperty->data->valueDeclaration->name() != nullptr &&
+		isPrivateIdentifier(unmatchedProperty->data->valueDeclaration->name()) &&
 		source->symbol != nullptr &&
 		(source->symbol->flags & SymbolFlagsClass) != 0) {
 		std::string privateIdentifierDescription =
-			unmatchedProperty->valueDeclaration->name()->text();
+			unmatchedProperty->data->valueDeclaration->name()->text();
 		std::string symbolTableKey = getSymbolNameForPrivateIdentifier(
 			source->symbol, privateIdentifierDescription);
 		if (c->getPropertyOfType(source, symbolTableKey) != nullptr) {
@@ -6674,9 +6674,9 @@ void Relater::reportUnmatchedProperty(Type* source, Type* target,
 		reportError(
 			Property_0_is_missing_in_type_1_but_required_in_type_2,
 			{propName, sourceType, targetType});
-		if (!unmatchedProperty->declarations.empty()) {
+		if (!unmatchedProperty->data->declarations.empty()) {
 			relatedInfo.push_back(c->createDiagnosticForNode(
-				unmatchedProperty->declarations[0],
+				unmatchedProperty->data->declarations[0],
 				X_0_is_declared_here, {propName}));
 		}
 	} else if (tryElaborateArrayLikeErrors(source, target,
@@ -6779,7 +6779,7 @@ Ternary Relater::propertiesIdenticalTo(
 	Ternary result = Ternary::True;
 	for (Symbol* sourceProp : sourceProperties) {
 		Symbol* targetProp =
-			c->getPropertyOfObjectType(target, sourceProp->name);
+			c->getPropertyOfObjectType(target, sourceProp->data->name);
 		if (targetProp == nullptr) {
 			return Ternary::False;
 		}
@@ -7260,7 +7260,7 @@ void Relater::reportErrorResults(Type* originalSource, Type* originalTarget,
 	}
 	reportRelationError(headMessage, source, target);
 	if ((source->flags & TypeFlagsTypeParameter) != 0 &&
-		source->symbol != nullptr && !source->symbol->declarations.empty() &&
+		source->symbol != nullptr && !source->symbol->data->declarations.empty() &&
 		c->getConstraintOfType(source) == nullptr) {
 		Type* syntheticParam = c->cloneTypeParameter(source);
 		syntheticParam->AsTypeParameter()->constraint = c->instantiateType(
@@ -7268,7 +7268,7 @@ void Relater::reportErrorResults(Type* originalSource, Type* originalTarget,
 		if (c->hasNonCircularBaseConstraint(syntheticParam)) {
 			std::string targetConstraintString = c->TypeToString(target);
 			relatedInfo.push_back(NewDiagnosticForNode(
-				source->symbol->declarations[0],
+				source->symbol->data->declarations[0],
 				
 					This_type_parameter_might_need_an_extends_0_constraint,
 				{targetConstraintString}));

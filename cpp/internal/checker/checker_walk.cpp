@@ -73,7 +73,7 @@ static InferenceInfo* newInferenceInfo(Type* typeParameter) {
 
 static bool hasTypeParameterByName(const std::vector<Type*>& typeParameters, const std::string& name) {
 	for (Type* tp : typeParameters) {
-		if (tp->symbol->name == name) {
+		if (tp->symbol->data->name == name) {
 			return true;
 		}
 	}
@@ -877,7 +877,7 @@ void Checker::checkConstEnumAccess(Node* node, Type* t) {
 		 tristateIsTrue(compilerOptions->VerbatimModuleSyntax)) && ok &&
 		resolveName(node, getFirstIdentifier(node)->text(), SymbolFlagsAlias, nullptr, false, true) == nullptr) {
 		TSC_ASSERT(t->symbol->flags & SymbolFlagsConstEnum, "isolated const-enum check assumes const-enum symbol");
-		Node* constEnumDeclaration = t->symbol->valueDeclaration;
+		Node* constEnumDeclaration = t->symbol->data->valueDeclaration;
 		auto* redirect = program->GetProjectReferenceFromOutputDts(getSourceFileOfNode(constEnumDeclaration)->Path());
 		if (constEnumDeclaration->flags & NodeFlagsAmbient &&
 			!isValidTypeOnlyAliasUseSite(node) &&
@@ -990,7 +990,7 @@ std::vector<Type*> Checker::getUniqueTypeParameters(InferenceContext* context,
 	std::vector<Type*> result;
 	result.reserve(typeParameters.size());
 	for (Type* tp : typeParameters) {
-		const std::string& name = tp->symbol->name;
+		const std::string& name = tp->symbol->data->name;
 		if (hasTypeParameterByName(context->inferredTypeParameters, name) ||
 			hasTypeParameterByName(result, name)) {
 			std::vector<Type*> combined = context->inferredTypeParameters;

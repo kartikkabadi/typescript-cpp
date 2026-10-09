@@ -1055,7 +1055,7 @@ LanguageService::getFromAllDeclarations(
 			std::vector<::tsc::Node*> symbolDecls;
 			if (canHaveSymbol(decl)) {
 				if (Symbol* symbol = decl->symbol(); symbol != nullptr) {
-					for (auto* d : symbol->declarations) {
+					for (auto* d : symbol->data->declarations) {
 						if (nodeTest(d)) {
 							for (auto* c :
 								 getChildrenFromNonJSDocNode(d, sourceFile)) {

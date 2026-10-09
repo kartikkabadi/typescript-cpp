@@ -13,12 +13,15 @@
 namespace tsc {
 
 struct Node;
+struct Symbol;
 
 using SymbolId = uint64_t;
+using SymbolTable = std::unordered_map<std::string, Symbol*>;
 
-struct Symbol {
-	SymbolFlags flags{};
-	CheckFlags checkFlags{};
+// SymbolData — symbol.go symbolData: the shared payload of a Symbol. Instantiated
+// symbols in the checker share one SymbolData with their origin; flags,
+// checkFlags, and id stay unique to each Symbol instance.
+struct SymbolData {
 	std::string name;
 	std::vector<Node*> declarations;
 	Node* valueDeclaration = nullptr;
@@ -26,18 +29,49 @@ struct Symbol {
 	std::unordered_map<std::string, Symbol*> exports;
 	Symbol* parent = nullptr;
 	Symbol* exportSymbol = nullptr;
+};
+
+// Symbol stores flags, checkFlags, and id uniquely for every symbol instance,
+// but may share SymbolData with other symbols. Every Symbol has its data field
+// initialized on construction (the equivalent of Go's ast.NewSymbol /
+// SymbolWithData.Initialize contract); use setSymbolData to share another
+// symbol's data.
+struct Symbol {
+	SymbolFlags flags{};
+	CheckFlags checkFlags{};
 	std::atomic<SymbolId> id{0};
+	SymbolData* data;
+
+	Symbol() : data(new SymbolData()) {}
+
+	// setSymbolData — Symbol.SetSymbolData: point this symbol at another
+	// symbol's SymbolData so both share it.
+	void setSymbolData(Symbol* other) { data = other->data; }
 
 	bool isExternalModule() const;
 	bool isStatic() const;
 	SymbolFlags combinedLocalAndExportSymbolFlags() const {
-		return exportSymbol ? flags | exportSymbol->flags : flags;
+		return data->exportSymbol ? flags | data->exportSymbol->flags : flags;
 	}
 };
 
-struct FlowNode;
+// SymbolWithData — ast.SymbolWithData: a Symbol paired with its own SymbolData
+// in one allocation. initialize() points the Symbol at its data, mirroring
+// SymbolWithData.Initialize.
+struct SymbolWithData {
+	Symbol s;
+	SymbolData d;
 
-using SymbolTable = std::unordered_map<std::string, Symbol*>;
+	Symbol* initialize() {
+		s.data = &d;
+		return &s;
+	}
+};
+
+// newSymbol — ast.NewSymbol.
+inline Symbol* newSymbol() { return (new SymbolWithData())->initialize(); }
+
+struct FlowNode;
 
 // Go map-read semantics: returns the value or nullptr without inserting.
 // operator[] must never be used to READ a SymbolTable — it inserts a null

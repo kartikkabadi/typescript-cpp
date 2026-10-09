@@ -291,7 +291,7 @@ struct affectedFilesHandler {
 		// emitted as well since the const enum value changed
 		if (affectedFile->Symbol != nullptr) {
 			for (const auto& [name, exported] :
-			     affectedFile->Symbol->exports) {
+			     affectedFile->Symbol->data->exports) {
 				if ((exported->flags & SymbolFlagsConstEnum) != 0) {
 					invalidateJsFiles = true;
 					break;
@@ -310,7 +310,7 @@ struct affectedFilesHandler {
 				}
 				if ((aliased->flags & SymbolFlagsConstEnum) != 0) {
 					bool found = false;
-					for (auto* d : aliased->declarations) {
+					for (auto* d : aliased->data->declarations) {
 						if (getSourceFileOfNode(d) ==
 						    affectedFile) {
 							found = true;

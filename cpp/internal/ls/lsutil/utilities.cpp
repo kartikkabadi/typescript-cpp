@@ -140,7 +140,7 @@ QuotePreference GetQuotePreference(SourceFile* sourceFile, const UserPreferences
 
 // ModuleSymbolToValidIdentifier — utilities.go:107
 std::string ModuleSymbolToValidIdentifier(Symbol* moduleSymbol, bool forceCapitalize) {
-	std::string moduleName = moduleSymbol->name;
+	std::string moduleName = moduleSymbol->data->name;
 	if (auto [ambientModuleName, ok] = detail::tryGetAmbientModuleNameFromSymbolName(moduleName); ok) {
 		moduleName = ambientModuleName;
 	}

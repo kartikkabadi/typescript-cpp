@@ -370,10 +370,10 @@ bool isSimpleIdentifierTypeReference(Node* node) {
 }
 
 std::string getSymbolPath(Symbol* symbol) {
-	if (symbol->parent != nullptr) {
-		return getSymbolPath(symbol->parent) + "." + symbol->name;
+	if (symbol->data->parent != nullptr) {
+		return getSymbolPath(symbol->data->parent) + "." + symbol->data->name;
 	}
-	return symbol->name;
+	return symbol->data->name;
 }
 
 // getTypeReferenceName — checker.go:24150 (also ported statically in
@@ -396,7 +396,7 @@ Node* getTypeReferenceName(Node* node) {
 }
 
 bool isLocalTypeAlias(Symbol* symbol) {
-	Node* declaration = findList(symbol->declarations,
+	Node* declaration = findList(symbol->data->declarations,
 		[](Node* d) { return isTypeAlias(d); });
 	return declaration != nullptr && getContainingFunction(declaration) != nullptr;
 }
@@ -699,7 +699,7 @@ Type* Checker::getESSymbolLikeTypeForNode(Node* node) {
 				std::string name;
 				name += kInternalSymbolNamePrefix;
 				name += '@';
-				name += symbol->name;
+				name += symbol->data->name;
 				name += '@';
 				name += std::to_string(getSymbolId(symbol));
 				uniqueType = newUniqueESSymbolType(symbol, name);
@@ -925,7 +925,7 @@ Symbol* Checker::getUnresolvedSymbolForEntityName(Node* name) {
 			result = newSymbolEx(SymbolFlagsTypeAlias, text,
 								 CheckFlagsUnresolved);
 			unresolvedSymbols[path] = result;
-			result->parent = parentSymbol;
+			result->data->parent = parentSymbol;
 			typeAliasLinks.Get(result)->declaredType = unresolvedType;
 		}
 		return result;
@@ -1520,7 +1520,7 @@ Type* Checker::getTypeAliasInstantiation(
 	TypeAlias* alias) {
 	Type* t = getDeclaredTypeOfSymbol(symbol);
 	if (t == intrinsicMarkerType) {
-		auto it = intrinsicTypeKinds.find(symbol->name);
+		auto it = intrinsicTypeKinds.find(symbol->data->name);
 		if (it != intrinsicTypeKinds.end() && typeArguments.size() == 1) {
 			switch (it->second) {
 			case IntrinsicTypeKind::NoInfer:
@@ -1544,7 +1544,7 @@ Type* Checker::getTypeAliasInstantiation(
 			fillMissingTypeArguments(
 				typeArguments, typeParameters,
 				getMinTypeArgumentCount(typeParameters),
-				isInJSFile(symbol->valueDeclaration)));
+				isInJSFile(symbol->data->valueDeclaration)));
 		instantiation = instantiateTypeWithAlias(t, mapper, alias);
 		links->instantiations[key] = instantiation;
 	}
@@ -2256,14 +2256,14 @@ Type* Checker::getTypeFromImportTypeNode(Node* node) {
 								/*dontResolveAlias*/ true);
 						if (immediateModuleSymbol != nullptr &&
 							someList(
-								immediateModuleSymbol->declarations,
+								immediateModuleSymbol->data->declarations,
 								[](Node* d) {
 									return getAssignmentDeclarationKind(d) ==
 										   JSDeclarationKind::ModuleExports;
 								})) {
 							SymbolTable parentExports =
 								getExportsOfSymbol(
-									immediateModuleSymbol->parent);
+									immediateModuleSymbol->data->parent);
 							symbolFromModule = getSymbol(
 								parentExports, current->text(), meaning);
 						}
@@ -2347,11 +2347,11 @@ Type* Checker::getGlobalImportMetaExpressionType() {
 		Type* importMetaType = getGlobalImportMetaType();
 		Symbol* metaPropertySymbol = newSymbolEx(
 			SymbolFlagsProperty, "meta", CheckFlagsReadonly);
-		metaPropertySymbol->parent = symbol;
+		metaPropertySymbol->data->parent = symbol;
 		valueSymbolLinks.Get(metaPropertySymbol)->resolvedType =
 			importMetaType;
 		SymbolTable members = createSymbolTable({metaPropertySymbol});
-		symbol->members = members;
+		symbol->data->members = members;
 		deferredGlobalImportMetaExpressionType = newAnonymousType(
 			symbol, members, {}, {}, {});
 	}
@@ -2462,7 +2462,7 @@ Type* Checker::createTupleTargetType(
 				valueSymbolLinks.Get(property)->resolvedType = typeParameter;
 				// valueSymbolLinks.Get(property).tupleLabelDeclaration =
 				//     elementInfos[i].labeledDeclaration
-				members[property->name] = property;
+				members[property->data->name] = property;
 			}
 		}
 	}
@@ -2481,7 +2481,7 @@ Type* Checker::createTupleTargetType(
 		valueSymbolLinks.Get(lengthSymbol)->resolvedType =
 			getUnionType(literalTypes);
 	}
-	members[lengthSymbol->name] = lengthSymbol;
+	members[lengthSymbol->data->name] = lengthSymbol;
 	Type* t =
 		newObjectType(ObjectFlagsTuple | ObjectFlagsReference, nullptr);
 	TupleType* d = t->AsTupleType();
@@ -2742,7 +2742,7 @@ Type* Checker::getImpliedConstraint(Type* t, Node* checkNode,
 SymbolTable createSymbolTable(const std::vector<Symbol*>& symbols) {
 	SymbolTable result;
 	for (Symbol* symbol : symbols) {
-		result[symbol->name] = symbol;
+		result[symbol->data->name] = symbol;
 	}
 	return result;
 }

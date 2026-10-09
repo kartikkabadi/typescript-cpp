@@ -368,7 +368,7 @@ std::vector<fixInfo*> getFixesInfoForUMDImport(Node* token,
 		}
 		result.push_back(new fixInfo{
 		    .fix = std::move(fix),
-		    .symbolName = umdSymbol->name,
+		    .symbolName = umdSymbol->data->name,
 		    .errorIdentifierText = errorIdentifierText,
 		});
 	}
@@ -410,9 +410,9 @@ Symbol* getUmdSymbol(Node* token, checker::Checker* ch) {
 
 // isUMDExportSymbol — codeactions_importfixes.go:297.
 bool isUMDExportSymbol(Symbol* symbol) {
-	return symbol != nullptr && symbol->declarations.size() > 0 &&
-	       symbol->declarations[0] != nullptr &&
-	       isNamespaceExportDeclaration(symbol->declarations[0]);
+	return symbol != nullptr && symbol->data->declarations.size() > 0 &&
+	       symbol->data->declarations[0] != nullptr &&
+	       isNamespaceExportDeclaration(symbol->data->declarations[0]);
 }
 
 // getFixesInfoForNonUMDImport — codeactions_importfixes.go:303.
@@ -577,7 +577,7 @@ bool needsJsxNamespaceFix(const std::string& jsxNamespace,
 	if (namespaceSymbol == nullptr) {
 		return true;
 	}
-	if (containsFunc(namespaceSymbol->declarations,
+	if (containsFunc(namespaceSymbol->data->declarations,
 	                 isTypeOnlyImportOrExportDeclaration)) {
 		return (namespaceSymbol->flags & SymbolFlagsValue) == 0;
 	}

@@ -262,7 +262,7 @@ void EmitResolver::markLinkedAliases(Node* node) {
 		visited.insert(id);
 
 		Symbol* nextSymbol = nullptr;
-		for (Node* declaration : exportSymbol->declarations) {
+		for (Node* declaration : exportSymbol->data->declarations) {
 			checker->emitResolverLinks.declarationLinks.Get(declaration)->isVisible = Tristate::True;
 
 			if (isInternalModuleImportEqualsDeclaration(declaration)) {
@@ -357,8 +357,8 @@ bool EmitResolver::IsImportRequiredByAugmentation(Node* decl) {
 		Symbol* s = kv.second;
 		Symbol* merged = checker->getMergedSymbol(s);
 		if (merged != s) {
-			if (!merged->declarations.empty()) {
-				for (Node* d : merged->declarations) {
+			if (!merged->data->declarations.empty()) {
+				for (Node* d : merged->data->declarations) {
 					SourceFile* declFile = getSourceFileOfNode(d);
 					if (declFile == importTarget) {
 						return true;
@@ -455,7 +455,7 @@ bool EmitResolver::IsExpandoFunctionDeclarationUnsafe(Node* node) {
 	// this is substantially different from strada, but so is expando property checking
 	std::vector<Symbol*> props = GetPropertiesOfContainerFunction(node);
 	for (Symbol* p : props) {
-		if (isExpandoPropertyDeclaration(p->valueDeclaration)) {
+		if (isExpandoPropertyDeclaration(p->data->valueDeclaration)) {
 			return true;
 		}
 	}
@@ -569,8 +569,8 @@ bool EmitResolver::isAliasResolvedToValue(Symbol* symbol, bool excludeTypeOnlyVa
 	if (symbol == nullptr) {
 		return false;
 	}
-	if (symbol->valueDeclaration != nullptr) {
-		if (SourceFile* container = getSourceFileOfNode(symbol->valueDeclaration);
+	if (symbol->data->valueDeclaration != nullptr) {
+		if (SourceFile* container = getSourceFileOfNode(symbol->data->valueDeclaration);
 			container != nullptr) {
 			Symbol* fileSymbol = c->getSymbolOfDeclaration(container->asNode());
 			// Ensures cjs export assignment is setup, since this symbol may point at, and merge with, the file itself.
@@ -1023,9 +1023,9 @@ printer::TypeReferenceSerializationKind EmitResolver::GetTypeReferenceSerializat
 		Symbol* rootValueSymbol = checker->resolveEntityName(
 			getFirstIdentifier(typeName), SymbolFlagsValue, true, true, location);
 
-		if (rootValueSymbol != nullptr && !rootValueSymbol->declarations.empty()) {
-			isTypeOnly = std::all_of(rootValueSymbol->declarations.begin(),
-									 rootValueSymbol->declarations.end(),
+		if (rootValueSymbol != nullptr && !rootValueSymbol->data->declarations.empty()) {
+			isTypeOnly = std::all_of(rootValueSymbol->data->declarations.begin(),
+									 rootValueSymbol->data->declarations.end(),
 									 isTypeOnlyImportOrExportDeclaration);
 		}
 	}
@@ -1155,15 +1155,15 @@ bool EmitResolver::IsThisPropertyAssignmentDeclarationRedundant(Node* node) {
 	}
 
 	Symbol* s = checker->getSymbolOfDeclaration(node);
-	if (s == nullptr || s->parent == nullptr) {
+	if (s == nullptr || s->data->parent == nullptr) {
 		return false;
 	}
-	Type* parentType = checker->getDeclaredTypeOfSymbol(s->parent);
+	Type* parentType = checker->getDeclaredTypeOfSymbol(s->data->parent);
 	if (parentType == nullptr) {
 		return false;
 	}
 	for (Type* base : checker->getBaseTypes(parentType)) {
-		Symbol* baseProp = checker->getPropertyOfType(base, s->name);
+		Symbol* baseProp = checker->getPropertyOfType(base, s->data->name);
 		if (baseProp == nullptr) {
 			continue;
 		}

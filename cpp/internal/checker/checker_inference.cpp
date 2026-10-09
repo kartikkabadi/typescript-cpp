@@ -288,7 +288,7 @@ bool hasInferenceCandidates(InferenceInfo* info) {
 // inference.go:1659 — hasTypeParameterDefault
 bool hasTypeParameterDefault(Type* tp) {
 	if (tp->symbol != nullptr) {
-		for (Node* d : tp->symbol->declarations) {
+		for (Node* d : tp->symbol->data->declarations) {
 			if (isTypeParameterDeclaration(d) &&
 				d->as<TypeParameterDeclaration>()->DefaultType != nullptr) {
 				return true;
@@ -666,7 +666,7 @@ void Checker::inferFromAliasTypeArguments(InferenceState* n, Type* source,
 	std::vector<Type*> params =
 		typeAliasLinks.Get(source->alias->symbol)->typeParameters;
 	int minParams = getMinTypeArgumentCount(params);
-	bool nodeIsInJsFile = isInJSFile(source->alias->symbol->valueDeclaration);
+	bool nodeIsInJsFile = isInJSFile(source->alias->symbol->data->valueDeclaration);
 	std::vector<Type*> sourceTypes = fillMissingTypeArguments(
 		source->alias->typeArguments, params, minParams, nodeIsInJsFile);
 	std::vector<Type*> targetTypes = fillMissingTypeArguments(
@@ -1411,9 +1411,9 @@ void Checker::inferFromObjectTypes(InferenceState* n, Type* source, Type* target
 void Checker::inferFromProperties(InferenceState* n, Type* source, Type* target) {
 	std::vector<Symbol*> properties = getPropertiesOfObjectType(target);
 	for (Symbol* targetProp : properties) {
-		Symbol* sourceProp = getPropertyOfType(source, targetProp->name);
+		Symbol* sourceProp = getPropertyOfType(source, targetProp->data->name);
 		if (sourceProp != nullptr &&
-			!someList(sourceProp->declarations,
+			!someList(sourceProp->data->declarations,
 					  [this](Node* d) { return isSkipDirectInferenceNode(d); })) {
 			inferFromTypes(
 				n,
@@ -1790,8 +1790,8 @@ void Checker::resolveReverseMappedTypeMembers(Type* t) {
 			ifElse(readonlyMask && isReadonlySymbol(prop), CheckFlagsReadonly,
 				   CheckFlagsNone);
 		Symbol* inferredProp = newSymbolEx(
-			SymbolFlagsProperty | (prop->flags & optionalMask), prop->name, checkFlags);
-		inferredProp->declarations = prop->declarations;
+			SymbolFlagsProperty | (prop->flags & optionalMask), prop->data->name, checkFlags);
+		inferredProp->data->declarations = prop->data->declarations;
 		valueSymbolLinks.Get(inferredProp)->nameType =
 			valueSymbolLinks.Get(prop)->nameType;
 		ReverseMappedSymbolLinks* links = reverseMappedSymbolLinks.Get(inferredProp);
@@ -1814,7 +1814,7 @@ void Checker::resolveReverseMappedTypeMembers(Type* t) {
 			links->mappedType = r->mappedType;
 			links->constraintType = r->constraintType;
 		}
-		members[prop->name] = inferredProp;
+		members[prop->data->name] = inferredProp;
 	}
 	setStructuredTypeMembers(t, std::move(members), {}, {}, indexInfos);
 }
@@ -1950,8 +1950,8 @@ Type* Checker::createEmptyObjectTypeFromStringLiteral(Type* t) {
 		Symbol* literalProp = newSymbol(SymbolFlagsProperty, name);
 		valueSymbolLinks.Get(literalProp)->resolvedType = anyType;
 		if (t2->symbol != nullptr) {
-			literalProp->declarations = t2->symbol->declarations;
-			literalProp->valueDeclaration = t2->symbol->valueDeclaration;
+			literalProp->data->declarations = t2->symbol->data->declarations;
+			literalProp->data->valueDeclaration = t2->symbol->data->valueDeclaration;
 		}
 		members[name] = literalProp;
 	}
@@ -2423,7 +2423,7 @@ bool Checker::literalTypesWithSameBaseType(const std::vector<Type*>& types) {
 // isFromInferenceBlockedSource — inference.go:1618
 bool Checker::isFromInferenceBlockedSource(Type* t) {
 	return t->symbol != nullptr &&
-		someList(t->symbol->declarations,
+		someList(t->symbol->data->declarations,
 				 [this](Node* d) { return isSkipDirectInferenceNode(d); });
 }
 

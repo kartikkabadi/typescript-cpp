@@ -147,13 +147,13 @@ ScriptElementKind getSymbolKindOfConstructorPropertyMethodAccessorFunctionOrVar(
 	if ((flags & SymbolFlagsVariable) != 0) {
 		if (isFirstDeclarationOfSymbolParameter(symbol)) {
 			return ScriptElementKindParameterElement;
-		} else if (symbol->valueDeclaration != nullptr && isVarConst(symbol->valueDeclaration)) {
+		} else if (symbol->data->valueDeclaration != nullptr && isVarConst(symbol->data->valueDeclaration)) {
 			return ScriptElementKindConstElement;
-		} else if (symbol->valueDeclaration != nullptr && isVarUsing(symbol->valueDeclaration)) {
+		} else if (symbol->data->valueDeclaration != nullptr && isVarUsing(symbol->data->valueDeclaration)) {
 			return ScriptElementKindVariableUsingElement;
-		} else if (symbol->valueDeclaration != nullptr && isVarAwaitUsing(symbol->valueDeclaration)) {
+		} else if (symbol->data->valueDeclaration != nullptr && isVarAwaitUsing(symbol->data->valueDeclaration)) {
 			return ScriptElementKindVariableAwaitUsingElement;
-		} else if (some(symbol->declarations, detail::isLet)) {
+		} else if (some(symbol->data->declarations, detail::isLet)) {
 			return ScriptElementKindLetElement;
 		}
 		if (isLocalVariableOrFunction(symbol)) {
@@ -217,8 +217,8 @@ ScriptElementKind getSymbolKindOfConstructorPropertyMethodAccessorFunctionOrVar(
 // isFirstDeclarationOfSymbolParameter — symbol_display.go:291
 static bool isFirstDeclarationOfSymbolParameter(Symbol* symbol) {
 	Node* declaration = nullptr;
-	if (!symbol->declarations.empty()) {
-		declaration = symbol->declarations[0];
+	if (!symbol->data->declarations.empty()) {
+		declaration = symbol->data->declarations[0];
 	}
 	Node* result = findAncestorOrQuit(declaration, [](Node* n) -> FindAncestorResult {
 		if (n->kind == Kind::Parameter) {
@@ -236,11 +236,11 @@ static bool isFirstDeclarationOfSymbolParameter(Symbol* symbol) {
 
 // isLocalVariableOrFunction — symbol_display.go:307
 static bool isLocalVariableOrFunction(Symbol* symbol) {
-	if (symbol->parent != nullptr) {
+	if (symbol->data->parent != nullptr) {
 		return false; // This is exported symbol
 	}
 
-	for (Node* decl : symbol->declarations) {
+	for (Node* decl : symbol->data->declarations) {
 		// Function expressions are local
 		if (decl->kind == Kind::FunctionExpression) {
 			return true;
@@ -290,9 +290,9 @@ ScriptElementKindModifier GetSymbolModifiers(checker::Checker* typeChecker, Symb
 // getNormalizedSymbolModifiers — symbol_display.go:351
 static ScriptElementKindModifier getNormalizedSymbolModifiers(checker::Checker* typeChecker, Symbol* symbol) {
 	ScriptElementKindModifier modifierSet = ScriptElementKindModifierNone;
-	if (!symbol->declarations.empty()) {
-		Node* declaration = symbol->declarations[0];
-		std::vector<Node*> declarations(symbol->declarations.begin() + 1, symbol->declarations.end());
+	if (!symbol->data->declarations.empty()) {
+		Node* declaration = symbol->data->declarations[0];
+		std::vector<Node*> declarations(symbol->data->declarations.begin() + 1, symbol->data->declarations.end());
 		// omit deprecated flag if some declarations are not deprecated
 		ModifierFlags excludeFlags;
 		if (!declarations.empty() &&

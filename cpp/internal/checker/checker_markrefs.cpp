@@ -557,8 +557,8 @@ void Checker::markExportSpecifierAliasReferenced(Node* location /*ExportSpecifie
 			nullptr /*nameNotFoundMessage*/, true /*isUse*/, false /*excludeGlobals*/);
 		if (symbol != nullptr &&
 			(symbol == undefinedSymbol || symbol == globalThisSymbol ||
-				(!symbol->declarations.empty() &&
-					isGlobalSourceFile(getDeclarationContainer(symbol->declarations[0]))))) {
+				(!symbol->data->declarations.empty() &&
+					isGlobalSourceFile(getDeclarationContainer(symbol->data->declarations[0]))))) {
 			// Do nothing, non-local symbol
 		} else {
 			Symbol* target = symbol;
@@ -906,7 +906,7 @@ void Checker::markEntityNameOrEntityExpressionAsReference(Node* typeName /*Entit
 			compilerOptions->GetEmitModuleKind() >= ModuleKind::ES2015 &&
 			!symbolIsValue(rootSymbol) &&
 			[&] {
-				for (Node* decl : rootSymbol->declarations) {
+				for (Node* decl : rootSymbol->data->declarations) {
 					if (isTypeOnlyImportOrExportDeclaration(decl)) {
 						return false;
 					}
@@ -916,7 +916,7 @@ void Checker::markEntityNameOrEntityExpressionAsReference(Node* typeName /*Entit
 			Diagnostic* diag = error(typeName,
 				A_type_referenced_in_a_decorated_signature_must_be_imported_with_import_type_or_a_namespace_import_when_isolatedModules_and_emitDecoratorMetadata_are_enabled);
 			Node* aliasDeclaration = nullptr;
-			for (Node* decl : rootSymbol->declarations) {
+			for (Node* decl : rootSymbol->data->declarations) {
 				if (isAliasSymbolDeclaration(decl)) {
 					aliasDeclaration = decl;
 					break;

@@ -413,7 +413,7 @@ bool Checker::checkGrammarModifiers(Node* node /*Union[HasModifiers, HasDecorato
 				}
 			} else if (legacyDecorators && (node->kind == Kind::GetAccessor || node->kind == Kind::SetAccessor)) {
 				AllAccessorDeclarations accessors =
-					getAllAccessorDeclarationsForDeclaration(node, getSymbolOfDeclaration(node)->declarations);
+					getAllAccessorDeclarationsForDeclaration(node, getSymbolOfDeclaration(node)->data->declarations);
 				if (hasDecorators(accessors.firstAccessor) && node == accessors.secondAccessor) {
 					return grammarErrorOnFirstToken(node, Decorators_cannot_be_applied_to_multiple_get_Slashset_accessors_of_the_same_name);
 				}

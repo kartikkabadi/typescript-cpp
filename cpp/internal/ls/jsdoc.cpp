@@ -54,7 +54,7 @@ std::string GetSymbolDocumentationComment(checker::Checker* c,
 	}
 	std::vector<std::string> parts;
 	collections::Set<Node*> seen;
-	for (Node* decl : symbol->declarations) {
+	for (Node* decl : symbol->data->declarations) {
 		if (decl == nullptr) {
 			continue;
 		}
@@ -184,7 +184,7 @@ std::vector<JSDocTagInfo> GetSymbolJSDocTags(Symbol* symbol) {
 	}
 	std::vector<JSDocTagInfo> infos;
 	collections::Set<Node*> seen;
-	for (Node* decl : symbol->declarations) {
+	for (Node* decl : symbol->data->declarations) {
 		if (decl == nullptr) {
 			continue;
 		}
@@ -286,7 +286,7 @@ Node* getJSDocOrTag(checker::Checker* c, Node* node,
 				if (Symbol* prop = c->GetPropertyOfType(objectType,
 				                                        name->text());
 				    prop != nullptr) {
-					for (Node* d : prop->declarations) {
+					for (Node* d : prop->data->declarations) {
 						if (Node* jsdoc = getJSDoc(d); jsdoc != nullptr) {
 							return jsdoc;
 						}
@@ -302,7 +302,7 @@ Node* getJSDocOrTag(checker::Checker* c, Node* node,
 		    isConstructorDeclaration(node) ||
 		    isConstructSignatureDeclaration(node)) {
 			Node* firstSignature =
-			    findRange(symbol->declarations,
+			    findRange(symbol->data->declarations,
 			              [](Node* d) { return isFunctionLike(d); });
 			if (firstSignature != nullptr && node != firstSignature) {
 				if (Node* jsDoc =
@@ -324,11 +324,11 @@ Node* getJSDocOrTag(checker::Checker* c, Node* node,
 				checker::Type* staticBaseType = c->GetApparentType(
 				    c->GetBaseConstructorTypeOfClass(classType));
 				if (Symbol* prop = c->GetPropertyOfType(staticBaseType,
-				                                        symbol->name);
-				    prop != nullptr && prop->valueDeclaration != nullptr &&
+				                                        symbol->data->name);
+				    prop != nullptr && prop->data->valueDeclaration != nullptr &&
 				    seenSymbols->AddIfAbsent(prop)) {
 					if (Node* jsDoc = getJSDocOrTag(
-					        c, prop->valueDeclaration, seenSymbols);
+					        c, prop->data->valueDeclaration, seenSymbols);
 					    jsDoc != nullptr) {
 						return jsDoc;
 					}
@@ -336,12 +336,12 @@ Node* getJSDocOrTag(checker::Checker* c, Node* node,
 			} else {
 				for (checker::Type* baseType : c->GetBaseTypes(classType)) {
 					if (Symbol* prop = c->GetPropertyOfType(baseType,
-					                                        symbol->name);
+					                                        symbol->data->name);
 					    prop != nullptr &&
-					    prop->valueDeclaration != nullptr &&
+					    prop->data->valueDeclaration != nullptr &&
 					    seenSymbols->AddIfAbsent(prop)) {
 						if (Node* jsDoc = getJSDocOrTag(
-						        c, prop->valueDeclaration, seenSymbols);
+						        c, prop->data->valueDeclaration, seenSymbols);
 						    jsDoc != nullptr) {
 							return jsDoc;
 						}

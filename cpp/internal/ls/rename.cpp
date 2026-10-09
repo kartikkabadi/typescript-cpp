@@ -158,14 +158,14 @@ const DiagnosticMessage* wouldRenameInOtherNodeModules(
 	if (!tristateIsTrueOrUnknown(preferences.ProvidePrefixAndSuffixTextForRename) &&
 		(sym->flags & SymbolFlagsAlias) != 0) {
 		::tsc::Node* importSpecifier =
-			findFirst(sym->declarations, &isImportSpecifier);
+			findFirst(sym->data->declarations, &isImportSpecifier);
 		if (importSpecifier != nullptr &&
 			importSpecifier->as<ImportSpecifier>()->PropertyName == nullptr) {
 			sym = ch->GetAliasedSymbol(sym);
 		}
 	}
 
-	std::vector<::tsc::Node*> declarations = sym->declarations;
+	std::vector<::tsc::Node*> declarations = sym->data->declarations;
 	if (declarations.empty()) {
 		return nullptr;
 	}
@@ -462,7 +462,7 @@ std::pair<RenameInfo, bool> LanguageService::getRenameInfoForNode(
 	}
 
 	// Only allow a symbol to be renamed if it actually has at least one declaration.
-	if (symbol->declarations.empty()) {
+	if (symbol->data->declarations.empty()) {
 		return {RenameInfo{}, false};
 	}
 
@@ -491,7 +491,7 @@ std::pair<RenameInfo, bool> LanguageService::getRenameInfoForNode(
 const DiagnosticMessage* LanguageService::renameBlockedReason(
 	SourceFile* sourceFile, ::tsc::Node* node, Symbol* symbol,
 	checker::Checker* ch, compiler::SimpleProgram* program) {
-	for (auto* declaration : symbol->declarations) {
+	for (auto* declaration : symbol->data->declarations) {
 		if (isDefinedInLibraryFile(program, declaration)) {
 			return 
 				You_cannot_rename_elements_that_are_defined_in_the_standard_TypeScript_library;
@@ -500,8 +500,8 @@ const DiagnosticMessage* LanguageService::renameBlockedReason(
 
 	// Cannot rename `default` as in `import { default as foo } from "./someModule"`
 	if (isIdentifier(node) && node->text() == "default" &&
-		symbol->parent != nullptr &&
-		(symbol->parent->flags & SymbolFlagsModule) != 0) {
+		symbol->data->parent != nullptr &&
+		(symbol->data->parent->flags & SymbolFlagsModule) != 0) {
 		return You_cannot_rename_this_element;
 	}
 
@@ -533,7 +533,7 @@ std::pair<RenameInfo, bool> LanguageService::getRenameInfoForModule(
 	}
 
 	::tsc::Node* moduleSourceFile =
-		findFirst(moduleSymbol->declarations, &isSourceFile);
+		findFirst(moduleSymbol->data->declarations, &isSourceFile);
 	if (moduleSourceFile == nullptr) {
 		return {RenameInfo{}, false};
 	}
@@ -656,7 +656,7 @@ std::string LanguageService::getTextForRename(::tsc::Node* originalNode,
 				originalSymbol = ch->GetSymbolAtLocation(originalNode);
 			}
 			if (originalSymbol != nullptr &&
-				containsVec(originalSymbol->declarations, parent)) {
+				containsVec(originalSymbol->data->declarations, parent)) {
 				return name + " as " + newText;
 			}
 			return newText;

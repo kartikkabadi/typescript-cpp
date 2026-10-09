@@ -466,8 +466,8 @@ Node* SymbolAndEntries::DefinitionNode() const {
 		return definition->node;
 	}
 	if (definition->symbol != nullptr &&
-	    !definition->symbol->declarations.empty()) {
-		return definition->symbol->declarations[0];
+	    !definition->symbol->data->declarations.empty()) {
+		return definition->symbol->data->declarations[0];
 	}
 	return nullptr;
 }
@@ -782,7 +782,7 @@ Symbol* skipPastExportOrImportSpecifierOrUnion(
 	// If the symbol is declared as part of a declaration like
 	// `{ type: "a" } | { type: "b" }`, use the property on the union type to get
 	// more references.
-	return firstNonNil(symbol->declarations, [&](Node* decl) -> Symbol* {
+	return firstNonNil(symbol->data->declarations, [&](Node* decl) -> Symbol* {
 		if (decl->parent == nullptr) {
 			// Ignore UMD module and global merge and CJS module end exports
 			// symbols
@@ -795,14 +795,14 @@ Symbol* skipPastExportOrImportSpecifierOrUnion(
 			TSC_UNREACHABLE(
 			    ("Unexpected symbol at " +
 			     std::string(kindToString(node->kind)) + ": " +
-			     symbol->name)
+			     symbol->data->name)
 			        .c_str());
 		}
 		if (decl->parent->kind == Kind::TypeLiteral &&
 		    decl->parent->parent->kind == Kind::UnionType) {
 			return checker->GetPropertyOfType(
 			    checker->GetTypeFromTypeNode(decl->parent->parent),
-			    symbol->name);
+			    symbol->data->name);
 		}
 		return nullptr;
 	});
@@ -812,18 +812,18 @@ Symbol* skipPastExportOrImportSpecifierOrUnion(
 Node* getSymbolScope(Symbol* symbol) {
 	// If this is the symbol of a named function expression or named class
 	// expression, then named references are limited to its own scope.
-	Node* valueDeclaration = symbol->valueDeclaration;
+	Node* valueDeclaration = symbol->data->valueDeclaration;
 	if (valueDeclaration != nullptr &&
 	    (valueDeclaration->kind == Kind::FunctionExpression ||
 	     valueDeclaration->kind == Kind::ClassExpression)) {
 		return valueDeclaration;
 	}
 
-	if (symbol->declarations.empty()) {
+	if (symbol->data->declarations.empty()) {
 		return nullptr;
 	}
 
-	std::vector<Node*> declarations = symbol->declarations;
+	std::vector<Node*> declarations = symbol->data->declarations;
 	// If this is private property or method, the scope is the containing class
 	if (symbol->flags & (SymbolFlagsProperty | SymbolFlagsMethod)) {
 		Node* privateDeclaration = find(declarations, [](Node* d) {
@@ -854,12 +854,12 @@ Node* getSymbolScope(Symbol* symbol) {
 		  visible through that namespace.
 	*/
 	bool exposedByParent =
-	    symbol->parent != nullptr &&
+	    symbol->data->parent != nullptr &&
 	    !(symbol->flags & SymbolFlagsTypeParameter);
 	if (exposedByParent &&
-	    !(checker::isExternalModuleSymbol(symbol->parent) &&
+	    !(checker::isExternalModuleSymbol(symbol->data->parent) &&
 	      !isSourceFileWithGlobalExports(
-	          symbol->parent->valueDeclaration))) {
+	          symbol->data->parent->data->valueDeclaration))) {
 		return nullptr;
 	}
 
@@ -918,7 +918,7 @@ nonLocalDefinition* LanguageService::getNonLocalDefinition(
 	auto [checker, done] = program->GetTypeCheckerForFileExclusive(nullptr);
 	doneGuard doneGuard_{done};
 	checker::EmitResolver* emitResolver = checker->NewEmitResolver(printer::NewEmitContext());
-	for (auto* d : entry->definition->symbol->declarations) {
+	for (auto* d : entry->definition->symbol->data->declarations) {
 		if (isDefinitionVisible(emitResolver, d)) {
 			auto [file, sp] = getFileAndStartPosFromDeclaration(d);
 			TextPos startPos = sp;
@@ -1034,7 +1034,7 @@ void LanguageService::forEachOriginalDefinitionLocation(
 	}
 
 	compiler::SimpleProgram* program = GetProgram();
-	for (auto* d : entry->definition->symbol->declarations) {
+	for (auto* d : entry->definition->symbol->data->declarations) {
 		auto [file, startPos] = getFileAndStartPosFromDeclaration(d);
 		std::string fileName = file->FileName();
 		if (tspath::isDeclarationFileName(fileName)) {
@@ -1365,8 +1365,8 @@ LanguageService::definitionToReferencedSymbolDefinitionInfo(
 
 		// Get the definition node
 		Node* node = nullptr;
-		if (!symbol->declarations.empty()) {
-			Node* decl = symbol->declarations[0];
+		if (!symbol->data->declarations.empty()) {
+			Node* decl = symbol->data->declarations[0];
 			node = orElse(decl->name(), decl);
 		} else {
 			node = originalNode;
@@ -1644,7 +1644,7 @@ bool isDeclarationOfSymbol(Node* node, Symbol* target) {
 	// as unknown as Declaration : undefined;
 
 	return source != nullptr &&
-	       some(target->declarations,
+	       some(target->data->declarations,
 	            [&](Node* decl) { return decl == source; });
 }
 
@@ -1799,7 +1799,7 @@ std::vector<SignatureUsage> LanguageService::GetSignatureUsages(
 	for (auto* entry : entries) {
 		if (entry->definition != nullptr &&
 		    entry->definition->symbol != nullptr) {
-			for (auto* decl : entry->definition->symbol->declarations) {
+			for (auto* decl : entry->definition->symbol->data->declarations) {
 				if (Node* n = decl->name(); n != nullptr) {
 					declNames[n] = true;
 				}
@@ -1923,12 +1923,12 @@ std::vector<SymbolAndEntries*> LanguageService::getReferencedSymbolsForNode(
 		return {};
 	}
 
-	if (symbol->name == InternalSymbolNameExportEquals) {
-		if (symbol->parent == nullptr) {
+	if (symbol->data->name == InternalSymbolNameExportEquals) {
+		if (symbol->data->parent == nullptr) {
 			return {};
 		}
 		return getReferencedSymbolsForModule(
-		    checker, program, symbol->parent,
+		    checker, program, symbol->data->parent,
 		    /*excludeImportTypeOfExportEquals*/ false, sourceFiles,
 		    &sourceFilesSet);
 	}
@@ -2023,11 +2023,11 @@ LanguageService::getReferencedSymbolsForModuleIfDeclaredBySourceFile(
 	std::string moduleSourceFileName;
 	if (symbol == nullptr ||
 	    !((symbol->flags & SymbolFlagsModule) &&
-	      !symbol->declarations.empty())) {
+	      !symbol->data->declarations.empty())) {
 		return {};
 	}
 	if (Node* moduleSourceFile =
-	        find(symbol->declarations,
+	        find(symbol->data->declarations,
 	             [](Node* d) { return isSourceFile(d); });
 	    moduleSourceFile != nullptr) {
 		moduleSourceFileName =
@@ -2035,9 +2035,9 @@ LanguageService::getReferencedSymbolsForModuleIfDeclaredBySourceFile(
 	} else {
 		return {};
 	}
-	auto exportIt = symbol->exports.find(InternalSymbolNameExportEquals);
+	auto exportIt = symbol->data->exports.find(InternalSymbolNameExportEquals);
 	Symbol* exportEquals =
-	    exportIt != symbol->exports.end() ? exportIt->second : nullptr;
+	    exportIt != symbol->data->exports.end() ? exportIt->second : nullptr;
 	// If exportEquals != nil, we're about to add references to `import("mod")`
 	// anyway, so don't double-count them.
 	auto moduleReferences = getReferencedSymbolsForModule(
@@ -2515,7 +2515,7 @@ LanguageService::getReferencedSymbolsForModule(
     Symbol* symbol, bool excludeImportTypeOfExportEquals,
     const std::vector<SourceFile*>& sourceFiles,
     collections::Set<std::string>* sourceFilesSet) {
-	debug::assert(symbol->valueDeclaration != nullptr, "");
+	debug::assert(symbol->data->valueDeclaration != nullptr, "");
 
 	auto moduleRefs =
 	    findModuleReferences(program, sourceFiles, symbol, checker);
@@ -2571,8 +2571,8 @@ LanguageService::getReferencedSymbolsForModule(
 	});
 
 	// Add references to the module declarations themselves
-	if (!symbol->declarations.empty()) {
-		for (auto* decl : symbol->declarations) {
+	if (!symbol->data->declarations.empty()) {
+		for (auto* decl : symbol->data->declarations) {
 			switch (decl->kind) {
 			case Kind::SourceFile:
 				// Don't include the source file itself. (This may not be ideal
@@ -2595,11 +2595,11 @@ LanguageService::getReferencedSymbolsForModule(
 	}
 
 	// Handle export equals declarations
-	auto exportedIt = symbol->exports.find(InternalSymbolNameExportEquals);
+	auto exportedIt = symbol->data->exports.find(InternalSymbolNameExportEquals);
 	Symbol* exported =
-	    exportedIt != symbol->exports.end() ? exportedIt->second : nullptr;
-	if (exported != nullptr && !exported->declarations.empty()) {
-		for (auto* decl : exported->declarations) {
+	    exportedIt != symbol->data->exports.end() ? exportedIt->second : nullptr;
+	if (exported != nullptr && !exported->data->declarations.empty()) {
+		for (auto* decl : exported->data->declarations) {
 			SourceFile* sourceFile = getSourceFileOfNode(decl);
 			if (sourceFilesSet->Has(sourceFile->FileName())) {
 				Node* node = nullptr;
@@ -2887,13 +2887,13 @@ void getReferenceEntriesForShorthandPropertyAssignment(
     Node* node, checker::Checker* checker,
     const std::function<void(Node*)>& addReference) {
 	Symbol* refSymbol = checker->GetSymbolAtLocation(node);
-	if (refSymbol == nullptr || refSymbol->valueDeclaration == nullptr) {
+	if (refSymbol == nullptr || refSymbol->data->valueDeclaration == nullptr) {
 		return;
 	}
 	Symbol* shorthandSymbol = checker->GetShorthandAssignmentValueSymbol(
-	    refSymbol->valueDeclaration);
-	if (shorthandSymbol != nullptr && !shorthandSymbol->declarations.empty()) {
-		for (auto* declaration : shorthandSymbol->declarations) {
+	    refSymbol->data->valueDeclaration);
+	if (shorthandSymbol != nullptr && !shorthandSymbol->data->declarations.empty()) {
+		for (auto* declaration : shorthandSymbol->data->declarations) {
 			if (getMeaningFromDeclaration(declaration) &
 			    SemanticMeaningValue) {
 				addReference(declaration);
@@ -2910,11 +2910,11 @@ Node* tryGetClassByExtendingIdentifier(Node* node) {
 
 // getClassConstructorSymbol — findallreferences.go:2043.
 Symbol* getClassConstructorSymbol(Symbol* classSymbol) {
-	if (classSymbol->members.empty()) {
+	if (classSymbol->data->members.empty()) {
 		return nullptr;
 	}
-	auto it = classSymbol->members.find(InternalSymbolNameConstructor);
-	return it != classSymbol->members.end() ? it->second : nullptr;
+	auto it = classSymbol->data->members.find(InternalSymbolNameConstructor);
+	return it != classSymbol->data->members.end() ? it->second : nullptr;
 }
 
 // hasOwnConstructor — findallreferences.go:2050.
@@ -2928,8 +2928,8 @@ void findOwnConstructorReferences(
     const std::function<void(Node*)>& addNode) {
 	Symbol* constructorSymbol = getClassConstructorSymbol(classSymbol);
 	if (constructorSymbol != nullptr &&
-	    !constructorSymbol->declarations.empty()) {
-		for (auto* decl : constructorSymbol->declarations) {
+	    !constructorSymbol->data->declarations.empty()) {
+		for (auto* decl : constructorSymbol->data->declarations) {
 			if (decl->kind == Kind::Constructor) {
 				if (Node* ctrKeyword = astnav::findChildOfKind(
 				        decl, Kind::ConstructorKeyword, sourceFile);
@@ -2940,9 +2940,9 @@ void findOwnConstructorReferences(
 		}
 	}
 
-	if (!classSymbol->exports.empty()) {
-		for (auto& [_, member] : classSymbol->exports) {
-			Node* decl = member->valueDeclaration;
+	if (!classSymbol->data->exports.empty()) {
+		for (auto& [_, member] : classSymbol->data->exports) {
+			Node* decl = member->data->valueDeclaration;
 			if (decl != nullptr && decl->kind == Kind::MethodDeclaration) {
 				Node* body = decl->body();
 				if (body != nullptr) {
@@ -2966,11 +2966,11 @@ void findSuperConstructorAccesses(
 	Symbol* constructorSymbol =
 	    getClassConstructorSymbol(classDeclaration->symbol());
 	if (constructorSymbol == nullptr ||
-	    constructorSymbol->declarations.empty()) {
+	    constructorSymbol->data->declarations.empty()) {
 		return;
 	}
 
-	for (auto* decl : constructorSymbol->declarations) {
+	for (auto* decl : constructorSymbol->data->declarations) {
 		if (decl->kind == Kind::Constructor) {
 			Node* body = decl->body();
 			if (body != nullptr) {
@@ -3421,7 +3421,7 @@ void refState::getReferencesAtExportSpecifier(Node* referenceLocation,
 // refState.searchForImportedSymbol — findallreferences.go:2455.
 // Go to the symbol we imported from and find references for it.
 void refState::searchForImportedSymbol(Symbol* symbol) {
-	for (auto* declaration : symbol->declarations) {
+	for (auto* declaration : symbol->data->declarations) {
 		SourceFile* exportingFile = getSourceFileOfNode(declaration);
 		// Need to search in the file even if it's not in the search-file set,
 		// because it might export the symbol.
@@ -3514,13 +3514,13 @@ bool refState::hasMatchingMeaning(Node* referenceLocation) {
 void refState::getReferenceForShorthandProperty(Symbol* referenceSymbol,
                                               refSearch* search) {
 	if (referenceSymbol->flags & SymbolFlagsTransient ||
-	    referenceSymbol->valueDeclaration == nullptr) {
+	    referenceSymbol->data->valueDeclaration == nullptr) {
 		return;
 	}
 	Symbol* shorthandValueSymbol =
 	    checker->GetShorthandAssignmentValueSymbol(
-	        referenceSymbol->valueDeclaration);
-	Node* name = getNameOfDeclaration(referenceSymbol->valueDeclaration);
+	        referenceSymbol->data->valueDeclaration);
+	Node* name = getNameOfDeclaration(referenceSymbol->data->valueDeclaration);
 
 	// Because in short-hand property assignment, an identifier which stored as
 	// name of the short-hand property assignment has two meanings: property
@@ -3609,7 +3609,7 @@ Symbol* refState::getRelatedSymbol(refSearch* search,
 	    [&](Symbol* rootSymbol) {
 		    return !(!search->parents.empty() &&
 		             !some(search->parents, [&](Symbol* parent) {
-			             return explicitlyInheritsFrom(rootSymbol->parent,
+			             return explicitlyInheritsFrom(rootSymbol->data->parent,
 			                                           parent);
 		             }));
 	    },
@@ -3644,12 +3644,12 @@ void refState::forEachRelatedSymbol(
 			}
 			// Add symbol of properties/methods of the same name in base
 			// classes and implemented interfaces definitions
-			if (rootSymbol->parent != nullptr &&
-			    rootSymbol->parent->flags &
+			if (rootSymbol->data->parent != nullptr &&
+			    rootSymbol->data->parent->flags &
 			        (SymbolFlagsClass | SymbolFlagsInterface) &&
 			    allowBaseTypes(rootSymbol)) {
 				Symbol* r = getPropertySymbolsFromBaseTypes(
-				    rootSymbol->parent, rootSymbol->name, checker,
+				    rootSymbol->data->parent, rootSymbol->data->name, checker,
 				    [&](Symbol* base) {
 					    return cbSymbol(sym, rootSymbol, base);
 				    });
@@ -3755,12 +3755,12 @@ void refState::forEachRelatedSymbol(
 		return;
 	}
 
-	if (symbol->valueDeclaration != nullptr &&
-	    isParameterPropertyDeclaration(symbol->valueDeclaration,
-	                                   symbol->valueDeclaration->parent)) {
+	if (symbol->data->valueDeclaration != nullptr &&
+	    isParameterPropertyDeclaration(symbol->data->valueDeclaration,
+	                                   symbol->data->valueDeclaration->parent)) {
 		auto [paramProp1, paramProp2] =
 		    checker->GetSymbolsOfParameterPropertyDeclaration(
-		        symbol->valueDeclaration, symbol->name);
+		        symbol->data->valueDeclaration, symbol->data->name);
 		debug::assert(
 		    paramProp1->flags & SymbolFlagsFunctionScopedVariable &&
 		        paramProp2->flags & SymbolFlagsClassMember,
@@ -3864,11 +3864,11 @@ bool refState::explicitlyInheritsFrom(Symbol* symbol, Symbol* parent) {
 	// Set to false initially to prevent infinite recursion
 	inheritsFromCache[key] = false;
 
-	if (symbol->declarations.empty()) {
+	if (symbol->data->declarations.empty()) {
 		return false;
 	}
 
-	bool inherits = some(symbol->declarations, [&](Node* declaration) {
+	bool inherits = some(symbol->data->declarations, [&](Node* declaration) {
 		auto superTypeNodes = getAllSuperTypeNodes(declaration);
 		return some(superTypeNodes, [&](Node* typeReference) {
 			checker::Type* typ = checker->GetTypeAtLocation(
@@ -3910,9 +3910,9 @@ std::vector<SymbolAndEntries*> getReferencedSymbolsForSymbol(
 
 	Node* exportSpecifier = nullptr;
 	if (isForRenameWithPrefixAndSuffixText(options) &&
-	    !symbol->declarations.empty()) {
+	    !symbol->data->declarations.empty()) {
 		exportSpecifier =
-		    find(symbol->declarations,
+		    find(symbol->data->declarations,
 		         [](Node* d) { return isExportSpecifier(d); });
 	}
 	if (exportSpecifier != nullptr) {
@@ -3925,12 +3925,12 @@ std::vector<SymbolAndEntries*> getReferencedSymbolsForSymbol(
 		                        ImpExpKindUnknown /*comingFrom*/, "", {}),
 		    /*addReferencesHere*/ true, /*alwaysGetReferences*/ true);
 	} else if (node != nullptr && node->kind == Kind::DefaultKeyword &&
-	           symbol->name == InternalSymbolNameDefault &&
-	           symbol->parent != nullptr) {
+	           symbol->data->name == InternalSymbolNameDefault &&
+	           symbol->data->parent != nullptr) {
 		state->addReference(node, symbol, entryKindNode);
 		state->searchForImportsOfExport(
 		    node, symbol,
-		    new ExportInfo{symbol->parent, ExportKindDefault});
+		    new ExportInfo{symbol->data->parent, ExportKindDefault});
 	} else {
 		refSearch* search = state->createSearch(
 		    node, symbol, ImpExpKindUnknown /*comingFrom*/, "",

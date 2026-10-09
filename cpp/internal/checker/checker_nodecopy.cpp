@@ -661,9 +661,9 @@ NodeVisitor* getExistingNodeTreeVisitor(NodeBuilderImpl* b,
 		if (sym != nullptr) {
 			// If a parameter is resolvable in the current context it is also visible, so no need to go to symbol accesibility
 			if ((sym->flags & SymbolFlagsFunctionScopedVariable) != 0 &&
-				sym->valueDeclaration != nullptr) {
-				if (isPartOfParameterDeclaration(sym->valueDeclaration) ||
-					isJSDocParameterTag(sym->valueDeclaration)) {
+				sym->data->valueDeclaration != nullptr) {
+				if (isPartOfParameterDeclaration(sym->data->valueDeclaration) ||
+					isJSDocParameterTag(sym->data->valueDeclaration)) {
 					return {introducesError,
 					        env->attachSymbolToLeftmostIdentifier(leftmost, node,
 					                                         sym),

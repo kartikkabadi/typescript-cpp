@@ -144,7 +144,7 @@ std::vector<Signature*> constructSignaturesOf(const StructuredType* t) {
 
 // ast.GetClassLikeDeclarationOfSymbol — not yet ported in internal/ast.
 Node* getClassLikeDeclarationOfSymbol(Symbol* symbol) {
-	for (Node* d : symbol->declarations) {
+	for (Node* d : symbol->data->declarations) {
 		if (isClassLike(d)) {
 			return d;
 		}
@@ -412,8 +412,8 @@ bool isThislessTypeParameter(Node* node);
 // inferred from their initializers and function members with inferred return types are conservatively
 // assumed not to be free of "this" references.
 bool isThisless(Symbol* symbol) {
-	if (symbol->declarations.size() == 1) {
-		Node* declaration = symbol->declarations[0];
+	if (symbol->data->declarations.size() == 1) {
+		Node* declaration = symbol->data->declarations[0];
 		if (declaration != nullptr) {
 			switch (declaration->kind) {
 			case Kind::Parameter:
@@ -498,7 +498,7 @@ bool isPrototypeProperty(Symbol* symbol) {
 
 // Return true for a synthetic property with multiple declarations, at least one of which is private.
 bool isConflictingPrivateProperty(Symbol* prop) {
-	return prop->valueDeclaration == nullptr &&
+	return prop->data->valueDeclaration == nullptr &&
 		(prop->checkFlags & CheckFlagsContainsPrivate) != 0;
 }
 
@@ -526,9 +526,9 @@ std::vector<Symbol*> Checker::getPropertiesOfUnionOrIntersectionType(Type* t) {
 		std::vector<Symbol*> props;
 		for (Type* current : d->types) {
 			for (Symbol* prop : getPropertiesOfType(current)) {
-				if (!checked.count(prop->name)) {
-					checked.insert(prop->name);
-					Symbol* combinedProp = getPropertyOfUnionOrIntersectionType(t, prop->name,
+				if (!checked.count(prop->data->name)) {
+					checked.insert(prop->data->name);
+					Symbol* combinedProp = getPropertyOfUnionOrIntersectionType(t, prop->data->name,
 						(t->flags & TypeFlagsIntersection) != 0 /*skipObjectFunctionPropertyAugment*/);
 					if (combinedProp != nullptr) {
 						props.push_back(combinedProp);
@@ -823,8 +823,8 @@ std::vector<Type*> Checker::getBaseTypes(Type* t) {
 		} else {
 			TSC_UNREACHABLE("Unhandled case in getBaseTypes");
 		}
-		if (!popTypeResolution() && !t->symbol->declarations.empty()) {
-			for (Node* declaration : t->symbol->declarations) {
+		if (!popTypeResolution() && !t->symbol->data->declarations.empty()) {
+			for (Node* declaration : t->symbol->data->declarations) {
 				if (isClassDeclaration(declaration) || isInterfaceDeclaration(declaration)) {
 					reportCircularBaseType(declaration, t);
 				}
@@ -903,7 +903,7 @@ void Checker::resolveBaseTypesOfClass(Type* t) {
 		return;
 	}
 	if (t == reducedBaseType || hasBaseType(reducedBaseType, t)) {
-		error(t->symbol->valueDeclaration,
+		error(t->symbol->data->valueDeclaration,
 			Type_0_recursively_references_itself_as_a_base_type, TypeToString(t));
 		return;
 	}
@@ -1211,7 +1211,7 @@ Signature* Checker::instantiateSignatureInContextOf(Signature* signature,
 
 void Checker::resolveBaseTypesOfInterface(Type* t) {
 	InterfaceType* data = t->AsInterfaceType();
-	for (Node* declaration : t->symbol->declarations) {
+	for (Node* declaration : t->symbol->data->declarations) {
 		if (isInterfaceDeclaration(declaration)) {
 			for (Node* node : getExtendsHeritageClauseElements(declaration)) {
 				Type* baseType = getReducedType(getTypeFromTypeNode(node));
@@ -1297,9 +1297,9 @@ SymbolTable Checker::addInheritedMembers(SymbolTable symbols,
 	const std::vector<Symbol*>& baseSymbols) {
 	for (Symbol* base : baseSymbols) {
 		if (!isStaticPrivateIdentifierProperty(base)) {
-			auto it = symbols.find(base->name);
+			auto it = symbols.find(base->data->name);
 			if (it == symbols.end() || !(it->second->flags & SymbolFlagsValue)) {
-				symbols[base->name] = base;
+				symbols[base->data->name] = base;
 			}
 		}
 	}
@@ -1345,7 +1345,7 @@ std::vector<IndexInfo*> Checker::getIndexInfosOfIndexSymbol(Symbol* indexSymbol,
 	bool readonlyComputedNumberProperty = true;
 	bool readonlyComputedSymbolProperty = true;
 	std::vector<Symbol*> propertySymbols;
-	for (Node* declaration : indexSymbol->declarations) {
+	for (Node* declaration : indexSymbol->data->declarations) {
 		if (isIndexSignatureDeclaration(declaration)) {
 			std::vector<Node*> parameters = declaration->parameters();
 			Node* returnTypeNode = declaration->type();
@@ -1443,7 +1443,7 @@ IndexInfo* Checker::getObjectLiteralIndexInfo(bool isReadonly,
 			(keyType == esSymbolType && isSymbolWithSymbolName(prop))) {
 			propTypes.push_back(getTypeOfSymbol(prop));
 			if (isSymbolWithComputedName(prop)) {
-				components.push_back(prop->declarations[0]);
+				components.push_back(prop->data->declarations[0]);
 			}
 		}
 	}
@@ -1458,8 +1458,8 @@ bool Checker::isSymbolWithSymbolName(Symbol* symbol) {
 	if (IsKnownSymbol(symbol)) {
 		return true;
 	}
-	if (!symbol->declarations.empty()) {
-		Node* name = symbol->declarations[0]->name();
+	if (!symbol->data->declarations.empty()) {
+		Node* name = symbol->data->declarations[0]->name();
 		return name != nullptr && isComputedPropertyName(name) &&
 			isTypeAssignableToKind(checkComputedPropertyName(name), TypeFlagsESSymbol);
 	}
@@ -1467,19 +1467,19 @@ bool Checker::isSymbolWithSymbolName(Symbol* symbol) {
 }
 
 bool Checker::isSymbolWithNumericName(Symbol* symbol) {
-	if (isNumericLiteralName(symbol->name)) {
+	if (isNumericLiteralName(symbol->data->name)) {
 		return true;
 	}
-	if (!symbol->declarations.empty()) {
-		Node* name = symbol->declarations[0]->name();
+	if (!symbol->data->declarations.empty()) {
+		Node* name = symbol->data->declarations[0]->name();
 		return name != nullptr && isNumericName(name);
 	}
 	return false;
 }
 
 bool Checker::isSymbolWithComputedName(Symbol* symbol) {
-	if (!symbol->declarations.empty()) {
-		Node* name = symbol->declarations[0]->name();
+	if (!symbol->data->declarations.empty()) {
+		Node* name = symbol->data->declarations[0]->name();
 		return name != nullptr && isComputedPropertyName(name);
 	}
 	return false;
@@ -1516,8 +1516,8 @@ std::vector<Signature*> Checker::getSignaturesOfSymbol(Symbol* symbol) {
 		return {};
 	}
 	std::vector<Signature*> result;
-	for (size_t i = 0; i < symbol->declarations.size(); i++) {
-		Node* decl = symbol->declarations[i];
+	for (size_t i = 0; i < symbol->data->declarations.size(); i++) {
+		Node* decl = symbol->data->declarations[i];
 		if (!isFunctionLike(decl)) {
 			continue;
 		}
@@ -1525,7 +1525,7 @@ std::vector<Signature*> Checker::getSignaturesOfSymbol(Symbol* symbol) {
 		// an implementation node if it has a body and the previous node is of the same kind and immediately
 		// precedes the implementation node (i.e. has the same parent and ends where the implementation starts).
 		if (i > 0 && decl->body() != nullptr) {
-			Node* previous = symbol->declarations[i - 1];
+			Node* previous = symbol->data->declarations[i - 1];
 			if (decl->parent == previous->parent && decl->kind == previous->kind &&
 				(decl->pos() == previous->end() || (previous->flags & NodeFlagsReparsed))) {
 				continue;
@@ -1581,9 +1581,9 @@ void Checker::resolveAnonymousTypeMembers(Type* t) {
 		for (const auto& kv : members) {
 			Symbol* p = kv.second;
 			if (!(p->flags & SymbolFlagsBlockScoped) &&
-				!((p->flags & SymbolFlagsValueModule) && !p->declarations.empty() &&
-					everyList(p->declarations, [](Node* n) { return isAmbientModule(n); }))) {
-				varsOnly[p->name] = p;
+				!((p->flags & SymbolFlagsValueModule) && !p->data->declarations.empty() &&
+					everyList(p->data->declarations, [](Node* n) { return isAmbientModule(n); }))) {
+				varsOnly[p->data->name] = p;
 			}
 		}
 		members = varsOnly;
@@ -1632,7 +1632,7 @@ void Checker::resolveAnonymousTypeMembers(Type* t) {
 		Type* classType = getDeclaredTypeOfClassOrInterface(symbol);
 		std::vector<Signature*> constructSignatures =
 			getSignaturesOfSymbol(
-				getSymbolFromTable(symbol->members, InternalSymbolNameConstructor));
+				getSymbolFromTable(symbol->data->members, InternalSymbolNameConstructor));
 		if (constructSignatures.empty()) {
 			constructSignatures = getDefaultConstructSignatures(classType);
 		}
@@ -1649,7 +1649,7 @@ SymbolTable Checker::createInstantiatedSymbolTable(const std::vector<Symbol*>& s
 	SymbolTable result;
 	result.reserve(symbols.size());
 	for (Symbol* symbol : symbols) {
-		result[symbol->name] = instantiateSymbol(symbol, m);
+		result[symbol->data->name] = instantiateSymbol(symbol, m);
 	}
 	return result;
 }
@@ -1700,15 +1700,11 @@ Symbol* Checker::instantiateSymbol(Symbol* symbol, TypeMapper* m) {
 		symbol = links->target;
 		m = combineTypeMappers(links->mapper, m);
 	}
-	// Keep the flags from the symbol we're instantiating.  Mark that is instantiated, and
-	// also transient so that we can just store data on it directly.
-	Symbol* result = newSymbol(symbol->flags, symbol->name);
+	// Create a new transient symbol that shares the underlying data with the original symbol.
+	Symbol* result = newSharedDataSymbol(symbol);
 	result->checkFlags = CheckFlagsInstantiated |
 		(symbol->checkFlags & (CheckFlagsReadonly | CheckFlagsLate |
 			CheckFlagsOptionalParameter | CheckFlagsRestParameter));
-	result->declarations = symbol->declarations;
-	result->parent = symbol->parent;
-	result->valueDeclaration = symbol->valueDeclaration;
 	ValueSymbolLinks* resultLinks = valueSymbolLinks.Get(result);
 	resultLinks->target = symbol;
 	resultLinks->mapper = m;
@@ -1841,7 +1837,7 @@ void Checker::resolveMappedTypeMembers(Type* t) {
 					if (modifiersProp != nullptr) {
 						mappedLinks->syntheticOrigin = modifiersProp;
 						if (shouldLinkPropDeclarations) {
-							prop->declarations = modifiersProp->declarations;
+							prop->data->declarations = modifiersProp->data->declarations;
 						}
 					}
 					members[propName] = prop;
@@ -2007,13 +2003,13 @@ std::vector<Signature*> Checker::getArrayMemberCallSignatures(Type* t) {
 	bool first = true;
 	for (Type* u : t->types()) {
 		if (!(u->objectFlags & ObjectFlagsInstantiated) || u->symbol == nullptr ||
-			u->symbol->parent == nullptr || !isArrayOrTupleSymbol(u->symbol->parent)) {
+			u->symbol->data->parent == nullptr || !isArrayOrTupleSymbol(u->symbol->data->parent)) {
 			return {};
 		}
 		if (first) {
-			memberName = u->symbol->name;
+			memberName = u->symbol->data->name;
 			first = false;
-		} else if (memberName != u->symbol->name) {
+		} else if (memberName != u->symbol->data->name) {
 			return {};
 		}
 	}
@@ -2021,13 +2017,13 @@ std::vector<Signature*> Checker::getArrayMemberCallSignatures(Type* t) {
 	Type* arrayArg = mapType(t, [this](Type* u) {
 		return getMappedType(
 			interfaceTypeTypeParameters(
-				ifElse(isReadonlyArraySymbol(u->symbol->parent), globalReadonlyArrayType,
+				ifElse(isReadonlyArraySymbol(u->symbol->data->parent), globalReadonlyArrayType,
 					globalArrayType)
 					->AsInterfaceType())[0],
 			typeMapperOf(u));
 	});
 	Type* arrayType = createArrayTypeEx(arrayArg, someType(t, [this](Type* u) {
-		return isReadonlyArraySymbol(u->symbol->parent);
+		return isReadonlyArraySymbol(u->symbol->data->parent);
 	}));
 	return getSignaturesOfType(getTypeOfPropertyOfType(arrayType, memberName),
 		SignatureKind::Call);
@@ -2519,9 +2515,9 @@ Symbol* Checker::createUnionOrIntersectionProperty(Type* containingType,
 						// If we merged instantiations of a generic type, we replicate the symbol parent resetting behavior we used
 						// to do when we recorded multiple distinct symbols so that we still get, eg, `Array<T>.length` printed
 						// back and not `Array<string>.length` when we're looking at a `.length` access on a `string[] | number[]`
-						mergedInstantiations = singleProp->parent != nullptr &&
+						mergedInstantiations = singleProp->data->parent != nullptr &&
 							!getLocalTypeParametersOfClassOrInterfaceOrTypeAlias(
-								singleProp->parent)
+								singleProp->data->parent)
 								 .empty();
 					} else {
 						if (propSet.Size() == 0) {
@@ -2638,8 +2634,8 @@ Symbol* Checker::createUnionOrIntersectionProperty(Type* containingType,
 			singlePropMapper = links->mapper;
 		}
 		Symbol* clone = createSymbolWithType(singleProp, singlePropType);
-		if (singleProp->valueDeclaration != nullptr) {
-			clone->parent = singleProp->valueDeclaration->symbol()->parent;
+		if (singleProp->data->valueDeclaration != nullptr) {
+			clone->data->parent = singleProp->data->valueDeclaration->symbol()->data->parent;
 		}
 		ValueSymbolLinks* links = valueSymbolLinks.Get(clone);
 		links->containingType = containingType;
@@ -2660,12 +2656,12 @@ Symbol* Checker::createUnionOrIntersectionProperty(Type* containingType,
 	bool hasNonUniformValueDeclaration = false;
 	for (Symbol* prop : propSet.items) {
 		if (firstValueDeclaration == nullptr) {
-			firstValueDeclaration = prop->valueDeclaration;
-		} else if (prop->valueDeclaration != nullptr &&
-			prop->valueDeclaration != firstValueDeclaration) {
+			firstValueDeclaration = prop->data->valueDeclaration;
+		} else if (prop->data->valueDeclaration != nullptr &&
+			prop->data->valueDeclaration != firstValueDeclaration) {
 			hasNonUniformValueDeclaration = true;
 		}
-		for (Node* declaration : prop->declarations) {
+		for (Node* declaration : prop->data->declarations) {
 			appendIfUnique(declarations, declaration);
 		}
 		Type* t = getTypeOfSymbol(prop);
@@ -2695,11 +2691,11 @@ Symbol* Checker::createUnionOrIntersectionProperty(Type* containingType,
 	propTypes.insert(propTypes.end(), indexTypes.begin(), indexTypes.end());
 	Symbol* result = newSymbolEx(propFlags | optionalFlag, name,
 		checkFlags | syntheticFlag);
-	result->declarations = declarations;
+	result->data->declarations = declarations;
 	if (!hasNonUniformValueDeclaration && firstValueDeclaration != nullptr) {
-		result->valueDeclaration = firstValueDeclaration;
+		result->data->valueDeclaration = firstValueDeclaration;
 		// Inherit information about parent type.
-		result->parent = firstValueDeclaration->symbol()->parent;
+		result->data->parent = firstValueDeclaration->symbol()->data->parent;
 	}
 	ValueSymbolLinks* links = valueSymbolLinks.Get(result);
 	links->containingType = containingType;
@@ -2740,19 +2736,19 @@ Symbol* Checker::getTargetSymbol(Symbol* s) {
 bool Checker::hasCommonDeclaration(OrderedSet<Symbol*>* symbols) {
 	std::unordered_set<Node*> commonDeclarations;
 	for (Symbol* symbol : symbols->items) {
-		if (symbol->declarations.empty()) {
+		if (symbol->data->declarations.empty()) {
 			return false;
 		}
 		if (commonDeclarations.empty()) {
-			for (Node* d : symbol->declarations) {
+			for (Node* d : symbol->data->declarations) {
 				commonDeclarations.insert(d);
 			}
 			continue;
 		}
 		std::vector<Node*> keys(commonDeclarations.begin(), commonDeclarations.end());
 		for (Node* d : keys) {
-			if (std::find(symbol->declarations.begin(), symbol->declarations.end(),
-					d) == symbol->declarations.end()) {
+			if (std::find(symbol->data->declarations.begin(), symbol->data->declarations.end(),
+					d) == symbol->data->declarations.end()) {
 				commonDeclarations.erase(d);
 			}
 		}
@@ -2765,10 +2761,10 @@ bool Checker::hasCommonDeclaration(OrderedSet<Symbol*>* symbols) {
 
 Symbol* Checker::createSymbolWithType(Symbol* source, Type* t) {
 	Symbol* symbol =
-		newSymbolEx(source->flags, source->name, source->checkFlags & CheckFlagsReadonly);
-	symbol->declarations = source->declarations;
-	symbol->parent = source->parent;
-	symbol->valueDeclaration = source->valueDeclaration;
+		newSymbolEx(source->flags, source->data->name, source->checkFlags & CheckFlagsReadonly);
+	symbol->data->declarations = source->data->declarations;
+	symbol->data->parent = source->data->parent;
+	symbol->data->valueDeclaration = source->data->valueDeclaration;
 	ValueSymbolLinks* links = valueSymbolLinks.Get(symbol);
 	links->resolvedType = t;
 	links->target = source;
@@ -2914,7 +2910,7 @@ bool Checker::somePropertyReducesToNever(Type* t) {
 	orderedStringIntMap counts;
 	for (Type* u : t->types()) {
 		for (Symbol* prop : getPropertiesOfType(u)) {
-			counts.add(prop->name);
+			counts.add(prop->data->name);
 		}
 	}
 	// Check if any property appears in more than one constituent type and reduces to 'never'.
@@ -3015,7 +3011,7 @@ bool isLateBoundName(const std::string& name) {
 
 // utilities.go:1018 IsKnownSymbol
 bool IsKnownSymbol(Symbol* symbol) {
-	return isLateBoundName(symbol->name);
+	return isLateBoundName(symbol->data->name);
 }
 
 // utilities.go:867 isObjectLiteralType

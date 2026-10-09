@@ -383,8 +383,8 @@ Node* findExpandoFunction(checker::Checker* ch, Node* node) {
 	auto properties = ch->GetPropertiesOfType(targetType);
 	bool found = false;
 	for (auto* p : properties) {
-		if (p->valueDeclaration == expandoDeclaration ||
-		    p->valueDeclaration == expandoDeclaration->parent) {
+		if (p->data->valueDeclaration == expandoDeclaration ||
+		    p->data->valueDeclaration == expandoDeclaration->parent) {
 			found = true;
 			break;
 		}
@@ -394,11 +394,11 @@ Node* findExpandoFunction(checker::Checker* ch, Node* node) {
 	}
 
 	auto* symbol = targetType->symbol;
-	if (symbol == nullptr || symbol->valueDeclaration == nullptr) {
+	if (symbol == nullptr || symbol->data->valueDeclaration == nullptr) {
 		return nullptr;
 	}
 
-	auto* fn = symbol->valueDeclaration;
+	auto* fn = symbol->data->valueDeclaration;
 	if ((isFunctionExpression(fn) || isArrowFunction(fn)) &&
 	    isVariableDeclaration(fn->parent)) {
 		return fn->parent;
@@ -452,7 +452,7 @@ bool typeParamHasDefault(checker::Type* tp) {
 	if (sym == nullptr) {
 		return false;
 	}
-	for (auto* decl : sym->declarations) {
+	for (auto* decl : sym->data->declarations) {
 		if (isTypeParameterDeclaration(decl) &&
 		    decl->as<TypeParameterDeclaration>()->DefaultType != nullptr) {
 			return true;
@@ -678,12 +678,12 @@ isolatedDeclarationsFixer::createNamespaceForExpandoProperties(
 
 	std::vector<Node*> newProperties;
 	for (auto* symbol : elements) {
-		if (!isIdentifierText(symbol->name, LanguageVariant::Standard)) {
+		if (!isIdentifierText(symbol->data->name, LanguageVariant::Standard)) {
 			continue;
 		}
 		// skip symbols that already have a variable declaration
-		if (symbol->valueDeclaration != nullptr &&
-		    isVariableDeclaration(symbol->valueDeclaration)) {
+		if (symbol->data->valueDeclaration != nullptr &&
+		    isVariableDeclaration(symbol->data->valueDeclaration)) {
 			continue;
 		}
 
@@ -695,7 +695,7 @@ isolatedDeclarationsFixer::createNamespaceForExpandoProperties(
 		}
 
 		auto* varDecl = factory->newVariableDeclaration(
-		    factory->newIdentifier(symbol->name), nullptr, typeNode,
+		    factory->newIdentifier(symbol->data->name), nullptr, typeNode,
 		    nullptr);
 		auto* exportToken = factory->newToken(Kind::ExportKeyword);
 		auto* varDeclList = factory->newVariableDeclarationList(
@@ -1768,13 +1768,13 @@ std::string isolatedDeclarationsFixer::addTypeToVariableLike(Node* decl) {
 // symbol's module and adds the symbol name to the named imports —
 // codeactions_fixmissingtypeannotation.go:1380.
 void isolatedDeclarationsFixer::addSymbolToExistingImport(Symbol* sym) {
-	if (sym == nullptr || sym->parent == nullptr) {
+	if (sym == nullptr || sym->data->parent == nullptr) {
 		return;
 	}
 
 	// Find the module specifier for this symbol
-	auto* moduleSymbol = sym->parent;
-	auto& symbolName = sym->name;
+	auto* moduleSymbol = sym->data->parent;
+	auto& symbolName = sym->data->name;
 
 	// Walk the source file's import declarations to find the one importing
 	// from the same module

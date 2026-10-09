@@ -254,7 +254,7 @@ std::vector<::tsc::Node*> getDeclarationsFromLocation(checker::Checker* c,
 		Symbol* shorthandSymbol = c->GetResolvedSymbol(node);
 		std::vector<::tsc::Node*> declarations;
 		if (shorthandSymbol != nullptr) {
-			declarations = shorthandSymbol->declarations;
+			declarations = shorthandSymbol->data->declarations;
 		}
 		std::vector<::tsc::Node*> contextualDeclarations =
 			getDeclarationsFromObjectLiteralElement(c, node);
@@ -286,8 +286,8 @@ std::vector<::tsc::Node*> getDeclarationsFromLocation(checker::Checker* c,
 				for (auto* unionType : types) {
 					if (Symbol* prop = c->GetPropertyOfType(unionType, name);
 						prop != nullptr) {
-						result.insert(result.end(), prop->declarations.begin(),
-									  prop->declarations.end());
+						result.insert(result.end(), prop->data->declarations.begin(),
+									  prop->data->declarations.end());
 					}
 				}
 				return result;
@@ -301,7 +301,7 @@ std::vector<::tsc::Node*> getDeclarationsFromLocation(checker::Checker* c,
 			(symbol->flags & (SymbolFlagsFunction | SymbolFlagsVariable)) == 0 &&
 			node->kind == Kind::ConstructorKeyword) {
 			if (Symbol* constructor =
-					getSymbolFromTable(symbol->members, InternalSymbolNameConstructor);
+					getSymbolFromTable(symbol->data->members, InternalSymbolNameConstructor);
 				constructor != nullptr) {
 				symbol = constructor;
 			}
@@ -316,8 +316,8 @@ std::vector<::tsc::Node*> getDeclarationsFromLocation(checker::Checker* c,
 		if (!objectLiteralElementDeclarations.empty()) {
 			return objectLiteralElementDeclarations;
 		}
-		if (!symbol->declarations.empty()) {
-			return symbol->declarations;
+		if (!symbol->data->declarations.empty()) {
+			return symbol->data->declarations;
 		}
 	}
 	if (std::vector<::tsc::Node*> indexInfos = c->GetIndexSignaturesAtLocation(node);
@@ -347,10 +347,10 @@ std::vector<::tsc::Node*> getDeclarationsFromObjectLiteralElement(checker::Check
 		c->GetPropertySymbolsFromContextualType(element, contextualType,
 											  false /*unionSymbolOk*/);
 	if (someOf(properties, [&](Symbol* p) {
-			return p->valueDeclaration != nullptr &&
-				   isObjectLiteralExpression(p->valueDeclaration->parent) &&
-				   isObjectLiteralElement(p->valueDeclaration) &&
-				   p->valueDeclaration->name() == node;
+			return p->data->valueDeclaration != nullptr &&
+				   isObjectLiteralExpression(p->data->valueDeclaration->parent) &&
+				   isObjectLiteralElement(p->data->valueDeclaration) &&
+				   p->data->valueDeclaration->name() == node;
 		})) {
 		if (checker::Type* withoutNodeInferencesType = c->GetContextualType(
 				element->parent, checker::ContextFlagsIgnoreNodeInferences);
@@ -366,8 +366,8 @@ std::vector<::tsc::Node*> getDeclarationsFromObjectLiteralElement(checker::Check
 
 	std::vector<::tsc::Node*> result;
 	for (auto* prop : properties) {
-		result.insert(result.end(), prop->declarations.begin(),
-					  prop->declarations.end());
+		result.insert(result.end(), prop->data->declarations.begin(),
+					  prop->data->declarations.end());
 	}
 	return result;
 }
@@ -420,7 +420,7 @@ bool symbolMatchesSignature(Symbol* symbol, ::tsc::Node* calledDeclaration) {
 	}
 	Symbol* calledSymbol = calledDeclaration->symbol();
 	if (symbol == calledSymbol ||
-		(calledSymbol != nullptr && symbol == calledSymbol->parent)) {
+		(calledSymbol != nullptr && symbol == calledSymbol->data->parent)) {
 		return true;
 	}
 	::tsc::Node* parent = calledDeclaration->parent;
@@ -474,10 +474,10 @@ checker::Type* getTypeOfSymbolAtLocation(checker::Checker* c, Symbol* symbol,
 	// If the type is just a function's inferred type, go-to-type should go to the return type instead since
 	// go-to-definition takes you to the function anyway.
 	if (t->symbol == symbol ||
-		(t->symbol != nullptr && symbol->valueDeclaration != nullptr &&
-		 isVariableDeclaration(symbol->valueDeclaration) &&
-		 symbol->valueDeclaration->initializer() ==
-			 t->symbol->valueDeclaration)) {
+		(t->symbol != nullptr && symbol->data->valueDeclaration != nullptr &&
+		 isVariableDeclaration(symbol->data->valueDeclaration) &&
+		 symbol->data->valueDeclaration->initializer() ==
+			 t->symbol->data->valueDeclaration)) {
 		auto sigs = c->GetCallSignatures(t);
 		if (sigs.size() == 1) {
 			return c->GetReturnTypeOfSignature(sigs[0]);
@@ -491,7 +491,7 @@ std::vector<::tsc::Node*> getDeclarationsFromType(checker::Type* t) {
 	std::vector<::tsc::Node*> result;
 	for (auto* u : t->Distributed()) {
 		if (u->symbol != nullptr) {
-			for (auto* decl : u->symbol->declarations) {
+			for (auto* decl : u->symbol->data->declarations) {
 				appendIfUnique(result, decl);
 			}
 		}
@@ -558,7 +558,7 @@ lsp::lsproto::DefinitionResponse LanguageService::provideDefinitionAtPosition(
 	if (node->kind == Kind::OverrideKeyword) {
 		if (Symbol* sym = getSymbolForOverriddenMember(c, node); sym != nullptr) {
 			return createDefinitionLocations(originSelectionRange,
-											 clientSupportsLink, sym->declarations,
+											 clientSupportsLink, sym->data->declarations,
 											 nullptr /*reference*/,
 											 spanmap::FeatureDefinition);
 		}
@@ -686,7 +686,7 @@ lsp::lsproto::TypeDefinitionResponse LanguageService::provideTypeDefinitionAtPos
 			(symbol->flags & SymbolFlagsType) != 0) {
 			return createDefinitionLocations(originSelectionRange,
 											 clientSupportsLink,
-											 symbol->declarations,
+											 symbol->data->declarations,
 											 nullptr /*reference*/,
 											 spanmap::FeatureTypeDefinition);
 		}

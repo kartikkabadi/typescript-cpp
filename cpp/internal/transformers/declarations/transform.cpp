@@ -113,7 +113,7 @@ bool isCommonJSAliasExport(Node* node) {
 	if (isBinaryExpression(node) &&
 	    isIdentifier(node->as<BinaryExpression>()->Right)) {
 		if (Symbol* symbol = node->symbol();
-		    symbol != nullptr && symbol->declarations.size() == 1) {
+		    symbol != nullptr && symbol->data->declarations.size() == 1) {
 			return true;
 		}
 	}
@@ -677,8 +677,8 @@ DeclarationTransformer* NewDeclarationTransformer(
 			return;
 		}
 		for (Symbol* p : resolver->GetPropertiesOfContainerFunction(node)) {
-			if (isExpandoPropertyDeclaration(p->valueDeclaration)) {
-				Node* errorTarget = p->valueDeclaration;
+			if (isExpandoPropertyDeclaration(p->data->valueDeclaration)) {
+				Node* errorTarget = p->data->valueDeclaration;
 				if (isBinaryExpression(errorTarget)) {
 					errorTarget =
 						errorTarget->as<BinaryExpression>()->Left;
@@ -937,12 +937,12 @@ Node* DeclarationTransformerImpl::transformSourceFile(SourceFile* node) {
 	combinedStatements->loc = statements->loc; // setTextRange
 	if (isExternalOrCommonJSModule(node)) {
 		if (isInJSFile(node->asNode())) {
-			auto it = node->Symbol->exports.find(InternalSymbolNameExportEquals);
+			auto it = node->Symbol->data->exports.find(InternalSymbolNameExportEquals);
 			Symbol* exportEquals =
-				it != node->Symbol->exports.end() ? it->second : nullptr;
+				it != node->Symbol->data->exports.end() ? it->second : nullptr;
 			if (exportEquals != nullptr &&
-			    exportEquals->declarations.size() > 1) {
-				for (Node* decl : exportEquals->declarations) {
+			    exportEquals->data->declarations.size() > 1) {
+				for (Node* decl : exportEquals->data->declarations) {
 					state->addDiagnostic(createDiagnosticForNode(
 						decl,
 						Multiple_module_exports_assignments_cannot_be_serialized_for_declaration_emit));
@@ -1805,8 +1805,8 @@ Node* DeclarationTransformerImpl::transformConstructSignatureDeclaration(
 
 // transform.go:1096 omitPrivateMethodType
 Node* DeclarationTransformerImpl::omitPrivateMethodType(Node* input) {
-	if (input->symbol() != nullptr && !input->symbol()->declarations.empty() &&
-	    input->symbol()->declarations[0] != input) {
+	if (input->symbol() != nullptr && !input->symbol()->data->declarations.empty() &&
+	    input->symbol()->data->declarations[0] != input) {
 		return nullptr;
 	}
 	Node* result = nullptr;

@@ -233,7 +233,7 @@ bool isNamedEvaluationSource(Node* node) {
 
 // utilities.go:2994 — getClassLikeDeclarationOfSymbol
 Node* getClassLikeDeclarationOfSymbol(Symbol* symbol) {
-	return findIf(symbol->declarations, isClassLike);
+	return findIf(symbol->data->declarations, isClassLike);
 }
 
 // ---------------------------------------------------------------------------
@@ -284,19 +284,19 @@ ModifierFlags getDeclarationModifierFlagsFromSymbolEx(Symbol* s, bool isWrite) {
 		}
 		return accessModifier;
 	}
-	if (s->valueDeclaration != nullptr) {
+	if (s->data->valueDeclaration != nullptr) {
 		Node* declaration = nullptr;
 		if (isWrite) {
-			declaration = findIf(s->declarations, isSetAccessorDeclaration);
+			declaration = findIf(s->data->declarations, isSetAccessorDeclaration);
 		}
 		if (declaration == nullptr && (s->flags & SymbolFlagsGetAccessor) != 0) {
-			declaration = findIf(s->declarations, isGetAccessorDeclaration);
+			declaration = findIf(s->data->declarations, isGetAccessorDeclaration);
 		}
 		if (declaration == nullptr) {
-			declaration = s->valueDeclaration;
+			declaration = s->data->valueDeclaration;
 		}
 		ModifierFlags flags = getCombinedModifierFlags(declaration);
-		if (s->parent != nullptr && (s->parent->flags & SymbolFlagsClass) != 0) {
+		if (s->data->parent != nullptr && (s->data->parent->flags & SymbolFlagsClass) != 0) {
 			return flags;
 		}
 		return flags & ~ModifierFlagsAccessibilityModifier;
@@ -2663,7 +2663,7 @@ void Checker::addImplementationSuccessElaboration(CallState* s,
 	if (failed->declaration != nullptr &&
 		failed->declaration->symbol() != nullptr) {
 		const std::vector<Node*>& declarations =
-			failed->declaration->symbol()->declarations;
+			failed->declaration->symbol()->data->declarations;
 		if (declarations.size() > 1) {
 			Node* implementation = findIf(declarations, [](Node* d) {
 				return isFunctionLikeDeclaration(d) && d->body() != nullptr;
@@ -2853,7 +2853,7 @@ bool Checker::isPromiseResolveArityError(Node* node) {
 	if (symbol == nullptr) {
 		return false;
 	}
-	Node* decl = symbol->valueDeclaration;
+	Node* decl = symbol->data->valueDeclaration;
 	if (decl == nullptr || !isParameterDeclaration(decl) ||
 		!isFunctionExpressionOrArrowFunction(decl->parent) ||
 		!isNewExpression(decl->parent->parent) ||
@@ -3404,7 +3404,7 @@ void Checker::inferFromAnnotatedParametersAndReturn(
 	int length = static_cast<int>(sig->parameters.size()) -
 		ifElse(signatureHasRestParameter(sig), 1, 0);
 	for (int i = 0; i < length; i++) {
-		Node* declaration = sig->parameters[i]->valueDeclaration;
+		Node* declaration = sig->parameters[i]->data->valueDeclaration;
 		Node* typeNode = declaration->type();
 		if (typeNode != nullptr) {
 			Type* source = addOptionalityEx(

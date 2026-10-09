@@ -74,7 +74,7 @@ Symbol* NameResolver::resolve(Node* location, std::string_view name, SymbolFlags
 							useResult = lastLocation->kind == Kind::Parameter ||
 								(lastLocation->flags & NodeFlagsSynthesized) != 0 ||
 								(lastLocation == location->type() &&
-									findAncestor(result->valueDeclaration, isParameterDeclaration) != nullptr);
+									findAncestor(result->data->valueDeclaration, isParameterDeclaration) != nullptr);
 						}
 					}
 				} else if (location->kind == Kind::ConditionalType) {
@@ -104,7 +104,7 @@ Symbol* NameResolver::resolve(Node* location, std::string_view name, SymbolFlags
 			if (moduleSymbol == nullptr) {
 				break;
 			}
-			auto& moduleExports = moduleSymbol->exports;
+			auto& moduleExports = moduleSymbol->data->exports;
 			if (isSourceFile(location) || (isModuleDeclaration(location) &&
 				(location->flags & NodeFlagsAmbient) != 0 && !isGlobalScopeAugmentation(location))) {
 				// It's an external module. First see if the module has an export default and if the local
@@ -113,7 +113,7 @@ Symbol* NameResolver::resolve(Node* location, std::string_view name, SymbolFlags
 				result = it != moduleExports.end() ? it->second : nullptr;
 				if (result != nullptr) {
 					Symbol* localSymbol = getLocalSymbolForExportDefault(result);
-					if (localSymbol != nullptr && (result->flags & meaning) != 0 && localSymbol->name == name) {
+					if (localSymbol != nullptr && (result->flags & meaning) != 0 && localSymbol->data->name == name) {
 						done = true;
 						break;
 					}
@@ -147,18 +147,18 @@ Symbol* NameResolver::resolve(Node* location, std::string_view name, SymbolFlags
 			if (enumSymbol == nullptr) {
 				break;
 			}
-			result = lookupOrDefault(&enumSymbol->exports, name, meaning & SymbolFlagsEnumMember);
+			result = lookupOrDefault(&enumSymbol->data->exports, name, meaning & SymbolFlagsEnumMember);
 			if (result != nullptr) {
 				if (nameNotFoundMessage != nullptr && compilerOptions->GetIsolatedModules() &&
 					(location->flags & NodeFlagsAmbient) == 0 &&
-					getSourceFileOfNode(location) != getSourceFileOfNode(result->valueDeclaration)) {
+					getSourceFileOfNode(location) != getSourceFileOfNode(result->data->valueDeclaration)) {
 					std::string isolatedModulesLikeFlagName =
 						compilerOptions->VerbatimModuleSyntax == Tristate::True
 						? "verbatimModuleSyntax" : "isolatedModules";
 					reportError(originalLocation,
 						Cannot_access_0_from_another_file_without_qualification_when_1_is_enabled_Use_2_instead,
 						{std::string(name), isolatedModulesLikeFlagName,
-						 enumSymbol->name + "." + std::string(name)});
+						 enumSymbol->data->name + "." + std::string(name)});
 				}
 				done = true;
 				break;
@@ -181,7 +181,7 @@ Symbol* NameResolver::resolve(Node* location, std::string_view name, SymbolFlags
 		case Kind::InterfaceDeclaration: {
 			Symbol* declSymbol = getSymbolOfDeclarationOrDefault(location);
 			result = declSymbol != nullptr
-				? lookupOrDefault(&declSymbol->members, name, meaning & SymbolFlagsType)
+				? lookupOrDefault(&declSymbol->data->members, name, meaning & SymbolFlagsType)
 				: nullptr;
 			if (result != nullptr) {
 				if (!isTypeParameterSymbolDeclaredInContainer(result, location)) {
@@ -218,7 +218,7 @@ Symbol* NameResolver::resolve(Node* location, std::string_view name, SymbolFlags
 				if (isClassLike(container)) {
 					Symbol* declSymbol = getSymbolOfDeclarationOrDefault(container);
 					result = declSymbol != nullptr
-						? lookupOrDefault(&declSymbol->members, name, meaning & SymbolFlagsType)
+						? lookupOrDefault(&declSymbol->data->members, name, meaning & SymbolFlagsType)
 						: nullptr;
 					if (result != nullptr) {
 						if (nameNotFoundMessage != nullptr) {
@@ -237,7 +237,7 @@ Symbol* NameResolver::resolve(Node* location, std::string_view name, SymbolFlags
 			if (isClassLike(grandparent) || isInterfaceDeclaration(grandparent)) {
 				Symbol* declSymbol = getSymbolOfDeclarationOrDefault(grandparent);
 				result = declSymbol != nullptr
-					? lookupOrDefault(&declSymbol->members, name, meaning & SymbolFlagsType)
+					? lookupOrDefault(&declSymbol->data->members, name, meaning & SymbolFlagsType)
 					: nullptr;
 				if (result != nullptr) {
 					if (nameNotFoundMessage != nullptr) {
@@ -379,9 +379,9 @@ Symbol* NameResolver::resolve(Node* location, std::string_view name, SymbolFlags
 bool NameResolver::useOuterVariableScopeInParameter(Symbol* result, Node* location, Node* lastLocation) {
 	if (isParameterDeclaration(lastLocation)) {
 		Node* body = location->body();
-		if (body != nullptr && result->valueDeclaration != nullptr &&
-			result->valueDeclaration->pos() >= body->pos() &&
-			result->valueDeclaration->end() <= body->end()) {
+		if (body != nullptr && result->data->valueDeclaration != nullptr &&
+			result->data->valueDeclaration->pos() >= body->pos() &&
+			result->data->valueDeclaration->end() <= body->end()) {
 			// check for several cases where we introduce temporaries that require moving the
 			// name/initializer of the parameter to the body:
 			// - static field in a class expression
@@ -484,17 +484,17 @@ Symbol* NameResolver::getArgumentsSymbol() {
 	if (argumentsSymbol == nullptr) {
 		// Default implementation synthesizes a transient symbol for `arguments`
 		argumentsSymbol = new Symbol();
-		argumentsSymbol->name = "arguments";
+		argumentsSymbol->data->name = "arguments";
 		argumentsSymbol->flags = SymbolFlagsProperty | SymbolFlagsTransient;
 	}
 	return argumentsSymbol;
 }
 
 Symbol* getLocalSymbolForExportDefault(Symbol* symbol) {
-	if (!isExportDefaultSymbol(symbol) || symbol->declarations.empty()) {
+	if (!isExportDefaultSymbol(symbol) || symbol->data->declarations.empty()) {
 		return nullptr;
 	}
-	for (Node* decl : symbol->declarations) {
+	for (Node* decl : symbol->data->declarations) {
 		Symbol* localSymbol = decl->localSymbol();
 		if (localSymbol != nullptr) {
 			return localSymbol;
@@ -504,8 +504,8 @@ Symbol* getLocalSymbolForExportDefault(Symbol* symbol) {
 }
 
 bool isExportDefaultSymbol(Symbol* symbol) {
-	return symbol != nullptr && !symbol->declarations.empty() &&
-		hasSyntacticModifier(symbol->declarations[0], ModifierFlagsDefault);
+	return symbol != nullptr && !symbol->data->declarations.empty() &&
+		hasSyntacticModifier(symbol->data->declarations[0], ModifierFlagsDefault);
 }
 
 static bool getIsDeferredContext(Node* location, Node* lastLocation) {
@@ -530,7 +530,7 @@ static bool getIsDeferredContext(Node* location, Node* lastLocation) {
 }
 
 static bool isTypeParameterSymbolDeclaredInContainer(Symbol* symbol, Node* container) {
-	for (Node* decl : symbol->declarations) {
+	for (Node* decl : symbol->data->declarations) {
 		if (decl->kind == Kind::TypeParameter) {
 			Node* parent = decl->parent;
 			if (parent == container) {

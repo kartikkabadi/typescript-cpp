@@ -1486,6 +1486,7 @@ public:
 		return stamp != nullptr && activeCheckFile != nullptr && stamp != activeCheckFile;
 	}
 	Arena symbolArena;
+	Arena symbolWithDataArena; // symbolWithDataArena — checker.go:670 (SymbolWithData)
 	Arena signatureArena;
 	Arena indexInfoArena;
 	Arena linksArena; // arena backing symbolArenaLinkStore + link stores
@@ -1775,6 +1776,7 @@ public:
 
 	// Symbol creation
 	Symbol* newSymbol(SymbolFlags flags, const std::string& name);
+	Symbol* newSharedDataSymbol(Symbol* symbol);
 	Symbol* newSymbolEx(SymbolFlags flags, const std::string& name, CheckFlags checkFlags);
 	Symbol* newParameter(const std::string& name, Type* t);
 	Symbol* newProperty(const std::string& name, Type* t);

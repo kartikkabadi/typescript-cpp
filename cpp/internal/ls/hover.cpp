@@ -320,7 +320,7 @@ symbolDisplayInfo getQuickInfoAndDeclarationAtLocation(
 
 	auto writeModuleImportAttributes = [&](::tsc::Symbol* symbol) {
 		::tsc::Node* declaration = nullptr;
-		for (auto* d : symbol->declarations) {
+		for (auto* d : symbol->data->declarations) {
 			if (isModuleDeclaration(d) &&
 				d->as<ModuleDeclaration>()->Attributes != nullptr) {
 				declaration = d;
@@ -531,8 +531,8 @@ symbolDisplayInfo getQuickInfoAndDeclarationAtLocation(
 			}
 		}
 		if ((flags & SymbolFlagsProperty) != 0 &&
-			symbol->valueDeclaration != nullptr &&
-			isMethodDeclaration(symbol->valueDeclaration)) {
+			symbol->data->valueDeclaration != nullptr &&
+			isMethodDeclaration(symbol->data->valueDeclaration)) {
 			flags = SymbolFlagsMethod;
 		}
 		if ((flags &
@@ -549,7 +549,7 @@ symbolDisplayInfo getQuickInfoAndDeclarationAtLocation(
 					dpw->Write("accessor");
 					dpw->WritePunctuation(") ");
 				} else {
-					::tsc::Node* decl = symbol->valueDeclaration;
+					::tsc::Node* decl = symbol->data->valueDeclaration;
 					if (decl != nullptr) {
 						decl = getRootDeclaration(decl);
 						if (isParameterDeclaration(decl)) {
@@ -570,9 +570,9 @@ symbolDisplayInfo getQuickInfoAndDeclarationAtLocation(
 						}
 					}
 				}
-				if (symbol->name == InternalSymbolNameExportEquals &&
-					symbol->parent != nullptr &&
-					(symbol->parent->flags & SymbolFlagsModule) != 0) {
+				if (symbol->data->name == InternalSymbolNameExportEquals &&
+					symbol->data->parent != nullptr &&
+					(symbol->data->parent->flags & SymbolFlagsModule) != 0) {
 					dpw->Write("exports");
 				} else {
 					writeSymbolClassified(symbol, container,
@@ -626,11 +626,11 @@ symbolDisplayInfo getQuickInfoAndDeclarationAtLocation(
 				}
 			}
 			setDeclaration(
-				symbol->valueDeclaration != nullptr
-					? symbol->valueDeclaration
-					: (symbol->declarations.empty()
+				symbol->data->valueDeclaration != nullptr
+					? symbol->data->valueDeclaration
+					: (symbol->data->declarations.empty()
 						   ? nullptr
-						   : symbol->declarations[0]));
+						   : symbol->data->declarations[0]));
 		}
 		if ((flags & SymbolFlagsEnumMember) != 0) {
 			writeNewLine();
@@ -644,7 +644,7 @@ symbolDisplayInfo getQuickInfoAndDeclarationAtLocation(
 				dpw->WriteLiteral(
 					checker::ValueToString(t->AsLiteralType()->value));
 			}
-			setDeclaration(symbol->valueDeclaration);
+			setDeclaration(symbol->data->valueDeclaration);
 		}
 		if ((flags & (SymbolFlagsFunction | SymbolFlagsMethod)) != 0) {
 			bool isMethod = (flags & SymbolFlagsMethod) != 0;
@@ -653,9 +653,9 @@ symbolDisplayInfo getQuickInfoAndDeclarationAtLocation(
 				(isFunctionLikeDeclaration(node->parent) ||
 				 isMethodSignatureDeclaration(node->parent)) &&
 				node->parent->name() == node &&
-				std::find(symbol->declarations.begin(),
-						  symbol->declarations.end(),
-						  node->parent) != symbol->declarations.end()) {
+				std::find(symbol->data->declarations.begin(),
+						  symbol->data->declarations.end(),
+						  node->parent) != symbol->data->declarations.end()) {
 				setDeclaration(node->parent);
 				std::vector<checker::Signature*> signatures{
 					c->GetSignatureFromDeclaration(node->parent)};
@@ -674,7 +674,7 @@ symbolDisplayInfo getQuickInfoAndDeclarationAtLocation(
 				}
 				writeSignatures(signatures, prefix, isMethod, symbol);
 			}
-			setDeclaration(symbol->valueDeclaration);
+			setDeclaration(symbol->data->valueDeclaration);
 		}
 		if ((flags & (SymbolFlagsClass | SymbolFlagsInterface)) != 0) {
 			if (node->kind == Kind::ThisKeyword ||
@@ -720,7 +720,7 @@ symbolDisplayInfo getQuickInfoAndDeclarationAtLocation(
 						if (!tryExpandSymbol(symbol, flags)) {
 							if (classExpression == nullptr) {
 								bool hasAbstract = false;
-								for (auto* d : symbol->declarations) {
+								for (auto* d : symbol->data->declarations) {
 									if (isClassDeclaration(d) &&
 										hasAbstractModifier(d)) {
 										hasAbstract = true;
@@ -757,10 +757,10 @@ symbolDisplayInfo getQuickInfoAndDeclarationAtLocation(
 				}
 			}
 			if ((flags & SymbolFlagsClass) != 0) {
-				setDeclaration(symbol->valueDeclaration);
+				setDeclaration(symbol->data->valueDeclaration);
 			} else {
 				::tsc::Node* found = nullptr;
-				for (auto* d : symbol->declarations) {
+				for (auto* d : symbol->data->declarations) {
 					if (isInterfaceDeclaration(d)) {
 						found = d;
 						break;
@@ -773,7 +773,7 @@ symbolDisplayInfo getQuickInfoAndDeclarationAtLocation(
 			writeNewLine();
 			if (!tryExpandSymbol(symbol, flags)) {
 				bool isConstEnum = false;
-				for (auto* d : symbol->declarations) {
+				for (auto* d : symbol->data->declarations) {
 					if (isEnumDeclaration(d) && isEnumConst(d)) {
 						isConstEnum = true;
 						break;
@@ -787,7 +787,7 @@ symbolDisplayInfo getQuickInfoAndDeclarationAtLocation(
 									  SymbolFlagsNone, symbolFormatFlags);
 			}
 			::tsc::Node* found = nullptr;
-			for (auto* d : symbol->declarations) {
+			for (auto* d : symbol->data->declarations) {
 				if (isEnumDeclaration(d)) {
 					found = d;
 					break;
@@ -799,16 +799,16 @@ symbolDisplayInfo getQuickInfoAndDeclarationAtLocation(
 			writeNewLine();
 			if (!tryExpandSymbol(symbol, flags)) {
 				bool isModule =
-					symbol->valueDeclaration != nullptr &&
-					(isSourceFile(symbol->valueDeclaration) ||
-					 isAmbientModule(symbol->valueDeclaration));
+					symbol->data->valueDeclaration != nullptr &&
+					(isSourceFile(symbol->data->valueDeclaration) ||
+					 isAmbientModule(symbol->data->valueDeclaration));
 				dpw->WriteKeyword(isModule ? "module " : "namespace ");
 				writeSymbolClassified(symbol, container,
 									  SymbolFlagsNone, symbolFormatFlags);
 				writeModuleImportAttributes(symbol);
 			}
 			::tsc::Node* found = nullptr;
-			for (auto* d : symbol->declarations) {
+			for (auto* d : symbol->data->declarations) {
 				if (isModuleDeclaration(d)) {
 					found = d;
 					break;
@@ -838,14 +838,14 @@ symbolDisplayInfo getQuickInfoAndDeclarationAtLocation(
 				writeTypeClassified(cons, container, typeFormatFlags);
 			}
 			// Show context: "in ClassName<T>" or "in funcName<T>(...)"
-			if (symbol->parent != nullptr) {
+			if (symbol->data->parent != nullptr) {
 				// Class/Interface type parameter
 				dpw->WriteKeyword(" in ");
-				writeSymbolClassified(symbol->parent, container,
+				writeSymbolClassified(symbol->data->parent, container,
 									  SymbolFlagsNone,
 									  symbolFormatFlags);
 				if (checker::Type* parentType =
-						c->GetDeclaredTypeOfSymbol(symbol->parent);
+						c->GetDeclaredTypeOfSymbol(symbol->data->parent);
 					parentType->AsInterfaceType() != nullptr) {
 					auto parentParams =
 						checker::interfaceTypeLocalTypeParameters(
@@ -897,7 +897,7 @@ symbolDisplayInfo getQuickInfoAndDeclarationAtLocation(
 				}
 			}
 			::tsc::Node* found = nullptr;
-			for (auto* d : symbol->declarations) {
+			for (auto* d : symbol->data->declarations) {
 				if (isTypeParameterDeclaration(d)) {
 					found = d;
 					break;
@@ -923,7 +923,7 @@ symbolDisplayInfo getQuickInfoAndDeclarationAtLocation(
 								typeFormatFlags |
 									checker::TypeFormatFlagsInTypeAlias);
 			::tsc::Node* found = nullptr;
-			for (auto* d : symbol->declarations) {
+			for (auto* d : symbol->data->declarations) {
 				if (isTypeOrJSTypeAliasDeclaration(d)) {
 					found = d;
 					break;
@@ -1384,17 +1384,17 @@ std::string documentationFromAlias(
 	}
 
 	std::vector<::tsc::Symbol*> candidates{aliasedSymbol};
-	if (aliasedSymbol->exportSymbol != nullptr) {
-		candidates.push_back(aliasedSymbol->exportSymbol);
+	if (aliasedSymbol->data->exportSymbol != nullptr) {
+		candidates.push_back(aliasedSymbol->data->exportSymbol);
 	}
 
 	for (auto* candidate : candidates) {
 		::tsc::Node* aliasedDeclaration =
-			candidate->valueDeclaration != nullptr
-				? candidate->valueDeclaration
-				: (candidate->declarations.empty()
+			candidate->data->valueDeclaration != nullptr
+				? candidate->data->valueDeclaration
+				: (candidate->data->declarations.empty()
 					   ? nullptr
-					   : candidate->declarations[0]);
+					   : candidate->data->declarations[0]);
 		if (aliasedDeclaration == nullptr) {
 			continue;
 		}
@@ -1429,10 +1429,10 @@ std::string documentationFromRootSymbols(
 		if (rootSymbol == nullptr) {
 			continue;
 		}
-		std::vector<::tsc::Node*> declarations = rootSymbol->declarations;
+		std::vector<::tsc::Node*> declarations = rootSymbol->data->declarations;
 		if (declarations.empty() &&
-			rootSymbol->valueDeclaration != nullptr) {
-			declarations = {rootSymbol->valueDeclaration};
+			rootSymbol->data->valueDeclaration != nullptr) {
+			declarations = {rootSymbol->data->valueDeclaration};
 		}
 		for (auto* declaration : declarations) {
 			if (std::string documentation =

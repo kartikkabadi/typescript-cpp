@@ -591,7 +591,7 @@ LanguageService::createSignatureHelpItems(
 	// render the signature with no prefix (as we already do when there is no
 	// call target symbol) rather than leaking the internal name.
 	if (callTargetSymbol != nullptr &&
-	    !callTargetSymbol->name.starts_with(kInternalSymbolNamePrefix)) {
+	    !callTargetSymbol->data->name.starts_with(kInternalSymbolNamePrefix)) {
 		if (useFullPrefix) {
 			callTargetDisplayParts += c->SymbolToStringEx(
 			    callTargetSymbol, sourceFile->asNode(), SymbolFlagsNone,
@@ -1068,10 +1068,10 @@ signatureHelpParameter LanguageService::createSignatureHelpParameterFromLabel(
 	    (parameter->checkFlags & CheckFlagsOptionalParameter) != 0;
 	bool isRest = (parameter->checkFlags & CheckFlagsRestParameter) != 0;
 	std::shared_ptr<lsproto::StringOrMarkupContent> documentation;
-	if (parameter->valueDeclaration != nullptr) {
+	if (parameter->data->valueDeclaration != nullptr) {
 		std::string doc = getDocumentationFromDeclaration(
 		    documentationLocationMapper(spanmap::FeatureSignatureHelp), c,
-		    nullptr, parameter->valueDeclaration, nullptr, docFormat,
+		    nullptr, parameter->data->valueDeclaration, nullptr, docFormat,
 		    true /*commentOnly*/);
 		if (!doc.empty()) {
 			documentation = std::make_shared<lsproto::StringOrMarkupContent>();
@@ -1809,8 +1809,8 @@ argumentListInfo* tryGetParameterInfo(Node* startingToken,
 
 // === chooseBetterSymbol — signaturehelp.go:1302 ===
 Symbol* chooseBetterSymbol(Symbol* s) {
-	if (s->name == InternalSymbolNameType) {
-		for (auto* d : s->declarations) {
+	if (s->data->name == InternalSymbolNameType) {
+		for (auto* d : s->data->declarations) {
 			if (isFunctionTypeNode(d) && canHaveSymbol(d->parent)) {
 				return d->parent->symbol();
 			}

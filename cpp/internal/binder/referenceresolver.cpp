@@ -93,7 +93,7 @@ Symbol* referenceResolver::getParentOfSymbol(Symbol* symbol) {
 		if (hooks.GetParentOfSymbol) {
 			return hooks.GetParentOfSymbol(symbol);
 		}
-		return symbol->parent;
+		return symbol->data->parent;
 	}
 	return nullptr;
 }
@@ -172,7 +172,7 @@ bool referenceResolver::isTypeOnlyAliasDeclaration(Symbol* symbol) {
 
 // referenceResolver::getDeclarationOfAliasSymbol — referenceresolver.go:134
 Node* referenceResolver::getDeclarationOfAliasSymbol(Symbol* symbol) {
-	return findLast(symbol->declarations, isAliasSymbolDeclaration);
+	return findLast(symbol->data->declarations, isAliasSymbolDeclaration);
 }
 
 // referenceResolver::getExportSymbolOfValueSymbolIfExported — referenceresolver.go:138
@@ -181,8 +181,8 @@ Symbol* referenceResolver::getExportSymbolOfValueSymbolIfExported(Symbol* symbol
 		if (hooks.GetExportSymbolOfValueSymbolIfExported) {
 			return hooks.GetExportSymbolOfValueSymbolIfExported(symbol);
 		}
-		if ((symbol->flags & SymbolFlagsExportValue) != 0 && symbol->exportSymbol != nullptr) {
-			symbol = symbol->exportSymbol;
+		if ((symbol->flags & SymbolFlagsExportValue) != 0 && symbol->data->exportSymbol != nullptr) {
+			symbol = symbol->data->exportSymbol;
 		}
 		return getMergedSymbol(symbol);
 	}
@@ -203,7 +203,7 @@ Node* referenceResolver::GetReferencedExportContainer(Node* node, bool prefixLoc
 			// If we reference an exported entity within the same module declaration, then whether
 			// we prefix depends on the kind of entity. SymbolFlags.ExportHasLocal encompasses all the
 			// kinds that we do NOT prefix.
-			Symbol* exportSymbol = getMergedSymbol(symbol->exportSymbol);
+			Symbol* exportSymbol = getMergedSymbol(symbol->data->exportSymbol);
 			if (!prefixLocals && (exportSymbol->flags & SymbolFlagsExportHasLocal) != 0 &&
 				(exportSymbol->flags & SymbolFlagsVariable) == 0) {
 				return nullptr;
@@ -213,9 +213,9 @@ Node* referenceResolver::GetReferencedExportContainer(Node* node, bool prefixLoc
 		Symbol* parentSymbol = getParentOfSymbol(symbol);
 		if (parentSymbol != nullptr) {
 			if ((parentSymbol->flags & SymbolFlagsValueModule) != 0 &&
-				parentSymbol->valueDeclaration != nullptr &&
-				parentSymbol->valueDeclaration->kind == Kind::SourceFile) {
-				SourceFile* symbolFile = parentSymbol->valueDeclaration->as<SourceFile>();
+				parentSymbol->data->valueDeclaration != nullptr &&
+				parentSymbol->data->valueDeclaration->kind == Kind::SourceFile) {
+				SourceFile* symbolFile = parentSymbol->data->valueDeclaration->as<SourceFile>();
 				SourceFile* referenceFile = getSourceFileOfNode(node);
 				// If `node` accesses an export and that export isn't in the same file, then symbol is a namespace export, so return nil.
 				bool symbolIsUmdExport = symbolFile != referenceFile;
@@ -251,7 +251,7 @@ Node* referenceResolver::GetReferencedImportDeclaration(Node* node) {
 // referenceResolver::GetReferencedValueDeclaration — referenceresolver.go:202
 Node* referenceResolver::GetReferencedValueDeclaration(Node* node) {
 	if (Symbol* symbol = getReferencedValueSymbol(node, false /*startInDeclarationContainer*/); symbol != nullptr) {
-		return getExportSymbolOfValueSymbolIfExported(symbol)->valueDeclaration;
+		return getExportSymbolOfValueSymbolIfExported(symbol)->data->valueDeclaration;
 	}
 	return nullptr;
 }
@@ -261,7 +261,7 @@ std::vector<Node*> referenceResolver::GetReferencedValueDeclarations(Node* node)
 	std::vector<Node*> declarations;
 	if (Symbol* symbol = getReferencedValueSymbol(node, false /*startInDeclarationContainer*/); symbol != nullptr) {
 		symbol = getExportSymbolOfValueSymbolIfExported(symbol);
-		for (Node* declaration : symbol->declarations) {
+		for (Node* declaration : symbol->data->declarations) {
 			switch (declaration->kind) {
 			case Kind::VariableDeclaration:
 			case Kind::Parameter:
@@ -311,7 +311,7 @@ Node* referenceResolver::GetReferencedMemberValueDeclaration(Node* node) {
 	if (s == nullptr) {
 		return nullptr;
 	}
-	return getExportSymbolOfValueSymbolIfExported(s)->valueDeclaration;
+	return getExportSymbolOfValueSymbolIfExported(s)->data->valueDeclaration;
 }
 
 }  // anonymous namespace

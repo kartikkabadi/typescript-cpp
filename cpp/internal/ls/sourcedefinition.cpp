@@ -424,7 +424,7 @@ std::pair<std::vector<::tsc::Node*>, std::string> getSourceDefCheckerInfo(
 			if (Symbol* prop = c->GetPropertyOfType(c->GetTypeAtLocation(left),
 												  node->text());
 				prop != nullptr) {
-				declarations = prop->declarations;
+				declarations = prop->data->declarations;
 			}
 		}
 	}
@@ -455,7 +455,7 @@ std::pair<std::vector<::tsc::Node*>, std::string> getSourceDefCheckerInfo(
 		}
 	}
 	if (Symbol* sym = c->GetSymbolAtLocation(resolveNode); sym != nullptr) {
-		for (auto* d : sym->declarations) {
+		for (auto* d : sym->data->declarations) {
 			if (!isImportSpecifier(d) && !isImportClause(d) &&
 				!isNamespaceImport(d) &&
 				!isImportEqualsDeclaration(d)) {

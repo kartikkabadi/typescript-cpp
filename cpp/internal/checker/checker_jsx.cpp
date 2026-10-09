@@ -369,7 +369,7 @@ Type* Checker::discriminateContextualTypeByJSXAttributes(Node* node, Type* conte
 		}
 		Node* initializer = p->initializer();
 		if ((initializer == nullptr || isPossiblyDiscriminantValue(initializer)) &&
-			isDiscriminantProperty(contextualType, symbol->name)) {
+			isDiscriminantProperty(contextualType, symbol->data->name)) {
 			discriminantProperties.push_back(p);
 		}
 	}
@@ -379,12 +379,12 @@ Type* Checker::discriminateContextualTypeByJSXAttributes(Node* node, Type* conte
 			continue;
 		}
 		Node* element = node->parent->parent;
-		if (s->name == jsxChildrenPropertyName && isJsxElement(element) &&
+		if (s->data->name == jsxChildrenPropertyName && isJsxElement(element) &&
 			!getSemanticJsxChildren(element->children()->nodes).empty()) {
 			continue;
 		}
-		if (node->symbol()->members.find(s->name) == node->symbol()->members.end() &&
-			isDiscriminantProperty(contextualType, s->name)) {
+		if (node->symbol()->data->members.find(s->data->name) == node->symbol()->data->members.end() &&
+			isDiscriminantProperty(contextualType, s->data->name)) {
 			discriminantMembers.push_back(s);
 		}
 	}
@@ -719,7 +719,7 @@ Type* Checker::getJSXFragmentType(Node* node) {
 		links->jsxFragmentType = errorType;
 		return links->jsxFragmentType;
 	}
-	if (jsxFactorySymbol->name == ReactNames.Fragment) {
+	if (jsxFactorySymbol->data->name == ReactNames.Fragment) {
 		links->jsxFragmentType = getTypeOfSymbol(jsxFactorySymbol);
 		return links->jsxFragmentType;
 	}
@@ -896,8 +896,8 @@ bool Checker::checkApplicableSignatureForJsxCallLikeElement(Node* node,
 				{entityNameToString(tagName), std::to_string(absoluteMinArgCount),
 					entityNameToString(factory), std::to_string(maxParamCount)});
 			Symbol* tagNameSymbol = getSymbolAtLocation(tagName, false);
-			if (tagNameSymbol != nullptr && tagNameSymbol->valueDeclaration != nullptr) {
-				diag->AddRelatedInfo(NewDiagnosticForNode(tagNameSymbol->valueDeclaration,
+			if (tagNameSymbol != nullptr && tagNameSymbol->data->valueDeclaration != nullptr) {
+				diag->AddRelatedInfo(NewDiagnosticForNode(tagNameSymbol->data->valueDeclaration,
 					X_0_is_declared_here, {entityNameToString(tagName)}));
 			}
 			reportDiagnostic(diag, diagnosticOutput);
@@ -975,18 +975,18 @@ Type* Checker::createJsxAttributesTypeFromAttributesProperty(
 				Type* exprType = checkJsxAttribute(attributeDecl, checkMode);
 				objectFlags |= exprType->objectFlags & ObjectFlagsPropagatingFlags;
 				Symbol* attributeSymbol =
-					newSymbol(SymbolFlagsProperty | member->flags, member->name);
-				attributeSymbol->declarations = member->declarations;
-				attributeSymbol->parent = member->parent;
-				if (member->valueDeclaration != nullptr) {
-					attributeSymbol->valueDeclaration = member->valueDeclaration;
+					newSymbol(SymbolFlagsProperty | member->flags, member->data->name);
+				attributeSymbol->data->declarations = member->data->declarations;
+				attributeSymbol->data->parent = member->data->parent;
+				if (member->data->valueDeclaration != nullptr) {
+					attributeSymbol->data->valueDeclaration = member->data->valueDeclaration;
 				}
 				ValueSymbolLinks* links = valueSymbolLinks.Get(attributeSymbol);
 				links->resolvedType = exprType;
 				links->target = member;
-				attributesTable[attributeSymbol->name] = attributeSymbol;
+				attributesTable[attributeSymbol->data->name] = attributeSymbol;
 				if (allAttributesTable.has_value()) {
-					(*allAttributesTable)[attributeSymbol->name] = attributeSymbol;
+					(*allAttributesTable)[attributeSymbol->data->name] = attributeSymbol;
 				}
 				if (attributeDecl->name()->text() == jsxChildrenPropertyName) {
 					explicitlySpecifyChildrenAttribute = true;
@@ -1099,11 +1099,11 @@ Type* Checker::createJsxAttributesTypeFromAttributesProperty(
 				links->resolvedType = createArrayType(getUnionType(childTypes));
 			}
 			// Fake up a property declaration for the children
-			childrenPropSymbol->valueDeclaration = factory.newPropertySignatureDeclaration(
+			childrenPropSymbol->data->valueDeclaration = factory.newPropertySignatureDeclaration(
 				nullptr, factory.newIdentifier(jsxChildrenPropertyName),
 				nullptr /*postfixToken*/, nullptr /*type*/, nullptr /*initializer*/);
-			childrenPropSymbol->valueDeclaration->parent = attributeParent;
-			childrenPropSymbol->valueDeclaration->as<PropertySignatureDeclaration>()
+			childrenPropSymbol->data->valueDeclaration->parent = attributeParent;
+			childrenPropSymbol->data->valueDeclaration->as<PropertySignatureDeclaration>()
 				->Symbol = childrenPropSymbol;
 			SymbolTable childPropMap;
 			childPropMap[jsxChildrenPropertyName] = childrenPropSymbol;
@@ -1348,7 +1348,7 @@ Type* Checker::instantiateAliasOrInterfaceWithDefaults(Symbol* managedSym,
 // jsx.go:1050
 Symbol* Checker::getJsxLibraryManagedAttributes(Symbol* jsxNamespace) {
 	if (jsxNamespace != nullptr) {
-		return getSymbol(jsxNamespace->exports, JsxNames.LibraryManagedAttributes,
+		return getSymbol(jsxNamespace->data->exports, JsxNames.LibraryManagedAttributes,
 			SymbolFlagsType);
 	}
 	return nullptr;
@@ -1358,7 +1358,7 @@ Symbol* Checker::getJsxLibraryManagedAttributes(Symbol* jsxNamespace) {
 Symbol* Checker::getJsxElementTypeSymbol(Symbol* jsxNamespace) {
 	// JSX.ElementType [symbol]
 	if (jsxNamespace != nullptr) {
-		return getSymbol(jsxNamespace->exports, JsxNames.ElementType, SymbolFlagsType);
+		return getSymbol(jsxNamespace->data->exports, JsxNames.ElementType, SymbolFlagsType);
 	}
 	return nullptr;
 }
@@ -1399,7 +1399,7 @@ std::string Checker::getNameFromJsxElementAttributesContainer(
 	const std::string& nameOfAttribPropContainer, Symbol* jsxNamespace) {
 	// JSX.ElementAttributesProperty | JSX.ElementChildrenAttribute [symbol]
 	if (jsxNamespace != nullptr) {
-		Symbol* jsxElementAttribPropInterfaceSym = getSymbol(jsxNamespace->exports,
+		Symbol* jsxElementAttribPropInterfaceSym = getSymbol(jsxNamespace->data->exports,
 			nameOfAttribPropContainer, SymbolFlagsType);
 		if (jsxElementAttribPropInterfaceSym != nullptr) {
 			Type* jsxElementAttribPropInterfaceType =
@@ -1411,12 +1411,12 @@ std::string Checker::getNameFromJsxElementAttributesContainer(
 				return "";
 			}
 			if (propertiesOfJsxElementAttribPropInterface.size() == 1) {
-				return propertiesOfJsxElementAttribPropInterface[0]->name;
+				return propertiesOfJsxElementAttribPropInterface[0]->data->name;
 			}
 			if (propertiesOfJsxElementAttribPropInterface.size() > 1 &&
-				!jsxElementAttribPropInterfaceSym->declarations.empty()) {
+				!jsxElementAttribPropInterfaceSym->data->declarations.empty()) {
 				// More than one property on ElementAttributesProperty is an error
-				error(jsxElementAttribPropInterfaceSym->declarations[0],
+				error(jsxElementAttribPropInterfaceSym->data->declarations[0],
 					The_global_type_JSX_0_may_not_have_more_than_one_property,
 					{nameOfAttribPropContainer});
 			}

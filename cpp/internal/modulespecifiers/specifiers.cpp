@@ -301,7 +301,7 @@ GetModuleSpecifiersForFileWithInfo(
 // specifiers.go:112 — tryGetModuleNameFromAmbientModule
 ambientModuleInfo tryGetModuleNameFromAmbientModule(Symbol* moduleSymbol,
                                                     checker::Checker* checker) {
-	for (auto* decl : moduleSymbol->declarations) {
+	for (auto* decl : moduleSymbol->data->declarations) {
 		if (isModuleWithStringLiteralName(decl) &&
 		    (!isModuleAugmentationExternal(decl) ||
 		     !tspath::isExternalModuleNameRelative(decl->name()->text()))) {
@@ -321,7 +321,7 @@ ambientModuleInfo tryGetModuleNameFromAmbientModule(Symbol* moduleSymbol,
 	 */
 	// `import {c} from "m";` is valid, in which case, `moduleSymbol` is "ns",
 	// but the module name should be "m"
-	for (auto* d : moduleSymbol->declarations) {
+	for (auto* d : moduleSymbol->data->declarations) {
 		if (!isModuleDeclaration(d)) {
 			continue;
 		}
@@ -335,14 +335,14 @@ ambientModuleInfo tryGetModuleNameFromAmbientModule(Symbol* moduleSymbol,
 		}
 
 		auto* sym = [&]() -> Symbol* {
-			auto& exports = possibleContainer->symbol()->exports;
+			auto& exports = possibleContainer->symbol()->data->exports;
 			auto it = exports.find(InternalSymbolNameExportEquals);
 			return it != exports.end() ? it->second : nullptr;
 		}();
 		if (sym == nullptr) {
 			continue;
 		}
-		auto* exportAssignmentDecl = sym->valueDeclaration;
+		auto* exportAssignmentDecl = sym->data->valueDeclaration;
 		if (exportAssignmentDecl == nullptr ||
 		    exportAssignmentDecl->kind != Kind::ExportAssignment) {
 			continue;

@@ -1149,20 +1149,20 @@ SourceFile* getSourceFileOfSymbol(Symbol* symbol) {
 	if (symbol->flags & SymbolFlagsTransient) {
 		return nullptr;
 	}
-	if (symbol->declarations.empty()) {
+	if (symbol->data->declarations.empty()) {
 		// A class's implicit prototype has no declaration of its own.
 		TSC_ASSERT(symbol->flags & SymbolFlagsPrototype,
 		           "File-bound symbol has no declarations");
-		TSC_ASSERT(symbol->parent != nullptr &&
-		               (symbol->parent->flags & SymbolFlagsClass),
+		TSC_ASSERT(symbol->data->parent != nullptr &&
+		               (symbol->data->parent->flags & SymbolFlagsClass),
 		           "Prototype has no declaring class");
-		symbol = symbol->parent;
+		symbol = symbol->data->parent;
 		TSC_ASSERT(!(symbol->flags & SymbolFlagsTransient),
 		           "Prototype parent is not file-bound");
-		TSC_ASSERT(!symbol->declarations.empty(),
+		TSC_ASSERT(!symbol->data->declarations.empty(),
 		           "Prototype parent has no declarations");
 	}
-	SourceFile* file = getSourceFileOfNode(symbol->declarations[0]);
+	SourceFile* file = getSourceFileOfNode(symbol->data->declarations[0]);
 	TSC_ASSERT(file != nullptr, "File-bound declaration has no source file");
 	return file;
 }
@@ -2100,7 +2100,16 @@ bool isGlobalScopeAugmentation(Node* node) {
 
 // symbol.go:23 — IsExternalModule
 bool Symbol::isExternalModule() const {
-	return (flags & SymbolFlagsModule) != 0 && isAmbientModuleSymbolName(name);
+	return (flags & SymbolFlagsModule) != 0 &&
+	       isAmbientModuleSymbolName(data->name);
+}
+
+bool Symbol::isStatic() const {
+	if (data->valueDeclaration == nullptr) {
+		return false;
+	}
+	ModifierFlags modifierFlags = data->valueDeclaration->modifierFlags();
+	return (modifierFlags & ModifierFlagsStatic) != 0;
 }
 
 bool isExternalModule(SourceFile* file) {

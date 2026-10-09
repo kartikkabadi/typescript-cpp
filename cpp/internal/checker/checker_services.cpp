@@ -539,9 +539,9 @@ Symbol* Checker::getApplicableIndexSymbol(Type* t, Type* keyType) {
 				Symbol* symbol = newSymbol(SymbolFlagsProperty,
 				                           InternalSymbolNameIndex);
 				symbol->checkFlags |= CheckFlagsIndexSymbol;
-				symbol->declarations = declarations;
-				symbol->valueDeclaration = declarations[0];
-				symbol->parent = t->symbol;
+				symbol->data->declarations = declarations;
+				symbol->data->valueDeclaration = declarations[0];
+				symbol->data->parent = t->symbol;
 				auto* links = valueSymbolLinks.Get(symbol);
 				links->resolvedType = info->valueType;
 				info->indexSymbol = symbol;
@@ -675,7 +675,7 @@ bool Checker::containsArgumentsReference(Node* node) {
 		}
 		switch (node->kind) {
 		case Kind::Identifier:
-			return node->text() == argumentsSymbol->name &&
+			return node->text() == argumentsSymbol->data->name &&
 				IsArgumentsSymbol(getResolvedSymbol(node));
 		case Kind::PropertyDeclaration:
 		case Kind::MethodDeclaration:

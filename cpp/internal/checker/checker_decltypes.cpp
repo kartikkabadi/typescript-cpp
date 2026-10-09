@@ -253,7 +253,7 @@ FlowNode* getFlowNodeOfNode(Node* node) {
 
 // getClassLikeDeclarationOfSymbol — ast.GetClassLikeDeclarationOfSymbol
 Node* getClassLikeDeclarationOfSymbol(Symbol* symbol) {
-	return findOrNull(symbol->declarations, isClassLike);
+	return findOrNull(symbol->data->declarations, isClassLike);
 }
 
 
@@ -292,19 +292,19 @@ ModifierFlags getDeclarationModifierFlagsFromSymbolEx(Symbol* s, bool isWrite) {
 		}
 		return accessModifier;
 	}
-	if (s->valueDeclaration != nullptr) {
+	if (s->data->valueDeclaration != nullptr) {
 		Node* declaration = nullptr;
 		if (isWrite) {
-			declaration = findOrNull(s->declarations, isSetAccessorDeclaration);
+			declaration = findOrNull(s->data->declarations, isSetAccessorDeclaration);
 		}
 		if (declaration == nullptr && (s->flags & SymbolFlagsGetAccessor)) {
-			declaration = findOrNull(s->declarations, isGetAccessorDeclaration);
+			declaration = findOrNull(s->data->declarations, isGetAccessorDeclaration);
 		}
 		if (declaration == nullptr) {
-			declaration = s->valueDeclaration;
+			declaration = s->data->valueDeclaration;
 		}
 		ModifierFlags flags = getCombinedModifierFlags(declaration);
-		if (s->parent != nullptr && (s->parent->flags & SymbolFlagsClass)) {
+		if (s->data->parent != nullptr && (s->data->parent->flags & SymbolFlagsClass)) {
 			return flags;
 		}
 		return flags & ~ModifierFlagsAccessibilityModifier;
@@ -624,7 +624,7 @@ bool isUnconstrainedTypeParameter(Type* tp) {
 	if (target->symbol == nullptr) {
 		return false;
 	}
-	for (Node* d : target->symbol->declarations) {
+	for (Node* d : target->symbol->data->declarations) {
 		if (isTypeParameterDeclaration(d) &&
 			(d->as<TypeParameterDeclaration>()->Constraint != nullptr ||
 			 isMappedTypeNode(d->parent) || isInferTypeNode(d->parent))) {
@@ -825,7 +825,7 @@ Type* Checker::getTypeOfVariableOrParameterOrProperty(Symbol* symbol) {
 
 // isParameterOfContextSensitiveSignature — checker.go:16883
 bool Checker::isParameterOfContextSensitiveSignature(Symbol* symbol) {
-	Node* decl = symbol->valueDeclaration;
+	Node* decl = symbol->data->valueDeclaration;
 	if (decl == nullptr) {
 		return false;
 	}
@@ -849,7 +849,7 @@ Type* Checker::getTypeOfVariableOrParameterOrPropertyWorker(Symbol* symbol) {
 		return anyType;
 	}
 	TSC_ASSERT(symbol->valueDeclaration != nullptr, "symbol->valueDeclaration != nullptr");
-	Node* declaration = symbol->valueDeclaration;
+	Node* declaration = symbol->data->valueDeclaration;
 	if (isSourceFile(declaration) && isJsonSourceFile(declaration->as<SourceFile>())) {
 		auto statements = declaration->statements();
 		if (statements.empty()) {
@@ -862,11 +862,11 @@ Type* Checker::getTypeOfVariableOrParameterOrPropertyWorker(Symbol* symbol) {
 		return reportCircularityError(symbol);
 	}
 	if (symbol->flags & SymbolFlagsModuleExports) {
-		if (symbol->name == "exports") {
+		if (symbol->data->name == "exports") {
 			return getTypeOfSymbol(
-				resolveExternalModuleSymbol(symbol->valueDeclaration->symbol(), false /*dontResolveAlias*/));
+				resolveExternalModuleSymbol(symbol->data->valueDeclaration->symbol(), false /*dontResolveAlias*/));
 		}
-		return newAnonymousType(symbol, symbol->members, {}, {}, {});
+		return newAnonymousType(symbol, symbol->data->members, {}, {}, {});
 	}
 	Type* result;
 	switch (declaration->kind) {
@@ -1033,7 +1033,7 @@ Type* Checker::getTypeForVariableLikeDeclaration(Node* declaration, bool include
 		}
 		// Use contextual parameter type if one is available
 		Type* t;
-		if (declaration->symbol()->name == InternalSymbolNameThis) {
+		if (declaration->symbol()->data->name == InternalSymbolNameThis) {
 			t = getContextualThisParameterType(fn);
 		} else {
 			t = getContextuallyTypedParameterType(declaration);
@@ -1154,14 +1154,14 @@ Type* Checker::padObjectLiteralType(Type* t, Node* pattern) {
 	}
 	SymbolTable members;
 	for (Symbol* prop : getPropertiesOfObjectType(t)) {
-		members[prop->name] = prop;
+		members[prop->data->name] = prop;
 	}
 	for (Node* e : missingElements) {
 		Symbol* symbol = newSymbol(SymbolFlagsProperty | SymbolFlagsOptional,
 								   getPropertyNameFromBindingElement(e));
 		valueSymbolLinks.Get(symbol)->resolvedType =
 			getTypeFromBindingElement(e, false /*includePatternInType*/, true /*reportErrors*/);
-		members[symbol->name] = symbol;
+		members[symbol->data->name] = symbol;
 	}
 	Type* result = newAnonymousType(t->symbol, members, {}, {}, getIndexInfosOfType(t));
 	result->objectFlags = t->objectFlags;
@@ -1247,9 +1247,9 @@ Type* Checker::getTypeOfFuncClassEnumModule(Symbol* symbol) {
 Type* Checker::getTypeOfFuncClassEnumModuleWorker(Symbol* symbol) {
 	if ((symbol->flags & SymbolFlagsModule) && isShorthandAmbientModuleSymbol(symbol)) {
 		return anyType;
-	} else if ((symbol->flags & SymbolFlagsValueModule) && symbol->valueDeclaration != nullptr &&
-			   isSourceFile(symbol->valueDeclaration) &&
-			   symbol->valueDeclaration->as<SourceFile>()->CommonJSModuleIndicator != nullptr) {
+	} else if ((symbol->flags & SymbolFlagsValueModule) && symbol->data->valueDeclaration != nullptr &&
+			   isSourceFile(symbol->data->valueDeclaration) &&
+			   symbol->data->valueDeclaration->as<SourceFile>()->CommonJSModuleIndicator != nullptr) {
 		Symbol* resolvedModule = resolveExternalModuleSymbol(symbol, false /*dontResolveAlias*/);
 		if (resolvedModule != symbol) {
 			return getTypeOfSymbol(resolvedModule);
@@ -1312,7 +1312,7 @@ Type* Checker::getBaseConstructorTypeOfClass(Type* t) {
 		resolveStructuredTypeMembers(baseConstructorType);
 	}
 	if (!popTypeResolution()) {
-		error(t->symbol->valueDeclaration,
+		error(t->symbol->data->valueDeclaration,
 			  X_0_is_referenced_directly_or_indirectly_in_its_own_base_expression,
 			  {symbolToString(t->symbol)});
 		if (data->resolvedBaseConstructorType == nullptr) {
@@ -1335,9 +1335,9 @@ Type* Checker::getBaseConstructorTypeOfClass(Type* t) {
 					ctorReturn = getReturnTypeOfSignature(ctorSigs[0]);
 				}
 			}
-			if (!baseConstructorType->symbol->declarations.empty()) {
+			if (!baseConstructorType->symbol->data->declarations.empty()) {
 				err->AddRelatedInfo(createDiagnosticForNode(
-					baseConstructorType->symbol->declarations[0],
+					baseConstructorType->symbol->data->declarations[0],
 					Did_you_mean_for_0_to_be_constrained_to_type_new_args_Colon_any_1,
 					{symbolToString(baseConstructorType->symbol), TypeToString(ctorReturn)}));
 			}
@@ -1396,7 +1396,7 @@ bool Checker::isMixinConstructorType(Type* t) {
 
 // getTypeOfParameter — checker.go:17362
 Type* Checker::getTypeOfParameter(Symbol* symbol) {
-	Node* declaration = symbol->valueDeclaration;
+	Node* declaration = symbol->data->valueDeclaration;
 	return addOptionalityEx(
 		getTypeOfSymbol(symbol), false,
 		declaration != nullptr &&
@@ -1481,8 +1481,8 @@ Type* Checker::getConstraintOrUnknownFromTypeParameter(Type* t) {
 // getInferredTypeParameterConstraint — checker.go:17434
 Type* Checker::getInferredTypeParameterConstraint(Type* t, bool omitTypeReferences) {
 	std::vector<Type*> inferences;
-	if (t->symbol != nullptr && !t->symbol->declarations.empty()) {
-		for (Node* declaration : t->symbol->declarations) {
+	if (t->symbol != nullptr && !t->symbol->data->declarations.empty()) {
+		for (Node* declaration : t->symbol->data->declarations) {
 			if (isInferTypeNode(declaration->parent)) {
 				// When an 'infer T' declaration is immediately contained in a type reference node
 				// (such as 'Foo<infer T>'), T's constraint is inferred from the constraint of the
@@ -1931,7 +1931,7 @@ Type* Checker::getRestType(Type* source, const std::vector<Node*>& properties, S
 	}
 	SymbolTable members;
 	for (Symbol* prop : spreadableProperties) {
-		members[prop->name] = getSpreadSymbol(prop, false /*readonly*/);
+		members[prop->data->name] = getSpreadSymbol(prop, false /*readonly*/);
 	}
 	Type* result = newAnonymousType(symbol, members, {}, {}, getIndexInfosOfType(source));
 	result->objectFlags |= ObjectFlagsObjectRestType;
@@ -2054,7 +2054,7 @@ Type* Checker::getTypeFromObjectBindingPattern(Node* pattern, bool includePatter
 		Symbol* symbol = newSymbol(flags, text);
 		valueSymbolLinks.Get(symbol)->resolvedType =
 			getTypeFromBindingElement(e, includePatternInType, reportErrors);
-		members[symbol->name] = symbol;
+		members[symbol->data->name] = symbol;
 	}
 	std::vector<IndexInfo*> indexInfos;
 	if (stringIndexInfo != nullptr) {
@@ -2216,8 +2216,8 @@ Type* Checker::getWidenedTypeForAssignmentDeclaration(Symbol* symbol) {
 	}
 	if (t == nullptr) {
 		std::vector<Type*> types;
-		for (size_t i = 0; i < symbol->declarations.size(); i++) {
-			Node* declaration = symbol->declarations[i];
+		for (size_t i = 0; i < symbol->data->declarations.size(); i++) {
+			Node* declaration = symbol->data->declarations[i];
 			if (isBinaryExpression(declaration) && declaration->type() != nullptr) {
 				t = getTypeFromTypeNode(declaration->type());
 				break;
@@ -2227,7 +2227,7 @@ Type* Checker::getWidenedTypeForAssignmentDeclaration(Symbol* symbol) {
 				// We ignore initial assignments of undefined to CommonJS exports when there are
 				// multiple assignment declarations
 				if (getAssignmentDeclarationKind(declaration) != JSDeclarationKind::ExportsProperty ||
-					i != 0 || symbol->declarations.size() == 1 ||
+					i != 0 || symbol->data->declarations.size() == 1 ||
 					(assignedType->flags & TypeFlagsUndefined) == 0) {
 					appendIfUnique(types, assignedType);
 				}
@@ -2247,9 +2247,9 @@ Type* Checker::getWidenedTypeForAssignmentDeclaration(Symbol* symbol) {
 	}
 	t = getWidenedType(t);
 	// report an all-nullable or empty union as an implicit any in JS files
-	if (symbol->valueDeclaration != nullptr && isInJSFile(symbol->valueDeclaration) &&
+	if (symbol->data->valueDeclaration != nullptr && isInJSFile(symbol->data->valueDeclaration) &&
 		filterType(t, [](Type* t) { return (t->flags & ~TypeFlagsNullable) != 0; }) == neverType) {
-		reportImplicitAny(symbol->valueDeclaration, anyType, WideningKind::Normal);
+		reportImplicitAny(symbol->data->valueDeclaration, anyType, WideningKind::Normal);
 		return anyType;
 	}
 	return t;
@@ -2295,13 +2295,13 @@ Type* Checker::getAssignmentDeclarationInitializerType(Node* node) {
 //	f.a = [];
 // hasParentWithTypeAnnotation — checker.go:18483
 bool Checker::hasParentWithTypeAnnotation(Symbol* symbol) {
-	if (symbol->parent != nullptr && symbol->parent->valueDeclaration != nullptr &&
-		isFunctionExpressionOrArrowFunction(symbol->parent->valueDeclaration)) {
+	if (symbol->data->parent != nullptr && symbol->data->parent->data->valueDeclaration != nullptr &&
+		isFunctionExpressionOrArrowFunction(symbol->data->parent->data->valueDeclaration)) {
 		if (Symbol* possiblyAnnotatedSymbol =
-				getSymbolOfNode(symbol->parent->valueDeclaration->parent);
+				getSymbolOfNode(symbol->data->parent->data->valueDeclaration->parent);
 			possiblyAnnotatedSymbol != nullptr &&
-			possiblyAnnotatedSymbol->valueDeclaration != nullptr) {
-			return possiblyAnnotatedSymbol->valueDeclaration->type() != nullptr;
+			possiblyAnnotatedSymbol->data->valueDeclaration != nullptr) {
+			return possiblyAnnotatedSymbol->data->valueDeclaration->type() != nullptr;
 		}
 	}
 	return false;
@@ -2347,8 +2347,8 @@ Type* Checker::getTypeFromPropertyDescriptor(Node* node) {
 // isConstructorDeclaredThisProperty — checker.go:18527
 std::pair<thisAssignmentDeclarationKind, Node*>
 Checker::isConstructorDeclaredThisProperty(Symbol* symbol) {
-	if (symbol->valueDeclaration == nullptr ||
-		!isBinaryExpression(symbol->valueDeclaration)) {
+	if (symbol->data->valueDeclaration == nullptr ||
+		!isBinaryExpression(symbol->data->valueDeclaration)) {
 		return {thisAssignmentDeclarationNone, nullptr};
 	}
 	if (auto it = thisExpandoKinds.find(symbol); it != thisExpandoKinds.end()) {
@@ -2361,7 +2361,7 @@ Checker::isConstructorDeclaredThisProperty(Symbol* symbol) {
 	}
 	bool allThis = true;
 	Node* typeAnnotation = nullptr;
-	for (Node* declaration : symbol->declarations) {
+	for (Node* declaration : symbol->data->declarations) {
 		if (!isBinaryExpression(declaration)) {
 			allThis = false;
 			break;
@@ -2634,12 +2634,12 @@ Type* Checker::getWidenedTypeOfObjectLiteral(Type* t, WideningContext* context) 
 	}
 	SymbolTable members;
 	for (Symbol* prop : getPropertiesOfObjectType(t)) {
-		members[prop->name] = getWidenedProperty(prop, context);
+		members[prop->data->name] = getWidenedProperty(prop, context);
 	}
 	if (context != nullptr) {
 		for (Symbol* prop : getPropertiesOfContext(context)) {
-			if (members.find(prop->name) == members.end()) {
-				members[prop->name] = getUndefinedProperty(prop);
+			if (members.find(prop->data->name) == members.end()) {
+				members[prop->data->name] = getUndefinedProperty(prop);
 			}
 		}
 	}
@@ -2673,7 +2673,7 @@ Symbol* Checker::getWidenedProperty(Symbol* prop, WideningContext* context) {
 	Type* original = getTypeOfSymbol(prop);
 	WideningContext* propContext = nullptr;
 	if (context != nullptr) {
-		propContext = context->getChildContext(prop->name);
+		propContext = context->getChildContext(prop->data->name);
 	}
 	Type* widened = getWidenedTypeWithContext(original, propContext);
 	if (widened == original) {
@@ -2715,7 +2715,7 @@ std::vector<Symbol*> Checker::getPropertiesOfContext(WideningContext* context) {
 			if (isObjectLiteralType(t) &&
 				(t->objectFlags & ObjectFlagsContainsSpread) == 0) {
 				for (Symbol* prop : getPropertiesOfType(t)) {
-					if (seen.insert(prop->name).second) {
+					if (seen.insert(prop->data->name).second) {
 						names.push_back(prop);
 					}
 				}
@@ -2746,13 +2746,13 @@ std::vector<Type*> Checker::getSiblingsOfContext(WideningContext* context) {
 
 // getUndefinedProperty — checker.go:18833
 Symbol* Checker::getUndefinedProperty(Symbol* prop) {
-	if (auto it = undefinedProperties.find(prop->name);
+	if (auto it = undefinedProperties.find(prop->data->name);
 		it != undefinedProperties.end() && it->second != nullptr) {
 		return it->second;
 	}
 	Symbol* result = createSymbolWithType(prop, undefinedOrMissingType);
 	result->flags |= SymbolFlagsOptional;
-	undefinedProperties[prop->name] = result;
+	undefinedProperties[prop->data->name] = result;
 	return result;
 }
 
@@ -2782,7 +2782,7 @@ Type* Checker::getTypeOfAccessors(Symbol* symbol) {
 		}
 		Node* getter = getDeclarationOfKind(symbol, Kind::GetAccessor);
 		Node* setter = getDeclarationOfKind(symbol, Kind::SetAccessor);
-		Node* accessor = findOrNull(symbol->declarations, isAutoAccessorPropertyDeclaration);
+		Node* accessor = findOrNull(symbol->data->declarations, isAutoAccessorPropertyDeclaration);
 		// We try to resolve a getter type annotation, a setter type annotation, or a getter
 		// function body return type inference, in that order.
 		Type* t = getAnnotatedAccessorType(getter);

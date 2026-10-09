@@ -525,7 +525,7 @@ bool Checker::checkInheritedPropertiesAreIdentical(Type* t, Node* typeNode) {
 		const std::string& id = entry.first;
 		Symbol* p = entry.second;
 		if (isNamedMember(p, id)) {
-			seen[p->name] = InheritanceInfo{p, t};
+			seen[p->data->name] = InheritanceInfo{p, t};
 		}
 	}
 	bool identical = true;
@@ -533,9 +533,9 @@ bool Checker::checkInheritedPropertiesAreIdentical(Type* t, Node* typeNode) {
 		std::vector<Symbol*> properties =
 			getPropertiesOfType(getTypeWithThisArgument(base, t->AsInterfaceType()->thisType, false));
 		for (Symbol* prop : properties) {
-			auto it = seen.find(prop->name);
+			auto it = seen.find(prop->data->name);
 			if (it == seen.end()) {
-				seen[prop->name] = InheritanceInfo{prop, base};
+				seen[prop->data->name] = InheritanceInfo{prop, base};
 			} else {
 				InheritanceInfo& existing = it->second;
 				bool isInheritedProperty = existing.containingType != t;
@@ -585,19 +585,19 @@ void Checker::checkEnumDeclaration(Node* node) {
 		!links->enumChecked || staleForCheckFile(links->enumCheckedFor)) {
 		links->enumChecked = true;
 		links->enumCheckedFor = checkFileTag();
-		if (enumSymbol->declarations.size() > 1) {
+		if (enumSymbol->data->declarations.size() > 1) {
 			Node* firstEnumDeclaration =
 			    getDeclarationOfKind(enumSymbol, Kind::EnumDeclaration);
 			bool enumIsConst = isEnumConst(firstEnumDeclaration);
 			// check that const is placed\omitted on all enum declarations
-			for (Node* decl : enumSymbol->declarations) {
+			for (Node* decl : enumSymbol->data->declarations) {
 				if (isEnumDeclaration(decl) && isEnumConst(decl) != enumIsConst) {
 					error(getNameOfDeclaration(decl), Enum_declarations_must_all_be_const_or_non_const);
 				}
 			}
 		}
 		bool seenEnumMissingInitialInitializer = false;
-		for (Node* declaration : enumSymbol->declarations) {
+		for (Node* declaration : enumSymbol->data->declarations) {
 			// return true if we hit a violation of the rule, false otherwise
 			if (declaration->kind != Kind::EnumDeclaration) {
 				continue;
@@ -681,7 +681,7 @@ void Checker::checkModuleDeclaration(Node* node) {
 			// so for now we will just not allow them in scripts, which is the only place they can merge cross-file.
 			error(node->name(), Namespaces_are_not_allowed_in_global_script_files_when_0_is_enabled_If_this_file_is_not_intended_to_be_a_global_script_set_moduleDetection_to_force_or_add_an_empty_export_statement, getIsolatedModulesLikeFlagName());
 		}
-		if (symbol->declarations.size() > 1) {
+		if (symbol->data->declarations.size() > 1) {
 			Node* firstNonAmbientClassOrFunc = getFirstNonAmbientClassOrFunctionDeclaration(symbol);
 			if (firstNonAmbientClassOrFunc != nullptr) {
 				if (getSourceFileOfNode(node) != getSourceFileOfNode(firstNonAmbientClassOrFunc)) {
@@ -753,7 +753,7 @@ void Checker::checkImportAttributesType(Node* attributes) {
 // checker.go:5357 — getFirstNonAmbientClassOrFunctionDeclaration
 namespace {
 Node* getFirstNonAmbientClassOrFunctionDeclaration(Symbol* symbol) {
-	for (Node* declaration : symbol->declarations) {
+	for (Node* declaration : symbol->data->declarations) {
 		if ((isClassDeclaration(declaration) ||
 			 (isFunctionDeclaration(declaration) && nodeIsPresent(declaration->body()))) &&
 			(declaration->flags & NodeFlagsAmbient) == 0) {
@@ -1006,7 +1006,7 @@ Type* Checker::checkImportAttributesExpression(Node* node) {
 			Symbol* member = newSymbol(SymbolFlagsProperty, attribute->name()->text());
 			valueSymbolLinks.Get(member)->resolvedType =
 				getRegularTypeOfLiteralType(checkExpressionCached(attribute->as<ImportAttribute>()->Value));
-			members[member->name] = member;
+			members[member->data->name] = member;
 		}
 		Type* t = newAnonymousType(symbol, std::move(members), {}, {}, {});
 		t->objectFlags |= ObjectFlagsObjectLiteral | ObjectFlagsNonInferrableType;
@@ -1161,8 +1161,8 @@ void Checker::checkExportSpecifier(Node* node) {
 			SymbolFlagsValue | SymbolFlagsType | SymbolFlagsNamespace | SymbolFlagsAlias,
 			nullptr /*nameNotFoundMessage*/, true /*isUse*/, false);
 		if (symbol != nullptr && (symbol == undefinedSymbol || symbol == globalThisSymbol ||
-			(!symbol->declarations.empty() &&
-			 isGlobalSourceFile(getDeclarationContainer(symbol->declarations[0]))))) {
+			(!symbol->data->declarations.empty() &&
+			 isGlobalSourceFile(getDeclarationContainer(symbol->data->declarations[0]))))) {
 			error(exportedName, Cannot_export_0_Only_local_declarations_can_be_exported_from_a_module, exportedName->text());
 		} else {
 			markLinkedReferences(node, ReferenceHint::ExportSpecifier, nullptr /*propSymbol*/, nullptr /*parentType*/);
@@ -1324,7 +1324,7 @@ void Checker::checkExternalModuleExports(Node* node) {
 	if (!links->exportsChecked || staleForCheckFile(links->exportsCheckedFor)) {
 		links->exportsCheckedFor = checkFileTag();
 		Symbol* exportEqualsSymbol = nullptr;
-		if (auto it = moduleSymbol->exports.find(InternalSymbolNameExportEquals); it != moduleSymbol->exports.end()) {
+		if (auto it = moduleSymbol->data->exports.find(InternalSymbolNameExportEquals); it != moduleSymbol->data->exports.end()) {
 			exportEqualsSymbol = it->second;
 		}
 		// An export assignment is in error if (a) the module exports value members or (b) if the module exports type or
@@ -1332,7 +1332,7 @@ void Checker::checkExternalModuleExports(Node* node) {
 		if (exportEqualsSymbol != nullptr &&
 			(hasExportedMembersOfKind(moduleSymbol, SymbolFlagsValue) || hasShadowedNamespace(exportEqualsSymbol))) {
 			Node* declaration = orElse(getDeclarationOfAliasSymbol(exportEqualsSymbol),
-									   exportEqualsSymbol->valueDeclaration);
+									   exportEqualsSymbol->data->valueDeclaration);
 			if (declaration != nullptr && !isTopLevelInExternalModuleAugmentation(declaration)) {
 				error(declaration, An_export_assignment_cannot_be_used_in_a_module_with_other_exported_elements);
 			}
@@ -1350,7 +1350,7 @@ void Checker::checkExternalModuleExports(Node* node) {
 			if ((symbol->flags & (SymbolFlagsNamespace | SymbolFlagsEnum)) != 0) {
 				continue;
 			}
-			int exportedDeclarationsCount = countWhere(symbol->declarations, [](Node* d) {
+			int exportedDeclarationsCount = countWhere(symbol->data->declarations, [](Node* d) {
 				return isNotOverload(d) && !isAccessor(d) && !isInterfaceDeclaration(d);
 			});
 			if ((symbol->flags & SymbolFlagsTypeAlias) != 0 && exportedDeclarationsCount <= 2) {
@@ -1359,10 +1359,10 @@ void Checker::checkExternalModuleExports(Node* node) {
 				continue;
 			}
 			if (exportedDeclarationsCount > 1 &&
-				!every(symbol->declarations, [](Node* node) {
+				!every(symbol->data->declarations, [](Node* node) {
 					return getAssignmentDeclarationKind(node) == JSDeclarationKind::ExportsProperty;
 				})) {
-				for (Node* declaration : symbol->declarations) {
+				for (Node* declaration : symbol->data->declarations) {
 					if (isNotOverload(declaration)) {
 						error(declaration, Cannot_redeclare_exported_variable_0, id);
 					}
@@ -1374,9 +1374,9 @@ void Checker::checkExternalModuleExports(Node* node) {
 
 // checker.go:5903 — hasExportedMembersOfKind
 bool Checker::hasExportedMembersOfKind(Symbol* moduleSymbol, SymbolFlags kind) {
-	for (auto& entry : moduleSymbol->exports) {
+	for (auto& entry : moduleSymbol->data->exports) {
 		Symbol* symbol = entry.second;
-		if (symbol->name != InternalSymbolNameExportEquals &&
+		if (symbol->data->name != InternalSymbolNameExportEquals &&
 			(getSymbolFlags(symbol) & kind) != 0) {
 			return true;
 		}
@@ -1558,7 +1558,7 @@ void Checker::checkVariableLikeDeclaration(Node* node) {
 		error(name, A_bigint_literal_cannot_be_used_as_a_property_name);
 	}
 	Type* t = convertAutoToAny(getTypeOfSymbol(symbol));
-	if (node == symbol->valueDeclaration) {
+	if (node == symbol->data->valueDeclaration) {
 		// Node is the primary declaration of the symbol, just validate the initializer
 		// Don't validate for-in initializer as it is already an error
 		if (initializer != nullptr && !isForInStatement(node->parent->parent)) {
@@ -1595,8 +1595,8 @@ void Checker::checkVariableLikeDeclaration(Node* node) {
 				}
 			}
 		}
-		if (symbol->declarations.size() > 1) {
-			if (some(symbol->declarations, [&](Node* d) {
+		if (symbol->data->declarations.size() > 1) {
+			if (some(symbol->data->declarations, [&](Node* d) {
 					return d != node && isVariableLike(d) && !areDeclarationFlagsIdentical(d, node);
 				})) {
 				error(name, All_declarations_of_0_must_have_identical_modifiers, declarationNameToString(name));
@@ -1608,13 +1608,13 @@ void Checker::checkVariableLikeDeclaration(Node* node) {
 		Type* declarationType = convertAutoToAny(getWidenedTypeForVariableLikeDeclaration(node, false));
 		if (!isErrorType(t) && !isErrorType(declarationType) && !isTypeIdenticalTo(t, declarationType) &&
 			(symbol->flags & SymbolFlagsAssignment) == 0) {
-			errorNextVariableOrPropertyDeclarationMustHaveSameType(symbol->valueDeclaration, t, node, declarationType);
+			errorNextVariableOrPropertyDeclarationMustHaveSameType(symbol->data->valueDeclaration, t, node, declarationType);
 		}
 		if (initializer != nullptr) {
 			checkTypeAssignableToAndOptionallyElaborate(checkExpressionCached(initializer), declarationType,
 				node, initializer, nullptr /*headMessage*/, nullptr);
 		}
-		if (symbol->valueDeclaration != nullptr && !areDeclarationFlagsIdentical(node, symbol->valueDeclaration)) {
+		if (symbol->data->valueDeclaration != nullptr && !areDeclarationFlagsIdentical(node, symbol->data->valueDeclaration)) {
 			error(name, All_declarations_of_0_must_have_identical_modifiers, declarationNameToString(name));
 		}
 	}
@@ -1690,7 +1690,7 @@ void Checker::checkVarDeclaredNamesNotShadowed(Node* node) {
 			(localDeclarationSymbol->flags & SymbolFlagsBlockScopedVariable) != 0) {
 			if ((getDeclarationNodeFlagsFromSymbol(localDeclarationSymbol) & NodeFlagsBlockScoped) != 0) {
 				Node* varDeclList =
-					findAncestorKind(localDeclarationSymbol->valueDeclaration, Kind::VariableDeclarationList);
+					findAncestorKind(localDeclarationSymbol->data->valueDeclaration, Kind::VariableDeclarationList);
 				Node* container = nullptr;
 				if (isVariableStatement(varDeclList->parent) && varDeclList->parent->parent != nullptr) {
 					container = varDeclList->parent->parent;
@@ -2319,14 +2319,14 @@ IterationTypes Checker::getIterationTypesOfMethod(Type* t, IterationTypesResolve
 		Type* globalIteratorType = resolver->getGlobalIteratorType();
 		bool isGeneratorMethod = false;
 		if (globalGeneratorType->symbol != nullptr) {
-			auto it = globalGeneratorType->symbol->members.find(methodName);
-			isGeneratorMethod = it != globalGeneratorType->symbol->members.end() &&
+			auto it = globalGeneratorType->symbol->data->members.find(methodName);
+			isGeneratorMethod = it != globalGeneratorType->symbol->data->members.end() &&
 				it->second == methodType->symbol;
 		}
 		bool isIteratorMethod = false;
 		if (!isGeneratorMethod && globalIteratorType->symbol != nullptr) {
-			auto it = globalIteratorType->symbol->members.find(methodName);
-			isIteratorMethod = it != globalIteratorType->symbol->members.end() &&
+			auto it = globalIteratorType->symbol->data->members.find(methodName);
+			isIteratorMethod = it != globalIteratorType->symbol->data->members.end() &&
 				it->second == methodType->symbol;
 		}
 		if (isGeneratorMethod || isIteratorMethod) {
@@ -2482,7 +2482,7 @@ std::pair<const DiagnosticMessage*, bool> Checker::getIterationDiagnosticDetails
 	if (yieldType != nullptr) {
 		return {Type_0_can_only_be_iterated_through_when_using_the_downlevelIteration_flag_or_with_a_target_of_es2015_or_higher, false};
 	}
-	if (inputType->symbol != nullptr && isES2015OrLaterIterable(inputType->symbol->name)) {
+	if (inputType->symbol != nullptr && isES2015OrLaterIterable(inputType->symbol->data->name)) {
 		return {Type_0_can_only_be_iterated_through_when_using_the_downlevelIteration_flag_or_with_a_target_of_es2015_or_higher, true};
 	}
 	if (allowsStrings) {
@@ -2504,7 +2504,7 @@ void Checker::checkAliasSymbol(Node* node) {
 	// Based on symbol.flags we can compute a set of excluded meanings (meaning that resolved alias should not have,
 	// otherwise it will conflict with some local declaration). Note that in addition to normal flags we include matching SymbolFlags.Export*
 	// in order to prevent collisions with declarations that were exported from the current module (they still contribute to local names).
-	symbol = getMergedSymbol(orElse(symbol->exportSymbol, symbol));
+	symbol = getMergedSymbol(orElse(symbol->data->exportSymbol, symbol));
 	SymbolFlags targetFlags = getSymbolFlags(target);
 	// A type-only import/export will already have a grammar error in a JS file, so no need to issue more errors within
 	if (isInJSFile(node) && (targetFlags & SymbolFlagsValue) == 0 &&
@@ -2514,18 +2514,18 @@ void Checker::checkAliasSymbol(Node* node) {
 		if (isExportSpecifier(node)) {
 			Diagnostic* diag = error(errorNode, Types_cannot_appear_in_export_declarations_in_JavaScript_files);
 			if (Symbol* sourceSymbol = getSourceFileOfNode(node)->asNode()->symbol(); sourceSymbol != nullptr) {
-				auto it = sourceSymbol->exports.find(node->propertyNameOrName()->text());
-				if (it != sourceSymbol->exports.end() && it->second == target) {
+				auto it = sourceSymbol->data->exports.find(node->propertyNameOrName()->text());
+				if (it != sourceSymbol->data->exports.end() && it->second == target) {
 					Symbol* alreadyExportedSymbol = it->second;
-					if (Node* exportingDeclaration = find(alreadyExportedSymbol->declarations, isJSTypeAliasDeclaration);
+					if (Node* exportingDeclaration = find(alreadyExportedSymbol->data->declarations, isJSTypeAliasDeclaration);
 						exportingDeclaration != nullptr) {
 						diag->AddRelatedInfo(NewDiagnosticForNode(exportingDeclaration,
-							X_0_is_automatically_exported_here, {alreadyExportedSymbol->name}));
+							X_0_is_automatically_exported_here, {alreadyExportedSymbol->data->name}));
 					}
 				}
 			}
 		} else {
-			std::string identifierText = symbol->name;
+			std::string identifierText = symbol->data->name;
 			if (isIdentifier(errorNode)) {
 				identifierText = errorNode->text();
 			}
@@ -2636,7 +2636,7 @@ void Checker::checkAliasSymbol(Node* node) {
 		if (tristateIsTrue(compilerOptions->VerbatimModuleSyntax) &&
 			!isTypeOnlyImportOrExportDeclaration(node) && (node->flags & NodeFlagsAmbient) == 0 &&
 			(targetFlags & SymbolFlagsConstEnum) != 0) {
-			Node* constEnumDeclaration = target->valueDeclaration;
+			Node* constEnumDeclaration = target->data->valueDeclaration;
 			if (constEnumDeclaration != nullptr &&
 				(constEnumDeclaration->flags & NodeFlagsAmbient) != 0) {
 				auto* redirect = program->GetProjectReferenceFromOutputDts(
@@ -2655,8 +2655,8 @@ void Checker::checkAliasSymbol(Node* node) {
 	}
 	if (isImportSpecifier(node)) {
 		Symbol* targetSymbol = resolveAliasWithDeprecationCheck(symbol, node);
-		if (isDeprecatedSymbol(targetSymbol) && !targetSymbol->declarations.empty()) {
-			addDeprecatedSuggestion(node, targetSymbol->declarations, targetSymbol->name);
+		if (isDeprecatedSymbol(targetSymbol) && !targetSymbol->data->declarations.empty()) {
+			addDeprecatedSuggestion(node, targetSymbol->data->declarations, targetSymbol->data->name);
 		}
 	}
 }
@@ -2727,19 +2727,19 @@ void Checker::checkExportsOnMergedDeclarations(Node* node) {
 		// Local symbol is undefined => this declaration is non-exported.
 		// However, symbol might contain other declarations that are exported.
 		symbol = getSymbolOfDeclaration(node);
-		if (symbol->exportSymbol == nullptr) {
+		if (symbol->data->exportSymbol == nullptr) {
 			// This is a pure local symbol (all declarations are non-exported) - no need to check anything.
 			return;
 		}
 	}
-	if (symbol->declarations.size() < 2 ||
+	if (symbol->data->declarations.size() < 2 ||
 	    !mergedExportsChecked.insert(symbol).second) {
 		return;
 	}
 	DeclarationSpaces exportedDeclarationSpaces = DeclarationSpacesNone;
 	DeclarationSpaces nonExportedDeclarationSpaces = DeclarationSpacesNone;
 	DeclarationSpaces defaultExportedDeclarationSpaces = DeclarationSpacesNone;
-	for (Node* d : symbol->declarations) {
+	for (Node* d : symbol->data->declarations) {
 		DeclarationSpaces declarationSpaces = getDeclarationSpaces(d);
 		ModifierFlags effectiveDeclarationFlags =
 			getEffectiveDeclarationFlags(d, ModifierFlagsExport | ModifierFlagsDefault);
@@ -2763,7 +2763,7 @@ void Checker::checkExportsOnMergedDeclarations(Node* node) {
 	if (commonDeclarationSpacesForExportsAndLocals != 0 ||
 		commonDeclarationSpacesForDefaultAndNonDefault != 0) {
 		// declaration spaces for exported and non-exported declarations intersect
-		for (Node* d : symbol->declarations) {
+		for (Node* d : symbol->data->declarations) {
 			DeclarationSpaces declarationSpaces = getDeclarationSpaces(d);
 			Node* name = getNameOfDeclaration(d);
 			// Only error on the declarations that contributed to the intersecting spaces.
@@ -2819,7 +2819,7 @@ DeclarationSpaces Checker::getDeclarationSpaces(Node* node) {
 	case Kind::ImportClause: {
 		DeclarationSpaces result = DeclarationSpacesNone;
 		Symbol* target = resolveAlias(getSymbolOfDeclaration(node));
-		for (Node* d : target->declarations) {
+		for (Node* d : target->data->declarations) {
 			result |= getDeclarationSpaces(d);
 		}
 		return result;
@@ -3043,11 +3043,11 @@ void Checker::checkUnusedLocalsAndParameters(Node* node) {
 				 ((local->flags & SymbolFlagsVariable) == 0 ||
 				  (referenceKinds & SymbolFlagsVariable) != 0)) ||
 				((local->flags & SymbolFlagsTypeParameter) == 0 &&
-				 (referenceKinds != 0 || local->exportSymbol != nullptr ||
+				 (referenceKinds != 0 || local->data->exportSymbol != nullptr ||
 				  (local->flags & SymbolFlagsModuleExports) != 0))) {
 				continue;
 			}
-			for (Node* declaration : local->declarations) {
+			for (Node* declaration : local->data->declarations) {
 				if (isVariableDeclaration(declaration) || isParameterDeclaration(declaration) ||
 					isBindingElement(declaration)) {
 					variableParents.insert(getRootDeclaration(declaration)->parent);

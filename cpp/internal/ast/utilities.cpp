@@ -57,8 +57,8 @@ SymbolId getSymbolId(Symbol* symbol) {
 }
 
 SymbolTable& getSymbolTable(SymbolTable& data) { return data; }
-SymbolTable& getMembers(Symbol* symbol) { return symbol->members; }
-SymbolTable& getExports(Symbol* symbol) { return symbol->exports; }
+SymbolTable& getMembers(Symbol* symbol) { return symbol->data->members; }
+SymbolTable& getExports(Symbol* symbol) { return symbol->data->exports; }
 SymbolTable& getLocals(Node* container) {
 	return *container->localsContainerData().locals;
 }
@@ -815,11 +815,11 @@ bool isInstantiatedModule(Node* node, bool preserveConstEnums) {
 // --- symbol.go helpers ---
 
 std::string symbolName(const Symbol* symbol) {
-	if (symbol->valueDeclaration &&
-	    isPrivateIdentifierClassElementDeclaration(symbol->valueDeclaration)) {
-		return symbol->valueDeclaration->name()->text();
+	if (symbol->data->valueDeclaration &&
+	    isPrivateIdentifierClassElementDeclaration(symbol->data->valueDeclaration)) {
+		return symbol->data->valueDeclaration->name()->text();
 	}
-	return symbol->name;
+	return symbol->data->name;
 }
 
 std::string escapeAllInternalSymbolNames(std::string_view name) {
@@ -1038,7 +1038,7 @@ bool isConstAssertion(Node* node) {
 }
 
 Node* getDeclarationOfKind(Symbol* symbol, Kind kind) {
-	for (Node* declaration : symbol->declarations) {
+	for (Node* declaration : symbol->data->declarations) {
 		if (declaration->kind == kind) {
 			return declaration;
 		}
@@ -2615,7 +2615,7 @@ bool isRequireVariableStatement(Node* node) {
 
 // utilities.go:3618 GetNonAugmentationDeclaration
 Node* getNonAugmentationDeclaration(Symbol* symbol) {
-	for (Node* d : symbol->declarations) {
+	for (Node* d : symbol->data->declarations) {
 		if (!isExternalModuleAugmentation(d) && !isGlobalScopeAugmentation(d)) {
 			return d;
 		}
@@ -2625,7 +2625,7 @@ Node* getNonAugmentationDeclaration(Symbol* symbol) {
 
 // utilities.go:3613 GetSourceFileOfModule
 SourceFile* getSourceFileOfModule(Symbol* module) {
-	Node* declaration = module->valueDeclaration;
+	Node* declaration = module->data->valueDeclaration;
 	if (declaration == nullptr) {
 		declaration = getNonAugmentationDeclaration(module);
 	}

@@ -383,7 +383,7 @@ void addReferencedFilesFromSymbol(
 	if (symbol == nullptr) {
 		return;
 	}
-	for (auto* declaration : symbol->declarations) {
+	for (auto* declaration : symbol->data->declarations) {
 		auto* fileOfDecl = getSourceFileOfNode(declaration);
 		if (fileOfDecl == nullptr) {
 			continue;

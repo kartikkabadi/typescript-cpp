@@ -363,11 +363,11 @@ typeWriterResult* writeTypeOrSymbol(typeWriterWalker* walker, Node* node,
 	                                  SymbolFlagsNone,
 	                                  checker::SymbolFormatFlagsAllowAnyNodeKind));
 	int count = 0;
-	for (auto* declaration : symbol->declarations) {
+	for (auto* declaration : symbol->data->declarations) {
 		if (count >= 5) {
 			symbolString += gostd::sprintf(
 			    " ... and %d more",
-			    {(int64_t)(symbol->declarations.size() - count)});
+			    {(int64_t)(symbol->data->declarations.size() - count)});
 			break;
 		}
 		count += 1;

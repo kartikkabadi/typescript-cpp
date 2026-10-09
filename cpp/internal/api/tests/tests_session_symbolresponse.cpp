@@ -78,8 +78,8 @@ void TestTransientSymbolWithFileDeclarationIsSnapshotOwned(T* t) {
 	auto* classNode = sourceFile->Statements->nodes[0];
 	auto* symbol = new Symbol();
 	symbol->flags = SymbolFlagsClass | SymbolFlagsTransient;
-	symbol->name = "C";
-	symbol->declarations = {classNode};
+	symbol->data->name = "C";
+	symbol->data->declarations = {classNode};
 	auto* sd = newTestSnapshotData();
 
 	auto response = sd->newSymbolResponse(symbol, "/tsconfig.json");
@@ -104,7 +104,7 @@ void TestSymbolReferencesIdentifyOwnerWithoutDescriptor(T* t) {
 	assert::Assert(t, encoded.find("contentHash") == std::string::npos);
 
 	// A file-owned symbol's relationships are references into the same file.
-	auto* member = classSymbol->members["property"];
+	auto* member = classSymbol->data->members["property"];
 	auto response = newFileSymbolResponse(member);
 	assert::Assert(t, response->Parent != nullptr &&
 	                      response->Parent->Id == reference->Id &&
@@ -135,7 +135,7 @@ void TestContentMappedSymbolsAreSnapshotOwned(T* t) {
 	assert::NilError(t, err);
 	assert::Assert(t, resolved == classSymbol);
 
-	auto reference = newSymbolReference(classSymbol->members["property"]);
+	auto reference = newSymbolReference(classSymbol->data->members["property"]);
 	assert::Assert(t, reference->File.empty());
 }
 

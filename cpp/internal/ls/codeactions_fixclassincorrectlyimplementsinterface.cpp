@@ -67,7 +67,7 @@ SymbolTable getInheritedMembers(checker::Checker* typeChecker,
 		}
 		auto flags = checker::GetDeclarationModifierFlagsFromSymbol(symbol);
 		if ((flags & ModifierFlagsPrivate) == 0) {
-			inheritedMembers[symbol->name] = symbol;
+			inheritedMembers[symbol->data->name] = symbol;
 		}
 	}
 	return inheritedMembers;
@@ -83,7 +83,7 @@ std::vector<Symbol*> getMissingMembers(
 
 	SymbolTable classMembers;
 	if (classDeclaration->symbol() != nullptr) {
-		classMembers = classDeclaration->symbol()->members;
+		classMembers = classDeclaration->symbol()->data->members;
 	}
 
 	std::vector<Symbol*> missingMembers;
@@ -93,17 +93,17 @@ std::vector<Symbol*> getMissingMembers(
 			if (symbol == nullptr) {
 				continue;
 			}
-			if (classMembers[symbol->name] != nullptr) {
+			if (classMembers[symbol->data->name] != nullptr) {
 				continue;
 			}
-			if (inheritedMembers[symbol->name] != nullptr ||
-			    seenMembers[symbol->name] != nullptr) {
+			if (inheritedMembers[symbol->data->name] != nullptr ||
+			    seenMembers[symbol->data->name] != nullptr) {
 				continue;
 			}
 			auto flags =
 			    checker::GetDeclarationModifierFlagsFromSymbol(symbol);
 			if ((flags & ModifierFlagsPrivate) == 0) {
-				seenMembers[symbol->name] = symbol;
+				seenMembers[symbol->data->name] = symbol;
 				missingMembers.push_back(symbol);
 			}
 		}

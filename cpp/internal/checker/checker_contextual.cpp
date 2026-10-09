@@ -255,7 +255,7 @@ bool hasInferenceCandidates(InferenceInfo* info) {
 // inference.go:1659
 bool hasTypeParameterDefault(Type* tp) {
 	if (tp->symbol != nullptr) {
-		for (Node* d : tp->symbol->declarations) {
+		for (Node* d : tp->symbol->data->declarations) {
 			if (isTypeParameterDeclaration(d) &&
 				d->as<TypeParameterDeclaration>()->DefaultType != nullptr) {
 				return true;
@@ -670,7 +670,7 @@ Type* Checker::getDefinitelyFalsyPartOfType(Type* t) {
 // checker.go:29600 — getConstraintDeclaration
 Node* Checker::getConstraintDeclaration(Type* t) {
 	if (t->symbol != nullptr) {
-		for (Node* d : t->symbol->declarations) {
+		for (Node* d : t->symbol->data->declarations) {
 			if (isTypeParameterDeclaration(d)) {
 				if (Node* constraint =
 						d->as<TypeParameterDeclaration>()->Constraint;
@@ -1135,7 +1135,7 @@ Type* Checker::getContextualTypeForStaticPropertyDeclaration(
 			parentType->symbol !=
 			    getSymbolOfDeclaration(declaration->parent)) {
 			return getTypeOfPropertyOfContextualType(
-				parentType, getSymbolOfDeclaration(declaration)->name);
+				parentType, getSymbolOfDeclaration(declaration)->data->name);
 		}
 	}
 	return nullptr;
@@ -1467,10 +1467,10 @@ Type* Checker::getContextualTypeForAssignmentExpression(BinaryExpression* binary
 				// 'F.id = expr' or 'F[xxx] = expr'. If 'F' is declared as a variable with a type annotation, we can obtain a
 				// contextual type from the annotated type without triggering a circularity. Otherwise, the assignment
 				// declaration has no contextual type.
-				if (symbol->valueDeclaration != nullptr &&
-					isVariableDeclaration(symbol->valueDeclaration)) {
+				if (symbol->data->valueDeclaration != nullptr &&
+					isVariableDeclaration(symbol->data->valueDeclaration)) {
 					if (Node* typeNode =
-							symbol->valueDeclaration->type();
+							symbol->data->valueDeclaration->type();
 						typeNode != nullptr) {
 						if (isPropertyAccessExpression(left)) {
 							return getTypeOfPropertyOfContextualType(
@@ -1522,7 +1522,7 @@ Type* Checker::getContextualTypeForAssignmentExpression(BinaryExpression* binary
 				}
 			}
 			if (symbol != nullptr) {
-				if (Node* d = symbol->valueDeclaration;
+				if (Node* d = symbol->data->valueDeclaration;
 					d != nullptr &&
 					(isPropertyDeclaration(d) ||
 					 isPropertySignatureDeclaration(d)) &&
@@ -1532,8 +1532,8 @@ Type* Checker::getContextualTypeForAssignmentExpression(BinaryExpression* binary
 				}
 			}
 			if (binary->Symbol != nullptr &&
-				binary->Symbol->valueDeclaration != nullptr &&
-				binary->Symbol->valueDeclaration->type() == nullptr) {
+				binary->Symbol->data->valueDeclaration != nullptr &&
+				binary->Symbol->data->valueDeclaration->type() == nullptr) {
 				// We have an assignment declaration 'this.xxx = expr' with no (synthetic) type annotation
 				if (!isObjectLiteralMethod(getThisContainer(expr, false, false))) {
 					return nullptr;
@@ -1572,7 +1572,7 @@ Type* Checker::getContextualTypeForObjectLiteralElement(
 			// SymbolTable.
 			Symbol* symbol = getSymbolOfDeclaration(element);
 			return getTypeOfPropertyOfContextualTypeEx(
-				t, symbol->name, valueSymbolLinks.Get(symbol)->nameType);
+				t, symbol->data->name, valueSymbolLinks.Get(symbol)->nameType);
 		}
 		if (hasDynamicName(element)) {
 			Node* name = getNameOfDeclaration(element);
@@ -2596,9 +2596,9 @@ int ObjectLiteralDiscriminator::len() {
 
 std::string ObjectLiteralDiscriminator::name(int index) {
 	if (index < static_cast<int>(props.size())) {
-		return props[index]->symbol()->name;
+		return props[index]->symbol()->data->name;
 	}
-	return members[index - static_cast<int>(props.size())]->name;
+	return members[index - static_cast<int>(props.size())]->data->name;
 }
 
 bool ObjectLiteralDiscriminator::matches(int index, Type* t) {
@@ -2649,10 +2649,10 @@ Type* Checker::discriminateContextualTypeByObjectMembers(Node* node,
 				}
 				if (isPropertyAssignment(p)) {
 					return isPossiblyDiscriminantValue(p->initializer()) &&
-						   isDiscriminantProperty(contextualType, symbol->name);
+						   isDiscriminantProperty(contextualType, symbol->data->name);
 				}
 				if (isShorthandPropertyAssignment(p)) {
-					return isDiscriminantProperty(contextualType, symbol->name);
+					return isDiscriminantProperty(contextualType, symbol->data->name);
 				}
 				return false;
 			});
@@ -2660,8 +2660,8 @@ Type* Checker::discriminateContextualTypeByObjectMembers(Node* node,
 			getPropertiesOfType(contextualType),
 			[this, contextualType, node](Symbol* s) {
 				return (s->flags & SymbolFlagsOptional) != 0 &&
-					   getSymbolFromTable(node->symbol()->members, s->name) == nullptr &&
-					   isDiscriminantProperty(contextualType, s->name);
+					   getSymbolFromTable(node->symbol()->data->members, s->data->name) == nullptr &&
+					   isDiscriminantProperty(contextualType, s->data->name);
 			});
 		ObjectLiteralDiscriminator discriminator;
 		discriminator.c = this;
@@ -2682,7 +2682,7 @@ Type* Checker::getMatchingUnionConstituentForObjectLiteral(Type* unionType,
 		Node* propNode = findRange(
 			node->properties(), [this, &keyPropertyName](Node* p) {
 				return p->symbol() != nullptr && isPropertyAssignment(p) &&
-					   p->symbol()->name == keyPropertyName &&
+					   p->symbol()->data->name == keyPropertyName &&
 					   isPossiblyDiscriminantValue(p->initializer());
 			});
 		if (propNode != nullptr) {

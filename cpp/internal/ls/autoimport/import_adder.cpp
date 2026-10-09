@@ -492,8 +492,8 @@ TryGetAutoImportableReferenceFromTypeNode(
 // instead, which searches for names of re-exported defaults/namespaces in target files.
 // getNameForExportedSymbol — import_adder.go:464
 std::string getNameForExportedSymbol(Symbol* symbol, bool preferCapitalized) {
-	if (symbol->name == InternalSymbolNameExportEquals ||
-	    symbol->name == InternalSymbolNameDefault) {
+	if (symbol->data->name == InternalSymbolNameExportEquals ||
+	    symbol->data->name == InternalSymbolNameDefault) {
 		// Names for default exports:
 		// - export default foo => foo
 		// - export { foo as default } => foo
@@ -502,12 +502,12 @@ std::string getNameForExportedSymbol(Symbol* symbol, bool preferCapitalized) {
 		if (!name.empty()) {
 			return name;
 		}
-		debug::assert(symbol->parent != nullptr,
+		debug::assert(symbol->data->parent != nullptr,
 	                  "Expected exported symbol to have module symbol as parent");
-		return lsutil::ModuleSymbolToValidIdentifier(symbol->parent,
+		return lsutil::ModuleSymbolToValidIdentifier(symbol->data->parent,
 	                                                 preferCapitalized);
 	}
-	return symbol->name;
+	return symbol->data->name;
 }
 
 // replaceFirstIdentifierOfEntityName — import_adder.go:485

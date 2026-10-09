@@ -620,11 +620,11 @@ bool isAmbientModuleSymbol(Symbol* symbol) {
 	if (symbol == nullptr) {
 		return false;
 	}
-	return std::find_if(symbol->declarations.begin(),
-	                    symbol->declarations.end(),
+	return std::find_if(symbol->data->declarations.begin(),
+	                    symbol->data->declarations.end(),
 	                    [](Node* d) {
 		                    return isModuleWithStringLiteralName(d);
-	                    }) != symbol->declarations.end();
+	                    }) != symbol->data->declarations.end();
 }
 
 } // namespace tsc::ls

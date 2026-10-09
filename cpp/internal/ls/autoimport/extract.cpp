@@ -98,7 +98,7 @@ std::vector<std::shared_ptr<Export>> exportExtractor::extractFromFile(
 			ModuleDeclaration* md = statement->as<ModuleDeclaration>();
 			if (isModuleWithStringLiteralName(statement) &&
 			    isNonPatternAmbientModuleDeclaration(file, md)) {
-				exportCount += static_cast<int>(md->Symbol->exports.size());
+				exportCount += static_cast<int>(md->Symbol->data->exports.size());
 			}
 		}
 		std::vector<std::shared_ptr<Export>> exports;
@@ -142,12 +142,12 @@ std::vector<std::shared_ptr<Export>> exportExtractor::extractFromModule(
 	int augmentationExportCount = 0;
 	for (ModuleDeclaration* decl : moduleAugmentations) {
 		augmentationExportCount +=
-		    static_cast<int>(decl->Symbol->exports.size());
+		    static_cast<int>(decl->Symbol->data->exports.size());
 	}
 	ModuleID moduleID = extractor->getModuleID(file);
 	std::vector<std::shared_ptr<Export>> exports;
-	exports.reserve(file->Symbol->exports.size() + augmentationExportCount);
-	for (const auto& [name, symbol] : file->Symbol->exports) {
+	exports.reserve(file->Symbol->data->exports.size() + augmentationExportCount);
+	for (const auto& [name, symbol] : file->Symbol->data->exports) {
 		extractor->extractFromSymbol(name, symbol, moduleID, file->FileName(),
 		                             file, &exports);
 	}
@@ -185,7 +185,7 @@ void exportExtractor::extractFromModuleDeclaration(
     ModuleDeclaration* decl, SourceFile* file, const ModuleID& moduleID,
     const std::string& moduleFileName,
     std::vector<std::shared_ptr<Export>>* exports) {
-	for (const auto& [name, symbol] : decl->Symbol->exports) {
+	for (const auto& [name, symbol] : decl->Symbol->data->exports) {
 		extractor->extractFromSymbol(name, symbol, moduleID, moduleFileName,
 		                             file, exports);
 	}
@@ -203,10 +203,10 @@ void symbolExtractor::extractFromSymbol(
 	if (name == InternalSymbolNameExportStar) {
 		checkerLease lease{/*.used =*/ false, /*.checker =*/ checker};
 		std::vector<Symbol*> allExports = checker->GetExportsOfModule(
-		    symbol->parent);
+		    symbol->data->parent);
 		// allExports includes named exports from the file that will be processed separately;
 		// we want to add only the ones that come from the star
-		for (const auto& [namedName, namedExport] : symbol->parent->exports) {
+		for (const auto& [namedName, namedExport] : symbol->data->parent->data->exports) {
 			if (namedName != InternalSymbolNameExportStar) {
 				auto it = std::find(allExports.begin(), allExports.end(),
 				                    namedExport);
@@ -229,14 +229,14 @@ void symbolExtractor::extractFromSymbol(
 			                 ExportSyntax::Star, file, &lease);
 			if (export_ != nullptr) {
 				Symbol* parent = lease.GetChecker()->GetMergedSymbol(
-				    reexportedSymbol->parent);
+				    reexportedSymbol->data->parent);
 				if (parent != nullptr && parent->isExternalModule()) {
 					if (auto [targetModuleID, ok] =
 					        getModuleIDForSymbol(parent);
 					    ok) {
 						export_->Target = ExportID{
 						    targetModuleID,
-						    reexportedSymbol->name,
+						    reexportedSymbol->data->name,
 						};
 					}
 				}
@@ -260,8 +260,8 @@ void symbolExtractor::extractFromSymbol(
 	if (target != nullptr) {
 		if (syntax == ExportSyntax::Equals &&
 		    (target->flags & SymbolFlagsNamespace) != 0) {
-			exports->reserve(exports->size() + target->exports.size());
-			for (const auto& [innerName, namedExport] : target->exports) {
+			exports->reserve(exports->size() + target->data->exports.size());
+			for (const auto& [innerName, namedExport] : target->data->exports) {
 				if (innerName != InternalSymbolNameExportStar) {
 					auto [innerExport, _t] =
 					    createExport(namedExport, moduleID, moduleFileName,
@@ -275,7 +275,7 @@ void symbolExtractor::extractFromSymbol(
 		}
 	} else if (syntax == ExportSyntax::CommonJSModuleExports) {
 		Node* expression =
-		    symbol->declarations[0]->as<BinaryExpression>()->Right;
+		    symbol->data->declarations[0]->as<BinaryExpression>()->Right;
 		if (expression->kind == Kind::ObjectLiteralExpression) {
 			NodeList* properties =
 			    expression->as<ObjectLiteralExpression>()->Properties;
@@ -292,7 +292,7 @@ void symbolExtractor::extractFromSymbol(
 				               propName(prop)->kind == Kind::Identifier);
 				if (isProp) {
 					Symbol* member = getSymbolFromTable(
-					    expression->symbol()->members, propName(prop)->text());
+					    expression->symbol()->data->members, propName(prop)->text());
 					auto [propExport, _t] =
 					    createExport(member, moduleID, moduleFileName, syntax,
 					                 file, &lease);
@@ -316,7 +316,7 @@ std::pair<std::shared_ptr<Export>, Symbol*> symbolExtractor::createExport(
 	}
 
 	auto export_ = std::make_shared<Export>();
-	export_->exportID.ExportName = symbol->name;
+	export_->exportID.ExportName = symbol->data->name;
 	export_->exportID.ModuleID = moduleID;
 	export_->ModuleFileName = moduleFileName;
 	export_->Syntax = syntax;
@@ -326,7 +326,7 @@ std::pair<std::shared_ptr<Export>, Symbol*> symbolExtractor::createExport(
 
 	if (syntax == ExportSyntax::UMD) {
 		export_->exportID.ExportName = InternalSymbolNameExportEquals;
-		export_->localName = symbol->name;
+		export_->localName = symbol->data->name;
 	}
 
 	Symbol* targetSymbol = nullptr;
@@ -334,26 +334,26 @@ std::pair<std::shared_ptr<Export>, Symbol*> symbolExtractor::createExport(
 		targetSymbol = tryResolveSymbol(symbol, syntax, lease);
 		if (targetSymbol != nullptr) {
 			Node* decl = nullptr;
-			if (!targetSymbol->declarations.empty()) {
-				decl = targetSymbol->declarations[0];
+			if (!targetSymbol->data->declarations.empty()) {
+				decl = targetSymbol->data->declarations[0];
 			} else if ((targetSymbol->checkFlags & CheckFlagsMapped) != 0) {
 				Symbol* mappedDecl =
 				    lease->GetChecker()->GetMappedTypeSymbolOfProperty(
 				        targetSymbol);
 				if (mappedDecl != nullptr &&
-				    !mappedDecl->declarations.empty()) {
-					decl = mappedDecl->declarations[0];
+				    !mappedDecl->data->declarations.empty()) {
+					decl = mappedDecl->data->declarations[0];
 				}
 			}
 			if (decl == nullptr) {
 				// !!! consider GetImmediateAliasedSymbol to go as far as we can
-				decl = symbol->declarations[0];
+				decl = symbol->data->declarations[0];
 			}
 			if (decl == nullptr) {
 				TSC_UNREACHABLE("no declaration for aliased symbol");
 			}
 
-			Symbol* parent = targetSymbol->parent;
+			Symbol* parent = targetSymbol->data->parent;
 			checker::Checker* ch = lease->TryChecker();
 			if (ch != nullptr) {
 				export_->Flags = ch->GetSymbolFlags(targetSymbol);
@@ -364,8 +364,8 @@ std::pair<std::shared_ptr<Export>, Symbol*> symbolExtractor::createExport(
 				export_->Flags = targetSymbol->flags;
 				// core.Some(symbol.Declarations, IsPartOfTypeOnly...)
 				export_->IsTypeOnly =
-				    std::any_of(symbol->declarations.begin(),
-				                symbol->declarations.end(),
+				    std::any_of(symbol->data->declarations.begin(),
+				                symbol->data->declarations.end(),
 				                isPartOfTypeOnlyImportOrExportDeclaration);
 			}
 			export_->ScriptElementKind =
@@ -381,19 +381,19 @@ std::pair<std::shared_ptr<Export>, Symbol*> symbolExtractor::createExport(
 			}
 			export_->Target = ExportID{
 			    targetModuleID,
-			    targetSymbol->name,
+			    targetSymbol->data->name,
 			};
 		}
 	} else {
 		export_->ScriptElementKind =
 		    lsutil::GetSymbolKind(lease->TryChecker(), symbol,
-		                          symbol->declarations[0]);
+		                          symbol->data->declarations[0]);
 		export_->ScriptElementKindModifiers =
 		    lsutil::GetSymbolModifiers(lease->TryChecker(), symbol);
 	}
 
-	if (symbol->name == InternalSymbolNameDefault ||
-	    symbol->name == InternalSymbolNameExportEquals) {
+	if (symbol->data->name == InternalSymbolNameDefault ||
+	    symbol->data->name == InternalSymbolNameExportEquals) {
 		Symbol* namedSymbol = symbol;
 		if (Symbol* s = binder::getLocalSymbolForExportDefault(symbol)) {
 			namedSymbol = s;
@@ -464,7 +464,7 @@ Symbol* symbolExtractor::tryResolveSymbol(Symbol* symbol, ExportSyntax syntax,
 		}
 		// !!! check if module.exports = foo is marked as an alias
 		case ExportSyntax::Equals:
-			if (symbol->name != InternalSymbolNameExportEquals) {
+			if (symbol->data->name != InternalSymbolNameExportEquals) {
 				break;
 			}
 			[[fallthrough]];
@@ -509,7 +509,7 @@ bool shouldIgnoreSymbol(Symbol* symbol) {
 
 // getSyntax — extract.go:417
 ExportSyntax getSyntax(Symbol* symbol) {
-	for (Node* decl : symbol->declarations) {
+	for (Node* decl : symbol->data->declarations) {
 		switch (decl->kind) {
 			case Kind::ExportSpecifier:
 				return ExportSyntax::Named;
@@ -553,8 +553,8 @@ bool isUnusableName(const std::string& name) {
 std::string fileNameForDefaultExportName(Symbol* targetSymbol,
                                          const std::string& moduleFileName,
                                          const ModuleID& moduleID) {
-	if (targetSymbol != nullptr && !targetSymbol->declarations.empty()) {
-		if (std::string fn = getSourceFileOfNode(targetSymbol->declarations[0])
+	if (targetSymbol != nullptr && !targetSymbol->data->declarations.empty()) {
+		if (std::string fn = getSourceFileOfNode(targetSymbol->data->declarations[0])
 		                         ->FileName();
 		    !fn.empty()) {
 			return fn;

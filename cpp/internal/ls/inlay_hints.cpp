@@ -110,10 +110,10 @@ bool hasContextSensitiveParameters(::tsc::Node* node) {
 
 // inlay_hints.go:858 — getParameterDeclarationIdentifier
 ::tsc::Node* getParameterDeclarationIdentifier(::tsc::Symbol* symbol) {
-	if (symbol->valueDeclaration != nullptr &&
-		isParameterDeclaration(symbol->valueDeclaration) &&
-		isIdentifier(symbol->valueDeclaration->name())) {
-		return symbol->valueDeclaration->name();
+	if (symbol->data->valueDeclaration != nullptr &&
+		isParameterDeclaration(symbol->data->valueDeclaration) &&
+		isIdentifier(symbol->data->valueDeclaration->name())) {
+		return symbol->data->valueDeclaration->name();
 	}
 	return nullptr;
 }
@@ -451,7 +451,7 @@ struct inlayHintState {
 	// inlay_hints.go:277 — getParameterDeclarationTypeHints
 	lsp::lsproto::StringOrInlayHintLabelParts*
 	getParameterDeclarationTypeHints(::tsc::Symbol* symbol) {
-		::tsc::Node* valueDeclaration = symbol->valueDeclaration;
+		::tsc::Node* valueDeclaration = symbol->data->valueDeclaration;
 		if (valueDeclaration == nullptr ||
 			!isParameterDeclaration(valueDeclaration)) {
 			return nullptr;
@@ -643,9 +643,9 @@ struct inlayHintState {
 				::tsc::Node* name = nullptr;
 				auto it = idToSymbol.find(node);
 				if (it != idToSymbol.end() && it->second != nullptr &&
-					!it->second->declarations.empty()) {
+					!it->second->data->declarations.empty()) {
 					name = getNameOfDeclaration(
-						it->second->declarations[0]);
+						it->second->data->declarations[0]);
 				}
 				if (name != nullptr) {
 					parts.push_back(
@@ -1167,7 +1167,7 @@ struct inlayHintState {
 		}
 
 		if (pos == paramCount) {
-			return new parameterInfo{restId, restParameter->name,
+			return new parameterInfo{restId, restParameter->data->name,
 									 /*isRestParameter*/ true};
 		}
 		return nullptr;

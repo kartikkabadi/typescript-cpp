@@ -125,9 +125,9 @@ struct Binder {
 	bool bind(Node* node);
 	Symbol* newSymbol(SymbolFlags flags, const std::string& name) {
 		symbolCount++;
-		auto* result = arena->alloc<Symbol>();
+		auto* result = arena->alloc<SymbolWithData>()->initialize();
 		result->flags = flags;
-		result->name = name;
+		result->data->name = name;
 		return result;
 	}
 	Symbol* declareSymbol(SymbolTable& symbolTable, Symbol* parent, Node* node,
@@ -436,13 +436,13 @@ Symbol* Binder::declareSymbolEx(SymbolTable& symbolTable, Symbol* parent,
 					messageNeedsName = false;
 				}
 				bool multipleDefaultExports = false;
-				if (!symbol->declarations.empty()) {
+				if (!symbol->data->declarations.empty()) {
 					if (isDefaultExport) {
 						message = A_module_cannot_have_multiple_default_exports;
 						messageNeedsName = false;
 						multipleDefaultExports = true;
 					} else {
-						if (!symbol->declarations.empty() &&
+						if (!symbol->data->declarations.empty() &&
 						    isExportAssignment(node) &&
 						    !node->as<ExportAssignment>()->IsExportEquals) {
 							message =
@@ -473,9 +473,9 @@ Symbol* Binder::declareSymbolEx(SymbolTable& symbolTable, Symbol* parent,
 						 node->as<TypeAliasDeclaration>()->name->text() +
 						 " }"}));
 				}
-				for (size_t index = 0; index < symbol->declarations.size();
+				for (size_t index = 0; index < symbol->data->declarations.size();
 				     index++) {
-					Node* declaration = symbol->declarations[index];
+					Node* declaration = symbol->data->declarations[index];
 					Node* decl = getNameOfDeclaration(declaration);
 					if (decl == nullptr) decl = declaration;
 					Diagnostic* d;
@@ -511,9 +511,9 @@ Symbol* Binder::declareSymbolEx(SymbolTable& symbolTable, Symbol* parent,
 		}
 	}
 	addDeclarationToSymbol(symbol, node, includes);
-	if (symbol->parent == nullptr) {
-		symbol->parent = parent;
-	} else if (symbol->parent != parent) {
+	if (symbol->data->parent == nullptr) {
+		symbol->data->parent = parent;
+	} else if (symbol->data->parent != parent) {
 		TSC_UNREACHABLE("Existing symbol parent should match new one");
 	}
 	return symbol;
@@ -638,7 +638,7 @@ Symbol* Binder::declareModuleMember(Node* node, SymbolFlags symbolFlags,
 		}
 		Symbol* local = declareSymbol(getLocals(container), nullptr, node,
 		                              exportKind, symbolExcludes);
-		local->exportSymbol = declareSymbol(getExports(container->symbol()),
+		local->data->exportSymbol = declareSymbol(getExports(container->symbol()),
 		                                    container->symbol(), node,
 		                                    symbolFlags, symbolExcludes);
 		auto data = node->exportableData();
@@ -1026,7 +1026,7 @@ void Binder::bindSourceFileIfExternalModule() {
 	} else if (isJsonSourceFile(file)) {
 		bindSourceFileAsExternalModule();
 		Symbol* originalSymbol = file->Symbol;
-		declareSymbol(file->Symbol->exports, file->Symbol, file,
+		declareSymbol(file->Symbol->data->exports, file->Symbol, file,
 		              SymbolFlagsProperty, SymbolFlagsAll);
 		file->Symbol = originalSymbol;
 	}
@@ -1259,15 +1259,15 @@ void Binder::bindClassLikeDeclaration(Node* node) {
 		newSymbol(SymbolFlagsProperty | SymbolFlagsPrototype, "prototype");
 	Symbol* symbolExport = nullptr;
 	{
-		auto it = getExports(symbol).find(prototypeSymbol->name);
+		auto it = getExports(symbol).find(prototypeSymbol->data->name);
 		if (it != getExports(symbol).end()) symbolExport = it->second;
 	}
 	if (symbolExport != nullptr) {
-		errorOnNode(symbolExport->declarations[0], Duplicate_identifier_0,
+		errorOnNode(symbolExport->data->declarations[0], Duplicate_identifier_0,
 		            {symbolName(prototypeSymbol)});
 	}
-	getExports(symbol)[prototypeSymbol->name] = prototypeSymbol;
-	prototypeSymbol->parent = symbol;
+	getExports(symbol)[prototypeSymbol->data->name] = prototypeSymbol;
+	prototypeSymbol->data->parent = symbol;
 }
 
 void Binder::bindPropertyOrMethodOrAccessor(Node* node, SymbolFlags symbolFlags,
@@ -1294,7 +1294,7 @@ void Binder::bindFunctionOrConstructorType(Node* node) {
 	Symbol* typeLiteralSymbol =
 		newSymbol(SymbolFlagsTypeLiteral, InternalSymbolNameType);
 	addDeclarationToSymbol(typeLiteralSymbol, node, SymbolFlagsTypeLiteral);
-	typeLiteralSymbol->members[symbol->name] = symbol;
+	typeLiteralSymbol->data->members[symbol->data->name] = symbol;
 }
 
 void Binder::addLateBoundAssignmentDeclarationToSymbol(Node* node,
@@ -1310,7 +1310,7 @@ void Binder::addLateBoundAssignmentDeclarationToSymbol(Node* node,
 		                             InternalSymbolNameAssignmentDeclaration);
 		exports[InternalSymbolNameAssignmentDeclaration] = assignmentSymbol;
 	}
-	assignmentSymbol->declarations.push_back(node);
+	assignmentSymbol->data->declarations.push_back(node);
 }
 
 void Binder::bindModuleExportsAssignment(Node* node) {
@@ -1341,7 +1341,7 @@ void Binder::bindDeferredExpandoAssignments() {
 }
 
 void Binder::bindCommonJSTypeExports(Symbol* moduleSymbol) {
-	SymbolTable& moduleExports = moduleSymbol->exports;
+	SymbolTable& moduleExports = moduleSymbol->data->exports;
 	auto ee = moduleExports.find(InternalSymbolNameExportEquals);
 	if (ee != moduleExports.end() && ee->second != nullptr) {
 		Symbol* exportEquals = ee->second;
@@ -1406,9 +1406,9 @@ void Binder::bindExportsOrObjectDefineProperty(Node* node) {
 }
 
 static Symbol* getInitializerSymbol(Symbol* symbol) {
-	if (symbol == nullptr || symbol->valueDeclaration == nullptr)
+	if (symbol == nullptr || symbol->data->valueDeclaration == nullptr)
 		return nullptr;
-	Node* declaration = symbol->valueDeclaration;
+	Node* declaration = symbol->data->valueDeclaration;
 	if (isFunctionDeclaration(declaration) ||
 	    (isInJSFile(declaration) && isClassDeclaration(declaration))) {
 		return symbol;
@@ -1568,7 +1568,7 @@ void Binder::bindAnonymousDeclaration(Node* node, SymbolFlags symbolFlags,
                                       const std::string& name) {
 	Symbol* symbol = newSymbol(symbolFlags, name);
 	if (symbolFlags & (SymbolFlagsEnumMember | SymbolFlagsClassMember)) {
-		symbol->parent = container->symbol();
+		symbol->data->parent = container->symbol();
 	}
 	addDeclarationToSymbol(symbol, node, symbolFlags);
 }
@@ -1624,8 +1624,8 @@ Symbol* Binder::lookupEntity(Node* node, Node* container) {
 		lookupEntity(node->expression(), container));
 	if (symbol != nullptr) {
 		if (Node* name = getElementOrPropertyAccessName(node)) {
-			auto it = symbol->exports.find(name->text());
-			return it == symbol->exports.end() ? nullptr : it->second;
+			auto it = symbol->data->exports.find(name->text());
+			return it == symbol->data->exports.end() ? nullptr : it->second;
 		}
 	}
 	return nullptr;
@@ -1636,14 +1636,14 @@ Symbol* Binder::lookupName(const std::string& name, Node* container) {
 	if (localsData.locals) {
 		auto it = localsData.locals->find(name);
 		if (it != localsData.locals->end()) {
-			return orElse(it->second->exportSymbol, it->second);
+			return orElse(it->second->data->exportSymbol, it->second);
 		}
 	}
 	auto declData = container->declarationData();
 	if (declData.symbol && *declData.symbol) {
 		Symbol* s = *declData.symbol;
-		auto it = s->exports.find(name);
-		return it == s->exports.end() ? nullptr : it->second;
+		auto it = s->data->exports.find(name);
+		return it == s->data->exports.end() ? nullptr : it->second;
 	}
 	return nullptr;
 }
@@ -1950,15 +1950,15 @@ void Binder::declareCommonJSVariable(const std::string& name) {
 			newSymbol(SymbolFlagsFunctionScopedVariable |
 		                  SymbolFlagsModuleExports,
 		              name);
-		symbol->declarations = {static_cast<Node*>(file)};
-		symbol->valueDeclaration = symbol->declarations[0];
+		symbol->data->declarations = {static_cast<Node*>(file)};
+		symbol->data->valueDeclaration = symbol->data->declarations[0];
 		if (name == "module") {
 			Symbol* exportsProperty = newSymbol(
 				SymbolFlagsModuleExports | SymbolFlagsProperty, "exports");
-			exportsProperty->declarations = symbol->declarations;
-			exportsProperty->valueDeclaration = symbol->valueDeclaration;
-			exportsProperty->parent = symbol;
-			symbol->members["exports"] = exportsProperty;
+			exportsProperty->data->declarations = symbol->data->declarations;
+			exportsProperty->data->valueDeclaration = symbol->data->valueDeclaration;
+			exportsProperty->data->parent = symbol;
+			symbol->data->members["exports"] = exportsProperty;
 		}
 		locals[name] = symbol;
 	}
@@ -2890,10 +2890,10 @@ void Binder::addDeclarationToSymbol(Symbol* symbol, Node* node,
 	symbol->flags |= symbolFlags;
 	auto data = node->declarationData();
 	if (data.symbol) *data.symbol = symbol;
-	if (symbol->declarations.empty()) {
-		symbol->declarations.push_back(node);
+	if (symbol->data->declarations.empty()) {
+		symbol->data->declarations.push_back(node);
 	} else {
-		appendIfUnique(symbol->declarations, node);
+		appendIfUnique(symbol->data->declarations, node);
 	}
 	if (symbol->flags & SymbolFlagsConstEnumOnlyModule &&
 	    symbol->flags &
@@ -2917,13 +2917,13 @@ bool isEffectiveModuleDeclaration(Node* node) {
 }
 
 void setValueDeclaration(Symbol* symbol, Node* node) {
-	Node* valueDeclaration = symbol->valueDeclaration;
+	Node* valueDeclaration = symbol->data->valueDeclaration;
 	if (valueDeclaration == nullptr ||
 	    (isAssignmentDeclaration(valueDeclaration) &&
 	     !isAssignmentDeclaration(node)) ||
 	    (valueDeclaration->kind != node->kind &&
 	     isEffectiveModuleDeclaration(valueDeclaration))) {
-		symbol->valueDeclaration = node;
+		symbol->data->valueDeclaration = node;
 	}
 }
 
