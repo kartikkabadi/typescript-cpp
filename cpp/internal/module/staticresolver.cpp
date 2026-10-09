@@ -124,24 +124,9 @@ StaticResolver::ResolveTypeReferenceDirective(
 	    redirectedReference);
 }
 
-std::shared_ptr<packagejson::InfoCacheEntry>
-StaticResolver::GetPackageScopeForPath(const std::string& directory) {
-	return fallback->GetPackageScopeForPath(directory);
-}
-
-void StaticResolver::PackageJsonCacheEntries(
-    const std::function<bool(
-        const std::string&,
-        std::shared_ptr<packagejson::InfoCacheEntry>)>& f) {
-	fallback->PackageJsonCacheEntries(f);
-}
-
-std::shared_ptr<ResolvedModule> StaticResolver::ResolvePackageDirectory(
-    std::string_view moduleName, std::string_view containingFile,
-    ResolutionMode resolutionMode,
-    const ResolvedProjectReference* redirectedReference) {
-	return fallback->ResolvePackageDirectory(
-	    moduleName, containingFile, resolutionMode, redirectedReference);
+// staticresolver.go — GetResolutionData passthrough (a5c43c4d54).
+std::shared_ptr<ResolutionData> StaticResolver::GetResolutionData() {
+	return fallback->GetResolutionData();
 }
 
 StaticResolver* NewStaticResolver(Resolver* fallback,

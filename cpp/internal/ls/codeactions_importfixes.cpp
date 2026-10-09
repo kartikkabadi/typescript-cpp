@@ -93,9 +93,9 @@ int compareBooleans(bool a, bool b) {
 // Forward declarations — Go package-level functions defined later in this
 // file but referenced earlier.
 std::pair<std::vector<fixInfo*>, gostd::Error> getFixInfos(
-    const gostd::Context& ctx, CodeFixContext* fixContext, int32_t errorCode,
+    checker::Checker* ch, CodeFixContext* fixContext, int32_t errorCode,
     int pos);
-gostd::Error addImportFromDiagnostic(const gostd::Context& ctx,
+gostd::Error addImportFromDiagnostic(checker::Checker* ch,
                                      autoimport::ImportAdder* importAdder,
                                      Diagnostic* diag,
                                      CodeFixContext* fixContext);
@@ -124,7 +124,14 @@ std::vector<fixInfo*> sortFixInfo(std::vector<fixInfo*> fixes,
 // getImportCodeActions — codeactions_importfixes.go:63.
 std::pair<std::vector<CodeAction*>, gostd::Error> getImportCodeActions(
     const gostd::Context& ctx, CodeFixContext* fixContext) {
-	auto [info, err] = getFixInfos(ctx, fixContext, fixContext->ErrorCode,
+	auto [ch, done] =
+	    fixContext->Program->GetTypeCheckerForFileExclusive(ctx, nullptr);
+	struct doneGuard {
+		std::function<void()> f;
+		~doneGuard() { if (f) f(); }
+	} _done{done};
+
+	auto [info, err] = getFixInfos(ch, fixContext, fixContext->ErrorCode,
 	                               fixContext->Span.pos());
 	if (err != nullptr) {
 		return {{}, err};
@@ -175,7 +182,12 @@ std::pair<CombinedCodeActions*, gostd::Error> getAllImportCodeActions(
 		return {nullptr, nullptr};
 	}
 
-	auto* ch = fixContext->Program->getChecker();
+	auto [ch, done] =
+	    fixContext->Program->GetTypeCheckerForFileExclusive(ctx, nullptr);
+	struct doneGuard {
+		std::function<void()> f;
+		~doneGuard() { if (f) f(); }
+	} _done{done};
 
 	auto [view, err] = fixContext->LS->getPreparedAutoImportView(
 	    fixContext->SourceFile, ch);
@@ -194,7 +206,7 @@ std::pair<CombinedCodeActions*, gostd::Error> getAllImportCodeActions(
 
 	for (auto* diag : importDiags) {
 		if (auto err2 =
-		        addImportFromDiagnostic(ctx, importAdder.get(), diag,
+		        addImportFromDiagnostic(ch, importAdder.get(), diag,
 		                                fixContext);
 		    err2 != nullptr) {
 			return {nullptr, err2};
@@ -215,7 +227,7 @@ std::pair<CombinedCodeActions*, gostd::Error> getAllImportCodeActions(
 
 // addImportFromDiagnostic — codeactions_importfixes.go:152. Finds the best
 // import fix for a diagnostic and adds it to the adder.
-gostd::Error addImportFromDiagnostic(const gostd::Context& ctx,
+gostd::Error addImportFromDiagnostic(checker::Checker* ch,
                                      autoimport::ImportAdder* importAdder,
                                      Diagnostic* diag,
                                      CodeFixContext* fixContext) {
@@ -228,7 +240,7 @@ gostd::Error addImportFromDiagnostic(const gostd::Context& ctx,
 	};
 
 	auto [infos, err] =
-	    getFixInfos(ctx, diagFixContext, diag->Code(), diag->Pos());
+	    getFixInfos(ch, diagFixContext, diag->Code(), diag->Pos());
 	if (err != nullptr) {
 		return err;
 	}
@@ -240,7 +252,7 @@ gostd::Error addImportFromDiagnostic(const gostd::Context& ctx,
 
 // getFixInfos — codeactions_importfixes.go:171.
 std::pair<std::vector<fixInfo*>, gostd::Error> getFixInfos(
-    const gostd::Context& ctx, CodeFixContext* fixContext, int32_t errorCode,
+    checker::Checker* ch, CodeFixContext* fixContext, int32_t errorCode,
     int pos) {
 	// Can't compute import fixes for dynamic/untitled files since they
 	// don't have real file paths
@@ -256,8 +268,6 @@ std::pair<std::vector<fixInfo*>, gostd::Error> getFixInfos(
 	    !isIdentifier(symbolToken)) {
 		return {{}, nullptr};
 	}
-
-	auto* ch = fixContext->Program->getChecker();
 
 	autoimport::View* view = nullptr;
 	std::vector<fixInfo*> info;

@@ -95,18 +95,10 @@ struct StaticResolver : Resolver {
 	    std::string_view containingFile, ResolutionMode resolutionMode,
 	    const ResolvedProjectReference* redirectedReference) override;
 
-	std::shared_ptr<packagejson::InfoCacheEntry> GetPackageScopeForPath(
-	    const std::string& directory) override;
-
-	void PackageJsonCacheEntries(
-	    const std::function<bool(
-	        const std::string&,
-	        std::shared_ptr<packagejson::InfoCacheEntry>)>& f) override;
-
-	std::shared_ptr<ResolvedModule> ResolvePackageDirectory(
-	    std::string_view moduleName, std::string_view containingFile,
-	    ResolutionMode resolutionMode,
-	    const ResolvedProjectReference* redirectedReference) override;
+	// staticresolver.go — a5c43c4d54: interface narrows to
+	// GetResolutionData (package-scope/directory helpers moved off the
+	// interface).
+	std::shared_ptr<ResolutionData> GetResolutionData() override;
 };
 
 StaticResolver* NewStaticResolver(Resolver* fallback,

@@ -188,9 +188,10 @@ std::string tryGetModuleNameFromRootDirs(
     const std::vector<ModuleSpecifierEnding>& allowedEndings,
     const CompilerOptions* compilerOptions, checker::Program* host);
 pkgJsonDirAttemptResult tryDirectoryWithPackageJson(
-    const NodeModulePathParts& parts, const ModulePath& pathObj,
-    SourceFile* importingSourceFile, checker::Program* host,
-    ResolutionMode overrideMode, const CompilerOptions* options,
+    const NodeModulePathParts& parts, int packageBaseRootIndex,
+    const ModulePath& pathObj, SourceFile* importingSourceFile,
+    checker::Program* host, ResolutionMode overrideMode,
+    const CompilerOptions* options,
     const std::vector<ModuleSpecifierEnding>& allowedEndings);
 std::string tryGetModuleNameFromExports(
     const CompilerOptions* options, checker::Program* host,
@@ -1061,11 +1062,14 @@ std::string tryGetModuleNameAsNodeModule(
 		int packageRootIndex = parts->PackageRootIndex;
 		std::string moduleFileName;
 		while (true) {
+			auto currentParts = *parts;
+			currentParts.PackageRootIndex = packageRootIndex;
 			// If the module could be imported by a directory name, use that
 			// directory's name
 			auto pkgJsonResults = tryDirectoryWithPackageJson(
-			    *parts, pathObj, importingSourceFile, host, overrideMode,
-			    options, allowedEndings);
+			    currentParts, parts->PackageRootIndex, pathObj,
+			    importingSourceFile, host, overrideMode, options,
+			    allowedEndings);
 			auto moduleFileToTry = pkgJsonResults.moduleFileToTry;
 			auto packageRootPath = pkgJsonResults.packageRootPath;
 			auto blockedByExports = pkgJsonResults.blockedByExports;
@@ -1125,9 +1129,10 @@ std::string tryGetModuleNameAsNodeModule(
 
 // specifiers.go:837 — tryDirectoryWithPackageJson
 pkgJsonDirAttemptResult tryDirectoryWithPackageJson(
-    const NodeModulePathParts& parts, const ModulePath& pathObj,
-    SourceFile* importingSourceFile, checker::Program* host,
-    ResolutionMode overrideMode, const CompilerOptions* options,
+    const NodeModulePathParts& parts, int packageBaseRootIndex,
+    const ModulePath& pathObj, SourceFile* importingSourceFile,
+    checker::Program* host, ResolutionMode overrideMode,
+    const CompilerOptions* options,
     const std::vector<ModuleSpecifierEnding>& allowedEndings) {
 	auto rootIdx = parts.PackageRootIndex;
 	if (rootIdx == -1) {
@@ -1145,7 +1150,7 @@ pkgJsonDirAttemptResult tryDirectoryWithPackageJson(
 		// No package.json exists; an index.js will still resolve as the
 		// package name
 		auto fileName =
-		    moduleFileToTry.substr(parts.PackageRootIndex + 1);
+		    moduleFileToTry.substr(packageBaseRootIndex + 1);
 		if (fileName == "index.d.ts" || fileName == "index.js" ||
 		    fileName == "index.ts" || fileName == "index.tsx") {
 			return pkgJsonDirAttemptResult{moduleFileToTry, packageRootPath,

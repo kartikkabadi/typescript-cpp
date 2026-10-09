@@ -2,6 +2,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -23,6 +24,9 @@ struct StdioServerOptions {
 	// Callbacks specifies which filesystem operations should be delegated
 	// to the client (e.g., "readFile", "fileExists"). Empty means no callbacks.
 	std::vector<std::string> Callbacks;
+	// UseCaseSensitiveFileNames overrides the base filesystem's case
+	// sensitivity when set.
+	std::optional<bool> UseCaseSensitiveFileNames;
 	// Async enables JSON-RPC protocol with async connection handling.
 	// When false (default), uses MessagePack protocol with sync connection.
 	bool Async = false;

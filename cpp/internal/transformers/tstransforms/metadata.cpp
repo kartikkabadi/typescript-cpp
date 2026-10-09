@@ -44,6 +44,8 @@ struct MetadataTransformer : Transformer {
 			return visitClassDeclaration(node->as<ClassDeclaration>());
 		case Kind::ClassExpression:
 			return visitClassExpression(node->as<ClassExpression>());
+		case Kind::ObjectLiteralExpression:
+			return visitObjectLiteralExpression(node);
 		case Kind::PropertyDeclaration:
 			return visitPropertyDeclaration(
 				node->as<PropertyDeclaration>());
@@ -88,6 +90,18 @@ struct MetadataTransformer : Transformer {
 		default:
 			return visitor()->visitEachChild(node);
 		}
+	}
+
+	Node* visitObjectLiteralExpression(Node* node) {
+		Node* oldParent = parent;
+		parent = node;
+		struct parentGuard {
+			MetadataTransformer* tx;
+			Node* old;
+			~parentGuard() { tx->setParent(old); }
+		} g{this, oldParent};
+
+		return visitor()->visitEachChild(node);
 	}
 
 	Node* visitClassExpression(ClassExpression* node) {

@@ -38,110 +38,6 @@ struct wmLockGuard {
 	wmLockGuard& operator=(const wmLockGuard&) = delete;
 };
 
-// --- reflect.DeepEqual helpers for ParsedOptions (watcher.go:663) ---
-
-// watchOptionsEqual — reflect.DeepEqual on *WatchOptions.
-bool watchOptionsEqual(const WatchOptions* a, const WatchOptions* b) {
-	if (a == b) {
-		return true;
-	}
-	if (a == nullptr || b == nullptr) {
-		return false;
-	}
-	return intPtrEqual(a->Interval, b->Interval) &&
-	       a->FileKind == b->FileKind &&
-	       a->DirectoryKind == b->DirectoryKind &&
-	       a->FallbackPolling == b->FallbackPolling &&
-	       a->SyncWatchDir == b->SyncWatchDir &&
-	       a->ExcludeDir == b->ExcludeDir &&
-	       a->ExcludeFiles == b->ExcludeFiles;
-}
-
-// projectReferencesEqual — DeepEqual on []ProjectReference.
-bool projectReferencesEqual(const std::vector<ProjectReference*>& a,
-                            const std::vector<ProjectReference*>& b) {
-	if (a.size() != b.size()) {
-		return false;
-	}
-	for (size_t i = 0; i < a.size(); i++) {
-		if ((a[i] == nullptr) != (b[i] == nullptr)) {
-			return false;
-		}
-		if (a[i] != nullptr &&
-		    (a[i]->Path != b[i]->Path ||
-		     a[i]->OriginalPath != b[i]->OriginalPath ||
-		     a[i]->Circular != b[i]->Circular)) {
-			return false;
-		}
-	}
-	return true;
-}
-
-// mapperManifestEqual — DeepEqual on contentmapper.Manifest.
-bool mapperManifestEqual(const contentmapper::Manifest& a,
-                         const contentmapper::Manifest& b) {
-	return a.Name == b.Name && a.Version == b.Version && a.Exec == b.Exec &&
-	       a.CompilerOptions == b.CompilerOptions &&
-	       a.DynamicConfig == b.DynamicConfig;
-}
-
-// typeAcquisitionEqual — DeepEqual on *TypeAcquisition (nil-safe).
-bool typeAcquisitionEqual(const TypeAcquisition* a,
-                          const TypeAcquisition* b) {
-	if (a == nullptr || b == nullptr) {
-		return a == b;
-	}
-	return a->Equals(b);
-}
-
-// contentMappersEqual — DeepEqual on []contentmapper.Mapper.
-bool contentMappersEqual(
-    const std::vector<contentmapper::Mapper*>& a,
-    const std::vector<contentmapper::Mapper*>& b) {
-	if (a.size() != b.size()) {
-		return false;
-	}
-	for (size_t i = 0; i < a.size(); i++) {
-		if ((a[i] == nullptr) != (b[i] == nullptr)) {
-			return false;
-		}
-		if (a[i] == nullptr) {
-			continue;
-		}
-		const auto& am = a[i];
-		const auto& bm = b[i];
-		if (am->Definition.Package != bm->Definition.Package ||
-		    am->Definition.Extensions != bm->Definition.Extensions ||
-		    am->Definition.Options != bm->Definition.Options ||
-		    am->PackageDirectory != bm->PackageDirectory ||
-		    am->ContributionID != bm->ContributionID ||
-		    !mapperManifestEqual(am->Manifest, bm->Manifest)) {
-			return false;
-		}
-	}
-	return true;
-}
-
-// parsedOptionsDeepEqual — reflect.DeepEqual on *tsoptions.ParsedOptions
-// (watcher.go:663). Note: TypeAcquisition has its own Equals covering the
-// same fields.
-bool parsedOptionsDeepEqual(const tsoptions::ParsedOptions* a,
-                            const tsoptions::ParsedOptions* b) {
-	if (a == b) {
-		return true;
-	}
-	if (a == nullptr || b == nullptr) {
-		return false;
-	}
-	return compilerOptionsDeepEqual(a->CompilerOptions, b->CompilerOptions) &&
-	       watchOptionsEqual(a->WatchOptions, b->WatchOptions) &&
-	       typeAcquisitionEqual(a->TypeAcquisition, b->TypeAcquisition) &&
-	       a->FileNames == b->FileNames &&
-	       projectReferencesEqual(a->ProjectReferences,
-	                              b->ProjectReferences) &&
-	       contentMappersEqual(a->ContentMappers, b->ContentMappers);
-}
-
 }  // namespace
 
 // watchCompilerHost.GetSourceFile — watcher.go:36.
@@ -357,9 +253,24 @@ std::unordered_map<std::string, bool> Watcher::computeDesiredWatches(
 	for (auto& [dir, recursive] : resolvedDirs) {
 		coverage.Set(dir, recursive);
 	}
+	auto* programFiles = &program->GetProgram()->FilesByPath();
+	auto caseSensitive = sys->fs()->UseCaseSensitiveFileNames();
+	collections::Set<tspath::Path> rootFiles;
+	for (auto& fileName : config->FileNames()) {
+		rootFiles.Add(tspath::toPath(fileName, cwd, caseSensitive));
+	}
 	for (auto& filePath : seenFilePaths) {
 		auto dir = tspath::getDirectoryPath(filePath);
-		if (!coverage.Covered(dir) &&
+		if (coverage.Covered(dir)) {
+			continue;
+		}
+		// Seen files mix program files with lookup locations. Only lookups
+		// keep the depth check, so an imported file outside the tsconfig
+		// directory (say /shared next to /app) is still watched. A root
+		// file is not in the program while it is missing, but its
+		// directory stays watched so that recreating it rebuilds.
+		auto p = tspath::toPath(filePath, cwd, caseSensitive);
+		if (programFiles->count(p) != 0 || rootFiles.Has(p) ||
 		    watchmanager::CanWatchDirectory(dir)) {
 			coverage.Set(dir, false);
 		}
@@ -812,12 +723,29 @@ tsc::CompileAndEmitResult Watcher::compileAndEmit() {
 bool Watcher::contentMapperManifestChanged(
     const std::unordered_map<std::string, fswatch::EventKind>&
         changedPaths) {
+	auto opts = comparePathsOptions();
+	std::unique_ptr<std::unordered_map<tspath::Path, bool>> changedPathKeys;
 	for (auto* mapper : config->ContentMappers()) {
 		if (mapper->PackageDirectory.empty() ||
 		    !mapper->ContributionID.empty()) {
 			continue;
 		}
-		if (changedPaths.count(tspath::combinePaths(mapper->PackageDirectory, {"package.json"})) != 0) {
+		if (changedPathKeys == nullptr) {
+			changedPathKeys = std::make_unique<
+			    std::unordered_map<tspath::Path, bool>>();
+			changedPathKeys->reserve(changedPaths.size());
+			for (auto& [path, _] : changedPaths) {
+				(*changedPathKeys)[tspath::toPath(
+				    path, opts.currentDirectory,
+				    opts.useCaseSensitiveFileNames)] = true;
+			}
+		}
+		std::string manifestPath = tspath::combinePaths(
+		    mapper->PackageDirectory, {"package.json"});
+		tspath::Path manifestKey = tspath::toPath(
+		    manifestPath, opts.currentDirectory,
+		    opts.useCaseSensitiveFileNames);
+		if (changedPathKeys->count(manifestKey) != 0) {
 			return true;
 		}
 	}
@@ -863,8 +791,8 @@ bool Watcher::recheckTsConfig(bool force) {
 	for (auto& f : configParseResult->ExtendedSourceFiles()) {
 		configFilePaths.push_back(f);
 	}
-	if (!parsedOptionsDeepEqual(config->ParsedConfig,
-	                            configParseResult->ParsedConfig)) {
+	if (!config->ParsedConfig->Equals(
+	        configParseResult->ParsedConfig)) {
 		configModified = true;
 	}
 	replaceContentMapperProject(configParseResult);

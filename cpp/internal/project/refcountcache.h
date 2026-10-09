@@ -69,6 +69,28 @@ struct RefCountCache {
 		return ok;
 	}
 
+	// AcquireExisting retrieves an existing entry and increments its reference
+	// count. It returns false without producing a value when no live entry
+	// exists.
+	//
+	// The caller is responsible for calling Deref when a value is returned.
+	std::pair<V, bool> AcquireExisting(const K& identity) {
+		auto [entry, ok] = entries.Load(identity);
+		if (!ok) {
+			return {V{}, false};
+		}
+		entry->mu.lock();
+		struct UnlockGuard {
+			refCountCacheEntry<V>* e;
+			~UnlockGuard() { e->mu.unlock(); }
+		} guard{entry.get()};
+		if (entry->refCount <= 0 && !Options.DisableDeletion) {
+			return {V{}, false};
+		}
+		entry->refCount++;
+		return {entry->value, true};
+	}
+
 	// AcquireOrError retrieves an existing entry (incrementing its refcount)
 	// or produces a new one via produce. If produce returns an error, no
 	// entry is stored and the error is returned, so callers can cache only

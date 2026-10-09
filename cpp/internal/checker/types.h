@@ -376,6 +376,21 @@ struct ContainingSymbolLinks {
 	std::unordered_map<AccessibleChainCacheKey, std::vector<Symbol*>, AccessibleChainCacheKeyHash> accessibleChainCache;
 };
 
+// externalModuleContainerIndex — symbolaccessibility.go
+struct externalModuleContainerIndex {
+	bool complete = false;
+	std::unordered_map<Symbol*, std::vector<Symbol*>> containersByTarget;
+	std::unordered_map<Symbol*, int> moduleOrder;
+
+	void add(Symbol* target, Symbol* container) {
+		// Modules are indexed one at a time, so a repeat of this container is always the last entry.
+		auto& existing = containersByTarget[target];
+		if (existing.empty() || existing.back() != container) {
+			existing.push_back(container);
+		}
+	}
+};
+
 using AccessFlags = uint32_t;
 inline constexpr AccessFlags AccessFlagsNone = 0;
 inline constexpr AccessFlags AccessFlagsIncludeUndefined = 1 << 0;

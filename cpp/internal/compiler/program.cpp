@@ -198,6 +198,7 @@ bool isPlainJSError(int32_t code) {
 	        ->code,
 	    A_default_export_must_be_at_the_top_level_of_a_file_or_module_declaration
 	        ->code,
+	    A_deferred_import_must_specify_a_namespace_binding->code,
 	    A_definite_assignment_assertion_is_not_permitted_in_this_context->code,
 	    A_destructuring_declaration_must_have_an_initializer->code,
 	    A_get_accessor_cannot_have_parameters->code,
@@ -212,6 +213,7 @@ bool isPlainJSError(int32_t code) {
 	    A_return_statement_cannot_be_used_inside_a_class_static_block->code,
 	    A_set_accessor_cannot_have_rest_parameter->code,
 	    A_set_accessor_must_have_exactly_one_parameter->code,
+    A_source_phase_import_must_specify_a_local_binding->code,
 	    An_export_declaration_can_only_be_used_at_the_top_level_of_a_module
 	        ->code,
 	    An_export_declaration_cannot_have_modifiers->code,
@@ -243,14 +245,21 @@ bool isPlainJSError(int32_t code) {
 	    Jump_target_cannot_cross_function_boundary->code,
 	    Line_terminator_not_permitted_before_arrow->code,
 	    Modifiers_cannot_appear_here->code,
+    Named_and_namespace_imports_are_not_allowed_in_a_source_phase_import
+        ->code,
 	    Only_a_single_variable_declaration_is_allowed_in_a_for_in_statement
 	        ->code,
 	    Only_a_single_variable_declaration_is_allowed_in_a_for_of_statement
 	        ->code,
+	    Optional_chaining_cannot_be_used_with_import_source->code,
 	    Private_identifiers_are_not_allowed_outside_class_bodies->code,
 	    Private_identifiers_are_only_allowed_in_class_bodies_and_may_only_be_used_as_part_of_a_class_member_declaration_property_access_or_on_the_left_hand_side_of_an_in_expression
 	        ->code,
 	    Property_0_is_not_accessible_outside_class_1_because_it_has_a_private_identifier
+	        ->code,
+	    Source_phase_imports_are_not_allowed_on_statements_that_compile_to_CommonJS_require_calls
+	        ->code,
+	    Source_phase_imports_are_only_supported_when_the_module_option_is_set_to_esnext_nodenext_or_preserve
 	        ->code,
 	    Tagged_template_expressions_are_not_permitted_in_an_optional_chain
 	        ->code,
@@ -400,8 +409,12 @@ SimpleProgram::SimpleProgram(CompilerHost* host_,
 	// filesparser.go:565 literal).
 	finishedProcessing = true;
 	resolver_ = std::move(loader.resolverOwned);
+	// fileloader.go:235 — the resolver's ResolutionData is stored on the
+	// program (a5c43c4d54): package-scope lookups build fresh resolvers
+	// over it via newResolver().
+	resolutionData_ = loader.resolver->GetResolutionData();
 	projectReferenceFileMapper_ =
-	    std::move(loader.projectReferenceFileMapper);
+	    std::move(loader.projectReferences.mapper);
 	duplicateSourceFiles = std::move(parser.duplicateSourceFiles);
 	outputFileToProjectReferenceSource =
 	    std::move(parser.outputFileToProjectReferenceSource);
@@ -521,6 +534,7 @@ std::optional<checker::ResolvedModule> SimpleProgram::GetResolvedModule(
 	out.resolvedFileName = rm->ResolvedFileName;
 	out.resolvedUsingTsExtension = rm->ResolvedUsingTsExtension;
 	out.isExternalLibraryImport = rm->IsExternalLibraryImport;
+	out.isCustomResolution = rm->IsCustomResolution;
 	out.extension = rm->Extension;
 	out.alternateResult = rm->AlternateResult;
 	out.packageId = checker::PackageId{rm->PackageId.Name};
@@ -529,10 +543,23 @@ std::optional<checker::ResolvedModule> SimpleProgram::GetResolvedModule(
 }
 
 // === slice: modulespecifiers ===
+// program.go:191 newResolver — fresh DefaultResolver over the
+// program's resolution data, host wrapped to BaseDirectory and through
+// the mapper's (possibly dts-faking) resolution host.
+module::DefaultResolver* SimpleProgram::newResolver() {
+	auto crh = std::make_unique<compilerResolutionHost>();
+	crh->host = host;
+	crh->baseDirectory = BaseDirectory();
+	compilerResolutionHostArena.push_back(std::move(crh));
+	return resolutionData_->NewResolver(
+	    projectReferenceFileMapper_->resolutionHost(
+	        compilerResolutionHostArena.back().get()));
+}
+
 // program.go GetNearestAncestorDirectoryWithPackageJson.
 std::string SimpleProgram::GetNearestAncestorDirectoryWithPackageJson(
     const std::string& dirname) {
-	auto scoped = resolver_->GetPackageScopeForPath(dirname);
+	auto scoped = newResolver()->GetPackageScopeForPath(dirname);
 	if (scoped && scoped->Exists()) {
 		return scoped->PackageDirectory;
 	}
@@ -543,7 +570,7 @@ std::string SimpleProgram::GetNearestAncestorDirectoryWithPackageJson(
 std::shared_ptr<packagejson::InfoCacheEntry>
 SimpleProgram::GetPackageJsonInfo(const std::string& pkgJsonPath) {
 	auto directory = tspath::getDirectoryPath(pkgJsonPath);
-	auto scoped = resolver_->GetPackageScopeForPath(directory);
+	auto scoped = newResolver()->GetPackageScopeForPath(directory);
 	if (scoped && scoped->Exists() && scoped->PackageDirectory == directory) {
 		return scoped;
 	}
@@ -556,6 +583,9 @@ module::ResolvedModule* SimpleProgram::GetResolvedModuleFromModuleSpecifier(
 	if (!isStringLiteralLike(moduleSpecifier)) {
 		TSC_UNREACHABLE(
 		    "moduleSpecifier must be a StringLiteralLike — program slice");
+	}
+	if (isSourcePhaseImport(moduleSpecifier->parent)) {
+		return nullptr;
 	}
 	ResolutionMode mode = GetModeForUsageLocation(file, moduleSpecifier);
 	return getResolvedModuleByPath(file->Path(),
@@ -2682,6 +2712,7 @@ std::vector<checker::ResolvedModule> SimpleProgram::GetResolvedModules() {
 				out.resolvedFileName = rm->ResolvedFileName;
 				out.resolvedUsingTsExtension = rm->ResolvedUsingTsExtension;
 				out.isExternalLibraryImport = rm->IsExternalLibraryImport;
+	out.isCustomResolution = rm->IsCustomResolution;
 				out.extension = rm->Extension;
 				out.alternateResult = rm->AlternateResult;
 				out.packageId = checker::PackageId{rm->PackageId.Name};
@@ -2788,7 +2819,7 @@ void SimpleProgram::PackageJsonCacheEntries(
     const std::function<bool(
         tspath::Path, const std::shared_ptr<packagejson::InfoCacheEntry>&)>&
         f) {
-	resolver_->PackageJsonCacheEntries(f);
+	resolutionData_->PackageJsonCacheEntries(f);
 }
 
 // program.go:804 GetSemanticDiagnosticsForIncremental — includes newly
@@ -2857,10 +2888,12 @@ SimpleProgram* NewProgram(const ProgramOptions& opts) {
 
 // program.go:2120 ExplainFiles.
 void SimpleProgram::ExplainFiles(std::ostream& w,
-                                 const locale::Locale& locale) {
-	auto toRelativeFileName = [this](const std::string& fileName) {
+                                 const locale::Locale& locale,
+                                 const tspath::Path& currentDirectory) {
+	auto toRelativeFileName = [this, &currentDirectory](
+	                              const std::string& fileName) {
 		return tspath::getRelativePathFromDirectory(
-		    GetCurrentDirectory(), fileName, comparePathsOptions());
+		    currentDirectory, fileName, comparePathsOptions());
 	};
 	auto localizeDiag = [&](Diagnostic* d) {
 		// ast.Diagnostic.Localize — diagnostic.go:117.
@@ -2881,7 +2914,8 @@ void SimpleProgram::ExplainFiles(std::ostream& w,
 		auto it = includeProcessor_.fileIncludeReasons.find(path);
 		if (it != includeProcessor_.fileIncludeReasons.end()) {
 			for (auto* reason : it->second) {
-				auto* diag = reason->toDiagnostic(this, true);
+				auto* diag = reason->toDiagnostic(this, true,
+				                                  currentDirectory);
 				w << "   " << localizeDiag(diag) << '\n';
 			}
 		}
@@ -2969,7 +3003,9 @@ bool SimpleProgram::canReplaceFileInProgram(SourceFile* file1,
 			       auto* n2 = file2->imports[i];
 			       if (!equalModuleSpecifiers(n1, n2) ||
 			           GetModeForUsageLocation(file1, n1) !=
-			               GetModeForUsageLocation(file2, n2)) {
+			               GetModeForUsageLocation(file2, n2) ||
+			           isSourcePhaseImport(n1->parent) !=
+			               isSourcePhaseImport(n2->parent)) {
 				       return false;
 			       }
 		       }
@@ -3165,6 +3201,9 @@ std::tuple<SimpleProgram*, SourceFile*, bool> SimpleProgram::ReuseProgram(
 	// processedFiles fields (fileloader.go:113-145) — the Go literal
 	// copies the struct wholesale.
 	result->resolver_ = resolver_;
+	// program.go:427 — the spliced program clones the resolution data
+	// (new package-json table, shared entries).
+	result->resolutionData_ = resolutionData_->Clone();
 	result->files = files;
 	result->duplicateSourceFiles = duplicateSourceFiles;
 	result->filesByPath = filesByPath;
@@ -3301,7 +3340,8 @@ SimpleProgram::extractUnresolvedImportsFromSourceFile(SourceFile* file) {
 // resolutions' realpath bookkeeping plus a package.json dependency probe
 // (records each runtime dep's original->resolved package.json pair).
 symlinks::KnownSymlinks* SimpleProgram::GetSymlinkCache() {
-	return knownSymlinks.getValue([this]() -> symlinks::KnownSymlinks* {
+	auto* resolver = newResolver();
+	return knownSymlinks.getValue([this, resolver]() -> symlinks::KnownSymlinks* {
 		auto* knownSymlinks = symlinks::NewKnownSymlink(
 		    GetCurrentDirectory(), UseCaseSensitiveFileNames());
 
@@ -3372,7 +3412,7 @@ symlinks::KnownSymlinks* SimpleProgram::GetSymlinkCache() {
 				}
 
 				auto packageResolution =
-				    resolver_->ResolvePackageDirectory(
+				    resolver->ResolvePackageDirectory(
 				        dep, packageJsonName,
 				        ResolutionModeCommonJS, nullptr);
 				if (packageResolution != nullptr &&
@@ -3544,7 +3584,8 @@ void SimpleProgram::ForEachCheckerParallel(
 
 // program.go:2226 collectPackageNames — lazyValue[packageNamesInfo].
 SimpleProgram::packageNamesInfo* SimpleProgram::collectPackageNames() {
-	return packageNames_.getValue([this]() -> packageNamesInfo* {
+	auto* resolver = newResolver();
+	return packageNames_.getValue([this, resolver]() -> packageNamesInfo* {
 		auto* packageNames = new packageNamesInfo{};
 		for (auto* file : files) {
 			if (IsSourceFileDefaultLibrary(file->Path()) ||
@@ -3558,7 +3599,8 @@ SimpleProgram::packageNamesInfo* SimpleProgram::collectPackageNames() {
 				continue;
 			}
 			for (auto* imp : file->imports) {
-				if (tspath::isExternalModuleNameRelative(imp->text())) {
+				if (isSourcePhaseImport(imp->parent) ||
+				    tspath::isExternalModuleNameRelative(imp->text())) {
 					continue;
 				}
 				auto rmIt = resolvedModules.find(file->Path());
@@ -3582,7 +3624,7 @@ SimpleProgram::packageNamesInfo* SimpleProgram::collectPackageNames() {
 							// 2. GetPackageScopeForPath - get name from
 							//    package.json in the package directory
 							auto packageScope =
-							    resolver_->GetPackageScopeForPath(
+							    resolver->GetPackageScopeForPath(
 							        resolvedModule->ResolvedFileName);
 							if (packageScope != nullptr &&
 							    packageScope->Exists()) {
@@ -3616,7 +3658,7 @@ SimpleProgram::packageNamesInfo* SimpleProgram::collectPackageNames() {
 							    module::ParsePackageName(imp->text());
 							if (!rest.empty()) {
 								if (auto scope =
-								        resolver_
+								        resolver
 								            ->GetPackageScopeForPath(
 								                resolvedModule
 								                    ->ResolvedFileName);

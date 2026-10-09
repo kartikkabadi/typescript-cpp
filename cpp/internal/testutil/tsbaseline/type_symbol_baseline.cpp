@@ -253,11 +253,7 @@ typeWriterResult* writeTypeOrSymbol(typeWriterWalker* walker, Node* node,
 		std::function<void()> f;
 	} doneGuard{done};
 
-	auto [ctx, putCtx] = printer::GetEmitContext();
-	struct PutCtxGuard {
-		~PutCtxGuard() { f(); }
-		std::function<void()> f;
-	} putCtxGuard{putCtx};
+	auto* ctx = printer::NewEmitContext();
 
 	if (!isSymbolWalk) {
 		// Don't try to get the type of something that's already a type.
@@ -302,7 +298,6 @@ typeWriterResult* writeTypeOrSymbol(typeWriterWalker* walker, Node* node,
 		    !isIntrinsicJsxTag(node, walker->currentSourceFile)) {
 			typeString = t->AsIntrinsicType()->intrinsicName;
 		} else {
-			ctx->reset();
 			auto* builder = checker::NewNodeBuilder(fileChecker, ctx);
 			auto typeFormatFlags =
 			    checker::TypeFormatFlagsNoTruncation |

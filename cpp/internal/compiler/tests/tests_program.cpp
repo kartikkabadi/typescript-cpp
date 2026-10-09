@@ -118,10 +118,12 @@ static const std::vector<std::string> esnextLibs = {
 	"lib.es2026.json.d.ts",
 	"lib.es2026.math.d.ts",
 	"lib.es2026.typedarrays.d.ts",
+	"lib.esnext.promise.d.ts",
 	"lib.esnext.date.d.ts",
 	"lib.esnext.decorators.d.ts",
 	"lib.esnext.disposable.d.ts",
 	"lib.esnext.intl.d.ts",
+	"lib.esnext.modulesource.d.ts",
 	"lib.esnext.sharedmemory.d.ts",
 	"lib.esnext.temporal.d.ts",
 	"lib.decorators.d.ts",
@@ -313,3 +315,101 @@ static void TestIncludeProcessorDiagnosticsWithMissingFileCasing(T* t) {
 REGISTER_UNIT_TEST("compiler.TestProgram", TestProgram);
 REGISTER_UNIT_TEST("compiler.TestIncludeProcessorDiagnosticsWithMissingFileCasing",
 				   TestIncludeProcessorDiagnosticsWithMissingFileCasing);
+
+static void TestImportSourceProgram(T* t) {
+	t->Parallel();
+	struct test {
+		std::string name;
+		std::string source;
+		std::string evaluation;
+	};
+	std::vector<test> tests = {
+	    {"static", "import source a from \"./a.js\";",
+	     "import { a as value } from \"./a.js\";"},
+	    {"dynamic", "import.source(\"./a.js\");", "import(\"./a.js\");"},
+	};
+	for (auto& test : tests) {
+		t->Run(test.name, [&test](T* t) {
+			t->Parallel();
+			std::string content =
+			    test.source +
+			    "import source b from \"missing\"; import.source(\"other\");";
+			std::unordered_map<std::string, vfs::vfstest::MapFileInput> files = {
+			    {"/src/tsconfig.json",
+			     "{\"compilerOptions\":{\"module\":\"esnext\",\"noLib\":true},"
+			     "\"files\":[\"index.ts\"]}"},
+			    {"/src/index.ts", content},
+			    {"/src/a.ts", "export const a = 1;"},
+			};
+			compiler::CompilerHost* host = compiler::NewCompilerHost(
+			    "/", vfs::vfstest::FromMap(files, true), "", nullptr,
+			    nullptr, nullptr);
+			auto [config, diagnostics] =
+			    tsoptions::GetParsedCommandLineOfConfigFile(
+			        "/src/tsconfig.json", nullptr, nullptr, host, nullptr);
+			gotest::assert::Equal(t, diagnostics.size(), size_t(0));
+			compiler::ProgramOptions programOpts;
+			programOpts.Config = config;
+			programOpts.Host = host;
+			auto* program = compiler::NewProgram(programOpts);
+			auto* file = program->GetSourceFile("/src/index.ts");
+			gotest::assert::Assert(t, program->GetSourceFile("/src/a.ts") ==
+			                    nullptr);
+			gotest::assert::Equal(t, program->GetResolvedModules().size(),
+			              size_t(0));
+			gotest::assert::Equal(t, program->GetUnresolvedImports()->Len(),
+			              size_t(0));
+			gotest::assert::Equal(t,
+			              program->collectPackageNames()->unresolved.Len(),
+			              size_t(0));
+
+			std::string evaluation = test.evaluation +
+				content.substr(test.source.size());
+			files["/src/index.ts"] = evaluation;
+			host = compiler::NewCompilerHost(
+			    "/", vfs::vfstest::FromMap(files, true), "", nullptr,
+			    nullptr, nullptr);
+			auto [program2, file2, reused] = program->UpdateProgram(
+			    "/src/index.ts", host, nullptr, nullptr);
+			gotest::assert::Assert(t, !reused);
+			program = program2;
+			gotest::assert::Assert(t, program->GetSourceFile("/src/a.ts") !=
+			                    nullptr);
+			for (auto* specifier : file2->imports) {
+				auto* resolved =
+				    program->GetResolvedModuleFromModuleSpecifier(
+				        file2, specifier);
+				gotest::assert::Equal(t, resolved != nullptr && resolved->IsResolved(),
+				              !isSourcePhaseImport(specifier->parent));
+			}
+
+			files["/src/index.ts"] = content;
+			host = compiler::NewCompilerHost(
+			    "/", vfs::vfstest::FromMap(files, true), "", nullptr,
+			    nullptr, nullptr);
+			auto [program3, file3, reused3] = program->UpdateProgram(
+			    "/src/index.ts", host, nullptr, nullptr);
+			gotest::assert::Assert(t, !reused3);
+			program = program3;
+			gotest::assert::Assert(t, program->GetSourceFile("/src/a.ts") ==
+			                    nullptr);
+
+			files["/src/index.ts"] = test.evaluation + content;
+			host = compiler::NewCompilerHost(
+			    "/", vfs::vfstest::FromMap(files, true), "", nullptr,
+			    nullptr, nullptr);
+			auto [program4, file4, reused4] = program->UpdateProgram(
+			    "/src/index.ts", host, nullptr, nullptr);
+			program = program4;
+			for (auto* specifier : file4->imports) {
+				auto* resolved =
+				    program->GetResolvedModuleFromModuleSpecifier(
+				        file4, specifier);
+				gotest::assert::Equal(t, resolved != nullptr && resolved->IsResolved(),
+				              !isSourcePhaseImport(specifier->parent));
+			}
+		});
+	}
+}
+REGISTER_UNIT_TEST("compiler.TestImportSourceProgram",
+                   TestImportSourceProgram);

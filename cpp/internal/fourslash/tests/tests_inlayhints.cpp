@@ -32,7 +32,7 @@ function doThing(f) {
     f(100)
 })TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{
 	.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsAll,
 	.IncludeInlayVariableTypeHints = Tristate::True,}}));
 	});
@@ -53,7 +53,7 @@ let foo = {
 }
 )TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{
 		.IncludeInlayVariableTypeHints = Tristate::True}}));
 	});
 }
@@ -70,7 +70,7 @@ static void TestInlayHintsEnumMemberValue(gostd::testing::T* t) {
     C = 'C',
 })TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayEnumMemberValueHints = Tristate::True}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayEnumMemberValueHints = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsEnumMemberValue, TestInlayHintsEnumMemberValue);
@@ -97,7 +97,7 @@ type F2 = (a: {
 }) => void
 const foo5: F2 = (a) => { })TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayFunctionParameterTypeHints = Tristate::True}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayFunctionParameterTypeHints = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsFunctionParameterTypes1, TestInlayHintsFunctionParameterTypes1);
@@ -121,7 +121,7 @@ function f10(a = ((((new C()))))) {}
 function f11(a = { a: 1, b: 1 }) {}
 function f12(a = ((({ a: 1, b: 1 })))) {})TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayFunctionParameterTypeHints = Tristate::True}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayFunctionParameterTypeHints = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsFunctionParameterTypes2, TestInlayHintsFunctionParameterTypes2);
@@ -144,7 +144,7 @@ class Foo {
     set foo(value) { this.#value = value; }
 })TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayFunctionParameterTypeHints = Tristate::True}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayFunctionParameterTypeHints = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsFunctionParameterTypes3, TestInlayHintsFunctionParameterTypes3);
@@ -164,7 +164,7 @@ class Foo {
     set foo(value) { this.#value = value; }
 })TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayFunctionParameterTypeHints = Tristate::True}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayFunctionParameterTypeHints = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsFunctionParameterTypes4, TestInlayHintsFunctionParameterTypes4);
@@ -180,7 +180,7 @@ declare function test(
 
 test((state) => {});)TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayFunctionParameterTypeHints = Tristate::True}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayFunctionParameterTypeHints = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsFunctionParameterTypes5, TestInlayHintsFunctionParameterTypes5);
@@ -191,7 +191,7 @@ static void TestInlayHintsIdentifierLocation(gostd::testing::T* t) {
 		const std::string content = R"TS(interface Foo {}
 const p = (a: Foo[]) => a;)TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayVariableTypeHints = Tristate::True}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayVariableTypeHints = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsIdentifierLocation, TestInlayHintsIdentifierLocation);
@@ -207,7 +207,7 @@ module.exports.a = 1
 const a = require('./a');)TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
 		f->GoToFile(t, "/b.js");
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayVariableTypeHints = Tristate::True}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayVariableTypeHints = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsImportType1, TestInlayHintsImportType1);
@@ -226,7 +226,7 @@ const c = foo()
 const d = bar())TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
 		f->GoToFile(t, "/b.js");
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayVariableTypeHints = Tristate::True, .IncludeInlayFunctionLikeReturnTypeHints = Tristate::True}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayVariableTypeHints = Tristate::True, .IncludeInlayFunctionLikeReturnTypeHints = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsImportType2, TestInlayHintsImportType2);
@@ -239,7 +239,7 @@ function test(x: unknown) {
   return typeof x === 'number';
 })TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayFunctionLikeReturnTypeHints = Tristate::True}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayFunctionLikeReturnTypeHints = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsInferredTypePredicate1, TestInlayHintsInferredTypePredicate1);
@@ -255,7 +255,7 @@ foo(foo);
 foo((1));
 foo(foo(1));)TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsLiterals}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsLiterals}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsInteractiveAnyParameter1, TestInlayHintsInteractiveAnyParameter1);
@@ -277,7 +277,7 @@ foo(foo);
 foo((1));
 foo(foo(1));)TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsAll}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsAll}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsInteractiveAnyParameter2, TestInlayHintsInteractiveAnyParameter2);
@@ -323,7 +323,7 @@ foo4(p => {})
  }) => void
  const foo5: F4 = (a) => { })TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayFunctionParameterTypeHints = Tristate::True}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayFunctionParameterTypeHints = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsInteractiveFunctionParameterTypes1, TestInlayHintsInteractiveFunctionParameterTypes1);
@@ -347,7 +347,7 @@ function f10(a = ((((new C()))))) {}
 function f11(a = { a: 1, b: 1 }) {}
 function f12(a = ((({ a: 1, b: 1 })))) {})TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayFunctionParameterTypeHints = Tristate::True}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayFunctionParameterTypeHints = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsInteractiveFunctionParameterTypes2, TestInlayHintsInteractiveFunctionParameterTypes2);
@@ -370,7 +370,7 @@ class Foo {
     set foo(value) { this.#value = value; }
 })TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayFunctionParameterTypeHints = Tristate::True}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayFunctionParameterTypeHints = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsInteractiveFunctionParameterTypes3, TestInlayHintsInteractiveFunctionParameterTypes3);
@@ -390,7 +390,7 @@ class Foo {
     set foo(value) { this.#value = value; }
 })TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayFunctionParameterTypeHints = Tristate::True}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayFunctionParameterTypeHints = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsInteractiveFunctionParameterTypes4, TestInlayHintsInteractiveFunctionParameterTypes4);
@@ -401,7 +401,7 @@ static void TestInlayHintsInteractiveFunctionParameterTypes5(gostd::testing::T* 
 		const std::string content = R"TS(const foo: 1n = 1n;
 export function fn(b = foo) {})TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayFunctionParameterTypeHints = Tristate::True}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayFunctionParameterTypeHints = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsInteractiveFunctionParameterTypes5, TestInlayHintsInteractiveFunctionParameterTypes5);
@@ -417,7 +417,7 @@ module.exports.a = 1
 const a = require('./a');)TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
 		f->GoToFile(t, "/b.js");
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayVariableTypeHints = Tristate::True}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayVariableTypeHints = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsInteractiveImportType1, TestInlayHintsInteractiveImportType1);
@@ -436,7 +436,7 @@ const c = foo()
 const d = bar())TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
 		f->GoToFile(t, "/b.js");
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayVariableTypeHints = Tristate::True, .IncludeInlayFunctionLikeReturnTypeHints = Tristate::True}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayVariableTypeHints = Tristate::True, .IncludeInlayFunctionLikeReturnTypeHints = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsInteractiveImportType2, TestInlayHintsInteractiveImportType2);
@@ -449,7 +449,7 @@ function test(x: unknown) {
   return typeof x === 'number';
 })TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayFunctionLikeReturnTypeHints = Tristate::True}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayFunctionLikeReturnTypeHints = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsInteractiveInferredTypePredicate1, TestInlayHintsInteractiveInferredTypePredicate1);
@@ -473,7 +473,7 @@ y.foo(1, 2)
 var z = "")TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
 		f->GoToFile(t, "/a.js");
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsLiterals}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsLiterals}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsInteractiveJsDocParameterNames, TestInlayHintsInteractiveJsDocParameterNames);
@@ -495,7 +495,7 @@ async function main () {
 })TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
 		f->GoToFile(t, "/b.ts");
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayVariableTypeHints = Tristate::True, .IncludeInlayFunctionLikeReturnTypeHints = Tristate::True}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayVariableTypeHints = Tristate::True, .IncludeInlayFunctionLikeReturnTypeHints = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsInteractiveMultifile1, TestInlayHintsInteractiveMultifile1);
@@ -517,7 +517,7 @@ export function helperB(bParam: string) {
 export function helperC(cParam: string) {})TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
 		f->GoToFile(t, "./aaa.mts");
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsAll}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsAll}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsInteractiveMultifileFunctionCalls, TestInlayHintsInteractiveMultifileFunctionCalls);
@@ -547,7 +547,7 @@ class Class {
 new Class(1)
 new Class(1, 2))TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsLiterals}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsLiterals}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsInteractiveOverloadCall, TestInlayHintsInteractiveOverloadCall);
@@ -573,7 +573,7 @@ function c6 () { foo6(/*k*/1, /*l*/2); })TS";
 		auto end = f->MarkerByName(t, "h");
 		auto span = std::make_shared<lsproto::Range>(lsproto::Range{.Start = start->LSPosition, .End = end->LSPosition});
 		f->VerifyBaselineInlayHints(t, span, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{
-		.InlayHints = lsutil::InlayHintsPreferences{
+		.InlayHintsPreferences = lsutil::InlayHintsPreferences{
 			.IncludeInlayParameterNameHints = "literals"}}));
 	});
 }
@@ -600,7 +600,7 @@ foo6(/*k*/1, /*l*/2);)TS";
 		auto end = f->MarkerByName(t, "h");
 		auto span = std::make_shared<lsproto::Range>(lsproto::Range{.Start = start->LSPosition, .End = end->LSPosition});
 		f->VerifyBaselineInlayHints(t, span, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{
-		.InlayHints = lsutil::InlayHintsPreferences{
+		.InlayHintsPreferences = lsutil::InlayHintsPreferences{
 			.IncludeInlayParameterNameHints = "literals"}}));
 	});
 }
@@ -641,7 +641,7 @@ foo(
     3
 ))TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsLiterals}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsLiterals}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsInteractiveParameterNamesWithComments, TestInlayHintsInteractiveParameterNamesWithComments);
@@ -689,7 +689,7 @@ function trace(message: string) {}
 trace()TS" +std::string("`") +std::string(R"TS(${1})TS") +std::string("`") +std::string(R"TS();
 trace()TS") +std::string("`") +std::string(R"TS()TS") +std::string("`") +std::string(R"TS();)TS");
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsLiterals}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsLiterals}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsInteractiveParameterNames, TestInlayHintsInteractiveParameterNames);
@@ -706,7 +706,7 @@ type Args3 = [number, number]
 declare function foo3(c: number, ...args: Args3);
 foo3(1, 2, 3))TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsLiterals}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsLiterals}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsInteractiveRestParameters1, TestInlayHintsInteractiveRestParameters1);
@@ -731,7 +731,7 @@ function foo5(...x: [number, number]) {
     foo(...x, 3);
 })TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsAll}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsAll}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsInteractiveRestParameters2, TestInlayHintsInteractiveRestParameters2);
@@ -745,7 +745,7 @@ static void TestInlayHintsInteractiveRestParameters3(gostd::testing::T* t) {
 const foo: [x: number, y: number] = [1, 2];
 fn(...foo, 3, 4);)TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsAll}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsAll}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsInteractiveRestParameters3, TestInlayHintsInteractiveRestParameters3);
@@ -772,7 +772,7 @@ const b = function () { return 1 }
 const c = (b) => 1
 const d = b => 1)TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayFunctionLikeReturnTypeHints = Tristate::True}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayFunctionLikeReturnTypeHints = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsInteractiveReturnType, TestInlayHintsInteractiveReturnType);
@@ -789,7 +789,7 @@ const lit3 = getTemplateLiteral3();
 declare function getTemplateLiteral4(): )TS") +std::string("`") +std::string(R"TS(${string}\)TS") +std::string("`") +std::string(R"TS(,${string})TS") +std::string("`") +std::string(R"TS(;
 const lit4 = getTemplateLiteral4();)TS");
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayVariableTypeHints = Tristate::True}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayVariableTypeHints = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsInteractiveTemplateLiteralTypes, TestInlayHintsInteractiveTemplateLiteralTypes);
@@ -818,7 +818,7 @@ const l = ((({ a: 1, b: 1 })));
  const p = ([a]: Foo[]) => a;
  const q = ({ a }: { a: Foo }) => a;)TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayVariableTypeHints = Tristate::True}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayVariableTypeHints = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsInteractiveVariableTypes1, TestInlayHintsInteractiveVariableTypes1);
@@ -837,7 +837,7 @@ const [] = array;
 declare function foo<T extends number>(t: T): T
 const x = foo(1))TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayVariableTypeHints = Tristate::True}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayVariableTypeHints = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsInteractiveVariableTypes2, TestInlayHintsInteractiveVariableTypes2);
@@ -856,7 +856,7 @@ function foo2(a: (b: number) => number) {
 }
 foo2((c: number) => c + 1);)TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsAll}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsAll}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsInteractiveWithClosures, TestInlayHintsInteractiveWithClosures);
@@ -880,7 +880,7 @@ y.foo(1, 2)
 var z = "")TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
 		f->GoToFile(t, "/a.js");
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsLiterals}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsLiterals}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsJsDocParameterNames, TestInlayHintsJsDocParameterNames);
@@ -901,7 +901,7 @@ async function main () {
 })TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
 		f->GoToFile(t, "/b.ts");
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayVariableTypeHints = Tristate::True, .IncludeInlayFunctionLikeReturnTypeHints = Tristate::True}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayVariableTypeHints = Tristate::True, .IncludeInlayFunctionLikeReturnTypeHints = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsMultifile1, TestInlayHintsMultifile1);
@@ -917,7 +917,7 @@ foo(v.a, v.a);
 foo(v.b, v.b);
 foo(v.c, v.c);)TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsAll, .IncludeInlayParameterNameHintsWhenArgumentMatchesName = Tristate::False}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsAll, .IncludeInlayParameterNameHintsWhenArgumentMatchesName = Tristate::False}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsNoHintWhenArgumentMatchesName, TestInlayHintsNoHintWhenArgumentMatchesName);
@@ -928,7 +928,7 @@ static void TestInlayHintsNoParameterHints(gostd::testing::T* t) {
 		const std::string content = R"TS(function foo (a: number, b: number) {}
 foo(1, 2);)TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsNone}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsNone}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsNoParameterHints, TestInlayHintsNoParameterHints);
@@ -938,7 +938,7 @@ static void TestInlayHintsNoVariableTypeHints(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		const std::string content = R"TS(const a = 123;)TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayVariableTypeHints = Tristate::False}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayVariableTypeHints = Tristate::False}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsNoVariableTypeHints, TestInlayHintsNoVariableTypeHints);
@@ -968,7 +968,7 @@ class Class {
 new Class(1)
 new Class(1, 2))TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsLiterals}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsLiterals}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsOverloadCall1, TestInlayHintsOverloadCall1);
@@ -994,7 +994,7 @@ func(
     },
 );)TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsAll}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsAll}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsOverloadCall2, TestInlayHintsOverloadCall2);
@@ -1055,7 +1055,7 @@ func(
     true,
 ))TS");
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsLiterals}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsLiterals}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsParameterNames, TestInlayHintsParameterNames);
@@ -1071,7 +1071,7 @@ static void TestInlayHintsPropertyDeclarationComputedName1(gostd::testing::T* t)
 })TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
 		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{
-		.InlayHints = lsutil::InlayHintsPreferences{
+		.InlayHintsPreferences = lsutil::InlayHintsPreferences{
 			.IncludeInlayPropertyDeclarationTypeHints = Tristate::True}}));
 	});
 }
@@ -1096,7 +1096,7 @@ class C {
     }
 })TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayPropertyDeclarationTypeHints = Tristate::True}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayPropertyDeclarationTypeHints = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsPropertyDeclarations2, TestInlayHintsPropertyDeclarations2);
@@ -1119,7 +1119,7 @@ class C {
     }
 })TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayPropertyDeclarationTypeHints = Tristate::True}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayPropertyDeclarationTypeHints = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsPropertyDeclarations, TestInlayHintsPropertyDeclarations);
@@ -1131,7 +1131,7 @@ static void TestInlayHintsQuotePreference1(gostd::testing::T* t) {
 const b1: '\\' = '\\';
 export function fn(a = a1, b = b1) {})TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.QuotePreference = lsutil::QuotePreference("double"), .InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayFunctionParameterTypeHints = Tristate::True}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.QuotePreference = lsutil::QuotePreference("double"), .InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayFunctionParameterTypeHints = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsQuotePreference1, TestInlayHintsQuotePreference1);
@@ -1143,7 +1143,7 @@ static void TestInlayHintsQuotePreference2(gostd::testing::T* t) {
 const b1: "\\" = "\\";
 export function fn(a = a1, b = b1) {})TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.QuotePreference = lsutil::QuotePreference("single"), .InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayFunctionParameterTypeHints = Tristate::True}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.QuotePreference = lsutil::QuotePreference("single"), .InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayFunctionParameterTypeHints = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsQuotePreference2, TestInlayHintsQuotePreference2);
@@ -1161,7 +1161,7 @@ module.exports = function () {
 };
 )TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{
 		.IncludeInlayFunctionParameterTypeHints = Tristate::True,
 		.IncludeInlayFunctionLikeReturnTypeHints = Tristate::True,}}));
 	});
@@ -1180,7 +1180,7 @@ type Args3 = [number, number]
 declare function foo3(c: number, ...args: Args3);
 foo3(1, 2, 3))TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsLiterals}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsLiterals}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsRestParameters1, TestInlayHintsRestParameters1);
@@ -1205,7 +1205,7 @@ function foo5(...x: [number, number]) {
     foo(...x, 3);
 })TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsAll}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsAll}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsRestParameters2, TestInlayHintsRestParameters2);
@@ -1229,7 +1229,7 @@ const b = function () { return 1 }
 const c = (b) => 1
 const d = b => 1)TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayFunctionLikeReturnTypeHints = Tristate::True}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayFunctionLikeReturnTypeHints = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsReturnType, TestInlayHintsReturnType);
@@ -1249,7 +1249,7 @@ declare function fn(
 fn(function (this, a, b) { });
 fn(function (this: I, a, b) { });)TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayFunctionParameterTypeHints = Tristate::True}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayFunctionParameterTypeHints = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsThisParameter, TestInlayHintsThisParameter);
@@ -1262,7 +1262,7 @@ static void TestInlayHintsTupleTypeCrash(gostd::testing::T* t) {
 })TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
 		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{
-		.InlayHints = lsutil::InlayHintsPreferences{
+		.InlayHintsPreferences = lsutil::InlayHintsPreferences{
 			.IncludeInlayFunctionParameterTypeHints = Tristate::True}}));
 	});
 }
@@ -1275,7 +1275,7 @@ static void TestInlayHintsTypeMatchesName(gostd::testing::T* t) {
 function getClient(): Client { return {}; };
 const client = getClient();)TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayVariableTypeHints = Tristate::True, .IncludeInlayVariableTypeHintsWhenTypeMatchesName = Tristate::False}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayVariableTypeHints = Tristate::True, .IncludeInlayVariableTypeHintsWhenTypeMatchesName = Tristate::False}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsTypeMatchesName, TestInlayHintsTypeMatchesName);
@@ -1287,7 +1287,7 @@ static void TestInlayHintsTypeParameterModifiers1(gostd::testing::T* t) {
   return function <const T>(a: T) {};
 })TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayFunctionLikeReturnTypeHints = Tristate::True}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayFunctionLikeReturnTypeHints = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsTypeParameterModifiers1, TestInlayHintsTypeParameterModifiers1);
@@ -1300,7 +1300,7 @@ using _defer = {
 	[Symbol.dispose]() {},
 };)TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{
 		.IncludeInlayVariableTypeHints = Tristate::True}}));
 	});
 }
@@ -1327,7 +1327,7 @@ const l = ((({ a: 1, b: 1 })));
  const m = () => 123;
  const n;)TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayVariableTypeHints = Tristate::True}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayVariableTypeHints = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsVariableTypes1, TestInlayHintsVariableTypes1);
@@ -1346,7 +1346,7 @@ const [] = array;
 declare function foo<T extends number>(t: T): T
 const x = foo(1))TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayVariableTypeHints = Tristate::True}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayVariableTypeHints = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsVariableTypes2, TestInlayHintsVariableTypes2);
@@ -1367,7 +1367,7 @@ interface ElementMap {
 declare function getCtor<K extends keyof ElementMap>(tagName: K): ElementMap[K] | undefined;
 const div = getCtor("div");)TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayVariableTypeHints = Tristate::True}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayVariableTypeHints = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsVariableTypes3, TestInlayHintsVariableTypes3);
@@ -1386,7 +1386,7 @@ function foo2(a: (b: number) => number) {
 }
 foo2((c: number) => c + 1);)TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr , content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHints = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsAll}}));
+		f->VerifyBaselineInlayHints(t, nullptr , std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.InlayHintsPreferences = lsutil::InlayHintsPreferences{.IncludeInlayParameterNameHints = lsutil::IncludeInlayParameterNameHintsAll}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestInlayHintsWithClosures, TestInlayHintsWithClosures);

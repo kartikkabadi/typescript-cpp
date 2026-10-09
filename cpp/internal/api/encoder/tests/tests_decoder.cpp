@@ -574,5 +574,24 @@ void TestDecodeSourceFile_PostfixDecrement(T* t) {
 REGISTER_UNIT_TEST("encoder.TestDecodeSourceFile_PostfixDecrement",
                    TestDecodeSourceFile_PostfixDecrement);
 
+
+void TestDecodeSourceFile_SourcePhaseImport(T* t) {
+	t->Parallel();
+	SourceFile* sf = parseTestFile("import source a from \"./a.wasm\";");
+	auto [buf, table, err] = EncodeSourceFile(sf);
+	assert::NilError(t, err);
+
+	auto [decoded, derr] = DecodeSourceFile(buf);
+	assert::NilError(t, derr);
+
+	auto* clause = decoded->Statements->nodes[0]
+	                   ->as<ImportDeclaration>()
+	                   ->ImportClause->as<ImportClause>();
+	assert::Equal(t, clause->PhaseModifier, Kind::SourceKeyword);
+	assert::Equal(t, std::string(clause->name->text()), std::string("a"));
+}
+
 }  // namespace
+
 }  // namespace tsc::api::encoder
+namespace tsc::api::encoder { REGISTER_UNIT_TEST("encoder.TestDecodeSourceFile_SourcePhaseImport", TestDecodeSourceFile_SourcePhaseImport); }

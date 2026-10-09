@@ -1356,7 +1356,8 @@ bool isTypeDeclaration(Node* node) {
 	case Kind::EnumDeclaration:
 		return true;
 	case Kind::ImportClause:
-		return node->isTypeOnly();
+		return node->isTypeOnly() &&
+		       node->as<ImportClause>()->name != nullptr;
 	case Kind::ImportSpecifier:
 	case Kind::ExportSpecifier:
 		return node->parent->parent->isTypeOnly();
@@ -1593,7 +1594,7 @@ bool isExpressionNode(Node* node) {
 	case Kind::AwaitExpression:
 		return true;
 	case Kind::MetaProperty:
-		// `import.defer` in `import.defer(...)` is not an expression
+		// `import.<phase>` in `import.<phase>(...)` is not an expression
 		return !isImportCall(node->parent) ||
 		       node->parent->expression() != node;
 	case Kind::ExpressionWithTypeArguments:
@@ -1677,6 +1678,11 @@ bool isInExpressionContext(Node* node) {
 	case Kind::ShorthandPropertyAssignment:
 		return parent->as<ShorthandPropertyAssignment>()
 		               ->ObjectAssignmentInitializer == node;
+	case Kind::FunctionExpression:
+	case Kind::ClassExpression:
+		// The name of a function or class expression is a declaration name,
+		// not an expression.
+		return parent->name() != node;
 	default:
 		return isExpressionNode(parent);
 	}

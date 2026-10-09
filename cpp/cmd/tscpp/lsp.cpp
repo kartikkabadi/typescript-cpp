@@ -150,7 +150,8 @@ bool parseLSPFlags(const std::vector<std::string>& args, lspFlags* f) {
 // ---------------------------------------------------------------------------
 
 std::pair<std::vector<uint8_t>, gostd::Error>
-npmInstall(const std::string& cwd, const std::vector<std::string>& args) {
+npmInstall(const gostd::Context& ctx, const std::string& cwd,
+           const std::vector<std::string>& args) {
 	int outPipe[2];
 	if (::pipe(outPipe) != 0) {
 #ifdef _WIN32
@@ -202,6 +203,16 @@ npmInstall(const std::string& cwd, const std::vector<std::string>& args) {
 	}
 #endif
 	::close(outPipe[1]);
+	// exec.CommandContext(ctx, ...) — kill the child when ctx is cancelled.
+	std::atomic<bool> waited{false};
+	if (gostd::ctxCancelable(ctx)) {
+		std::thread([&] {
+			gostd::ctxWaitDone(ctx);
+			if (!waited.load()) {
+				::kill(pid, SIGKILL);
+			}
+		}).detach();
+	}
 	std::vector<uint8_t> out;
 	char buf[8192];
 	for (;;) {
@@ -212,6 +223,7 @@ npmInstall(const std::string& cwd, const std::vector<std::string>& args) {
 	::close(outPipe[0]);
 	int status = 0;
 	::waitpid(pid, &status, 0);
+	waited.store(true);
 	if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
 		// exec.Command(...).Output() error — ExitError string form is
 		// "exit status N"; signal death is "signal: <name>".
@@ -318,9 +330,10 @@ int runLSP(const std::vector<std::string>& args) {
 	    .DefaultLibraryPath = defaultLibraryPath,
 	    .TypingsLocation = typingsLocation,
 	    .ParseCache = nullptr,
-	    .NpmInstall = [](const std::string& cwd,
+	    .NpmInstall = [](const gostd::Context& ctx,
+	                     const std::string& cwd,
 	                     const std::vector<std::string>& a) {
-		    return npmInstall(cwd, a);
+		    return npmInstall(ctx, cwd, a);
 	    },
 	    .Spawn = [](const std::vector<std::string>& command,
 	                const std::string& dir, gostd::io::Writer* stderrW2) {

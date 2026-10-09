@@ -34,12 +34,11 @@ func main() {
 		os.Exit(2)
 	}
 	fs := bundled.WrapFS(osvfs.FS())
-	host := compiler.NewCompilerHost(
-		tspath.NormalizePath(cwd), fs, bundled.LibPath(), nil, nil, nil)
+	host := compiler.NewCompilerHost(fs, bundled.LibPath(), nil, nil, nil)
 
 	// `tsc --noEmit <args>` — the same command line the real CLI sees.
 	args := append([]string{"--noEmit"}, os.Args[1:]...)
-	parsed := tsoptions.ParseCommandLine(args, host)
+	parsed := tsoptions.ParseCommandLine(args, fs, tspath.RootedDirectoryPathFromAbsolute(cwd))
 	if len(parsed.Errors) > 0 {
 		for _, e := range parsed.Errors {
 			fmt.Printf("C %d\n", e.Code())
@@ -77,8 +76,8 @@ func main() {
 	names := make([]string, 0, len(byFile))
 	files := map[string]*ast.SourceFile{}
 	for f := range byFile {
-		names = append(names, f.FileName())
-		files[f.FileName()] = f
+		names = append(names, string(f.FileName()))
+		files[string(f.FileName())] = f
 	}
 	sort.Strings(names)
 	for _, name := range names {

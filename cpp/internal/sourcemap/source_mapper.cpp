@@ -609,24 +609,81 @@ bool unmarshalRawSourceMap(const JsonValue& v, RawSourceMap& out) {
 // source_mapper.go
 // ---------------------------------------------------------------------------
 
-// tryParseRawSourceMap — source_mapper.go:272
-RawSourceMap* tryParseRawSourceMap(std::string_view contents) {
-	auto* sourceMap = new RawSourceMap();
+// parsedRawSourceMap — source_mapper.go:272
+struct parsedRawSourceMap {
+	RawSourceMap* sourceMap = nullptr;
+	std::optional<std::string> sourceRoot;
+	std::vector<bool> nullSources;
+};
+
+// tryParseRawSourceMap — source_mapper.go:282
+parsedRawSourceMap* tryParseRawSourceMap(std::string_view contents) {
 	JsonParser p(contents);
 	JsonValue root;
-	if (!p.parse(root) || !unmarshalRawSourceMap(root, *sourceMap)) {
+	if (!p.parse(root)) {
 		// err != nil
+		return nullptr;
+	}
+	auto* parsed = new parsedRawSourceMap();
+	auto* sourceMap = new RawSourceMap();
+	parsed->sourceMap = sourceMap;
+	// rawSourceMapJSON — nullable sourceRoot / sources elements.
+	std::optional<std::vector<std::optional<std::string>>> rawSources;
+	bool malformed = false;
+	if (root.kind == JsonValue::Object) {
+		for (auto& member : root.members) {
+			const std::string& name = member.name;
+			const JsonValue& val = member.value;
+			if (name == "version") {
+				if (!unmarshalInt(val, sourceMap->Version)) malformed = true;
+			} else if (name == "file") {
+				if (!unmarshalString(val, sourceMap->File)) malformed = true;
+			} else if (name == "sourceRoot") {
+				if (val.kind == JsonValue::Null) {
+					// *string stays nil
+				} else if (val.kind == JsonValue::String) {
+					parsed->sourceRoot = val.str;
+				} else {
+					malformed = true;
+				}
+			} else if (name == "sources") {
+				if (!unmarshalOptionalStringArray(val, rawSources)) {
+					malformed = true;
+				}
+			} else if (name == "names") {
+				if (!unmarshalStringArray(val, sourceMap->Names)) malformed = true;
+			} else if (name == "mappings") {
+				if (!unmarshalString(val, sourceMap->Mappings)) malformed = true;
+			} else if (name == "sourcesContent") {
+				if (!unmarshalOptionalStringArray(val, sourceMap->SourcesContent)) {
+					malformed = true;
+				}
+			}
+			// unknown members are ignored (already syntax-validated)
+		}
+	} else if (root.kind != JsonValue::Null) {
+		malformed = true;
+	}
+	if (malformed) {
 		return nullptr;
 	}
 	if (sourceMap->Version != 3) {
 		return nullptr;
 	}
-	return sourceMap;
+	if (rawSources.has_value()) {
+		sourceMap->Sources.resize(rawSources->size());
+		parsed->nullSources.resize(rawSources->size());
+		for (size_t i = 0; i < rawSources->size(); i++) {
+			const auto& src = (*rawSources)[i];
+			if (!src.has_value()) {
+				parsed->nullSources[i] = true;
+				continue;
+			}
+			sourceMap->Sources[i] = *src;
+		}
+	}
+	return parsed;
 }
-
-// convertDocumentToSourceMapper — source_mapper.go:257
-DocumentPositionMapper* convertDocumentToSourceMapper(
-    Host* host, std::string_view contents, std::string_view mapFileName);
 
 // tryGetSourceMappingURL — source_mapper.go:284
 std::string tryGetSourceMappingURL(Host* host, std::string_view fileName) {
@@ -669,33 +726,62 @@ std::pair<std::string_view, bool> tryParseBase64Url(std::string_view url) {
 	return {url, true};
 }
 
+// compareSourcePositions — source_mapper.go:41
+int compareSourcePositions(const SourceMappedPosition* a,
+                           const SourceMappedPosition* b) {
+	return a->sourcePosition - b->sourcePosition;
+}
+
 // createDocumentPositionMapper — source_mapper.go:52
 DocumentPositionMapper* createDocumentPositionMapper(
-    Host* host, const RawSourceMap* sourceMap, std::string_view mapPath) {
+    Host* host, const RawSourceMap* sourceMap,
+    const std::optional<std::string>& sourceRootField,
+    const std::vector<bool>& nullSources, std::string_view mapPath) {
 	std::string mapDirectory = tspath::getDirectoryPath(mapPath);
-	std::string sourceRoot;
-	if (!sourceMap->SourceRoot.empty()) {
-		sourceRoot =
-		    tspath::getNormalizedAbsolutePath(sourceMap->SourceRoot,
-		                                      mapDirectory);
-	} else {
-		sourceRoot = mapDirectory;
+	std::string sourceURLPrefix;
+	// ECMA-426 prefixes an explicit empty sourceRoot with "/", but
+	// TypeScript and established consumers treat it as absent. Preserve
+	// that compatibility.
+	if (sourceRootField.has_value() && !sourceRootField->empty()) {
+		sourceURLPrefix = *sourceRootField;
+		if (!sourceURLPrefix.ends_with('/')) {
+			sourceURLPrefix += '/';
+		}
 	}
 	std::string generatedAbsoluteFilePath =
 	    tspath::getNormalizedAbsolutePath(sourceMap->File, mapDirectory);
-	// core.Map(sourceMap.Sources, ...)
-	std::vector<std::string> sourceFileAbsolutePaths;
-	sourceFileAbsolutePaths.reserve(sourceMap->Sources.size());
-	for (const std::string& source : sourceMap->Sources) {
-		sourceFileAbsolutePaths.push_back(
-		    tspath::getNormalizedAbsolutePath(source, sourceRoot));
+	std::vector<bool> unmappedSources(sourceMap->Sources.size(), false);
+	for (size_t i = 0;
+	     i < nullSources.size() && i < unmappedSources.size(); i++) {
+		unmappedSources[i] = nullSources[i];
+	}
+	std::vector<std::string> sourceFileAbsolutePaths(
+	    sourceMap->Sources.size());
+	for (size_t i = 0; i < sourceMap->Sources.size(); i++) {
+		if (unmappedSources[i]) {
+			continue;
+		}
+		std::string sourceWithPrefix =
+		    sourceURLPrefix + sourceMap->Sources[i];
+		if (sourceWithPrefix.empty()) {
+			sourceFileAbsolutePaths[i] = std::string(mapPath);
+		} else {
+			sourceFileAbsolutePaths[i] =
+			    tspath::getNormalizedAbsolutePath(sourceWithPrefix,
+			                                      mapDirectory);
+		}
 	}
 	bool useCaseSensitiveFileNames = host->UseCaseSensitiveFileNames();
-	std::unordered_map<std::string, SourceIndex> sourceToSourceIndexMap;
+	std::unordered_map<std::string, std::vector<SourceIndex>>
+	    sourceToSourceIndexMap;
 	for (size_t i = 0; i < sourceFileAbsolutePaths.size(); i++) {
+		if (unmappedSources[i]) {
+			continue;
+		}
 		sourceToSourceIndexMap[tspath::getCanonicalFileName(
 		    sourceFileAbsolutePaths[i],
-		    useCaseSensitiveFileNames)] = static_cast<SourceIndex>(i);
+		    useCaseSensitiveFileNames)]
+		    .push_back(static_cast<SourceIndex>(i));
 	}
 
 	std::vector<MappedPosition*> decodedMappings;
@@ -718,13 +804,15 @@ DocumentPositionMapper* createDocumentPositionMapper(
 
 		int sourcePosition = -1;
 		if (mapping->IsSourceMapping()) {
-			if (mapping->SourceIndex < 0 ||
-			    mapping->SourceIndex >= static_cast<SourceIndex>(
-			                                sourceFileAbsolutePaths.size())) {
-				TSC_UNREACHABLE("index out of range"); // Go slice-index panic
-			}
-			if (ECMALineInfo* lineInfo = host->GetECMALineInfo(
-			        sourceFileAbsolutePaths[mapping->SourceIndex])) {
+			SourceIndex sourceIndex = mapping->SourceIndex;
+			if (sourceIndex >= 0 &&
+			    sourceIndex < static_cast<SourceIndex>(
+			                      sourceFileAbsolutePaths.size()) &&
+			    !unmappedSources[sourceIndex] &&
+			    host->GetECMALineInfo(
+			        sourceFileAbsolutePaths[sourceIndex]) != nullptr) {
+				ECMALineInfo* lineInfo = host->GetECMALineInfo(
+				    sourceFileAbsolutePaths[sourceIndex]);
 				int pos = computePositionOfLineAndUTF16Character(
 				    lineInfo->lineStarts, mapping->SourceLine,
 				    mapping->SourceCharacter, lineInfo->text,
@@ -770,6 +858,25 @@ DocumentPositionMapper* createDocumentPositionMapper(
 			           a->sourcePosition == b->sourcePosition;
 		    });
 	}
+	std::unordered_map<std::string, std::vector<SourceMappedPosition*>>
+	    sourceMappingsByPath;
+	sourceMappingsByPath.reserve(sourceToSourceIndexMap.size());
+	for (auto& kv : sourceToSourceIndexMap) {
+		std::vector<SourceMappedPosition*> mappings;
+		for (SourceIndex sourceIndex : kv.second) {
+			auto it = sourceMappings.find(sourceIndex);
+			if (it != sourceMappings.end()) {
+				mappings.insert(mappings.end(), it->second.begin(),
+				                it->second.end());
+			}
+		}
+		std::sort(mappings.begin(), mappings.end(),
+		          [](const SourceMappedPosition* a,
+		             const SourceMappedPosition* b) {
+			          return compareSourcePositions(a, b) < 0;
+		          });
+		sourceMappingsByPath[kv.first] = std::move(mappings);
+	}
 
 	// getGeneratedMappings()
 	generatedMappings = decodedMappings;
@@ -787,17 +894,22 @@ DocumentPositionMapper* createDocumentPositionMapper(
 	auto* d = new DocumentPositionMapper();
 	d->useCaseSensitiveFileNames = useCaseSensitiveFileNames;
 	d->sourceFileAbsolutePaths = std::move(sourceFileAbsolutePaths);
-	d->sourceToSourceIndexMap = std::move(sourceToSourceIndexMap);
+	d->sourceMappingsByPath = std::move(sourceMappingsByPath);
 	d->generatedAbsoluteFilePath = std::move(generatedAbsoluteFilePath);
 	d->generatedMappings = std::move(generatedMappings);
 	d->sourceMappings = std::move(sourceMappings);
 	return d;
 }
 
+
+} // namespace
+
 // convertDocumentToSourceMapper — source_mapper.go:257
 DocumentPositionMapper* convertDocumentToSourceMapper(
     Host* host, std::string_view contents, std::string_view mapFileName) {
-	RawSourceMap* sourceMap = tryParseRawSourceMap(contents);
+	parsedRawSourceMap* parsed = tryParseRawSourceMap(contents);
+	RawSourceMap* sourceMap =
+	    parsed != nullptr ? parsed->sourceMap : nullptr;
 	if (sourceMap == nullptr || sourceMap->Sources.empty() ||
 	    sourceMap->File.empty() || sourceMap->Mappings.empty()) {
 		// invalid map
@@ -813,10 +925,9 @@ DocumentPositionMapper* convertDocumentToSourceMapper(
 		}
 	}
 
-	return createDocumentPositionMapper(host, sourceMap, mapFileName);
+	return createDocumentPositionMapper(host, sourceMap, parsed->sourceRoot,
+	                                    parsed->nullSources, mapFileName);
 }
-
-} // namespace
 
 // DocumentPositionMapper.GetSourcePosition — source_mapper.go:169
 // Free function (spanmap convention): Go callers may invoke on a nil mapper.
@@ -862,23 +973,15 @@ GetGeneratedPosition(const DocumentPositionMapper* m,
 	if (m == nullptr) {
 		return nullptr;
 	}
-	auto it = m->sourceToSourceIndexMap.find(tspath::getCanonicalFileName(
+	auto it = m->sourceMappingsByPath.find(tspath::getCanonicalFileName(
 	    loc->FileName, m->useCaseSensitiveFileNames));
-	if (it == m->sourceToSourceIndexMap.end()) {
+	if (it == m->sourceMappingsByPath.end()) {
 		return nullptr;
 	}
-	SourceIndex sourceIndex = it->second;
-	// Go checks against len(d.sourceMappings) — the MAP's key count
-	if (sourceIndex < 0 ||
-	    sourceIndex >= static_cast<SourceIndex>(m->sourceMappings.size())) {
+	const std::vector<SourceMappedPosition*>& list = it->second;
+	if (list.empty()) {
 		return nullptr;
 	}
-	// Go: sourceMappings := d.sourceMappings[sourceIndex] — absent key yields
-	// a nil (empty) list; no insertion like operator[] would perform.
-	static const std::vector<SourceMappedPosition*> emptyMappings;
-	auto smIt = m->sourceMappings.find(sourceIndex);
-	const std::vector<SourceMappedPosition*>& list =
-	    smIt != m->sourceMappings.end() ? smIt->second : emptyMappings;
 	int targetIndex = binarySearchFunc(
 	    list, loc->Pos, [](const SourceMappedPosition* mp, int pos) {
 		    return static_cast<int64_t>(mp->sourcePosition) - pos;
@@ -889,9 +992,6 @@ GetGeneratedPosition(const DocumentPositionMapper* m,
 	}
 
 	MappedPosition* mapping = list[targetIndex];
-	if (mapping->sourceIndex != sourceIndex) {
-		return nullptr;
-	}
 
 	// Closest position
 	return new DocumentPosition{m->generatedAbsoluteFilePath,

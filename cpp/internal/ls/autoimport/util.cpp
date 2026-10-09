@@ -343,38 +343,68 @@ getPackageRealpathFuncs(vfs::FS* fs, const std::string& packageDir) {
 	// external packages encountered via re-exports. Keyed by the node_modules
 	// package directory, so all files under that package reuse a single
 	// realpath lookup.
+	auto replacePrefix = [](const std::string& fileName,
+	                        const std::string& prefix,
+	                        const std::string& replacement) -> std::string {
+		std::string_view relative = fileName;
+		if (relative.substr(0, prefix.size()) == prefix) {
+			relative = relative.substr(prefix.size());
+		}
+		while (!relative.empty() &&
+		       (relative.front() == '/' || relative.front() == '\\')) {
+			relative = relative.substr(1);
+		}
+		return tspath::combinePaths(replacement, {relative});
+	};
 	auto dirCache =
 	    std::make_shared<std::unordered_map<std::string, std::string>>();
 	std::function<std::string(const std::string&)> toRealpath =
-	    [fs, packageDir, realPackageDir, isSymlinked,
+	    [fs, packageDir, realPackageDir, isSymlinked, replacePrefix,
 	     dirCache](const std::string& fileName) -> std::string {
 		// Fast path: files within the package use prefix substitution.
 		if (isSymlinked) {
 			if (fileName.compare(0, packageDir.size(), packageDir) == 0) {
-				return realPackageDir + fileName.substr(packageDir.size());
+				std::string_view relative =
+				    std::string_view(fileName)
+				        .substr(packageDir.size());
+				if (relative.empty() || relative.front() == '/' ||
+				    relative.front() == '\\') {
+					return replacePrefix(fileName, packageDir,
+					                     realPackageDir);
+				}
 			}
 		}
 		// Files outside the package (e.g. re-exports into symlinked deps):
 		// find the node_modules package directory, resolve it once, and cache.
-		std::string pkgDir =
-		    module::ParseNodeModuleFromPath(fileName, false /*isFolder*/);
-		if (pkgDir.empty()) {
+		std::string filePackageDir =
+		    module::NodeModulePackageRootForFile(fileName);
+		if (filePackageDir.empty()) {
 			return fileName;
 		}
-		auto it = dirCache->find(pkgDir);
+		// The wrapped FS also calls Realpath while traversing directories.
+		// The two parses differ only when the path may be a package root,
+		// so establish its kind before using the package cache.
+		if (std::string directoryPackage =
+		        module::NodeModulePackageRootForDirectory(fileName);
+		    directoryPackage != filePackageDir) {
+			if (fs->DirectoryExists(fileName)) {
+				filePackageDir = directoryPackage;
+			}
+		}
+		auto it = dirCache->find(filePackageDir);
 		if (it != dirCache->end()) {
 			const std::string& realDir = it->second;
-			if (realDir == pkgDir) {
+			if (realDir == filePackageDir) {
 				return fileName;
 			}
-			return realDir + fileName.substr(pkgDir.size());
+			return realDir + fileName.substr(filePackageDir.size());
 		}
-		std::string realDir = fs->Realpath(pkgDir);
-		(*dirCache)[pkgDir] = realDir;
-		if (realDir == pkgDir) {
+		std::string realDir = fs->Realpath(filePackageDir);
+		(*dirCache)[filePackageDir] = realDir;
+		if (realDir == filePackageDir) {
 			return fileName;
 		}
-		return realDir + fileName.substr(pkgDir.size());
+		return realDir + fileName.substr(filePackageDir.size());
 	};
 	if (!isSymlinked) {
 		return {toRealpath,

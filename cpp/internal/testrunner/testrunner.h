@@ -39,6 +39,14 @@ public:
 // runTests — runner.go:12.
 void runTests(gostd::testing::T* t, std::vector<Runner*> runners);
 
+// compiler_test_filter.go — setCompilerTestRunPattern stands in for Go's
+// flag.Lookup("test.run"): runners that link compiler-test surfaces pass
+// their -run value through it.
+void setCompilerTestRunPattern(std::string pattern);
+std::string_view compilerTestRunPattern();
+std::function<bool(std::string_view)> compilerTestFileFilter(
+    const std::string& pattern);
+
 // === test_case_parser.go ===
 
 namespace detail {

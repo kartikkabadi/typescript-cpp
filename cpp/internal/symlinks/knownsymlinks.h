@@ -14,12 +14,29 @@ namespace tsc::symlinks {
 
 // knownsymlinks.go:13 — KnownDirectoryLink
 struct KnownDirectoryLink {
+	// Matches the spelling used to reach the symlink. Used to preserve the
+	// spelling of child paths when substituting the real directory.
+	// Always has trailing directory separator.
+	std::string Symlink;
 	// Matches the casing returned by `realpath`. Used to compute the
 	// `realpath` of children. Always has trailing directory separator.
 	std::string Real;
 	// toPath(real). Stored to avoid repeated recomputation.
 	// Always has trailing directory separator.
 	tspath::Path RealPath;
+
+	// ResolveFileName — knownsymlinks.go:68. Maps a canonical or
+	// presentation path under `Symlink` to its real path.
+	std::pair<std::string, bool> ResolveFileName(
+	    const std::string& fileName,
+	    bool useCaseSensitiveFileNames) const {
+		auto [relative, ok] = tspath::trimFilePathPrefix(
+		    fileName, Symlink, useCaseSensitiveFileNames);
+		if (!ok) {
+			return {"", false};
+		}
+		return {Real + relative, true};
+	}
 };
 
 namespace {
@@ -88,11 +105,16 @@ public:
 		return &filesByRealpath;
 	}
 
-	// SetDirectory — knownsymlinks.go:55.
+	// SetDirectory — knownsymlinks.go:55. The stored link gains a `Symlink`
+	// field copied from the presentation path (Go copies the struct).
 	void SetDirectory(const std::string& symlink,
 	                  const tspath::Path& symlinkPath,
 	                  const std::shared_ptr<KnownDirectoryLink>& realDirectory) {
+		std::shared_ptr<KnownDirectoryLink> storedLink = realDirectory;
 		if (realDirectory != nullptr) {
+			storedLink = std::make_shared<KnownDirectoryLink>(*realDirectory);
+			storedLink->Symlink =
+			    tspath::ensureTrailingDirectorySeparator(symlink);
 			if (!directories.Load(symlinkPath).second) {
 				auto [set, loaded] = directoriesByRealpath.LoadOrStore(
 				    realDirectory->RealPath,
@@ -100,7 +122,7 @@ public:
 				set->Add(symlink);
 			}
 		}
-		directories.Store(symlinkPath, realDirectory);
+		directories.Store(symlinkPath, storedLink);
 	}
 
 	// SetFile — knownsymlinks.go:65.
@@ -189,10 +211,10 @@ public:
 	guessDirectorySymlink(const std::string& a, const std::string& b,
 	                      const std::string& cwd_) {
 		auto aParts =
-		    tspath::getPathComponents(tspath::getNormalizedAbsolutePath(a, cwd_),
+		    tspath::resolvePathComponents(tspath::getNormalizedAbsolutePath(a, cwd_),
 		                              "");
 		auto bParts =
-		    tspath::getPathComponents(tspath::getNormalizedAbsolutePath(b, cwd_),
+		    tspath::resolvePathComponents(tspath::getNormalizedAbsolutePath(b, cwd_),
 		                              "");
 		bool isDirectory = false;
 		while (aParts.size() >= 2 && bParts.size() >= 2 &&

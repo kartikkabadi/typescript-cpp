@@ -71,7 +71,7 @@ let namedFn3 = function namedFn3() {};
 const namedFn4 = function namedFn4() {};
 )TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr, content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineCodeLens(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.CodeLens = lsutil::CodeLensUserPreferences{.ReferencesCodeLensEnabled = Tristate::True, .ImplementationsCodeLensEnabled = Tristate::True, .ReferencesCodeLensShowOnAllFunctions = Tristate::True, .ImplementationsCodeLensShowOnInterfaceMethods = Tristate::True, .ImplementationsCodeLensShowOnAllClassMethods = Tristate::True}}));
+		f->VerifyBaselineCodeLens(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.CodeLensUserPreferences = lsutil::CodeLensUserPreferences{.ReferencesCodeLensEnabled = Tristate::True, .ImplementationsCodeLensEnabled = Tristate::True, .ReferencesCodeLensShowOnAllFunctions = Tristate::True, .ImplementationsCodeLensShowOnInterfaceMethods = Tristate::True, .ImplementationsCodeLensShowOnAllClassMethods = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCodeLensFunctionExpressions01, TestCodeLensFunctionExpressions01);
@@ -109,7 +109,7 @@ foo(5);
 console.log(bar);
 )TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr, content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineCodeLens(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.CodeLens = lsutil::CodeLensUserPreferences{.ReferencesCodeLensEnabled = Tristate::True, .ImplementationsCodeLensEnabled = Tristate::True, .ReferencesCodeLensShowOnAllFunctions = Tristate::True, .ImplementationsCodeLensShowOnInterfaceMethods = Tristate::True, .ImplementationsCodeLensShowOnAllClassMethods = Tristate::True}}));
+		f->VerifyBaselineCodeLens(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.CodeLensUserPreferences = lsutil::CodeLensUserPreferences{.ReferencesCodeLensEnabled = Tristate::True, .ImplementationsCodeLensEnabled = Tristate::True, .ReferencesCodeLensShowOnAllFunctions = Tristate::True, .ImplementationsCodeLensShowOnInterfaceMethods = Tristate::True, .ImplementationsCodeLensShowOnAllClassMethods = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCodeLensFunctionsAndConstants01, TestCodeLensFunctionsAndConstants01);
@@ -156,7 +156,7 @@ const p: Pointable = {
 };
 )TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr, content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineCodeLens(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.CodeLens = lsutil::CodeLensUserPreferences{.ReferencesCodeLensEnabled = Tristate::True, .ImplementationsCodeLensEnabled = Tristate::True, .ReferencesCodeLensShowOnAllFunctions = Tristate::True, .ImplementationsCodeLensShowOnInterfaceMethods = Tristate::True, .ImplementationsCodeLensShowOnAllClassMethods = Tristate::True}}));
+		f->VerifyBaselineCodeLens(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.CodeLensUserPreferences = lsutil::CodeLensUserPreferences{.ReferencesCodeLensEnabled = Tristate::True, .ImplementationsCodeLensEnabled = Tristate::True, .ReferencesCodeLensShowOnAllFunctions = Tristate::True, .ImplementationsCodeLensShowOnInterfaceMethods = Tristate::True, .ImplementationsCodeLensShowOnAllClassMethods = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCodeLensInterface01, TestCodeLensInterface01);
@@ -183,7 +183,7 @@ foo("hello");
 foo(Math.random() ? 1 : "hello");
 )TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr, content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-		f->VerifyBaselineCodeLens(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.CodeLens = lsutil::CodeLensUserPreferences{.ReferencesCodeLensEnabled = Tristate::True, .ImplementationsCodeLensEnabled = Tristate::True, .ReferencesCodeLensShowOnAllFunctions = Tristate::True, .ImplementationsCodeLensShowOnInterfaceMethods = Tristate::True, .ImplementationsCodeLensShowOnAllClassMethods = Tristate::True}}));
+		f->VerifyBaselineCodeLens(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.CodeLensUserPreferences = lsutil::CodeLensUserPreferences{.ReferencesCodeLensEnabled = Tristate::True, .ImplementationsCodeLensEnabled = Tristate::True, .ReferencesCodeLensShowOnAllFunctions = Tristate::True, .ImplementationsCodeLensShowOnInterfaceMethods = Tristate::True, .ImplementationsCodeLensShowOnAllClassMethods = Tristate::True}}));
 	});
 }
 REGISTER_FOURSLASH_TEST(TestCodeLensOverloads01, TestCodeLensOverloads01);
@@ -217,7 +217,7 @@ export abstract class ABC {
 }
 )TS";
 	auto __fsp = fourslash::NewFourslash(t, nullptr, content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-	f->VerifyBaselineCodeLens(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.CodeLens = lsutil::CodeLensUserPreferences{.ImplementationsCodeLensEnabled = Tristate::True, .ImplementationsCodeLensShowOnAllClassMethods = value}}));
+	f->VerifyBaselineCodeLens(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.CodeLensUserPreferences = lsutil::CodeLensUserPreferences{.ImplementationsCodeLensEnabled = Tristate::True, .ImplementationsCodeLensShowOnAllClassMethods = value}}));
 	});
 				_++;
 			}
@@ -250,7 +250,7 @@ const f4 = () => {};
 const f5 = function() {};
 )TS";
 	auto __fsp = fourslash::NewFourslash(t, nullptr, content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-	f->VerifyBaselineCodeLens(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.CodeLens = lsutil::CodeLensUserPreferences{.ReferencesCodeLensEnabled = Tristate::True, .ReferencesCodeLensShowOnAllFunctions = value}}));
+	f->VerifyBaselineCodeLens(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.CodeLensUserPreferences = lsutil::CodeLensUserPreferences{.ReferencesCodeLensEnabled = Tristate::True, .ReferencesCodeLensShowOnAllFunctions = value}}));
 	});
 				_++;
 			}
@@ -297,7 +297,7 @@ class AbstractC implements J {
 }
 )TS";
 	auto __fsp = fourslash::NewFourslash(t, nullptr, content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
-	f->VerifyBaselineCodeLens(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.CodeLens = lsutil::CodeLensUserPreferences{.ImplementationsCodeLensEnabled = Tristate::True, .ImplementationsCodeLensShowOnInterfaceMethods = value}}));
+	f->VerifyBaselineCodeLens(t, std::make_shared<lsutil::UserPreferences>(lsutil::UserPreferences{.CodeLensUserPreferences = lsutil::CodeLensUserPreferences{.ImplementationsCodeLensEnabled = Tristate::True, .ImplementationsCodeLensShowOnInterfaceMethods = value}}));
 	});
 				_++;
 			}

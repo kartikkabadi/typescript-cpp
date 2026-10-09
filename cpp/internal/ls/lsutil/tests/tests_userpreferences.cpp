@@ -8,6 +8,7 @@
 #include "internal/gostd/testing.h"
 #include "internal/json/json.h"
 #include "internal/ls/lsutil/lsutil.h"
+#include "internal/modulespecifiers/types.h"
 #include "internal/testutil/testutil.h"
 #include "internal/testutil/unittests/registry.h"
 
@@ -62,6 +63,132 @@ static void TestUserPreferencesRoundtrip(T* t) {
 REGISTER_UNIT_TEST("ls/lsutil.TestUserPreferencesRoundtrip",
                    TestUserPreferencesRoundtrip);
 
+// TestUserPreferencesParsingEdgeCases — userpreferences_test.go:13.
+static void TestUserPreferencesParsingEdgeCases(T* t) {
+	t->Parallel();
+
+	auto base = [] {
+		UserPreferences p = NewDefaultUserPreferences();
+		p.QuotePreference = QuotePreferenceDouble;
+		p.MaximumHoverLength = 17;
+		p.OrganizeImportsIgnoreCase = Tristate::True;
+		return p;
+	};
+	auto runCase = [&](T* t, std::string name, JsonObject config,
+	                   UserPreferences expected) {
+		t->Run(name, [&, config, expected](T* t) {
+			t->Parallel();
+			prefsDeepEqual(t, expected,
+			               TestWithConfig(base(), config));
+		});
+	};
+
+	runCase(t, "null raw values leave preferences unchanged",
+	        JsonObject{{"quotePreference", JsonAny{}},
+	                   {"maximumHoverLength", JsonAny{}},
+	                   {"includeCompletionsForModuleExports", JsonAny{}}},
+	        base());
+
+	{
+		UserPreferences expected = base();
+		expected.IncludeCompletionsForModuleExports = Tristate::Unknown;
+		runCase(t, "invalid boolean becomes unknown",
+		        JsonObject{{"includeCompletionsForModuleExports",
+		                    JsonAny("invalid")}},
+		        expected);
+	}
+
+	{
+		UserPreferences expected = base();
+		expected.QuotePreference = QuotePreferenceSingle;
+		expected.JsxAttributeCompletionStyle =
+		    JsxAttributeCompletionStyleBraces;
+		expected.OrganizeImportsCaseFirst =
+		    OrganizeImportsCaseFirstLower;
+		expected.InlayHintsPreferences.IncludeInlayParameterNameHints =
+		    IncludeInlayParameterNameHintsAll;
+		expected.OrganizeImportsTypeOrder = OrganizeImportsTypeOrderFirst;
+		expected.WorkspaceSymbolsScope =
+		    WorkspaceSymbolsScopeCurrentProject;
+		runCase(
+		    t, "case-insensitive enums",
+		    JsonObject{
+		        {"quotePreference", JsonAny("SINGLE")},
+		        {"jsxAttributeCompletionStyle", JsonAny("BRACES")},
+		        {"organizeImportsCaseFirst", JsonAny("LOWER")},
+		        {"includeInlayParameterNameHints", JsonAny("ALL")},
+		        {"organizeImportsTypeOrder", JsonAny("FIRST")},
+		        {"workspaceSymbolsScope",
+		         JsonAny("CURRENTPROJECT")}},
+		    expected);
+	}
+
+	runCase(
+	    t, "present null primary path prevents fallback",
+	    JsonObject{
+	        {"suggest",
+	         JsonAny(JsonObject{{"jsdoc",
+	                             JsonAny(JsonObject{
+	                                 {"enabled", JsonAny{}}})},
+	                            {"completeJSDocs", JsonAny(false)}})}},
+	    base());
+
+	{
+		UserPreferences expected = base();
+		expected.OrganizeImportsIgnoreCase = Tristate::Unknown;
+		runCase(
+		    t, "null case sensitivity becomes unknown",
+		    JsonObject{
+		        {"preferences",
+		         JsonAny(JsonObject{
+		             {"organizeImports",
+		              JsonAny(JsonObject{{"caseSensitivity",
+		                                  JsonAny{}}})}})}},
+		    expected);
+	}
+
+	{
+		UserPreferences expected = base();
+		expected.MaximumHoverLength = 9;
+		expected.FormatCodeSettings.IndentStyle =
+		    IndentStyleBlock;
+		expected.AutoImportFileExcludePatterns = {"first", "second"};
+		runCase(t, "numeric conversion and array filtering",
+		        JsonObject{
+		            {"maximumHoverLength", JsonAny(9.8)},
+		            {"indentStyle", JsonAny(1.7)},
+		            {"autoImportFileExcludePatterns",
+		             JsonAny(std::vector<JsonAny>{
+		                 JsonAny("first"), JsonAny(false), JsonAny(3),
+		                 JsonAny("second")})}},
+		        expected);
+	}
+
+	{
+		UserPreferences expected = base();
+		expected.AutoImportFileExcludePatterns = {};
+		runCase(t, "empty array is not nil",
+		        JsonObject{{"autoImportFileExcludePatterns",
+		                    JsonAny(std::vector<JsonAny>{})}},
+		        expected);
+	}
+
+	{
+		UserPreferences expected = base();
+		expected.ImportModuleSpecifierPreference =
+		    tsc::modulespecifiers::
+		        ImportModuleSpecifierPreferenceShortest;
+		runCase(t,
+		        "invalid module specifier preference uses its "
+		        "default",
+		        JsonObject{{"importModuleSpecifierPreference",
+		                    JsonAny(true)}},
+		        expected);
+	}
+}
+REGISTER_UNIT_TEST("ls/lsutil.TestUserPreferencesParsingEdgeCases",
+                   TestUserPreferencesParsingEdgeCases);
+
 static void TestUserPreferencesSerialize(T* t) {
 	t->Parallel();
 
@@ -97,9 +224,9 @@ static void TestUserPreferencesSerialize(T* t) {
 	t->Run("inlay hint inversion on serialize", [](T* t) {
 		t->Parallel();
 		UserPreferences prefs;
-		prefs.InlayHints.IncludeInlayParameterNameHints =
+		prefs.InlayHintsPreferences.IncludeInlayParameterNameHints =
 		    IncludeInlayParameterNameHintsAll;
-		prefs.InlayHints
+		prefs.InlayHintsPreferences
 		    .IncludeInlayParameterNameHintsWhenArgumentMatchesName =
 		    Tristate::True;
 		auto [jsonBytes, err] = tsc::json::marshal(&prefs);
@@ -178,7 +305,7 @@ static void TestUserPreferencesParseUnstable(T* t) {
 	        .expected = [] {
 		        UserPreferences p;
 		        p.QuotePreference = QuotePreferenceSingle;
-		        p.UseAliasesForRename = Tristate::True;
+		        p.ProvidePrefixAndSuffixTextForRename = Tristate::True;
 		        return p;
 	        }(),
 	    },
@@ -209,9 +336,9 @@ static void TestUserPreferencesParseUnstable(T* t) {
 			})JSON",
 	        .expected = [] {
 		        UserPreferences p;
-		        p.InlayHints.IncludeInlayParameterNameHints =
+		        p.InlayHintsPreferences.IncludeInlayParameterNameHints =
 		            IncludeInlayParameterNameHintsAll;
-		        p.InlayHints
+		        p.InlayHintsPreferences
 		            .IncludeInlayParameterNameHintsWhenArgumentMatchesName =
 		            Tristate::False; // inverted
 		        return p;
@@ -301,9 +428,9 @@ static void TestUserPreferencesParseUnstable(T* t) {
 		        UserPreferences p;
 		        p.IncludeCompletionsForModuleExports = Tristate::True;
 		        p.QuotePreference = QuotePreferenceSingle;
-		        p.UseAliasesForRename = Tristate::True;
+		        p.ProvidePrefixAndSuffixTextForRename = Tristate::True;
 		        p.OrganizeImportsLocale = "en";
-		        p.InlayHints.IncludeInlayParameterNameHints =
+		        p.InlayHintsPreferences.IncludeInlayParameterNameHints =
 		            IncludeInlayParameterNameHintsAll;
 		        return p;
 	        }(),
@@ -501,9 +628,9 @@ static void TestUserPreferencesParseServerFeaturePreferences(T* t) {
 		          JsonObject{{"enabled", JsonAny(false)}}},
 		     }},
 		});
-		gotest::assert::Equal(t, prefs.EnableValidation, Tristate::False);
-		gotest::assert::Equal(t, prefs.EnableFormatting, Tristate::False);
-		gotest::assert::Equal(t, prefs.EnableAutoClosingTags,
+		gotest::assert::Equal(t, prefs.ValidateEnabled, Tristate::False);
+		gotest::assert::Equal(t, prefs.FormatEnabled, Tristate::False);
+		gotest::assert::Equal(t, prefs.AutoClosingTags,
 		                      Tristate::False);
 	});
 
@@ -517,9 +644,9 @@ static void TestUserPreferencesParseServerFeaturePreferences(T* t) {
 		         {"autoClosingTags", JsonAny(false)},
 		     }},
 		});
-		gotest::assert::Equal(t, prefs.EnableValidation, Tristate::False);
-		gotest::assert::Equal(t, prefs.EnableFormatting, Tristate::False);
-		gotest::assert::Equal(t, prefs.EnableAutoClosingTags,
+		gotest::assert::Equal(t, prefs.ValidateEnabled, Tristate::False);
+		gotest::assert::Equal(t, prefs.FormatEnabled, Tristate::False);
+		gotest::assert::Equal(t, prefs.AutoClosingTags,
 		                      Tristate::False);
 	});
 
@@ -540,9 +667,9 @@ static void TestUserPreferencesParseServerFeaturePreferences(T* t) {
 		          JsonObject{{"enabled", JsonAny(true)}}},
 		     }},
 		});
-		gotest::assert::Equal(t, prefs.EnableValidation, Tristate::True);
-		gotest::assert::Equal(t, prefs.EnableFormatting, Tristate::True);
-		gotest::assert::Equal(t, prefs.EnableAutoClosingTags,
+		gotest::assert::Equal(t, prefs.ValidateEnabled, Tristate::True);
+		gotest::assert::Equal(t, prefs.FormatEnabled, Tristate::True);
+		gotest::assert::Equal(t, prefs.AutoClosingTags,
 		                      Tristate::True);
 	});
 }
@@ -582,7 +709,7 @@ static void TestUserPreferencesParseJSDocCompletionPreferences(T* t) {
 		                      JsonObject{{"enabled", JsonAny(false)}}}}},
 		     }},
 		});
-		gotest::assert::Equal(t, prefs.EnableJSDocCompletions,
+		gotest::assert::Equal(t, prefs.CompleteJSDocs,
 		                      Tristate::False);
 	});
 
@@ -595,7 +722,7 @@ static void TestUserPreferencesParseJSDocCompletionPreferences(T* t) {
 		          JsonObject{{"completeJSDocs", JsonAny(false)}}},
 		     }},
 		});
-		gotest::assert::Equal(t, prefs.EnableJSDocCompletions,
+		gotest::assert::Equal(t, prefs.CompleteJSDocs,
 		                      Tristate::False);
 	});
 
@@ -616,7 +743,7 @@ static void TestUserPreferencesParseJSDocCompletionPreferences(T* t) {
 		                                         JsonAny(true)}}}}},
 		            }},
 		       });
-		       gotest::assert::Equal(t, prefs.EnableJSDocCompletions,
+		       gotest::assert::Equal(t, prefs.CompleteJSDocs,
 		                             Tristate::True);
 	       });
 

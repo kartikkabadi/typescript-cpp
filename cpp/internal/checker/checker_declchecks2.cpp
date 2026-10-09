@@ -483,14 +483,18 @@ void Checker::checkInterfaceDeclaration(Node* node) {
 		!links->interfaceChecked || staleForCheckFile(links->interfaceCheckedFor)) {
 		links->interfaceChecked = true;
 		links->interfaceCheckedFor = checkFileTag();
+		// Check once per checker, but report on the first interface
+		// declaration, independently of which declaration is checked first.
+		Node* firstInterfaceDeclaration =
+		    getDeclarationOfKind(symbol, Kind::InterfaceDeclaration);
 		Type* t = getDeclaredTypeOfSymbol(symbol);
 		Type* typeWithThis = getTypeWithThisArgument(t, nullptr, false);
 		// run subsequent checks only if first set succeeded
-		if (checkInheritedPropertiesAreIdentical(t, node->name())) {
+		if (checkInheritedPropertiesAreIdentical(t, firstInterfaceDeclaration->name())) {
 			for (Type* baseType : getBaseTypes(t)) {
 				checkTypeAssignableTo(typeWithThis,
 					getTypeWithThisArgument(baseType, t->AsInterfaceType()->thisType, false),
-					node->name(), Interface_0_incorrectly_extends_interface_1);
+					firstInterfaceDeclaration->name(), Interface_0_incorrectly_extends_interface_1);
 			}
 			checkIndexConstraints(t, symbol, false /*isStaticIndex*/);
 		}
@@ -582,7 +586,9 @@ void Checker::checkEnumDeclaration(Node* node) {
 		links->enumChecked = true;
 		links->enumCheckedFor = checkFileTag();
 		if (enumSymbol->declarations.size() > 1) {
-			bool enumIsConst = isEnumConst(node);
+			Node* firstEnumDeclaration =
+			    getDeclarationOfKind(enumSymbol, Kind::EnumDeclaration);
+			bool enumIsConst = isEnumConst(firstEnumDeclaration);
 			// check that const is placed\omitted on all enum declarations
 			for (Node* decl : enumSymbol->declarations) {
 				if (isEnumDeclaration(decl) && isEnumConst(decl) != enumIsConst) {
@@ -616,6 +622,9 @@ void Checker::checkEnumDeclaration(Node* node) {
 void Checker::checkEnumMember(Node* node) {
 	if (isPrivateIdentifier(node->name())) {
 		error(node, An_enum_member_cannot_be_named_with_a_private_identifier);
+	}
+	if (isComputedPropertyName(node->name())) {
+		checkExpression(node->name()->expression());
 	}
 	if (node->initializer() != nullptr) {
 		checkExpression(node->initializer());
@@ -1571,9 +1580,18 @@ void Checker::checkVariableLikeDeclaration(Node* node) {
 				Type* globalDisposableType = getGlobalDisposableType();
 				if (globalDisposableType != emptyObjectType) {
 					Type* optionalDisposableType = getUnionType({globalDisposableType, nullType, undefinedType});
-					checkTypeAssignableTo(widenTypeForVariableLikeDeclaration(initializerType, node, false),
-						optionalDisposableType, initializer,
-						The_initializer_of_a_using_declaration_must_be_either_an_object_with_a_Symbol_dispose_method_or_be_null_or_undefined);
+					Type* widenedInitializerType = widenTypeForVariableLikeDeclaration(initializerType, node, false);
+					std::vector<Diagnostic*> diags;
+					if (!checkTypeAssignableToEx(widenedInitializerType, optionalDisposableType, initializer,
+						The_initializer_of_a_using_declaration_must_be_either_an_object_with_a_Symbol_dispose_method_or_be_null_or_undefined, &diags)) {
+						Type* globalAsyncDisposableType = getGlobalAsyncDisposableType();
+						Type* optionalAsyncDisposableType = getUnionType({globalAsyncDisposableType, nullType, undefinedType});
+						if (globalAsyncDisposableType != emptyObjectType && isTypeAssignableTo(widenedInitializerType, optionalAsyncDisposableType)) {
+							diags[0]->AddMessageChain(newDiagnosticChain(nullptr,
+								This_initializer_has_a_Symbol_asyncDispose_method_Did_you_mean_to_use_await_using));
+						}
+						addDiagnostic(diags[0]);
+					}
 				}
 			}
 		}
@@ -2714,8 +2732,8 @@ void Checker::checkExportsOnMergedDeclarations(Node* node) {
 			return;
 		}
 	}
-	// Run the check only for the first declaration in the list.
-	if (getDeclarationOfKind(symbol, node->kind) != node) {
+	if (symbol->declarations.size() < 2 ||
+	    !mergedExportsChecked.insert(symbol).second) {
 		return;
 	}
 	DeclarationSpaces exportedDeclarationSpaces = DeclarationSpacesNone;

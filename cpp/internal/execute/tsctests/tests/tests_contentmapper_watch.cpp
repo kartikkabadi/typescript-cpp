@@ -722,6 +722,60 @@ REGISTER_UNIT_TEST(
     "tsctests.TestContentMapperBuildWatchSymlinkedManifestChange",
     TestContentMapperBuildWatchSymlinkedManifestChange);
 
+void TestContentMapperWatchManifestChangeIgnoresCase(T* t) {
+	t->Parallel();
+	const std::string manifestTarget =
+	    "/home/src/workspaces/Mapper/package.json";
+	const std::string manifestEvent =
+	    "/home/src/workspaces/mapper/package.json";
+	auto* input = new tscInput{.ignoreCase = true,
+	                         .files = FileMap{
+	    {"/home/src/workspaces/project/tsconfig.json",
+	     std::string(R"({
+			"compilerOptions": { "composite": true },
+			"contentMappers": [{ "package": "mapper", "extensions": [".vue"] }]
+		})")},
+	    {"/home/src/workspaces/project/app.vue", "export const app = 1;"},
+	    {"/home/src/workspaces/project/node_modules/mapper",
+	     vfs::vfstest::Symlink("/home/src/workspaces/Mapper")},
+	    {manifestTarget,
+	     contentmappertest::PackageJSON(contentmappertest::VerbatimMapper)},
+	}};
+	auto testSys = newTestSys(input, false);
+	auto* spawner = new recordingContentMapperSpawner{
+	    .inner = contentmappertest::NewSpawner()};
+	auto* sys =
+	    new recordingContentMapperSystem(std::move(testSys), spawner);
+	auto* testSysPtr = sys->inner.get();
+	auto cc = gostd::contextWithCancel(t->Context());
+	auto ctx = cc.first;
+	auto cancel = cc.second;
+	t->Cleanup([cancel] { cancel(); });
+
+	auto result = execute::CommandLine(
+	    ctx, sys, {"--watch", "--runExternalCode"}, testSysPtr);
+	if (spawner->spawns.load() != 1)
+		t->Error({"expected 1 spawn"});
+	if (spawner->closes.load() != 0)
+		t->Error({"expected 0 closes"});
+
+	std::string updatedManifest = stringsReplace(
+	    contentmappertest::PackageJSON(contentmappertest::VerbatimMapper),
+	    "\"version\": \"1.0.0\"", "\"version\": \"2.0.0\"", 1);
+	testSysPtr->writeFileNoError(manifestEvent, updatedManifest);
+	testSysPtr->mockWatchBackend->SendEvents(
+	    {fswatch::Event{fswatch::EventKind::EventUpdate, manifestEvent}});
+	result.Watcher->DoCycle();
+
+	if (spawner->spawns.load() != 2)
+		t->Error({"expected 2 spawns"});
+	if (spawner->closes.load() != 1)
+		t->Error({"expected 1 close"});
+}
+REGISTER_UNIT_TEST(
+    "tsctests.TestContentMapperWatchManifestChangeIgnoresCase",
+    TestContentMapperWatchManifestChangeIgnoresCase);
+
 void TestContentMapperBuildWatchSymlinkedManifestDelete(T* t) {
 	t->Parallel();
 	const std::string manifestTarget =

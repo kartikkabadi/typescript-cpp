@@ -28,8 +28,12 @@ inline constexpr std::string_view InferredTypesContainingFile =
 // compiler's own version.
 bool IsApplicableVersionedTypesKey(std::string_view key);
 
-// ParseNodeModuleFromPath — node_modules package dir prefix, or "".
-std::string ParseNodeModuleFromPath(std::string_view resolved, bool isFolder);
+// NodeModulePackageRootForFile/NodeModulePackageRootForDirectory —
+// node_modules package dir prefix, or "" (util.go).
+std::string NodeModulePackageRootForFile(std::string_view resolved);
+std::string NodeModulePackageRootForDirectory(std::string_view resolved);
+std::string parseNodeModulePackageRoot(std::string_view resolved,
+                                       bool isDirectory);
 
 // ParsePackageName — splits "@scope/name/rest" or "name/rest".
 std::pair<std::string_view, std::string_view> ParsePackageName(

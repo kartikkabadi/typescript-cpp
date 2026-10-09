@@ -52,6 +52,10 @@ struct SnapshotHost {
 	    const SourceFileParseOptions& options,
 	    const std::string& text, ScriptKind scriptKind);
 
+	// AcquireExistingSourceFile — snapshothost.go:65.
+	struct SourceFileLease* AcquireExistingSourceFile(
+	    const ParseCacheKey& key);
+
 	// NewRootSnapshot — snapshothost.go:92. Creates an independent
 	// root snapshot.
 	Snapshot* NewRootSnapshot() { return newRootSnapshot(0, false); }

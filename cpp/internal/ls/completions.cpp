@@ -173,6 +173,7 @@ Node* getTypeAnnotationNode(Node* node) {
 	case Kind::RestType:
 	case Kind::TemplateLiteralTypeSpan:
 	case Kind::JSDocTypeExpression:
+	case Kind::JSDocParameterTag:
 	case Kind::JSDocPropertyTag:
 	case Kind::JSDocNullableType:
 	case Kind::JSDocNonNullableType:
@@ -7855,6 +7856,7 @@ std::vector<CompletionItem*> getJSDocParameterCompletions(
 		}
 	}
 	int paramIndex = -1;
+	printer::EmitContext* emitContext = nullptr;
 	return mapNonNil(fun->parameters(), [&](Node* param) -> CompletionItem* {
 		paramIndex++;
 		if (paramIndex < paramTagCount) {
@@ -7865,7 +7867,7 @@ std::vector<CompletionItem*> getJSDocParameterCompletions(
 			int tabstopCounter = 1;
 			std::string paramName = param->name()->text();
 			std::string displayText = getJSDocParamAnnotation(
-			    paramName, param->initializer(),
+			    &emitContext, paramName, param->initializer(),
 			    param->as<ParameterDeclaration>()->DotDotDotToken,
 			    isJS,
 			    /*isObject*/ false,
@@ -7874,7 +7876,7 @@ std::vector<CompletionItem*> getJSDocParameterCompletions(
 			std::string snippetText;
 			if (isSnippet) {
 				snippetText = getJSDocParamAnnotation(
-				    paramName, param->initializer(),
+				    &emitContext, paramName, param->initializer(),
 				    param->as<ParameterDeclaration>()
 				        ->DotDotDotToken,
 				    isJS,
@@ -7911,7 +7913,7 @@ std::vector<CompletionItem*> getJSDocParameterCompletions(
 			    gostd::sprintf("param%d", {paramIndex});
 			std::vector<std::string> displayTextResult =
 			    generateJSDocParamTagsForDestructuring(
-			        paramPath, param->name()->as<BindingPattern>(),
+			        &emitContext, paramPath, param->name()->as<BindingPattern>(),
 			        param->initializer(),
 			        param->as<ParameterDeclaration>()
 			            ->DotDotDotToken,
@@ -7922,7 +7924,7 @@ std::vector<CompletionItem*> getJSDocParameterCompletions(
 			if (isSnippet) {
 				std::vector<std::string> snippetTextResult =
 				    generateJSDocParamTagsForDestructuring(
-				        paramPath,
+				        &emitContext, paramPath,
 				        param->name()->as<BindingPattern>(),
 				        param->initializer(),
 				        param->as<ParameterDeclaration>()
@@ -7968,6 +7970,7 @@ std::vector<CompletionItem*> getJSDocParameterCompletions(
 
 // completions.go:6348
 std::string getJSDocParamAnnotation(
+    printer::EmitContext** emitContext,
     const std::string& paramName, Node* initializer,
     Node* dotDotDotToken, bool isJS, bool isObject, bool isSnippet,
     checker::Checker* typeChecker, const CompilerOptions* options,
@@ -8016,8 +8019,9 @@ std::string getJSDocParamAnnotation(
 					    builderFlags,
 					    /*idToSymbol*/ nullptr);
 					if (typeNode != nullptr) {
-						printer::EmitContext* emitContext =
-						    printer::NewEmitContext();
+						if (*emitContext == nullptr) {
+							*emitContext = printer::NewEmitContext();
+						}
 						// !!! snippet p
 						printer::Printer* p = printer::NewPrinter(
 						    printer::PrinterOptions{
@@ -8029,8 +8033,8 @@ std::string getJSDocParamAnnotation(
 						        // Target: options.Target,
 						    },
 						    printer::PrintHandlers{},
-						    emitContext);
-						emitContext->setEmitFlags(
+						    *emitContext);
+						(*emitContext)->setEmitFlags(
 						    typeNode, printer::EFSingleLine);
 						t = p->Emit(typeNode, file);
 					}
@@ -8079,6 +8083,7 @@ std::string getJSDocParamNameWithInitializer(const std::string& paramName,
 
 // completions.go:6420
 std::vector<std::string> generateJSDocParamTagsForDestructuring(
+    printer::EmitContext** emitContext,
     const std::string& path, BindingPattern* pattern,
     Node* initializer, Node* dotDotDotToken, bool isJS, bool isSnippet,
     checker::Checker* typeChecker, const CompilerOptions* options,
@@ -8086,11 +8091,11 @@ std::vector<std::string> generateJSDocParamTagsForDestructuring(
 	int tabstopCounter = 1;
 	if (!isJS) {
 		return {getJSDocParamAnnotation(
-		    path, initializer, dotDotDotToken, isJS,
+		    emitContext, path, initializer, dotDotDotToken, isJS,
 		    /*isObject*/ false, isSnippet, typeChecker, options,
 		    preferences, &tabstopCounter)};
 	}
-	return jsDocParamPatternWorker(path, pattern, initializer,
+	return jsDocParamPatternWorker(emitContext, path, pattern, initializer,
 	                               dotDotDotToken, isJS, isSnippet,
 	                               typeChecker, options, preferences,
 	                               &tabstopCounter);
@@ -8098,6 +8103,7 @@ std::vector<std::string> generateJSDocParamTagsForDestructuring(
 
 // completions.go:6453
 std::vector<std::string> jsDocParamPatternWorker(
+    printer::EmitContext** emitContext,
     const std::string& path, BindingPattern* pattern,
     Node* initializer, Node* dotDotDotToken, bool isJS, bool isSnippet,
     checker::Checker* typeChecker, const CompilerOptions* options,
@@ -8105,14 +8111,14 @@ std::vector<std::string> jsDocParamPatternWorker(
 	if (isObjectBindingPattern(pattern) && dotDotDotToken == nullptr) {
 		int childCounter = *counter;
 		std::string rootParam = getJSDocParamAnnotation(
-		    path, initializer, dotDotDotToken, isJS,
+		    emitContext, path, initializer, dotDotDotToken, isJS,
 		    /*isObject*/ true, isSnippet, typeChecker, options,
 		    preferences, &childCounter);
 		std::vector<std::string> childTags;
 		for (Node* element : pattern->elements()) {
 			std::vector<std::string> elementTags =
 			    jsDocParamElementWorker(
-			        path, element->as<BindingElement>(), initializer,
+			        emitContext, path, element->as<BindingElement>(), initializer,
 			        dotDotDotToken, isJS, isSnippet, typeChecker,
 			        options, preferences, &childCounter);
 			if (elementTags.empty()) {
@@ -8130,7 +8136,7 @@ std::vector<std::string> jsDocParamPatternWorker(
 			return result;
 		}
 	}
-	return {getJSDocParamAnnotation(path, initializer, dotDotDotToken,
+	return {getJSDocParamAnnotation(emitContext, path, initializer, dotDotDotToken,
 	                                isJS,
 	                                /*isObject*/ false, isSnippet,
 	                                typeChecker, options, preferences,
@@ -8140,6 +8146,7 @@ std::vector<std::string> jsDocParamPatternWorker(
 // completions.go:6510 — Assumes binding element is inside object binding
 // pattern. We can't deeply annotate an array binding pattern.
 std::vector<std::string> jsDocParamElementWorker(
+    printer::EmitContext** emitContext,
     const std::string& path, BindingElement* element,
     Node* initializer, Node* dotDotDotToken, bool isJS, bool isSnippet,
     checker::Checker* typeChecker, const CompilerOptions* options,
@@ -8158,7 +8165,7 @@ std::vector<std::string> jsDocParamElementWorker(
 		std::string paramName =
 		    gostd::sprintf("%s.%s", {path, propertyName});
 		return {getJSDocParamAnnotation(
-		    paramName, element->initializer(),
+		    emitContext, paramName, element->initializer(),
 		    element->as<BindingElement>()->DotDotDotToken, isJS,
 		    /*isObject*/ false, isSnippet, typeChecker, options,
 		    preferences, counter)};
@@ -8170,7 +8177,7 @@ std::vector<std::string> jsDocParamElementWorker(
 			return {};
 		}
 		return jsDocParamPatternWorker(
-		    gostd::sprintf("%s.%s", {path, propertyName}),
+		    emitContext, gostd::sprintf("%s.%s", {path, propertyName}),
 		    element->name->as<BindingPattern>(),
 		    element->initializer(),
 		    element->as<BindingElement>()->DotDotDotToken, isJS,

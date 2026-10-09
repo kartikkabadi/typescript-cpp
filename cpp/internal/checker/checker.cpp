@@ -2368,9 +2368,12 @@ void Checker::recordMergedSymbol(Symbol* target, Symbol* source) {
 	mergedSymbols[source] = target;
 }
 
+Symbol* Checker::getResolvedTarget(Symbol* symbol) {
+	return getMergedSymbol(resolveSymbol(getMergedSymbol(symbol)));
+}
+
 Symbol* Checker::getSymbolIfSameReference(Symbol* s1, Symbol* s2) {
-	if (getMergedSymbol(resolveSymbol(getMergedSymbol(s1))) ==
-		getMergedSymbol(resolveSymbol(getMergedSymbol(s2)))) {
+	if (getResolvedTarget(s1) == getResolvedTarget(s2)) {
 		return s1;
 	}
 	return nullptr;
@@ -2718,7 +2721,7 @@ void Checker::addDeclarationToLateBoundSymbol(Symbol* symbol, Node* member, Symb
 			symbol->declarations.end());
 		symbol->declarations.push_back(member);
 		SymbolFlags oldFlags = symbol->flags;
-		symbol->flags = SymbolFlagsNone;
+		symbol->flags = SymbolFlagsTransient;
 		for (Node* d : symbol->declarations) {
 			symbol->flags |= d->symbol()->flags;
 		}
@@ -3440,6 +3443,8 @@ std::vector<Type*> Checker::getInferTypeParameters(Node* node) {
 			result.push_back(getDeclaredTypeOfSymbol(symbol));
 		}
 	}
+	std::sort(result.begin(), result.end(),
+			  [](Type* a, Type* b) { return CompareTypes(a, b) < 0; });
 	return result;
 }
 
@@ -6377,6 +6382,7 @@ void Checker::init(Program* p) {
 	getGlobalPromiseType = getGlobalTypeResolver("Promise", 1, false);
 	getGlobalPromiseTypeChecked = getGlobalTypeResolver("Promise", 1, true);
 	getGlobalPromiseLikeType = getGlobalTypeResolver("PromiseLike", 1, true);
+	getGlobalAbstractModuleSourceType = getGlobalTypeResolver("AbstractModuleSource", 0, true);
 	getGlobalPromiseConstructorSymbol =
 		getGlobalValueSymbolResolver("Promise", true);
 	getGlobalPromiseConstructorSymbolOrNil =
@@ -6508,6 +6514,9 @@ Symbol* Checker::resolveExternalModuleNameWorker(
 	const DiagnosticMessage* moduleNotFoundError, bool ignoreErrors,
 	bool isForAugmentation, Type* importAttributesType) {
 	if (isStringLiteralLike(moduleReferenceExpression)) {
+		if (isSourcePhaseImport(moduleReferenceExpression->parent)) {
+			return nullptr;
+		}
 		return resolveExternalModule(
 		    location, std::string(moduleReferenceExpression->text()),
 		    moduleNotFoundError,
@@ -6640,8 +6649,13 @@ SourceFile* Checker::getExternalModuleFileFromDeclaration(Node* declaration) {
 		importAttributesType =
 		    getTypeFromImportAttributes(getImportAttributes(declaration));
 	}
+	// This is only used by emit and type printing, after checking has
+	// already reported any resolution errors for this specifier. Resolve
+	// with ignoreErrors so that these queries don't add new diagnostics
+	// (e.g. an implicit-any-module suggestion) as a side effect.
 	Symbol* moduleSymbol = resolveExternalModuleNameWorker(
-	    specifier, specifier /*moduleNotFoundError*/, nullptr, false, false,
+	    specifier, specifier, nullptr /*moduleNotFoundError*/,
+	    true /*ignoreErrors*/, false /*isForAugmentation*/,
 	    importAttributesType);  // TODO: GH#18217
 	if (moduleSymbol == nullptr) {
 		return nullptr;
@@ -6865,7 +6879,7 @@ Symbol* Checker::resolveExternalModule(
 			      {moduleReference, resolvedModule.resolvedFileName});
 		}
 
-		if (errorNode != nullptr) {
+		if (errorNode != nullptr && !resolvedModule.isCustomResolution) {
 			if (resolvedModule.resolvedUsingTsExtension &&
 			    tspath::isDeclarationFileName(moduleReference)) {
 				if (findAncestor(location, isEmittableImport) != nullptr) {

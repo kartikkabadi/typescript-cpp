@@ -88,15 +88,29 @@ static void TestGetPackageRealpathFuncs_FollowsNodeModulesSymlinks(T* t) {
 	    {{"/symlink-bin/pkg", vfs::vfstest::Symlink("/real/bin/pkg")},
 	     {"/real/bin/pkg/index.d.ts",
 	      "export declare const a: number;"},
+	     {"/real/bin/pkg/node_modules/.package-lock.json", "{}"},
 	     {"/real/bin/pkg/node_modules/dep",
 	      vfs::vfstest::Symlink("/real/dep")},
+	     {"/real/bin/pkg/node_modules/@scope/dep",
+	      vfs::vfstest::Symlink("/real/scoped-dep")},
 	     {"/real/dep/index.d.ts", "export declare const b: number;"},
 	     {"/real/dep/src/utils/helper.d.ts",
-	      "export declare const c: number;"}},
+	      "export declare const c: number;"},
+	     {"/real/scoped-dep/index.d.ts",
+	      "export declare const d: number;"}},
 	    true);
 
 	auto [toRealpath, _p] =
 	    getPackageRealpathFuncs(fs.get(), "/symlink-bin/pkg");
+
+	// Files directly within node_modules must not seed a cache entry
+	// that prevents a later package-root directory from following its
+	// symlink.
+	gotest::assert::Equal(
+	    t,
+	    toRealpath(
+	        "/real/bin/pkg/node_modules/.package-lock.json"),
+	    std::string("/real/bin/pkg/node_modules/.package-lock.json"));
 
 	// Files inside the package should be converted via string replacement
 	// (fast path).
@@ -104,6 +118,13 @@ static void TestGetPackageRealpathFuncs_FollowsNodeModulesSymlinks(T* t) {
 	    t, toRealpath("/symlink-bin/pkg/index.d.ts"),
 	    std::string("/real/bin/pkg/index.d.ts"),
 	    "package files should be converted via prefix replacement");
+
+	// A sibling whose name starts with the package name is not inside
+	// the package.
+	gotest::assert::Equal(
+	    t, toRealpath("/symlink-bin/pkg2/index.d.ts"),
+	    std::string("/symlink-bin/pkg2/index.d.ts"),
+	    "sibling package paths must not use prefix replacement");
 
 	// Files outside the package (e.g. node_modules symlinks) should be
 	// resolved via fs.Realpath so the cache key is the canonical realpath,
@@ -113,6 +134,25 @@ static void TestGetPackageRealpathFuncs_FollowsNodeModulesSymlinks(T* t) {
 	    std::string("/real/dep/index.d.ts"),
 	    "node_modules symlinks must be followed so the same file gets a "
 	    "consistent cache key");
+
+	// The module resolver also uses toRealpath while traversing
+	// directories.
+	gotest::assert::Equal(
+	    t, toRealpath("/real/bin/pkg/node_modules/dep"),
+	    std::string("/real/dep"),
+	    "package-root directories should follow their node_modules "
+	    "symlink");
+
+	// Walking the scope directory first must not seed a cache entry
+	// that prevents a nested scoped package from following its symlink.
+	gotest::assert::Equal(
+	    t, toRealpath("/real/bin/pkg/node_modules/@scope"),
+	    std::string("/real/bin/pkg/node_modules/@scope"));
+	gotest::assert::Equal(
+	    t, toRealpath("/real/bin/pkg/node_modules/@scope/dep"),
+	    std::string("/real/scoped-dep"),
+	    "scoped package-root directories should follow their "
+	    "node_modules symlink");
 
 	// Files in subdirectories of an already-resolved external package
 	// should use the cached prefix mapping without additional realpath

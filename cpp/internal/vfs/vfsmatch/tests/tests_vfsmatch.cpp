@@ -901,6 +901,35 @@ void TestReadDirectoryMatchesTypeScriptBaselines(T* t) {
 	}
 }
 
+
+// vfsmatch_test.go — dynamic-root read-directory and glob case sensitivity.
+void TestReadDirectoryWithExtendedDynamicRoot(T* t) {
+	t->Parallel();
+	std::string packageDirectory =
+	    "^/~ts-uri~/custom/ts-nul-authority/node_modules/Pkg";
+	auto host = vfstest::FromMap(
+	    std::unordered_map<std::string, vfstest::MapFileInput>{
+	        {packageDirectory + "/value.d.ts", ""},
+	        {packageDirectory + "/node_modules/dep/index.d.ts", ""}},
+	    true);
+	auto got = matchFiles(packageDirectory, {".d.ts"}, {}, {"**/*"},
+	                      host->UseCaseSensitiveFileNames(),
+	                      packageDirectory, UnlimitedDepth, host.get());
+	assert::DeepEqual(t, got,
+	                  std::vector<std::string>{
+	                      packageDirectory + "/value.d.ts"});
+}
+
+void TestDynamicAbsoluteGlobUsesCaseSensitivePattern(T* t) {
+	t->Parallel();
+	std::string root = "^/~ts-uri~/custom/ts-nul-authority";
+	auto matcher = NewSpecMatcher({root + "/Foo/**/*.ts"}, "/dev",
+	                              Usage::Files, false);
+	assert::Assert(t, matcher != nullptr);
+	assert::Assert(t, matcher->MatchString(root + "/Foo/a.ts"));
+	assert::Assert(t, !matcher->MatchString(root + "/foo/a.ts"));
+}
+
 void TestSpecMatcher(T* t) {
 	t->Parallel();
 	struct row {
@@ -1570,6 +1599,10 @@ REGISTER_UNIT_TEST("vfsmatch.TestReadDirectorySymlinkCycle",
 REGISTER_UNIT_TEST("vfsmatch.TestReadDirectoryMatchesTypeScriptBaselines",
                    TestReadDirectoryMatchesTypeScriptBaselines);
 REGISTER_UNIT_TEST("vfsmatch.TestSpecMatcher", TestSpecMatcher);
+REGISTER_UNIT_TEST("vfsmatch.TestReadDirectoryWithExtendedDynamicRoot",
+                   TestReadDirectoryWithExtendedDynamicRoot);
+REGISTER_UNIT_TEST("vfsmatch.TestDynamicAbsoluteGlobUsesCaseSensitivePattern",
+                   TestDynamicAbsoluteGlobUsesCaseSensitivePattern);
 REGISTER_UNIT_TEST("vfsmatch.TestSpecMatcher_MatchString",
                    TestSpecMatcher_MatchString);
 REGISTER_UNIT_TEST("vfsmatch.TestSingleSpecMatcher_MatchString",

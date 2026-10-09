@@ -2137,8 +2137,7 @@ ParsedCommandLine* parseJsonConfigFileContentWorker(
 	auto* result = new ParsedCommandLine{};
 	result->ParsedConfig = new ParsedOptions{
 	    .CompilerOptions = parsedConfig->options,
-	    .WatchOptions = nullptr,
-	    .TypeAcquisition = parsedConfig->typeAcquisition,
+		    .TypeAcquisition = parsedConfig->typeAcquisition,
 	    .FileNames = fileNames,
 	    .ProjectReferences = getProjectReferences(basePathForFileNames),
 	    .ContentMappers = contentMappers,
@@ -2152,6 +2151,7 @@ ParsedCommandLine* parseJsonConfigFileContentWorker(
 	        host->FS()->UseCaseSensitiveFileNames(),
 	    .currentDirectory = basePathForFileNames,
 	};
+	result->baseDirectory = basePathForFileNames;
 	result->literalFileNamesLen = literalFileNamesLen;
 	return result;
 }
@@ -2271,6 +2271,9 @@ StringLiteral* GetTsConfigPropArrayElementValue(
 Diagnostic* CreateDiagnosticAtReferenceSyntax(
     ParsedCommandLine* config, int index, const DiagnosticMessage* message,
     std::vector<std::string> args) {
+	if (config->ConfigFile == nullptr) {
+		return nullptr;
+	}
 	return ForEachTsConfigPropArray<Diagnostic>(
 	    config->ConfigFile->SourceFile, "references",
 	    [&](PropertyAssignment* property) -> Diagnostic* {

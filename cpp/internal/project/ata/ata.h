@@ -59,7 +59,7 @@ struct TypingsInstallerOptions {
 struct NpmExecutor {
 	virtual ~NpmExecutor() = default;
 	virtual std::pair<std::string, gostd::Error>
-	NpmInstall(const std::string& cwd,
+	NpmInstall(const gostd::Context& ctx, const std::string& cwd,
 	           const std::vector<std::string>& args) = 0;
 };
 
@@ -145,19 +145,23 @@ public:
 	                             logging::Logger* logger);
 
 	std::pair<std::unique_ptr<TypingsInstallResult>, gostd::Error>
-	InstallTypings(const TypingsInstallRequest* request);
+	InstallTypings(const gostd::Context& ctx,
+	               const TypingsInstallRequest* request);
 
 private:
 	std::pair<std::unique_ptr<TypingsInstallResult>, gostd::Error>
-	discoverAndInstallTypings(const TypingsInstallRequest* request);
+	discoverAndInstallTypings(const gostd::Context& ctx,
+	                          const TypingsInstallRequest* request);
 
 	std::pair<std::vector<std::string>, gostd::Error> installTypings(
+	    const gostd::Context& ctx,
 	    int32_t requestID,
 	    const std::vector<std::string>& currentlyCachedTypings,
 	    const std::vector<std::string>& filteredTypings,
 	    logging::Logger* logger);
 
 	std::pair<std::vector<std::string>, bool> installWorker(
+	    const gostd::Context& ctx,
 	    int32_t requestId, const std::vector<std::string>& packageNames,
 	    logging::Logger* logger);
 
@@ -165,7 +169,8 @@ private:
 	    logging::Logger* logger,
 	    const std::vector<std::string>& typingsToInstall);
 
-	void init(const std::string& projectID, vfs::FS* fs,
+	void init(const gostd::Context& ctx, const std::string& projectID,
+	          vfs::FS* fs,
 	          logging::Logger* logger);
 
 	void processCacheLocation(const std::string& projectID, vfs::FS* fs,

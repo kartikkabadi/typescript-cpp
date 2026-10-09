@@ -2649,6 +2649,7 @@ Node* Parser::parseImportDeclarationOrImportEqualsDeclaration(
 	// We don't parse the identifier here in await context, instead we will
 	// report a grammar error in the checker.
 	bool saveHasAwaitIdentifier = statementHasAwaitIdentifier;
+	Kind phaseModifierCandidate = currentImportPhaseModifier();
 	Node* identifier = nullptr;
 	if (isIdentifier()) {
 		identifier = parseIdentifier();
@@ -2665,26 +2666,19 @@ Node* Parser::parseImportDeclarationOrImportEqualsDeclaration(
 		if (isIdentifier()) {
 			identifier = parseIdentifier();
 		}
-	} else if (identifier != nullptr && identifier->text() == "defer") {
-		bool shouldParseAsDeferModifier;
-		if (token == Kind::FromKeyword) {
-			shouldParseAsDeferModifier =
-				!lookAhead(&Parser::nextTokenIsTokenStringLiteral);
-		} else {
-			shouldParseAsDeferModifier = token != Kind::CommaToken &&
-			                             token != Kind::EqualsToken;
-		}
-		if (shouldParseAsDeferModifier) {
-			phaseModifier = Kind::DeferKeyword;
-			identifier = nullptr;
-			if (isIdentifier()) {
-				identifier = parseIdentifier();
-			}
+	} else if (identifier != nullptr &&
+	           phaseModifierCandidate != Kind::Unknown &&
+	           shouldParseImportPhaseModifier()) {
+		phaseModifier = phaseModifierCandidate;
+		identifier = nullptr;
+		if (isIdentifier()) {
+			identifier = parseIdentifier();
 		}
 	}
 	if (identifier != nullptr &&
-	    !tokenAfterImportedIdentifierDefinitelyProducesImportDeclaration() &&
-	    phaseModifier != Kind::DeferKeyword) {
+	    tokenAfterImportedIdentifierAllowsImportEqualsDeclaration() &&
+	    phaseModifier != Kind::DeferKeyword &&
+	    phaseModifier != Kind::SourceKeyword) {
 		Node* importEquals = checkJSSyntax(parseImportEqualsDeclaration(
 			pos, jsdoc, modifiers, identifier,
 			phaseModifier == Kind::TypeKeyword));
@@ -2719,10 +2713,37 @@ bool Parser::tokenAfterImportDefinitelyProducesImportDeclaration() {
 	return token == Kind::AsteriskToken || token == Kind::OpenBraceToken;
 }
 
-bool Parser::tokenAfterImportedIdentifierDefinitelyProducesImportDeclaration() {
-	// In `import id ___`, the current token decides whether to produce
-	// an ImportDeclaration or ImportEqualsDeclaration.
-	return token == Kind::CommaToken || token == Kind::FromKeyword;
+bool Parser::shouldParseImportPhaseModifier() {
+	switch (token) {
+	case Kind::CommaToken:
+	case Kind::EqualsToken:
+		return false;
+	case Kind::FromKeyword:
+		if (lookAhead(&Parser::nextTokenIsTokenStringLiteral)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+Kind Parser::currentImportPhaseModifier() {
+	if (scanner->tokenText() == "defer") {
+		return Kind::DeferKeyword;
+	}
+	if (scanner->tokenText() == "source") {
+		return Kind::SourceKeyword;
+	}
+	return Kind::Unknown;
+}
+
+bool Parser::tokenAfterImportedIdentifierAllowsImportEqualsDeclaration() {
+	switch (token) {
+	case Kind::CommaToken:
+	case Kind::FromKeyword:
+		return false;
+	default:
+		return true;
+	}
 }
 
 Node* Parser::parseImportEqualsDeclaration(int pos, JSDocScannerInfo jsdoc,
@@ -2783,6 +2804,10 @@ Node* Parser::tryParseImportClause(Node* identifier, int pos,
 		                                       skipJSDocLeadingAsterisks);
 		parseExpected(Kind::FromKeyword);
 		return importClause;
+	}
+	if (phaseModifier == Kind::DeferKeyword ||
+	    phaseModifier == Kind::SourceKeyword) {
+		return finishNode(factory.newImportClause(phaseModifier, nullptr, nullptr), pos);
 	}
 	return nullptr;
 }
@@ -6191,9 +6216,9 @@ Node* Parser::parseLeftHandSideExpressionOrHigher() {
 			nextToken();  // advance past the dot
 			expression = finishNode(
 				factory.newMetaProperty(Kind::ImportKeyword,
-				                        parseIdentifierName()),
+				                        parseImportMetaPropertyName()),
 				pos);
-			if (expression->text() == "defer") {
+			if (isImportPhaseMetaProperty(expression)) {
 				if (token == Kind::OpenParenToken ||
 				    token == Kind::LessThanToken) {
 					sourceFlags |=
@@ -6967,6 +6992,18 @@ Node* Parser::parseBindingIdentifierWithDiagnostic(
 	return id;
 }
 
+Node* Parser::parseImportMetaPropertyName() {
+	switch (token) {
+	case Kind::DeferKeyword:
+	case Kind::SourceKeyword:
+		if (currentImportPhaseModifier() == Kind::Unknown) {
+			parseErrorAtCurrentToken(
+				Keywords_cannot_contain_escape_characters);
+		}
+	}
+	return parseIdentifierName();
+}
+
 Node* Parser::parseIdentifierName() {
 	return parseIdentifierNameWithDiagnostic(nullptr);
 }
@@ -7260,6 +7297,7 @@ bool Parser::isStartOfStatement() {
 	case Kind::TypeKeyword:
 	case Kind::GlobalKeyword:
 	case Kind::DeferKeyword:
+	case Kind::SourceKeyword:
 		// When these don't start a declaration, they're an identifier in an
 		// expression statement
 		return true;
@@ -7327,6 +7365,7 @@ bool Parser::scanStartOfDeclaration() {
 		case Kind::InterfaceKeyword:
 		case Kind::TypeKeyword:
 		case Kind::DeferKeyword:
+		case Kind::SourceKeyword:
 			return nextTokenIsIdentifierOnSameLine();
 		case Kind::ModuleKeyword:
 		case Kind::NamespaceKeyword:
@@ -7362,6 +7401,7 @@ bool Parser::scanStartOfDeclaration() {
 		case Kind::ImportKeyword:
 			nextToken();
 			return token == Kind::DeferKeyword ||
+			       token == Kind::SourceKeyword ||
 			       token == Kind::StringLiteral ||
 			       token == Kind::AsteriskToken ||
 			       token == Kind::OpenBraceToken ||

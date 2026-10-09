@@ -63,16 +63,8 @@ struct callbackModuleResolver : module::Resolver {
 	    std::string_view typeReferenceDirectiveName,
 	    std::string_view containingFile, ResolutionMode resolutionMode,
 	    const module::ResolvedProjectReference* redirectedReference) override;
-	std::shared_ptr<packagejson::InfoCacheEntry> GetPackageScopeForPath(
-	    const std::string& directory) override;
-	void PackageJsonCacheEntries(
-	    const std::function<bool(
-	        const std::string&,
-	        std::shared_ptr<packagejson::InfoCacheEntry>)>& f) override;
-	std::shared_ptr<module::ResolvedModule> ResolvePackageDirectory(
-	    std::string_view moduleName, std::string_view containingFile,
-	    ResolutionMode resolutionMode,
-	    const module::ResolvedProjectReference* redirectedReference) override;
+	// module_resolution.go:134 — a5c43c4d54.
+	std::shared_ptr<module::ResolutionData> GetResolutionData() override;
 };
 
 } // namespace tsc::api

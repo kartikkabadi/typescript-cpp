@@ -1036,6 +1036,9 @@ std::unique_ptr<Fix> View::tryAddToExistingImport(
 			continue;
 		}
 		ImportClause* importClause = importClauseNode->as<ImportClause>();
+		if (importClause->PhaseModifier == Kind::SourceKeyword) {
+			continue;
+		}
 
 		Node* namedBindings = importClause->NamedBindings;
 		// A type-only import may not have both a default and named imports, so the only way a name can

@@ -50,6 +50,20 @@ SourceFileLease* SnapshotHost::AcquireSourceFile(
 	};
 }
 
+// AcquireExistingSourceFile — snapshothost.go:65.
+SourceFileLease* SnapshotHost::AcquireExistingSourceFile(
+    const ParseCacheKey& key) {
+	auto [sourceFile, ok] = parseCache->AcquireExisting(key);
+	if (!ok) {
+		return nullptr;
+	}
+	return new SourceFileLease{
+	    .cache = parseCache,
+	    .key = key,
+	    .sourceFile = sourceFile,
+	};
+}
+
 // NewSnapshotHost — snapshothost.go:64.
 SnapshotHost* NewSnapshotHost(SessionInit* init) {
 	auto currentDirectory = init->Options->CurrentDirectory;
@@ -109,6 +123,13 @@ std::pair<Snapshot*, gostd::Error> SnapshotHost::CloneSnapshot(
 	change.apiRequest = apiRequest;
 	change.fileChanges = fileChanges;
 	if (apiRequest != nullptr) {
+		change.newConfig = apiRequest->UserPreferences;
+		if (!apiRequest->PrepareAutoImports.empty()) {
+			static_cast<ResourceRequest&>(change) =
+			    baseSnapshot->resourceRequestForDocument(
+			        apiRequest->PrepareAutoImports);
+			change.AutoImports = apiRequest->PrepareAutoImports;
+		}
 		change.fs = apiRequest->FileSystem;
 		change.fileSystemOverride =
 		    apiRequest->FileSystem != nullptr;

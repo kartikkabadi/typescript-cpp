@@ -44,7 +44,7 @@ LanguageService::ProvideDiagnostics(const gostd::Context& ctx,
                                     lsproto::DocumentUri uri) {
 	auto [program, file] = getProgramAndFile(uri);
 
-	if (tristateIsFalse(UserPreferences().EnableValidation)) {
+	if (tristateIsFalse(UserPreferences().ValidateEnabled)) {
 		auto diagnostics =
 		    std::vector<std::shared_ptr<lsproto::Diagnostic>>{};
 		return {

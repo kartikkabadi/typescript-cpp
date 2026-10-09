@@ -16,6 +16,26 @@ bool IsSupportedVirtualExtension(std::string_view extension) {
 }
 
 // Mapper.DiagnosticName — contentmapper.go:67.
+// Mapper::Equals — contentmapper.go:99.
+bool Mapper::Equals(const Mapper* other) const {
+	if (this == other) {
+		return true;
+	}
+	if (other == nullptr) {
+		return false;
+	}
+	return Definition.Package == other->Definition.Package &&
+	       Definition.Extensions == other->Definition.Extensions &&
+	       Definition.Options == other->Definition.Options &&
+	       Manifest.Name == other->Manifest.Name &&
+	       Manifest.Version == other->Manifest.Version &&
+	       Manifest.Exec == other->Manifest.Exec &&
+	       Manifest.CompilerOptions == other->Manifest.CompilerOptions &&
+	       Manifest.DynamicConfig == other->Manifest.DynamicConfig &&
+	       PackageDirectory == other->PackageDirectory &&
+	       ContributionID == other->ContributionID;
+}
+
 std::string Mapper::DiagnosticName() const {
 	if (!Manifest.Name.empty()) {
 		return Manifest.Name;

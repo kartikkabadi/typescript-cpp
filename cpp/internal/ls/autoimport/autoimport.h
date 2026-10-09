@@ -401,6 +401,7 @@ struct CacheStats {
 // RegistryChange — registry.go:487
 struct RegistryChange {
 	tspath::Path RequestedFile;
+	std::string RequestedFileName;
 	std::unordered_map<tspath::Path, std::string> OpenFiles;
 	collections::Set<lsp::lsproto::DocumentUri> Changed;
 	collections::Set<lsp::lsproto::DocumentUri> Created;

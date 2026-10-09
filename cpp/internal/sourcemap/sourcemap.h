@@ -247,7 +247,8 @@ struct DocumentPosition {
 struct DocumentPositionMapper {
 	bool useCaseSensitiveFileNames = false;
 	std::vector<std::string> sourceFileAbsolutePaths;
-	std::unordered_map<std::string, SourceIndex> sourceToSourceIndexMap;
+	std::unordered_map<std::string, std::vector<SourceMappedPosition*>>
+	    sourceMappingsByPath;
 	std::string generatedAbsoluteFilePath;
 	std::vector<MappedPosition*> generatedMappings;
 	std::unordered_map<SourceIndex, std::vector<SourceMappedPosition*>> sourceMappings;
@@ -263,6 +264,11 @@ DocumentPosition* GetGeneratedPosition(const DocumentPositionMapper* m,
 
 DocumentPositionMapper* GetDocumentPositionMapper(Host* host,
                                                   std::string_view generatedFileName);
+
+// convertDocumentToSourceMapper — source_mapper.go:292. Exported for the
+// internal source_mapper tests (source_mapper_test.go is package-internal).
+DocumentPositionMapper* convertDocumentToSourceMapper(
+    Host* host, std::string_view contents, std::string_view mapFileName);
 
 // ---------------------------------------------------------------------------
 // util.go

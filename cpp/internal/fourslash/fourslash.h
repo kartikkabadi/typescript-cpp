@@ -1033,7 +1033,7 @@ struct FourslashTest {
 	std::unordered_map<std::string, std::shared_ptr<scriptInfo>> scriptInfos;
 	std::shared_ptr<testConverters> converters;
 
-	bool stateEnableFormatting = false;
+	bool stateFormatEnabled = false;
 	bool reportFormatOnTypeCrash = false;
 	lsutil::UserPreferences userPreferences;
 	lsproto::Position currentCaretPosition;
@@ -1059,9 +1059,7 @@ struct FourslashTest {
 
 	// initialize — fourslash.go:368.
 	void initialize(gostd::testing::T* t,
-	                const std::shared_ptr<lsproto::ClientCapabilities>&
-	                    capabilities,
-	                bool runExternalCode);
+	                const struct FourslashOptions* options);
 
 	// sendRequest — fourslash.go:739 (template body below).
 	template <typename Params, typename Resp>
@@ -1607,6 +1605,9 @@ struct FourslashOptions {
 	std::shared_ptr<lsproto::ClientCapabilities> Capabilities;
 	std::shared_ptr<contentmapper::Spawner> ContentMapperSpawner;
 	bool RunExternalCode = false;
+	// fourslash.go:169 — makes every textDocument/diagnostic request also
+	// emit the program and compare diagnostics before and after emit.
+	std::shared_ptr<lsproto::DiagnosticFlakeLogLevel> TrackFlakyDiagnostics;
 };
 
 // NewFourslashWithOptions — fourslash.go:171.

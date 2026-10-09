@@ -1003,7 +1003,7 @@ void TestPushDiagnostics(T* t) {
 		auto& utils = p0.second;
 		t->Cleanup([session] { session->Close(); });
 		auto prefs = lsutil::NewDefaultUserPreferences();
-		prefs.EnableValidation = tsc::Tristate::False;
+		prefs.ValidateEnabled = tsc::Tristate::False;
 		session->Configure(prefs);
 		session->DidOpenFile(t->Context(), "file:///src/index.ts", 1,
 		                     fileText(files, "/src/index.ts"),
@@ -1068,7 +1068,7 @@ void TestPushDiagnostics(T* t) {
 		    "expected initial diagnostics");
 
 		auto prefs = lsutil::NewDefaultUserPreferences();
-		prefs.EnableValidation = tsc::Tristate::False;
+		prefs.ValidateEnabled = tsc::Tristate::False;
 		session->Configure(prefs);
 		{
 			auto gP = session->GetLanguageService(

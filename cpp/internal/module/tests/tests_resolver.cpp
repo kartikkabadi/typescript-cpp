@@ -256,6 +256,7 @@ module::DefaultResolver* newTestResolver(
 	opts->Module = ModuleKind::ESNext;
 	opts->ModuleResolution = ModuleResolutionKind::Bundler;
 	opts->Target = ScriptTarget::ESNext;
+	opts->TraceResolution = Tristate::True;
 	return module::NewResolver(module::ResolverOptions{
 	    .Host = host,
 	    .CompilerOptions = opts,
@@ -463,7 +464,7 @@ void TestResolveSubpathNilContentsRace(T* t) {
 	}
 }
 
-void TestParseNodeModuleFromPath(T* t) {
+void TestNodeModulePackageRoot(T* t) {
 	t->Parallel();
 
 	struct {
@@ -485,6 +486,10 @@ void TestParseNodeModuleFromPath(T* t) {
 	     "/a/node_modules/b"},
 	    {"scoped package root folder", "/a/node_modules/@scope/b", true,
 	     "/a/node_modules/@scope/b"},
+	    {"package root interpreted as file", "/a/node_modules/b", false,
+	     "/a/node_modules"},
+	    {"scoped package root interpreted as file",
+	     "/a/node_modules/@scope/b", false, "/a/node_modules/@scope"},
 	    // A bare scope directory has no package name; must not panic
 	    // (https://github.com/microsoft/TypeScript/tsc/issues/4373).
 	    {"scope-only folder", "/a/node_modules/@scope", true,
@@ -497,11 +502,15 @@ void TestParseNodeModuleFromPath(T* t) {
 	for (auto& tt : tests) {
 		t->Run(tt.name, [tt](T* t) {
 			t->Parallel();
-			if (auto got = module::ParseNodeModuleFromPath(
-			        tt.path, tt.isFolder);
-			    got != tt.want) {
+			std::string got;
+			if (tt.isFolder) {
+				got = module::NodeModulePackageRootForDirectory(tt.path);
+			} else {
+				got = module::NodeModulePackageRootForFile(tt.path);
+			}
+			if (got != tt.want) {
 				t->Errorf(
-				    "ParseNodeModuleFromPath(%q, %v) = %q, want %q",
+				    "nodeModulesPackageRoot(%q, %v) = %q, want %q",
 				    {tt.path, tt.isFolder ? "true" : "false",
 				     got, tt.want});
 			}
@@ -609,15 +618,388 @@ void TestResolvePeerDependencyNilContentsRace(T* t) {
 	}
 }
 
+// resolver_test.go:112 — dynamic roots resolution. The host cwd is the
+// dynamic root so resolutionHostStub::toPath keeps `^/` paths intact.
+void TestResolveDynamicModuleNameUsingRootDirs(T* t) {
+	t->Parallel();
+
+	struct tc {
+		std::string name;
+		std::string targetRoot;
+		std::string targetFile;
+	};
+	for (auto& tt : std::vector<tc>{
+	         {"dynamic roots",
+	          "^/~ts-uri~/custom/ts-nul-authority/generated",
+	          "^/~ts-uri~/custom/ts-nul-authority/generated/"
+	          "~ts-uri-escape~"
+	          "7e74732d7572692d6573636170657e66696c65~.ts"},
+	         {"dynamic to disk", "c:/generated",
+	          "c:/generated/~ts-uri-escape~file.ts"},
+	     }) {
+		t->Run(tt.name, [tt](T* t) {
+			t->Parallel();
+
+			std::string sourceFile =
+			    "^/~ts-uri~/custom/ts-nul-authority/src/main.ts";
+			auto fs = vfs::vfstest::FromMap(
+			    {
+			        {sourceFile, ""},
+			        {tt.targetFile, "export const value = 1;"},
+			    },
+			    true);
+			auto* host = new resolutionHostStub(
+			    fs, "^/~ts-uri~/custom/ts-nul-authority/");
+			auto* opts = new CompilerOptions();
+			opts->Module = ModuleKind::ESNext;
+			opts->ModuleResolution = ModuleResolutionKind::Bundler;
+			opts->Target = ScriptTarget::ESNext;
+			opts->RootDirs = {
+			    "^/~ts-uri~/custom/ts-nul-authority/src",
+			    tt.targetRoot,
+			};
+			auto* resolver = module::NewResolver(module::ResolverOptions{
+			    .Host = host,
+			    .CompilerOptions = opts,
+			});
+			auto [resolved, _] = resolver->ResolveModuleName(
+			    "./~ts-uri-escape~file", sourceFile, ModuleKind::ESNext,
+			    nullptr);
+			if (!resolved->IsResolved() ||
+			    resolved->ResolvedFileName != tt.targetFile) {
+				t->Errorf("resolved file = %q, expected %q",
+				          {resolved->ResolvedFileName, tt.targetFile});
+			}
+		});
+	}
+}
+
+void TestRootDirsPreservesExceptionalDynamicSegments(T* t) {
+	t->Parallel();
+
+	std::string sourceFile =
+	    "^/~ts-uri~/custom/ts-nul-authority/src/~ts-uri-escape~2e2e~/main.ts";
+	std::string targetFile =
+	    "^/~ts-uri~/custom/ts-nul-authority/generated/"
+	    "~ts-uri-escape~2e2e~/dep.ts";
+	auto fs = vfs::vfstest::FromMap(
+	    {
+	        {sourceFile, ""},
+	        {targetFile, "export const value = 1;"},
+	        {"^/~ts-uri~/custom/ts-nul-authority/dep.ts",
+	         "export const wrong = 1;"},
+	    },
+	    true);
+	auto* host = new resolutionHostStub(
+	    fs, "^/~ts-uri~/custom/ts-nul-authority/");
+	auto* opts = new CompilerOptions();
+	opts->Module = ModuleKind::ESNext;
+	opts->ModuleResolution = ModuleResolutionKind::Bundler;
+	opts->Target = ScriptTarget::ESNext;
+	opts->RootDirs = {
+	    "^/~ts-uri~/custom/ts-nul-authority/src",
+	    "^/~ts-uri~/custom/ts-nul-authority/generated",
+	};
+	auto* resolver = module::NewResolver(module::ResolverOptions{
+	    .Host = host,
+	    .CompilerOptions = opts,
+	});
+	auto [resolved, _] = resolver->ResolveModuleName(
+	    "./dep", sourceFile, ModuleKind::ESNext, nullptr);
+	if (!resolved->IsResolved() ||
+	    resolved->ResolvedFileName != targetFile) {
+		t->Errorf("resolved file = %q, expected %q",
+		          {resolved->ResolvedFileName, targetFile});
+	}
+}
+
+void TestRootDirsRejectsUnrepresentableDiskSegments(T* t) {
+	t->Parallel();
+
+	for (std::string sourceFile : {
+	         "^/~ts-uri~/custom/ts-nul-authority/src/~ts-uri-escape~2e2e~/main.ts",
+	         "^/~ts-uri~/custom/ts-nul-authority/src/c:/main.ts",
+	         "^/~ts-uri~/custom/ts-nul-authority/src/^/main.ts",
+	     }) {
+		t->Run(sourceFile, [sourceFile](T* t) {
+			t->Parallel();
+
+			auto fs = vfs::vfstest::FromMap(
+			    {
+			        {sourceFile, ""},
+			        {"c:/dep.ts", "export const wrong = 1;"},
+			    },
+			    true);
+			auto* host = new resolutionHostStub(
+			    fs, "^/~ts-uri~/custom/ts-nul-authority/");
+			auto* opts = new CompilerOptions();
+			opts->Module = ModuleKind::ESNext;
+			opts->ModuleResolution = ModuleResolutionKind::Bundler;
+			opts->Target = ScriptTarget::ESNext;
+			opts->RootDirs = {
+			    "^/~ts-uri~/custom/ts-nul-authority/src",
+			    "c:/generated",
+			};
+			auto* resolver = module::NewResolver(module::ResolverOptions{
+			    .Host = host,
+			    .CompilerOptions = opts,
+			});
+			auto [resolved, _] = resolver->ResolveModuleName(
+			    "./dep", sourceFile, ModuleKind::ESNext, nullptr);
+			if (resolved->IsResolved()) {
+				t->Errorf(
+				    "unexpectedly resolved unrepresentable disk path "
+				    "to %q",
+				    {resolved->ResolvedFileName});
+			}
+		});
+	}
+}
+
+void TestResolveDynamicPackageSubpathFile(T* t) {
+	t->Parallel();
+
+	std::string sourceFile =
+	    "^/~ts-uri~/custom/ts-nul-authority/src/main.ts";
+	std::string targetFile =
+	    "^/~ts-uri~/custom/ts-nul-authority/node_modules/pkg/"
+	    "~ts-uri-escape~"
+	    "7e74732d7572692d6573636170657e3636366636667e~.ts";
+	auto fs = vfs::vfstest::FromMap(
+	    {
+	        {sourceFile, ""},
+	        {"^/~ts-uri~/custom/ts-nul-authority/node_modules/pkg/"
+	         "package.json",
+	         R"({"name":"pkg"})"},
+	        {targetFile, "export const value = 1;"},
+	    },
+	    true);
+	auto* host = new resolutionHostStub(
+	    fs, "^/~ts-uri~/custom/ts-nul-authority/");
+	auto* opts = new CompilerOptions();
+	opts->Module = ModuleKind::ESNext;
+	opts->ModuleResolution = ModuleResolutionKind::Bundler;
+	opts->Target = ScriptTarget::ESNext;
+	auto* resolver = module::NewResolver(module::ResolverOptions{
+	    .Host = host,
+	    .CompilerOptions = opts,
+	});
+	auto [resolved, _] = resolver->ResolveModuleName(
+	    "pkg/~ts-uri-escape~666f6f~.ts", sourceFile, ModuleKind::ESNext,
+	    nullptr);
+	if (!resolved->IsResolved() ||
+	    resolved->ResolvedFileName != targetFile) {
+		t->Errorf("resolved file = %q, expected %q",
+		          {resolved->ResolvedFileName, targetFile});
+	}
+}
+
+void TestResolveDynamicDottedDirectory(T* t) {
+	t->Parallel();
+
+	std::string sourceFile =
+	    "^/~ts-uri~/custom/ts-nul-authority/src/main.ts";
+	std::string targetFile =
+	    "^/~ts-uri~/custom/ts-nul-authority/src/"
+	    "~ts-uri-escape~"
+	    "7e74732d7572692d6573636170657e6469722e6a73~/index.ts";
+	auto fs = vfs::vfstest::FromMap(
+	    {
+	        {sourceFile, ""},
+	        {targetFile, "export const value = 1;"},
+	    },
+	    true);
+	auto* host = new resolutionHostStub(
+	    fs, "^/~ts-uri~/custom/ts-nul-authority/");
+	auto* opts = new CompilerOptions();
+	opts->Module = ModuleKind::CommonJS;
+	opts->ModuleResolution = ModuleResolutionKind::Bundler;
+	opts->Target = ScriptTarget::ESNext;
+	auto* resolver = module::NewResolver(module::ResolverOptions{
+	    .Host = host,
+	    .CompilerOptions = opts,
+	});
+	auto [resolved, _] = resolver->ResolveModuleName(
+	    "./~ts-uri-escape~dir.js", sourceFile, ModuleKind::CommonJS,
+	    nullptr);
+	if (!resolved->IsResolved() ||
+	    resolved->ResolvedFileName != targetFile) {
+		t->Errorf("resolved file = %q, expected %q",
+		          {resolved->ResolvedFileName, targetFile});
+	}
+}
+
+void TestResolveDynamicPackageJSONPath(T* t) {
+	t->Parallel();
+
+	std::string sourceFile =
+	    "^/~ts-uri~/custom/ts-nul-authority/src/main.ts";
+	std::string fallbackFile =
+	    "^/~ts-uri~/custom/ts-nul-authority/node_modules/pkg/"
+	    "~ts-uri-escape~"
+	    "7e74732d7572692d6573636170657e7479706573~.d.ts";
+	std::string targetFile =
+	    "^/~ts-uri~/custom/ts-nul-authority/node_modules/pkg/ts3.1/"
+	    "~ts-uri-escape~"
+	    "7e74732d7572692d6573636170657e7479706573~.d.ts";
+	auto fs = vfs::vfstest::FromMap(
+	    {
+	        {sourceFile, ""},
+	        {"^/~ts-uri~/custom/ts-nul-authority/node_modules/pkg/"
+	         "package.json",
+	         R"({"name":"pkg","types":"~ts-uri-escape~types.d.ts","typesVersions":{"*":{"*":["ts3.1/*"]}}})"},
+	        {fallbackFile, "export const fallback: number;"},
+	        {targetFile, "export const value: number;"},
+	    },
+	    true);
+	auto* host = new resolutionHostStub(
+	    fs, "^/~ts-uri~/custom/ts-nul-authority/");
+	auto* opts = new CompilerOptions();
+	opts->Module = ModuleKind::ESNext;
+	opts->ModuleResolution = ModuleResolutionKind::Bundler;
+	opts->Target = ScriptTarget::ESNext;
+	auto* resolver = module::NewResolver(module::ResolverOptions{
+	    .Host = host,
+	    .CompilerOptions = opts,
+	});
+	auto [resolved, _] = resolver->ResolveModuleName(
+	    "pkg", sourceFile, ModuleKind::ESNext, nullptr);
+	if (!resolved->IsResolved() ||
+	    resolved->ResolvedFileName != targetFile) {
+		t->Errorf("resolved file = %q, expected %q",
+		          {resolved->ResolvedFileName, targetFile});
+	}
+}
+
+void TestResolveDynamicESMPackageIndexFromReservedDirectory(T* t) {
+	t->Parallel();
+
+	std::string sourceFile =
+	    "^/~ts-uri~/custom/ts-nul-authority/src/main.ts";
+	std::string packageName = "~ts-uri-escape~pkg.js";
+	std::string packageDirectory =
+	    "^/~ts-uri~/custom/ts-nul-authority/node_modules/"
+	    "~ts-uri-escape~"
+	    "7e74732d7572692d6573636170657e706b672e6a73~";
+	std::string targetFile = packageDirectory + "/index.js";
+	auto fs = vfs::vfstest::FromMap(
+	    {
+	        {sourceFile, ""},
+	        {packageDirectory + "/package.json",
+	         R"({"name":"~ts-uri-escape~pkg.js"})"},
+	        {targetFile, "exports.value = 1;"},
+	    },
+	    true);
+	auto* host = new resolutionHostStub(
+	    fs, "^/~ts-uri~/custom/ts-nul-authority/");
+	auto* opts = new CompilerOptions();
+	opts->Module = ModuleKind::ESNext;
+	opts->ModuleResolution = ModuleResolutionKind::Bundler;
+	opts->Target = ScriptTarget::ESNext;
+	auto* resolver = module::NewResolver(module::ResolverOptions{
+	    .Host = host,
+	    .CompilerOptions = opts,
+	});
+	auto [resolved, _] = resolver->ResolveModuleName(
+	    packageName, sourceFile, ModuleKind::ESNext, nullptr);
+	if (!resolved->IsResolved() ||
+	    resolved->ResolvedFileName != targetFile) {
+		t->Errorf("resolved file = %q, expected %q",
+		          {resolved->ResolvedFileName, targetFile});
+	}
+}
+
+void TestGeneratedDynamicEntrypointSpecifierResolvesEncodedFile(T* t) {
+	t->Parallel();
+
+	std::string sourceFile =
+	    "^/~ts-uri~/custom/ts-nul-authority/src/main.ts";
+	std::string packageFile =
+	    "^/~ts-uri~/custom/ts-nul-authority/node_modules/Pkg/"
+	    "~ts-uri-escape~"
+	    "7e74732d7572692d6573636170657e76616c7565~.d.ts";
+	std::string moduleSpecifier =
+	    "Pkg/~ts-uri-spec~"
+	    "7e74732d7572692d6573636170657e76616c7565~.d.ts";
+	auto fs = vfs::vfstest::FromMap(
+	    {
+	        {sourceFile, ""},
+	        {"^/~ts-uri~/custom/ts-nul-authority/node_modules/Pkg/"
+	         "package.json",
+	         R"({"name":"Pkg"})"},
+	        {packageFile, "export const value: number;"},
+	    },
+	    true);
+	auto* host = new resolutionHostStub(
+	    fs, "^/~ts-uri~/custom/ts-nul-authority/");
+	auto* opts = new CompilerOptions();
+	opts->Module = ModuleKind::ESNext;
+	opts->ModuleResolution = ModuleResolutionKind::Bundler;
+	opts->Target = ScriptTarget::ESNext;
+	auto* resolver = module::NewResolver(module::ResolverOptions{
+	    .Host = host,
+	    .CompilerOptions = opts,
+	});
+
+	(void)resolver->ResolveModuleName("Pkg", sourceFile,
+	                                  ModuleKind::ESNext, nullptr);
+	std::shared_ptr<packagejson::InfoCacheEntry> packageJson;
+	resolver->PackageJsonCacheEntries(
+	    [&](const std::string&,
+	        std::shared_ptr<packagejson::InfoCacheEntry> entry) -> bool {
+		    if (entry->Exists()) {
+			    packageJson = entry;
+			    return false;
+		    }
+		    return true;
+	    });
+	if (packageJson == nullptr) {
+		t->Fatal({"expected package JSON cache entry"});
+	}
+	auto entrypoints = resolver->GetEntrypointsFromPackageJsonInfo(
+	    packageJson, "Pkg", true);
+	if (entrypoints.size() != 1 ||
+	    entrypoints[0]->ModuleSpecifier != moduleSpecifier) {
+		t->Fatalf("entrypoints = %v, expected %q",
+		          {entrypoints.size(), moduleSpecifier});
+	}
+
+	auto [resolved, _] = resolver->ResolveModuleName(
+	    moduleSpecifier, sourceFile, ModuleKind::ESNext, nullptr);
+	if (!resolved->IsResolved() ||
+	    resolved->ResolvedFileName != packageFile) {
+		t->Errorf("resolved file = %q, expected %q",
+		          {resolved->ResolvedFileName, packageFile});
+	}
+}
+
 } // namespace
 
+REGISTER_UNIT_TEST("module.TestResolveDynamicModuleNameUsingRootDirs",
+                   TestResolveDynamicModuleNameUsingRootDirs);
+REGISTER_UNIT_TEST("module.TestRootDirsPreservesExceptionalDynamicSegments",
+                   TestRootDirsPreservesExceptionalDynamicSegments);
+REGISTER_UNIT_TEST("module.TestRootDirsRejectsUnrepresentableDiskSegments",
+                   TestRootDirsRejectsUnrepresentableDiskSegments);
+REGISTER_UNIT_TEST("module.TestResolveDynamicPackageSubpathFile",
+                   TestResolveDynamicPackageSubpathFile);
+REGISTER_UNIT_TEST("module.TestResolveDynamicDottedDirectory",
+                   TestResolveDynamicDottedDirectory);
+REGISTER_UNIT_TEST("module.TestResolveDynamicPackageJSONPath",
+                   TestResolveDynamicPackageJSONPath);
+REGISTER_UNIT_TEST(
+    "module.TestResolveDynamicESMPackageIndexFromReservedDirectory",
+    TestResolveDynamicESMPackageIndexFromReservedDirectory);
+REGISTER_UNIT_TEST(
+    "module.TestGeneratedDynamicEntrypointSpecifierResolvesEncodedFile",
+    TestGeneratedDynamicEntrypointSpecifierResolvesEncodedFile);
 REGISTER_UNIT_TEST("module.TestResolveModuleNameTrailingSlash",
                    TestResolveModuleNameTrailingSlash);
 REGISTER_UNIT_TEST("module.TestResolveModuleNameTrailingSlashRace",
                    TestResolveModuleNameTrailingSlashRace);
 REGISTER_UNIT_TEST("module.TestResolveSubpathNilContentsRace",
                    TestResolveSubpathNilContentsRace);
-REGISTER_UNIT_TEST("module.TestParseNodeModuleFromPath",
-                   TestParseNodeModuleFromPath);
+REGISTER_UNIT_TEST("module.TestNodeModulePackageRoot",
+                   TestNodeModulePackageRoot);
 REGISTER_UNIT_TEST("module.TestResolvePeerDependencyNilContentsRace",
                    TestResolvePeerDependencyNilContentsRace);

@@ -122,11 +122,6 @@ ParsedCommandLine* ParseCommandLine(
 	        options,
 	        new compilerOptionsParser(new tsc::CompilerOptions{}))
 	        ->CompilerOptions;
-	::tsc::WatchOptions* watchOptions =
-	    convertMapToOptions(
-	        options,
-	        new watchOptionsParser(new ::tsc::WatchOptions{}))
-	        ->WatchOptions;
 	ParsedCommandLine* result = NewParsedCommandLine(
 	    compilerOptions, parser->fileNames, {},
 	    tspath::ComparePathsOptions{
@@ -134,7 +129,6 @@ ParsedCommandLine* ParseCommandLine(
 	            host->FS()->UseCaseSensitiveFileNames(),
 	        .currentDirectory = host->GetCurrentDirectory(),
 	    });
-	result->ParsedConfig->WatchOptions = watchOptions;
 	result->Errors = parser->errors;
 	result->Raw = parser->options;
 	return result;
@@ -163,11 +157,6 @@ ParsedBuildCommandLine* ParseBuildCommandLine(
 	            new buildOptionsParser(new BuildOptions{}))
 	            ->BuildOptions,
 	    .CompilerOptions = compilerOptions,
-	    .WatchOptions =
-	        convertMapToOptions(
-	            parser->options,
-	            new watchOptionsParser(new ::tsc::WatchOptions{}))
-	            ->WatchOptions,
 	    .Projects = parser->fileNames,
 	    .Errors = parser->errors,
 	    .Raw = parser->options,
@@ -248,18 +237,8 @@ void commandLineParser::parseStrings(
 				    args, (int)i, opt,
 				    workerDiagnostics->OptionTypeMismatchDiagnostic);
 			} else {
-				const CommandLineOption* watchOpt =
-				    WatchNameMap().GetOptionDeclarationFromName(
-				        inputOptionName, true /*allowShort*/);
-				if (watchOpt != nullptr) {
-					i = parseOptionValue(
-					    args, (int)i, watchOpt,
-					    watchOptionsDidYouMeanDiagnostics()
-					        .OptionTypeMismatchDiagnostic);
-				} else {
-					errors.push_back(createUnknownOptionError(
-					    inputOptionName, s, nullptr, nullptr));
-				}
+				errors.push_back(createUnknownOptionError(
+				    inputOptionName, s, nullptr, nullptr));
 			}
 			break;
 		}

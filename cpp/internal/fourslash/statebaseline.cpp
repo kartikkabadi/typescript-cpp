@@ -22,9 +22,9 @@ std::shared_ptr<stateBaseline> newStateBaseline(
 	// differ borrows (non-owning); lives for the test's duration.
 	sb->fsDiffer->WrittenFiles =
 	    new collections::SyncSet<std::string>();
-	// fmt.Fprintf(&stateBaseline.baseline, "UseCaseSensitiveFileNames: %v\n", ...)
+	// fmt.Fprintf(&stateBaseline.baseline, "CaseSensitivity: %v\n", ...)
 	sb->baseline.WriteString(gostd::sprintf(
-	    "UseCaseSensitiveFileNames: %v\n",
+	    "CaseSensitivity: %v\n",
 	    {fsFromMap->UseCaseSensitiveFileNames()}));
 	sb->fsDiffer->BaselineFSwithDiff(&sb->baseline);
 	return sb;

@@ -13,12 +13,14 @@ import (
 	"github.com/microsoft/TypeScript/tsc/internal/core"
 	"github.com/microsoft/TypeScript/tsc/internal/parser"
 	"github.com/microsoft/TypeScript/tsc/internal/tspath"
+	"github.com/microsoft/TypeScript/tsc/internal/vfs/osvfs"
 )
 
 func parseOne(name string, src []byte) {
+	fileName := tspath.ToRootedFilePath(name, tspath.RootedDirectoryPathFromAbsolute("/"))
 	parser.ParseSourceFile(
-		ast.SourceFileParseOptions{FileName: name, Path: tspath.Path(name)},
-		string(src), core.EnsureScriptKindFromFileName(name))
+		ast.SourceFileParseOptions{FileName: fileName, PathKey: osvfs.FS().CaseSensitivity().PathKey(tspath.RootedPath(fileName))},
+		string(src), core.EnsureScriptKindFromFileName(fileName))
 }
 
 func main() {
@@ -74,9 +76,10 @@ func main() {
 	best := 1e30
 	for range iters {
 		t0 := time.Now()
+		fileName := tspath.ToRootedFilePath(os.Args[1], tspath.RootedDirectoryPathFromAbsolute("/"))
 		file := parser.ParseSourceFile(
-			ast.SourceFileParseOptions{FileName: os.Args[1], Path: tspath.Path(os.Args[1])},
-			string(src), core.EnsureScriptKindFromFileName(os.Args[1]))
+			ast.SourceFileParseOptions{FileName: fileName, PathKey: osvfs.FS().CaseSensitivity().PathKey(tspath.RootedPath(fileName))},
+			string(src), core.EnsureScriptKindFromFileName(fileName))
 		_ = file
 		ms := float64(time.Since(t0)) / 1e6
 		if ms < best {

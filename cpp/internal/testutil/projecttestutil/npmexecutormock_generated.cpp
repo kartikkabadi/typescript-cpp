@@ -8,8 +8,9 @@ namespace tsc::testutil::projecttestutil {
 
 // NpmInstall calls NpmInstallFunc — npmexecutormock_generated.go:49.
 std::pair<std::string, gostd::Error> NpmExecutorMock::NpmInstall(
-    const std::string& cwd, const std::vector<std::string>& args) {
-	NpmInstallCall callInfo{.Cwd = cwd, .Args = args};
+    const gostd::Context& ctx, const std::string& cwd,
+    const std::vector<std::string>& args) {
+	NpmInstallCall callInfo{.Ctx = ctx, .Cwd = cwd, .Args = args};
 	{
 		std::unique_lock lk(lockNpmInstall);
 		calls.NpmInstall.push_back(callInfo);
@@ -17,7 +18,7 @@ std::pair<std::string, gostd::Error> NpmExecutorMock::NpmInstall(
 	if (!NpmInstallFunc) {
 		return {{}, nullptr};
 	}
-	return NpmInstallFunc(cwd, args);
+	return NpmInstallFunc(ctx, cwd, args);
 }
 
 // NpmInstallCalls — npmexecutormock_generated.go:74.

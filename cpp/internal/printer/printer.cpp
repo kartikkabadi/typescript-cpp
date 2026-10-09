@@ -3247,8 +3247,8 @@ void Printer::emitNonNullExpression(Node* node) {
 void Printer::emitMetaProperty(Node* node) {
 	auto* n = node->as<MetaProperty>();
 	printerState state = enterNode(node);
-	emitToken(n->KeywordToken, node->pos(), WriteKind::Punctuation, node);
-	writePunctuation(".");
+	int pos = emitToken(n->KeywordToken, node->pos(), WriteKind::Punctuation, node);
+	emitToken(Kind::DotToken, pos, WriteKind::Punctuation, node);
 	emitIdentifierName(n->name);
 	exitNode(node, state);
 }

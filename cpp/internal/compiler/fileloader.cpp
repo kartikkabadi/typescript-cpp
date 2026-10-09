@@ -197,7 +197,11 @@ SourceFileMetaData filesLoader::loadSourceFileMetaData(
 	}
 
 	packagejson::InfoCacheEntry* packageJsonScope =
-	    resolver->GetPackageScopeForPath(tspath::getDirectoryPath(fileName)).get();
+	    resolver->GetResolutionData()
+	        ->NewResolver(projectReferences.host)
+	        ->GetPackageScopeForPath(
+	            tspath::getDirectoryPath(fileName))
+	        .get();
 	ModuleResolutionKind moduleResolutionKind =
 	    compilerOptions->GetModuleResolutionKind();
 
@@ -249,7 +253,7 @@ SourceFile* filesLoader::parseSourceFile(parseTask* t) {
 	// fileloader.go:414 — the redirected project's options when this file
 	// comes from a project reference.
 	const CompilerOptions* options =
-	    projectReferenceFileMapper->getCompilerOptionsForFile(
+	    projectReferences.getCompilerOptionsForFile(
 	        HasFileName{t->normalizedFilePath, t->path});
 	SourceFileParseOptions parseOptions{
 	    .FileName = t->normalizedFilePath,
@@ -747,8 +751,10 @@ filesLoader::resolveTripleslashPathReference(
 	}
 	std::string normalizedFileName = tspath::normalizePath(referencedFileName);
 	const FileIncludeReason* includeReason = ip->newReason(
-	    FileIncludeKind::ReferenceFile,
-	    referencedFileData{toPath(containingFile), index, nullptr});
+	    FileIncludeReason{
+	        .kind = FileIncludeKind::ReferenceFile,
+	        .referencedFile = referencedFileData{
+	            toPath(containingFile), index, nullptr}});
 
 	auto [ResolvedFileName, diagnostic] = getSourceFileFromReference(
 	    normalizedFileName, moduleName, containingFile, includeReason);
@@ -796,7 +802,7 @@ void filesLoader::resolveTypeReferenceDirectives(parseTask* t) {
 		// project's options when this file comes from a project
 		// reference.
 		auto [redirect, fileName] =
-		    projectReferenceFileMapper->getRedirectForResolution(
+		    projectReferences.getRedirectForResolution(
 		        HasFileName{file->FileName(), file->Path()});
 		ResolutionMode resolutionMode =
 		    getModeForTypeReferenceDirectiveInFile(
@@ -827,8 +833,10 @@ void filesLoader::resolveTypeReferenceDirectives(parseTask* t) {
 		                                              resolutionMode}] =
 		    resolved;
 		const FileIncludeReason* includeReason = ip->newReason(
-		    FileIncludeKind::TypeReferenceDirective,
-		    referencedFileData{t->path, static_cast<int>(index), nullptr});
+		    FileIncludeReason{
+		        .kind = FileIncludeKind::TypeReferenceDirective,
+		        .referencedFile = referencedFileData{
+		            t->path, static_cast<int>(index), nullptr}});
 		// fileloader.go:803 — capture the resolver's trace (the C++
 		// resolver returns it alongside the result).
 		typeResolutionsTrace.insert(typeResolutionsTrace.end(),
@@ -879,7 +887,7 @@ void filesLoader::resolveImportsAndModuleAugmentations(parseTask* t) {
 	// options when this file comes from a project reference; fileName is
 	// the mapped source name.
 	auto [redirect, fileName] =
-	    projectReferenceFileMapper->getRedirectForResolution(
+	    projectReferences.getRedirectForResolution(
 	        HasFileName{file->FileName(), file->Path()});
 	const CompilerOptions* optionsForFile =
 	    module::GetCompilerOptionsWithRedirect(
@@ -931,7 +939,7 @@ void filesLoader::resolveImportsAndModuleAugmentations(parseTask* t) {
 		for (size_t index = 0; index < moduleNames.size(); index++) {
 			Node* entry = moduleNames[index];
 			std::string moduleName = entry->text();
-			if (moduleName.empty()) {
+			if (moduleName.empty() || isSourcePhaseImport(entry->parent)) {
 				continue;
 			}
 
@@ -987,7 +995,7 @@ void filesLoader::resolveImportsAndModuleAugmentations(parseTask* t) {
 			    !tspath::fileExtensionIsOneOf(
 			        ResolvedFileName,
 			        tspath::supportedTSExtensionsWithJsonFlat) &&
-			    projectReferenceFileMapper
+			    projectReferences.mapper
 			            ->getRedirectParsedCommandLineForResolution(
 			                HasFileName{ResolvedFileName,
 			                            toPath(ResolvedFileName)}) == nullptr;
@@ -1019,10 +1027,11 @@ void filesLoader::resolveImportsAndModuleAugmentations(parseTask* t) {
 				    resolvedModule->IsExternalLibraryImport;
 				sub->elideOnDepth = isJsFileFromNodeModules;
 				sub->includeReason = ip->newReason(
-				    FileIncludeKind::Import,
-				    referencedFileData{
-				        t->path, importIndex,
-				        importIndex < 0 ? entry : nullptr});
+				    FileIncludeReason{
+				        .kind = FileIncludeKind::Import,
+				        .referencedFile = referencedFileData{
+				            t->path, importIndex,
+				            importIndex < 0 ? entry : nullptr}});
 				sub->PackageId = resolvedModule->PackageId;
 				t->subTasks.push_back(sub);
 			}
@@ -1113,9 +1122,11 @@ void filesLoader::resolveAutomaticTypeDirectives(parseTask* t) {
 				sub->increaseDepth = resolved->IsExternalLibraryImport;
 				sub->elideOnDepth = false;
 				sub->includeReason = ip->newReason(
-				    FileIncludeKind::AutomaticTypeDirectiveFile,
-				    automaticTypeDirectiveFileData{
-				        name, resolved->PackageId});
+				    FileIncludeReason{
+				        .kind = FileIncludeKind::AutomaticTypeDirectiveFile,
+				        .automaticTypeDirective =
+				            automaticTypeDirectiveFileData{
+				                name, resolved->PackageId}});
 				sub->PackageId = resolved->PackageId;
 				t->subTasks.push_back(sub);
 			} else {
@@ -1126,11 +1137,11 @@ void filesLoader::resolveAutomaticTypeDirectives(parseTask* t) {
 				        includeExplainingDiagnostic{
 				            {},
 				            ip->newReason(
-				                FileIncludeKind::
-				                    AutomaticTypeDirectiveFile,
-				                automaticTypeDirectiveFileData{name,
-				                                               module::
-				                                                   PackageId{}}),
+				                FileIncludeReason{
+				                    .kind = FileIncludeKind::AutomaticTypeDirectiveFile,
+				                    .automaticTypeDirective =
+				                        automaticTypeDirectiveFileData{
+				                            name, module::PackageId{}}}),
 				            
 				                Cannot_find_type_definition_file_for_0,
 				        {name}}));
@@ -1190,20 +1201,21 @@ void filesLoader::addRootFileTask(const std::string& fileName,
 // delegates to the real host's fs (out-of-line: ProgramOptions is
 // forward-declared where the struct sits).
 bool projectReferenceDtsFakingVfs::UseCaseSensitiveFileNames() {
-	return mapper->opts->Host->FS()->UseCaseSensitiveFileNames();
+	return host->UseCaseSensitiveFileNames();
 }
 
 // projectreferencedtsfakinghost.go:81 ReadFile — passthrough to the real
 // fs (a faked dts has no content to serve).
 std::pair<std::string, bool>
 projectReferenceDtsFakingVfs::ReadFile(const std::string& path) {
-	return mapper->opts->Host->FS()->ReadFile(path);
+	if (auto r = host->ReadFile(path)) return std::pair{*r, true};
+	return {"", false};
 }
 
 // projectreferencedtsfakinghost.go:60 FileExists — a real file wins;
 // a missing .d.ts is faked from its project-reference source.
 bool projectReferenceDtsFakingVfs::FileExists(const std::string& path) {
-	if (mapper->opts->Host->FS()->FileExists(path)) {
+	if (host->FileExists(path)) {
 		return true;
 	}
 	if (!tspath::isDeclarationFileName(path)) {
@@ -1216,7 +1228,7 @@ bool projectReferenceDtsFakingVfs::FileExists(const std::string& path) {
 // projectreferencedtsfakinghost.go:98 DirectoryExists.
 bool projectReferenceDtsFakingVfs::DirectoryExists(
     const std::string& path) {
-	if (mapper->opts->Host->FS()->DirectoryExists(path)) {
+	if (host->DirectoryExists(path)) {
 		handleDirectoryCouldBeSymlink(path);
 		return true;
 	}
@@ -1232,15 +1244,15 @@ std::string projectReferenceDtsFakingVfs::Realpath(
 	    ok) {
 		return result;
 	}
-	return mapper->opts->Host->FS()->Realpath(path);
+	return host->Realpath(path);
 }
 
 // projectreferencedtsfakinghost.go:125 toPath.
 tspath::Path projectReferenceDtsFakingVfs::toPath(
     const std::string& path) const {
 	return tspath::toPath(
-	    path, mapper->opts->Host->GetCurrentDirectory(),
-	    mapper->opts->Host->FS()->UseCaseSensitiveFileNames());
+	    path, host->GetCurrentDirectory(),
+	    host->UseCaseSensitiveFileNames());
 }
 
 // projectreferencedtsfakinghost.go:129 handleDirectoryCouldBeSymlink —
@@ -1274,6 +1286,7 @@ void projectReferenceDtsFakingVfs::handleDirectoryCouldBeSymlink(
 	    directory, directoryPath,
 	    std::make_shared<symlinks::KnownDirectoryLink>(
 	        symlinks::KnownDirectoryLink{
+	            {},
 	            tspath::ensureTrailingDirectorySeparator(realDirectory),
 	            realPath}));
 }
@@ -1297,9 +1310,14 @@ bool projectReferenceDtsFakingVfs::fileOrDirectoryExistsUsingSource(
 		return false;
 	}
 	// Check if the directory or file is a symlinked package.
-	if (std::string packageRoot = module::ParseNodeModuleFromPath(
-	        fileOrDirectory, /*isFolder*/ true);
-	    !packageRoot.empty()) {
+	std::string packageRoot;
+	if (isFile) {
+		packageRoot = module::NodeModulePackageRootForFile(fileOrDirectory);
+	} else {
+		packageRoot =
+		    module::NodeModulePackageRootForDirectory(fileOrDirectory);
+	}
+	if (!packageRoot.empty()) {
 		handleDirectoryCouldBeSymlink(packageRoot);
 	}
 	auto* knownDirectoryLinks = knownSymlinks.Directories();
@@ -1318,19 +1336,20 @@ bool projectReferenceDtsFakingVfs::fileOrDirectoryExistsUsingSource(
 	knownDirectoryLinks->Range(
 	    [&](tspath::Path directoryPath,
 	        std::shared_ptr<symlinks::KnownDirectoryLink> link) -> bool {
-		    std::string_view dirPrefix = directoryPath;
-		    if (fileOrDirectoryPath.compare(0, dirPrefix.size(),
-		                                    dirPrefix) != 0) {
+		    if (!fileOrDirectoryPath.starts_with(directoryPath)) {
 			    return true; // keep ranging
 		    }
-		    std::string relative{
-		        std::string_view(fileOrDirectoryPath)
-		            .substr(dirPrefix.size())};
+		    auto [realFileOrDirectory, resolved] = link->ResolveFileName(
+		        fileOrDirectory, UseCaseSensitiveFileNames());
+		    if (!resolved) {
+			    TSC_UNREACHABLE("canonical symlink path did not match its "
+			                    "presentation path");
+		    }
 		    Tristate sub = isFile
 		                       ? fileExistsIfProjectReferenceDts(
-		                             link->RealPath + relative)
+		                             realFileOrDirectory)
 		                       : directoryExistsIfProjectReferenceDeclDir(
-		                             link->RealPath + relative);
+		                             realFileOrDirectory);
 		    if (tristateIsTrue(sub)) {
 			    exists = true;
 			    if (isFile) {
@@ -1338,11 +1357,10 @@ bool projectReferenceDtsFakingVfs::fileOrDirectoryExistsUsingSource(
 				    std::string absolutePath =
 				        tspath::getNormalizedAbsolutePath(
 				            fileOrDirectory,
-				            mapper->opts->Host->GetCurrentDirectory());
+				            host->GetCurrentDirectory());
 				    knownSymlinks.SetFile(
 				        absolutePath, fileOrDirectoryPath,
-				        link->Real +
-				            absolutePath.substr(dirPrefix.size()));
+				        realFileOrDirectory);
 			    }
 			    return false; // stop ranging
 		    }
@@ -1357,7 +1375,7 @@ Tristate projectReferenceDtsFakingVfs::fileExistsIfProjectReferenceDts(
 	tsoptions::SourceOutputAndProjectReference* source =
 	    mapper->getProjectReferenceFromOutputDts(toPath(file));
 	if (source != nullptr) {
-		return mapper->opts->Host->FS()->FileExists(source->Source)
+		return host->FileExists(source->Source)
 		           ? Tristate::True
 		           : Tristate::False;
 	}
@@ -1379,34 +1397,14 @@ projectReferenceDtsFakingVfs::directoryExistsIfProjectReferenceDeclDir(
 	return Tristate::Unknown;
 }
 
-// projectreferencedtsfakinghost.go:23 newProjectReferenceDtsFakingHost —
-// the faking vfs, its cachedvfs wrapper, and the host all live on the
-// mapper so the resolver's captured Host stays valid after parse.
-module::ResolutionHost* newProjectReferenceDtsFakingHost(
-    filesLoader* loader) {
-	auto* mapper = loader->projectReferenceFileMapper.get();
-	mapper->fakingVfsImpl =
-	    std::make_unique<projectReferenceDtsFakingVfs>();
-	mapper->fakingVfsImpl->mapper = mapper;
-	// projectreferencedtsfakinghost.go:29 — Go copies the map header:
-	// share the shared_ptr so the Set outlives this stack-local loader.
-	mapper->fakingVfsImpl->dtsDirectories = loader->dtsDirectories;
-	mapper->fakingVfs =
-	    vfs::cachedvfs::From(mapper->fakingVfsImpl.get());
-	mapper->fakingHost =
-	    std::make_unique<projectReferenceDtsFakingHost>();
-	mapper->fakingHost->host = loader->opts->Host;
-	mapper->fakingHost->fs = mapper->fakingVfs.get();
-	return mapper->fakingHost.get();
-}
 
 // projectreferencefilemapper.go:28 rootConfigPath.
 tspath::Path projectReferenceFileMapper::rootConfigPath() const {
-	if (opts->Config == nullptr || opts->Config->ConfigFile == nullptr ||
-	    opts->Config->ConfigFile->SourceFile == nullptr) {
+	if (config == nullptr || config->ConfigFile == nullptr ||
+	    config->ConfigFile->SourceFile == nullptr) {
 		return {};
 	}
-	return opts->Config->ConfigFile->SourceFile->Path();
+	return config->ConfigFile->SourceFile->Path();
 }
 
 // projectreferencefilemapper.go:35 getParseFileRedirect — map a
@@ -1414,12 +1412,13 @@ tspath::Path projectReferenceFileMapper::rootConfigPath() const {
 // project-reference source to its dts.
 std::string projectReferenceFileMapper::getParseFileRedirect(
     const HasFileName& file) {
-	if (opts->canUseProjectReferenceSource()) {
+	if (useSourceOfProjectReference) {
 		// Map to source file from project reference.
 		tsoptions::SourceOutputAndProjectReference* source =
 		    getProjectReferenceFromOutputDts(file.Path());
 		if (source == nullptr) {
-			source = getSourceToDtsIfSymlink(file);
+			auto [cached, _] = realpathDtsToSource.Load(file.Path());
+			source = cached;
 		}
 		if (source != nullptr) {
 			return source->Source;
@@ -1471,7 +1470,7 @@ projectReferenceFileMapper::getProjectReferenceFromOutputDts(
 // projectreferencefilemapper.go:76 isSourceFromProjectReference.
 bool projectReferenceFileMapper::isSourceFromProjectReference(
     const tspath::Path& path) {
-	return opts->canUseProjectReferenceSource() &&
+	return useSourceOfProjectReference &&
 	       getProjectReferenceFromSource(path) != nullptr;
 }
 
@@ -1483,7 +1482,7 @@ projectReferenceFileMapper::getCompilerOptionsForFile(
 	tsoptions::ParsedCommandLine* redirect =
 	    getRedirectParsedCommandLineForResolution(file);
 	return module::GetCompilerOptionsWithRedirect(
-	    opts->Config->CompilerOptions(), redirect);
+	    config->CompilerOptions(), redirect);
 }
 
 // projectreferencefilemapper.go:85 getRedirectParsedCommandLineForResolution.
@@ -1510,8 +1509,8 @@ projectReferenceFileMapper::getRedirectForResolution(
 	    resultFromDts != nullptr) {
 		return {resultFromDts->Resolved, resultFromDts->Source};
 	}
-	if (tsoptions::SourceOutputAndProjectReference* realpathDtsToSource_ =
-	        getSourceToDtsIfSymlink(file);
+	if (auto [realpathDtsToSource_, _] =
+	        realpathDtsToSource.Load(path);
 	    realpathDtsToSource_ != nullptr) {
 		return {realpathDtsToSource_->Resolved,
 		        realpathDtsToSource_->Source};
@@ -1532,15 +1531,15 @@ projectReferenceFileMapper::getResolvedReferenceFor(
 bool projectReferenceFileMapper::rangeResolvedProjectReference(
     const std::function<bool(tspath::Path, tsoptions::ParsedCommandLine*,
                              tsoptions::ParsedCommandLine*, int)>& f) {
-	if (opts->Config == nullptr ||
-	    opts->Config->ProjectReferences().empty()) {
+	if (config == nullptr ||
+	    config->ProjectReferences().empty()) {
 		return false;
 	}
 	collections::Set<tspath::Path> seenRef(referencesInConfigFile.size());
 	tspath::Path rootConfig = rootConfigPath();
 	seenRef.Add(rootConfig);
 	return rangeResolvedReferenceWorker(referencesInConfigFile[rootConfig],
-	                                    f, opts->Config, &seenRef);
+	                                    f, config, &seenRef);
 }
 
 // projectreferencefilemapper.go:129 rangeResolvedReferenceWorker.
@@ -1591,43 +1590,105 @@ bool projectReferenceFileMapper::
 	    childConfig->ConfigFile->SourceFile->Path();
 	seenRef.Add(childPath);
 	return rangeResolvedReferenceWorker(referencesInConfigFile[childPath],
-	                                    f, opts->Config, &seenRef);
+	                                    f, config, &seenRef);
 }
 
-// projectreferencefilemapper.go:163 getSourceToDtsIfSymlink — with
-// preserveSymlinks the resolved real path may be the .d.ts from a
-// project reference. Only probed for node_modules paths (to avoid a
-// realpath on every file) and only while the loader/host are attached.
-tsoptions::SourceOutputAndProjectReference*
-projectReferenceFileMapper::getSourceToDtsIfSymlink(
+// projectreferencefilemapper.go:31 resolutionHost — a5c43c4d54: wraps
+// the host in a fresh dts-faking host when source-of-project-reference
+// is on and dts outputs are mapped. Each call builds a new host (Go:
+// GC-owned; C++: arena'd on the mapper).
+module::ResolutionHost* projectReferenceFileMapper::resolutionHost(
+    module::ResolutionHost* host) {
+	if (!useSourceOfProjectReference ||
+	    outputDtsToProjectReference.empty()) {
+		return host;
+	}
+	auto vfsImpl = std::make_unique<projectReferenceDtsFakingVfs>();
+	vfsImpl->mapper = this;
+	vfsImpl->host = host;
+	// projectreferencedtsfakinghost.go:29 — share the map header.
+	vfsImpl->dtsDirectories = dtsDirectories;
+	auto cached = vfs::cachedvfs::From(vfsImpl.get());
+	auto faking = std::make_unique<projectReferenceDtsFakingHost>();
+	faking->currentDirectory = host->GetCurrentDirectory();
+	faking->fs = cached.get();
+	fakingVfsImpls.push_back(std::move(vfsImpl));
+	fakingVfss.push_back(std::move(cached));
+	fakingHosts.push_back(std::move(faking));
+	return fakingHosts.back().get();
+}
+
+// --- projectReferenceFileMapperBuilder (projectreferencefilemapper.go:28) ---
+
+// projectreferencefilemapper.go:173 getParseFileRedirect — probes the
+// realpath once (resolveSymlink) before the mapper read.
+std::string projectReferenceFileMapperBuilder::getParseFileRedirect(
+    const HasFileName& file) {
+	if (mapper->useSourceOfProjectReference &&
+	    mapper->getProjectReferenceFromOutputDts(file.Path()) ==
+	        nullptr) {
+		resolveSymlink(file);
+	}
+	return mapper->getParseFileRedirect(file);
+}
+
+// projectreferencefilemapper.go:180 getRedirectForResolution.
+std::pair<tsoptions::ParsedCommandLine*, std::string>
+projectReferenceFileMapperBuilder::getRedirectForResolution(
+    const HasFileName& file) {
+	if (mapper->getProjectReferenceFromSource(file.Path()) == nullptr &&
+	    mapper->getProjectReferenceFromOutputDts(file.Path()) ==
+	        nullptr) {
+		resolveSymlink(file);
+	}
+	return mapper->getRedirectForResolution(file);
+}
+
+// projectreferencefilemapper.go:186 getCompilerOptionsForFile.
+const CompilerOptions*
+projectReferenceFileMapperBuilder::getCompilerOptionsForFile(
+    const HasFileName& file) {
+	auto [redirect, _] = getRedirectForResolution(file);
+	return module::GetCompilerOptionsWithRedirect(
+	    mapper->config->CompilerOptions(), redirect);
+}
+
+// projectreferencefilemapper.go:191
+// getRedirectParsedCommandLineForResolution.
+tsoptions::ParsedCommandLine*
+projectReferenceFileMapperBuilder::
+    getRedirectParsedCommandLineForResolution(const HasFileName& file) {
+	auto [redirect, _] = getRedirectForResolution(file);
+	return redirect;
+}
+
+// projectreferencefilemapper.go:197 resolveSymlink — only probed for
+// node_modules paths; the memo lives in mapper->realpathDtsToSource.
+void projectReferenceFileMapperBuilder::resolveSymlink(
     const HasFileName& file) {
 	const tspath::Path& path = file.Path();
-	if (auto [cached, ok] = realpathDtsToSource.Load(path); ok) {
-		return cached;
+	if (auto [cached, ok] = mapper->realpathDtsToSource.Load(path); ok) {
+		return;
 	}
-	if (loader != nullptr &&
-	    tristateIsTrue(opts->Config->CompilerOptions()->PreserveSymlinks)) {
+	if (!mapper->config->ResolvedProjectReferencePaths().empty() &&
+	    tristateIsTrue(
+	        mapper->config->CompilerOptions()->PreserveSymlinks)) {
 		const std::string& fileName = file.FileName();
 		if (fileName.find("/node_modules/") == std::string::npos) {
-			realpathDtsToSource.Store(path, nullptr);
+			mapper->realpathDtsToSource.Store(path, nullptr);
 		} else {
-			tspath::Path realDeclarationPath =
-			    loader->toPath(host->Realpath(fileName));
+			tspath::Path realDeclarationPath = tspath::toPath(
+			    host->Realpath(fileName), host->GetCurrentDirectory(),
+			    host->UseCaseSensitiveFileNames());
 			if (realDeclarationPath == path) {
-				realpathDtsToSource.Store(path, nullptr);
+				mapper->realpathDtsToSource.Store(path, nullptr);
 			} else {
-				tsoptions::SourceOutputAndProjectReference* source =
-				    getProjectReferenceFromOutputDts(
-				        realDeclarationPath);
-				if (source != nullptr) {
-					realpathDtsToSource.Store(path, source);
-					return source;
-				}
-				realpathDtsToSource.Store(path, nullptr);
+				mapper->realpathDtsToSource.Store(
+				    path, mapper->getProjectReferenceFromOutputDts(
+				              realDeclarationPath));
 			}
 		}
 	}
-	return nullptr;
 }
 
 // projectreferenceparser.go:42 — parses each referenced project's
@@ -1697,7 +1758,6 @@ std::vector<projectReferenceParseTask*> createProjectReferenceParseTasks(
 // task, then fill the mapper.
 void projectReferenceParser::parse(
     std::vector<projectReferenceParseTask*>& tasks) {
-	loader->projectReferenceFileMapper->loader = loader;
 	start(tasks);
 	wg->RunAndWait();
 	initMapper(tasks);
@@ -1727,17 +1787,17 @@ void projectReferenceParser::start(
 // projectreferenceparser.go:70 initMapper.
 void projectReferenceParser::initMapper(
     std::vector<projectReferenceParseTask*>& tasks) {
-	auto* mapper = loader->projectReferenceFileMapper.get();
+	auto* mapper = loader->projectReferences.mapper.get();
 	size_t totalReferences = tasksByFileName.size() + 1;
 	mapper->configToProjectReference.reserve(totalReferences);
 	mapper->referencesInConfigFile.reserve(totalReferences);
 	collections::Set<projectReferenceParseTask*> seen;
 	mapper->referencesInConfigFile[mapper->rootConfigPath()] =
 	    initMapperWorker(tasks, &seen);
-	if (mapper->opts->canUseProjectReferenceSource() &&
-	    !mapper->outputDtsToProjectReference.empty()) {
-		mapper->host = newProjectReferenceDtsFakingHost(loader);
-	}
+	// projectreferenceparser.go:76 — the builder's host becomes the
+	// (possibly dts-faking) resolution host.
+	loader->projectReferences.host =
+	    mapper->resolutionHost(loader->projectReferences.host);
 }
 
 // projectreferenceparser.go:82 initMapperWorker — fill the four maps and
@@ -1749,7 +1809,7 @@ std::vector<tspath::Path> projectReferenceParser::initMapperWorker(
 	if (tasks.empty()) {
 		return {};
 	}
-	auto* mapper = loader->projectReferenceFileMapper.get();
+	auto* mapper = loader->projectReferences.mapper.get();
 	std::vector<tspath::Path> results;
 	results.reserve(tasks.size());
 	for (auto* task : tasks) {
@@ -1761,7 +1821,7 @@ std::vector<tspath::Path> projectReferenceParser::initMapperWorker(
 		}
 		mapper->configToProjectReference[path] = task->resolved;
 		if (task->resolved != nullptr &&
-		    mapper->opts->Config->ConfigFile !=
+		    mapper->config->ConfigFile !=
 		        task->resolved->ConfigFile) {
 			// Map current task's files first, before recursing into
 			// subtasks. This matches TypeScript's behavior where child
@@ -1776,7 +1836,7 @@ std::vector<tspath::Path> projectReferenceParser::initMapperWorker(
 			     *task->resolved->OutputDtsToProjectReference()) {
 				mapper->outputDtsToProjectReference[k] = v;
 			}
-			if (mapper->opts->canUseProjectReferenceSource()) {
+			if (mapper->useSourceOfProjectReference) {
 				std::string declDir =
 				    task->resolved->CompilerOptions()
 				        ->DeclarationDir;
@@ -1784,7 +1844,7 @@ std::vector<tspath::Path> projectReferenceParser::initMapperWorker(
 					declDir = task->resolved->CompilerOptions()->OutDir;
 				}
 				if (!declDir.empty()) {
-					loader->dtsDirectories->Add(
+					mapper->dtsDirectories->Add(
 					    loader->toPath(declDir));
 				}
 			}
@@ -1801,10 +1861,12 @@ std::vector<tspath::Path> projectReferenceParser::initMapperWorker(
 // referenced project's config through the host.
 void filesLoader::addProjectReferenceTasks(bool singleThreaded) {
 	(void)singleThreaded; // the C++ parser is single-threaded
-	projectReferenceFileMapper =
+	projectReferences.mapper =
 	    std::make_shared<compiler::projectReferenceFileMapper>();
-	projectReferenceFileMapper->opts = opts;
-	projectReferenceFileMapper->host = host;
+	projectReferences.mapper->config = opts->Config;
+	projectReferences.mapper->useSourceOfProjectReference =
+	    opts->canUseProjectReferenceSource();
+	projectReferences.host = host;
 	std::vector<std::string> projectReferences =
 	    opts->Config != nullptr ? opts->Config->ResolvedProjectReferencePaths()
 	                            : std::vector<std::string>{};
@@ -1875,7 +1937,7 @@ void filesParser::load(parseTask* t) {
 
 	// filesparser.go:73-77 — Try to find the project redirect
 	if (std::string redirect =
-	        loader->projectReferenceFileMapper->getParseFileRedirect(
+	        loader->projectReferences.getParseFileRedirect(
 	            HasFileName{t->normalizedFilePath, t->path});
 	    !redirect.empty()) {
 		t->redirect(loader, redirect);
@@ -1982,9 +2044,10 @@ void filesParser::load(parseTask* t) {
 			const FileReference* lib = file->LibReferenceDirectives[index];
 			const FileIncludeReason* includeReason =
 			    loader->ip->newReason(
-			        FileIncludeKind::LibReferenceDirective,
-			        referencedFileData{t->path, static_cast<int>(index),
-			                           nullptr});
+			        FileIncludeReason{
+			            .kind = FileIncludeKind::LibReferenceDirective,
+			            .referencedFile = referencedFileData{
+			                t->path, static_cast<int>(index), nullptr}});
 			if (auto [name, ok] =
 			        tsoptions::getLibFileName(lib->FileName);
 			    ok) {
@@ -2013,7 +2076,9 @@ void filesParser::load(parseTask* t) {
 			sub->file = supplemental;
 			sub->isContentMapperSupplemental = true;
 			sub->includeReason = loader->ip->newReason(
-			    FileIncludeKind::ContentMapperSupplemental, t->path);
+			    FileIncludeReason{
+			        .kind = FileIncludeKind::ContentMapperSupplemental,
+			        .canonicalSourceFile = t->path});
 			t->subTasks.push_back(sub);
 		}
 	}
@@ -2067,7 +2132,8 @@ void filesParser::start(const std::vector<parseTask*>& tasks, int depth) {
 
 			int currentDepth =
 			    task->increaseDepth ? depth + 1 : depth;
-			if (currentDepth < data->lowestDepth) {
+			bool lowered = currentDepth < data->lowestDepth;
+			if (lowered) {
 				// reprocess subtasks to ensure they are loaded
 				data->lowestDepth = currentDepth;
 				startSubtasks = true;
@@ -2088,8 +2154,9 @@ void filesParser::start(const std::vector<parseTask*>& tasks, int depth) {
 						data->startedSubTasks = true;
 					}
 				}
-				if (!taskByFileName->startedSubTasksTask &&
-				    loadSubTasks) {
+				if (loadSubTasks &&
+				    (lowered ||
+				     !taskByFileName->startedSubTasksTask)) {
 					taskByFileName->startedSubTasksTask = true;
 					start(taskByFileName->subTasks,
 					      data->lowestDepth);
@@ -2268,7 +2335,8 @@ void filesParser::collectFiles(const std::vector<parseTask*>& tasks) {
 				// filesparser.go:490-495 — when the program can't use
 				// project-reference sources, remember which source a
 				// redirected dts parse produced so emit can attribute it.
-				if (!loader->opts->canUseProjectReferenceSource()) {
+				if (!loader->projectReferences.mapper
+				         ->useSourceOfProjectReference) {
 					outputFileToProjectReferenceSource
 					    [task->redirectedParseTask->path] =
 					        task->normalizedFilePath;
@@ -2364,12 +2432,15 @@ ResolutionMode getEmitSyntaxForUsageLocationWorker(
 	}
 	ModuleKind fileEmitMode = getEmitModuleFormatOfFileWorker(
 	    fileName, options, meta);
-	if (isImportCall(walkUpParenthesizedExpressions(usage->parent))) {
+	if (Node* call = walkUpParenthesizedExpressions(usage->parent);
+	    isImportCall(call)) {
+		if (isSourcePhaseImportCall(call)) {
+			return ModuleKind::ESNext;
+		}
 		if (shouldTransformImportCall(fileName, options, fileEmitMode)) {
 			return ResolutionModeCommonJS;
-		} else {
-			return ResolutionModeESM;
 		}
+		return ResolutionModeESM;
 	}
 	// If we're in --module preserve on an input file, we know that an
 	// import is an import. But if this is a declaration file, we'd prefer to
@@ -2461,7 +2532,7 @@ void filesLoader::processAllProgramFiles(
 	// fileloader.go:181-190 — resolver construction (moved out of the
 	// SimpleProgram ctor to match Go's ordering).
 	module::ResolverOptions resolverOptions{
-	    .Host = projectReferenceFileMapper->host,
+	    .Host = projectReferences.host,
 	    .CompilerOptions = compilerOptions,
 	    .TypingsLocation = opts->TypingsLocation,
 	    .ProjectName = opts->ProjectName,
@@ -2486,9 +2557,9 @@ void filesLoader::processAllProgramFiles(
 	for (size_t index = 0; index < rootFileNames.size(); index++) {
 		addRootFileTask(
 		    rootFileNames[index], nullptr,
-		    ip->newReason(FileIncludeKind::RootFile,
-		                  FileIncludeReason::DataV{
-		                      static_cast<int>(index)}));
+		    ip->newReason(FileIncludeReason{
+		        .kind = FileIncludeKind::RootFile,
+		        .index = static_cast<int>(index)}));
 	}
 	if (!rootFileNames.empty() &&
 	    compilerOptions->NoLib != Tristate::True) {
@@ -2497,9 +2568,9 @@ void filesLoader::processAllProgramFiles(
 			    tsoptions::getDefaultLibFileName(compilerOptions));
 			LibFile* libFile = pathForLibFile(name);
 			addRootTask(libFile->path, libFile,
-			            ip->newReason(FileIncludeKind::LibFile,
-			                          FileIncludeReason::DataV{
-			                              std::monostate{}}));
+			            ip->newReason(FileIncludeReason{
+			                .kind = FileIncludeKind::LibFile,
+			                .isDefaultLib = true}));
 		} else {
 			for (size_t index = 0; index < compilerOptions->Lib.size();
 			     index++) {
@@ -2510,9 +2581,10 @@ void filesLoader::processAllProgramFiles(
 					    pathForLibFile(std::string(name));
 					addRootTask(libFile->path, libFile,
 					            ip->newReason(
-					                FileIncludeKind::LibFile,
-					                FileIncludeReason::DataV{
-					                    static_cast<int>(index)}));
+					                FileIncludeReason{
+					                    .kind = FileIncludeKind::LibFile,
+					                    .index = static_cast<int>(
+					                        index)}));
 				}
 				// !!! error on unknown name
 			}
@@ -2536,12 +2608,6 @@ void filesParser::getProcessedFiles(
 	wg.reset(tsc::newWorkGroup(singleThreaded));
 	start(tasks, 0);
 	wg->RunAndWait();
-
-	// fileloader.go:223-224 — the mapper's loader and host links are
-	// severed once parsing ends so reuse can detect a stale loader and a
-	// host that may have been swapped for the faking host.
-	loader->projectReferenceFileMapper->loader = nullptr;
-	loader->projectReferenceFileMapper->host = nullptr;
 
 	collectFiles(tasks);
 

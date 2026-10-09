@@ -128,29 +128,6 @@ void EmitContext::releaseArenas() {
 	a.sweep();
 }
 
-// GetEmitContext (emitcontext.go:57) — pooled.
-namespace {
-std::mutex emitContextPoolMutex;
-std::vector<EmitContext*> emitContextPool;
-} // namespace
-
-std::pair<EmitContext*, std::function<void()>> GetEmitContext() {
-	EmitContext* c;
-	{
-		std::lock_guard<std::mutex> lock(emitContextPoolMutex);
-		if (!emitContextPool.empty()) {
-			c = emitContextPool.back();
-			emitContextPool.pop_back();
-		} else {
-			c = NewEmitContext();
-		}
-	}
-	return {c, [c] {
-		        c->reset();
-		        std::lock_guard<std::mutex> lock(emitContextPoolMutex);
-		        emitContextPool.push_back(c);
-	        }};
-}
 
 // NewNodeVisitor (emitcontext.go:90) — visitor attached to this EmitContext.
 NodeVisitor* EmitContext::newNodeVisitor(std::function<Node*(Node*)> visit) {

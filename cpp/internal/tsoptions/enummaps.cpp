@@ -115,37 +115,5 @@ const JsonObject& newLineOptionMap() {
 	return m;
 }
 
-const JsonObject& watchFileEnumMap() {
-	static const JsonObject m = enumMapFromEntries({
-		{"fixedpollinginterval", WatchFileKind::FixedPollingInterval},
-		{"prioritypollinginterval", WatchFileKind::PriorityPollingInterval},
-		{"dynamicprioritypolling", WatchFileKind::DynamicPriorityPolling},
-		{"fixedchunksizepolling", WatchFileKind::FixedChunkSizePolling},
-		{"usefsevents", WatchFileKind::UseFsEvents},
-		{"usefseventsonparentdirectory",
-		 WatchFileKind::UseFsEventsOnParentDirectory},
-	});
-	return m;
-}
-
-const JsonObject& watchDirectoryEnumMap() {
-	static const JsonObject m = enumMapFromEntries({
-		{"usefsevents", WatchDirectoryKind::UseFsEvents},
-		{"fixedpollinginterval", WatchDirectoryKind::FixedPollingInterval},
-		{"dynamicprioritypolling", WatchDirectoryKind::DynamicPriorityPolling},
-		{"fixedchunksizepolling", WatchDirectoryKind::FixedChunkSizePolling},
-	});
-	return m;
-}
-
-const JsonObject& fallbackEnumMap() {
-	static const JsonObject m = enumMapFromEntries({
-		{"fixedinterval", PollingKind::FixedInterval},
-		{"priorityinterval", PollingKind::PriorityInterval},
-		{"dynamicpriority", PollingKind::DynamicPriority},
-		{"fixedchunksize", PollingKind::FixedChunkSize},
-	});
-	return m;
-}
 
 }  // namespace tsc::tsoptions

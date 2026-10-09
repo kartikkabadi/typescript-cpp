@@ -250,7 +250,7 @@ struct Project : ls::Project {
 	collections::Set<tspath::Path>* potentialProjectReferences =
 	    nullptr;
 
-	WatchedFiles<collections::SyncSet<tspath::Path>*>*
+	WatchedFiles<collections::SyncMap<tspath::Path, std::string>*>*
 	    programFilesWatch = nullptr;
 	WatchedFiles<PatternsAndIgnored>* typingsWatch = nullptr;
 	WatchedFiles<std::vector<std::string>>* contentMapperWatch =
@@ -346,7 +346,7 @@ struct Project : ls::Project {
 	CreateProgramResult CreateProgram();
 
 	// CloneWatchers — project.go:593.
-	WatchedFiles<collections::SyncSet<tspath::Path>*>* CloneWatchers();
+	WatchedFiles<collections::SyncMap<tspath::Path, std::string>*>* CloneWatchers();
 
 	// toPath — project.go:601.
 	tspath::Path toPath(const std::string& fileName) const;

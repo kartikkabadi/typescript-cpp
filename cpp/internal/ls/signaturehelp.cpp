@@ -248,10 +248,11 @@ displayPartsWriter* returnTypeToDisplayParts(checker::Signature* candidateSignat
                                              checker::Checker* c,
                                              Node* enclosingDeclaration,
                                              SourceFile* sourceFile,
-                                             bool vsCapability);
+                                             bool vsCapability,
+                                             printer::EmitContext* emitContext);
 signatureHelpParameter createSignatureHelpParameterForTypeParameter(
     checker::Type* t, SourceFile* sourceFile, Node* enclosingDeclaration,
-    checker::Checker* c, printer::Printer* p);
+    checker::NodeBuilder* builder, printer::Printer* p);
 
 // === ProvideSignatureHelp — signaturehelp.go:49 ===
 std::pair<lsproto::SignatureHelpOrNull, gostd::Error>
@@ -448,15 +449,17 @@ std::shared_ptr<lsproto::SignatureHelp> createTypeHelpItems(
 signatureInformation getTypeHelpItem(
     Symbol* symbol, const std::vector<checker::Type*>& typeParameter,
     Node* enclosingDeclaration, SourceFile* sourceFile, checker::Checker* c) {
+	printer::EmitContext* emitContext = printer::NewEmitContext();
+	checker::NodeBuilder* builder = checker::NewNodeBuilder(c, emitContext);
 	printer::Printer* p = printer::NewPrinter(
 	    printer::PrinterOptions{.NewLine = NewLineKind::LineFeed},
-	    printer::PrintHandlers{}, nullptr);
+	    printer::PrintHandlers{}, emitContext);
 
 	std::vector<signatureHelpParameter> parameters;
 	parameters.reserve(typeParameter.size());
 	for (auto* typeParam : typeParameter) {
 		parameters.push_back(createSignatureHelpParameterForTypeParameter(
-		    typeParam, sourceFile, enclosingDeclaration, c, p));
+		    typeParam, sourceFile, enclosingDeclaration, builder, p));
 	}
 
 	// Creating display label
@@ -758,17 +761,20 @@ std::vector<signatureInformation> LanguageService::getSignatureHelpItem(
     const std::string& callTargetSymbol, Symbol* callTargetSym,
     Node* enclosingDeclaration, SourceFile* sourceFile, checker::Checker* c,
     lsproto::MarkupKind docFormat, bool vsCapability) {
+	printer::EmitContext* emitContext = printer::NewEmitContext();
 	std::vector<signatureHelpItemInfo*> infos;
 	if (isTypeParameterList) {
 		infos = itemInfoForTypeParameters(candidate, c, enclosingDeclaration,
-		                                  sourceFile, docFormat, vsCapability);
+		                                  sourceFile, docFormat, vsCapability,
+		                                  emitContext);
 	} else {
 		infos = itemInfoForParameters(candidate, c, enclosingDeclaration,
-		                              sourceFile, docFormat, vsCapability);
+		                              sourceFile, docFormat, vsCapability,
+		                              emitContext);
 	}
 
 	displayPartsWriter* suffixDpw = returnTypeToDisplayParts(
-	    candidate, c, enclosingDeclaration, sourceFile, vsCapability);
+	    candidate, c, enclosingDeclaration, sourceFile, vsCapability, emitContext);
 
 	// Generate documentation from the signature's declaration
 	std::string* documentation = nullptr;
@@ -805,7 +811,8 @@ std::vector<signatureInformation> LanguageService::getSignatureHelpItem(
 // === returnTypeToDisplayParts — signaturehelp.go:488 ===
 displayPartsWriter* returnTypeToDisplayParts(
     checker::Signature* candidateSignature, checker::Checker* c,
-    Node* enclosingDeclaration, SourceFile* sourceFile, bool vsCapability) {
+    Node* enclosingDeclaration, SourceFile* sourceFile, bool vsCapability,
+    printer::EmitContext* emitContext) {
 	displayPartsWriter* dpw = newDisplayPartsWriter(vsCapability);
 
 	// Add ": " prefix
@@ -824,7 +831,7 @@ displayPartsWriter* returnTypeToDisplayParts(
 		if (typeNode != nullptr) {
 			printer::Printer* p = printer::NewPrinter(
 			    printer::PrinterOptions{.NewLine = NewLineKind::LineFeed},
-			    printer::PrintHandlers{}, printer::NewEmitContext());
+			    printer::PrintHandlers{}, emitContext);
 			// Use a temporary writer for p.Write since the printer calls
 			// Clear() on its writer
 			displayPartsWriter* tempDpw = newDisplayPartsWriter(vsCapability);
@@ -842,8 +849,9 @@ std::vector<signatureHelpItemInfo*>
 LanguageService::itemInfoForTypeParameters(
     checker::Signature* candidateSignature, checker::Checker* c,
     Node* enclosingDeclaration, SourceFile* sourceFile,
-    lsproto::MarkupKind docFormat, bool vsCapability) {
-	printer::EmitContext* emitContext = printer::NewEmitContext();
+    lsproto::MarkupKind docFormat, bool vsCapability,
+    printer::EmitContext* emitContext) {
+	checker::NodeBuilder* builder = checker::NewNodeBuilder(c, emitContext);
 	printer::Printer* p = printer::NewPrinter(
 	    printer::PrinterOptions{.NewLine = NewLineKind::LineFeed},
 	    printer::PrintHandlers{}, emitContext);
@@ -859,13 +867,13 @@ LanguageService::itemInfoForTypeParameters(
 	for (auto* typeParameter : typeParameters) {
 		signatureHelpTypeParameters.push_back(
 		    createSignatureHelpParameterForTypeParameter(
-		        typeParameter, sourceFile, enclosingDeclaration, c, p));
+		        typeParameter, sourceFile, enclosingDeclaration, builder, p));
 	}
 
 	std::vector<signatureHelpParameter> thisParameter;
 	if (candidateSignature->thisParameter != nullptr) {
 		thisParameter.push_back(createSignatureHelpParameterForParameter(
-		    candidateSignature->thisParameter, enclosingDeclaration, p,
+		    candidateSignature->thisParameter, enclosingDeclaration, builder, p,
 		    sourceFile, c, docFormat));
 	}
 
@@ -905,7 +913,7 @@ LanguageService::itemInfoForTypeParameters(
 		std::vector<signatureHelpParameter> parameters = thisParameter;
 		for (size_t j = 0; j < parameterList.size(); j++) {
 			Symbol* param = parameterList[j];
-			Node* paramNode = checker::NewNodeBuilder(c, emitContext)
+			Node* paramNode = builder
 			                      ->symbolToParameterDeclaration(
 			                          param, enclosingDeclaration,
 			                          signatureHelpNodeBuilderFlags,
@@ -919,6 +927,7 @@ LanguageService::itemInfoForTypeParameters(
 			// Clear() on its writer
 			displayPartsWriter* tempDpw = newDisplayPartsWriter(vsCapability);
 			p->Write(paramNode, sourceFile, tempDpw, nullptr);
+			emitContext->releaseArenas();
 			std::string paramLabel = tempDpw->String();
 			paramDpw->WriteFrom(tempDpw);
 
@@ -944,8 +953,9 @@ LanguageService::itemInfoForTypeParameters(
 std::vector<signatureHelpItemInfo*> LanguageService::itemInfoForParameters(
     checker::Signature* candidateSignature, checker::Checker* c,
     Node* enclosingDeclaratipn, SourceFile* sourceFile,
-    lsproto::MarkupKind docFormat, bool vsCapability) {
-	printer::EmitContext* emitContext = printer::NewEmitContext();
+    lsproto::MarkupKind docFormat, bool vsCapability,
+    printer::EmitContext* emitContext) {
+	checker::NodeBuilder* builder = checker::NewNodeBuilder(c, emitContext);
 	printer::Printer* p = printer::NewPrinter(
 	    printer::PrinterOptions{.NewLine = NewLineKind::LineFeed},
 	    printer::PrintHandlers{}, emitContext);
@@ -957,7 +967,7 @@ std::vector<signatureHelpItemInfo*> LanguageService::itemInfoForParameters(
 		for (auto* typeParameter : signatureTypeParameters) {
 			signatureHelpTypeParameters.push_back(
 			    createSignatureHelpParameterForTypeParameter(
-			        typeParameter, sourceFile, enclosingDeclaratipn, c, p));
+			        typeParameter, sourceFile, enclosingDeclaratipn, builder, p));
 		}
 	}
 
@@ -1013,7 +1023,7 @@ std::vector<signatureHelpItemInfo*> LanguageService::itemInfoForParameters(
 
 		for (size_t j = 0; j < parameterList.size(); j++) {
 			Symbol* param = parameterList[j];
-			Node* paramNode = checker::NewNodeBuilder(c, emitContext)
+			Node* paramNode = builder
 			                      ->symbolToParameterDeclaration(
 			                          param, enclosingDeclaratipn,
 			                          signatureHelpNodeBuilderFlags,
@@ -1027,6 +1037,7 @@ std::vector<signatureHelpItemInfo*> LanguageService::itemInfoForParameters(
 			// Clear() on its writer
 			displayPartsWriter* tempDpw = newDisplayPartsWriter(vsCapability);
 			p->Write(paramNode, sourceFile, tempDpw, nullptr);
+			emitContext->releaseArenas();
 			std::string paramLabel = tempDpw->String();
 			paramDpw->WriteFrom(tempDpw);
 
@@ -1085,12 +1096,16 @@ signatureHelpParameter LanguageService::createSignatureHelpParameterFromLabel(
 // === createSignatureHelpParameterForParameter — signaturehelp.go:694 ===
 signatureHelpParameter
 LanguageService::createSignatureHelpParameterForParameter(
-    Symbol* parameter, Node* enclosingDeclaration, printer::Printer* p,
+    Symbol* parameter, Node* enclosingDeclaration,
+    checker::NodeBuilder* builder, printer::Printer* p,
     SourceFile* sourceFile, checker::Checker* c,
     lsproto::MarkupKind docFormat) {
+	struct DeferReleaseParam {
+		checker::NodeBuilder* b;
+		~DeferReleaseParam() { b->EmitContext()->releaseArenas(); }
+	} deferRelease{builder};
 	std::string display = p->Emit(
-	    checker::NewNodeBuilder(c, printer::NewEmitContext())
-	        ->symbolToParameterDeclaration(
+	    builder->symbolToParameterDeclaration(
 	            parameter, enclosingDeclaration,
 	            signatureHelpNodeBuilderFlags,
 	            nodebuilder::InternalFlagsNone, nullptr),
@@ -1102,10 +1117,13 @@ LanguageService::createSignatureHelpParameterForParameter(
 // === createSignatureHelpParameterForTypeParameter — signaturehelp.go:699 ===
 signatureHelpParameter createSignatureHelpParameterForTypeParameter(
     checker::Type* t, SourceFile* sourceFile, Node* enclosingDeclaration,
-    checker::Checker* c, printer::Printer* p) {
+    checker::NodeBuilder* builder, printer::Printer* p) {
+	struct DeferReleaseTP {
+		checker::NodeBuilder* b;
+		~DeferReleaseTP() { b->EmitContext()->releaseArenas(); }
+	} deferRelease{builder};
 	std::string display = p->Emit(
-	    checker::NewNodeBuilder(c, printer::NewEmitContext())
-	        ->TypeParameterToDeclaration(
+	    builder->TypeParameterToDeclaration(
 	            t, enclosingDeclaration, signatureHelpNodeBuilderFlags,
 	            nodebuilder::InternalFlagsNone, nullptr),
 	    sourceFile);

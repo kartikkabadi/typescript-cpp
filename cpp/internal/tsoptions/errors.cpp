@@ -143,9 +143,6 @@ const DiagnosticMessage* extraKeyDiagnostics(std::string_view s) {
 	if (s == "compilerOptions") {
 		return Unknown_compiler_option_0;
 	}
-	if (s == "watchOptions") {
-		return Unknown_watch_option_0;
-	}
 	if (s == "typeAcquisition") {
 		return Unknown_type_acquisition_option_0;
 	}
@@ -158,9 +155,6 @@ const DiagnosticMessage* extraKeyDiagnostics(std::string_view s) {
 const DiagnosticMessage* extraKeyDidYouMeanDiagnostics(std::string_view s) {
 	if (s == "compilerOptions") {
 		return Unknown_compiler_option_0_Did_you_mean_1;
-	}
-	if (s == "watchOptions") {
-		return Unknown_watch_option_0_Did_you_mean_1;
 	}
 	if (s == "typeAcquisition") {
 		return Unknown_type_acquisition_option_0_Did_you_mean_1;

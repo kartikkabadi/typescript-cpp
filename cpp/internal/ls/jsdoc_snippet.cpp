@@ -806,7 +806,7 @@ bool isPotentiallyValidJSDocSnippetCompletionPosition(SourceFile* file,
 
 CompletionList* LanguageService::getJSDocSnippetCompletion(
     const ContextPtr& ctx, SourceFile* file, int position) {
-	if (tristateIsFalse(UserPreferences().EnableJSDocCompletions)) {
+	if (tristateIsFalse(UserPreferences().CompleteJSDocs)) {
 		return nullptr;
 	}
 	if (!isPotentiallyValidJSDocSnippetCompletionPosition(file, position)) {

@@ -53,7 +53,7 @@ bool isUnclosedFragment(::tsc::JsxFragment* node) {
 std::pair<lsp::lsproto::VSOnAutoInsertResponse, gostd::Error>
 LanguageService::ProvideOnAutoInsert(
     gostd::Context ctx, lsp::lsproto::VSOnAutoInsertParams* params) {
-	if (tristateIsFalse(UserPreferences().EnableAutoClosingTags)) {
+	if (tristateIsFalse(UserPreferences().AutoClosingTags)) {
 		return {lsp::lsproto::VSOnAutoInsertResponse{}, nullptr};
 	}
 	if (params->VSCh != ">") {

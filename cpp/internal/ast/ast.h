@@ -803,6 +803,7 @@ inline bool rangeIsSynthesized(const TextRange& loc) {
 	return positionIsSynthesized(loc.pos()) || positionIsSynthesized(loc.end());
 }
 const SourceFile* getSourceFileOfNode(const Node* node);
+SourceFile* getSourceFileOfSymbol(Symbol* symbol);
 inline SourceFile* getSourceFileOfNode(Node* node) {
 	return const_cast<SourceFile*>(
 		getSourceFileOfNode(static_cast<const Node*>(node)));
@@ -908,6 +909,12 @@ Node* getExternalModuleName(Node* node);
 bool isLiteralImportTypeNode(Node* node);
 bool isRequireCall(Node* node, bool requireStringLiteralLikeArgument);
 bool isImportCall(Node* node);
+bool isImportPhaseMetaProperty(Node* node);
+bool isImportDeferMetaProperty(Node* node);
+bool isImportSourceMetaProperty(Node* node);
+bool isImportMetaProperty(Node* node, std::string_view name);
+bool isSourcePhaseImport(Node* node);
+bool isSourcePhaseImportCall(Node* node);
 bool isImportMeta(Node* node);
 Node* getFirstIdentifier(Node* node);
 bool isExternalModuleAugmentation(Node* node);

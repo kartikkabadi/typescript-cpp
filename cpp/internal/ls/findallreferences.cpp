@@ -915,9 +915,9 @@ nonLocalDefinition* LanguageService::getNonLocalDefinition(
 	}
 
 	compiler::SimpleProgram* program = GetProgram();
-	auto [checker, done] = program->GetTypeChecker(ctx);
+	auto [checker, done] = program->GetTypeCheckerForFileExclusive(nullptr);
 	doneGuard doneGuard_{done};
-	checker::EmitResolver* emitResolver = checker->GetEmitResolver();
+	checker::EmitResolver* emitResolver = checker->NewEmitResolver(printer::NewEmitContext());
 	for (auto* d : entry->definition->symbol->declarations) {
 		if (isDefinitionVisible(emitResolver, d)) {
 			auto [file, sp] = getFileAndStartPosFromDeclaration(d);
@@ -1177,7 +1177,7 @@ std::vector<SymbolAndEntries*> LanguageService::getSymbolAndEntries(
 	} else {
 		options.use = referenceUseRename;
 		options.useAliasesForRename =
-		    tristateIsTrueOrUnknown(UserPreferences().UseAliasesForRename);
+		    tristateIsTrueOrUnknown(UserPreferences().ProvidePrefixAndSuffixTextForRename);
 	}
 	return getReferencedSymbolsForNode(ctx, position, node, program,
 	                                 program->GetSourceFiles(), options);
@@ -1495,7 +1495,7 @@ LanguageService::getDefinitionKindAndDisplayParts(
     const gostd::Context& ctx, Symbol* symbol, Node* originalNode,
     bool vsCapability) {
 	compiler::SimpleProgram* program = GetProgram();
-	auto [c, done] = program->GetTypeChecker(ctx);
+	auto [c, done] = program->GetTypeCheckerForFileExclusive(nullptr);
 	doneGuard doneGuard_{done};
 
 	SemanticMeaning meaning = getIntersectingMeaningFromDeclarations(
@@ -1852,7 +1852,7 @@ std::vector<SymbolAndEntries*> LanguageService::getReferencedSymbolsForNode(
 		                           getSourceFileOfNode(node));
 	}
 
-	auto [checker, done] = program->GetTypeChecker(ctx);
+	auto [checker, done] = program->GetTypeCheckerForFileExclusive(nullptr);
 	doneGuard doneGuard_{done};
 
 	if (node->kind == Kind::SourceFile) {
@@ -1866,7 +1866,7 @@ std::vector<SymbolAndEntries*> LanguageService::getReferencedSymbolsForNode(
 		        resolvedRef->file->Symbol);
 		    moduleSymbol != nullptr) {
 			return getReferencedSymbolsForModule(
-			    ctx, program, moduleSymbol,
+			    checker, program, moduleSymbol,
 			    /*excludeImportTypeOfExportEquals*/ false, sourceFiles,
 			    &sourceFilesSet);
 		}
@@ -1928,7 +1928,7 @@ std::vector<SymbolAndEntries*> LanguageService::getReferencedSymbolsForNode(
 			return {};
 		}
 		return getReferencedSymbolsForModule(
-		    ctx, program, symbol->parent,
+		    checker, program, symbol->parent,
 		    /*excludeImportTypeOfExportEquals*/ false, sourceFiles,
 		    &sourceFilesSet);
 	}
@@ -2041,7 +2041,7 @@ LanguageService::getReferencedSymbolsForModuleIfDeclaredBySourceFile(
 	// If exportEquals != nil, we're about to add references to `import("mod")`
 	// anyway, so don't double-count them.
 	auto moduleReferences = getReferencedSymbolsForModule(
-	    ctx, program, symbol, exportEquals != nullptr, sourceFiles,
+	    checker, program, symbol, exportEquals != nullptr, sourceFiles,
 	    sourceFilesSet);
 	if (exportEquals == nullptr || !(exportEquals->flags & SymbolFlagsAlias) ||
 	    !sourceFilesSet->Has(moduleSourceFileName)) {
@@ -2511,14 +2511,11 @@ Symbol* getMergedAliasedSymbolOfNamespaceExportDeclaration(
 // getReferencedSymbolsForModule — findallreferences.go:1735.
 std::vector<SymbolAndEntries*>
 LanguageService::getReferencedSymbolsForModule(
-    const gostd::Context& ctx, compiler::SimpleProgram* program,
+    checker::Checker* checker, compiler::SimpleProgram* program,
     Symbol* symbol, bool excludeImportTypeOfExportEquals,
     const std::vector<SourceFile*>& sourceFiles,
     collections::Set<std::string>* sourceFilesSet) {
 	debug::assert(symbol->valueDeclaration != nullptr, "");
-
-	auto [checker, done] = program->GetTypeChecker(ctx);
-	doneGuard doneGuard_{done};
 
 	auto moduleRefs =
 	    findModuleReferences(program, sourceFiles, symbol, checker);

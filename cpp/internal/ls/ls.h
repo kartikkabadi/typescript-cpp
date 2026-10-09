@@ -1605,16 +1605,19 @@ private:
 	std::vector<signatureHelpItemInfo*> itemInfoForTypeParameters(
 	    checker::Signature* candidateSignature, checker::Checker* c,
 	    Node* enclosingDeclaration, SourceFile* sourceFile,
-	    lsproto::MarkupKind docFormat, bool vsCapability);
+	    lsproto::MarkupKind docFormat, bool vsCapability,
+	    printer::EmitContext* emitContext);
 	std::vector<signatureHelpItemInfo*> itemInfoForParameters(
 	    checker::Signature* candidateSignature, checker::Checker* c,
 	    Node* enclosingDeclaratipn, SourceFile* sourceFile,
-	    lsproto::MarkupKind docFormat, bool vsCapability);
+	    lsproto::MarkupKind docFormat, bool vsCapability,
+	    printer::EmitContext* emitContext);
 	signatureHelpParameter createSignatureHelpParameterFromLabel(
 	    Symbol* parameter, const std::string& label, checker::Checker* c,
 	    lsproto::MarkupKind docFormat);
 	signatureHelpParameter createSignatureHelpParameterForParameter(
-	    Symbol* parameter, Node* enclosingDeclaration, printer::Printer* p,
+	    Symbol* parameter, Node* enclosingDeclaration,
+	    checker::NodeBuilder* builder, printer::Printer* p,
 	    SourceFile* sourceFile, checker::Checker* c,
 	    lsproto::MarkupKind docFormat);
 
@@ -1718,7 +1721,7 @@ private:
 	    const std::vector<SourceFile*>& sourceFiles, checker::Checker* checker,
 	    refOptions options, collections::Set<std::string>* sourceFilesSet);
 	std::vector<SymbolAndEntries*> getReferencedSymbolsForModule(
-	    const gostd::Context& ctx, compiler::SimpleProgram* program,
+	    checker::Checker* checker, compiler::SimpleProgram* program,
 	    Symbol* symbol, bool excludeImportTypeOfExportEquals,
 	    const std::vector<SourceFile*>& sourceFiles,
 	    collections::Set<std::string>* sourceFilesSet);
@@ -2651,6 +2654,7 @@ std::vector<CompletionItem*> getJSDocParameterCompletions(
     const lsutil::UserPreferences& preferences, bool tagNameOnly);
 // completions.go:6348 getJSDocParamAnnotation.
 std::string getJSDocParamAnnotation(
+    printer::EmitContext** emitContext,
     const std::string& paramName, Node* initializer,
     Node* dotDotDotToken, bool isJS, bool isObject, bool isSnippet,
     checker::Checker* typeChecker, const CompilerOptions* options,
@@ -2660,6 +2664,7 @@ std::string getJSDocParamNameWithInitializer(const std::string& paramName,
                                              Node* initializer);
 // completions.go:6420 generateJSDocParamTagsForDestructuring.
 std::vector<std::string> generateJSDocParamTagsForDestructuring(
+    printer::EmitContext** emitContext,
     const std::string& path, BindingPattern* pattern,
     Node* initializer, Node* dotDotDotToken, bool isJS,
     bool isSnippet, checker::Checker* typeChecker,
@@ -2667,6 +2672,7 @@ std::vector<std::string> generateJSDocParamTagsForDestructuring(
     const lsutil::UserPreferences& preferences);
 // completions.go:6453 jsDocParamPatternWorker.
 std::vector<std::string> jsDocParamPatternWorker(
+    printer::EmitContext** emitContext,
     const std::string& path, BindingPattern* pattern,
     Node* initializer, Node* dotDotDotToken, bool isJS,
     bool isSnippet, checker::Checker* typeChecker,
@@ -2674,6 +2680,7 @@ std::vector<std::string> jsDocParamPatternWorker(
     const lsutil::UserPreferences& preferences, int* counter);
 // completions.go:6510 jsDocParamElementWorker.
 std::vector<std::string> jsDocParamElementWorker(
+    printer::EmitContext** emitContext,
     const std::string& path, BindingElement* element,
     Node* initializer, Node* dotDotDotToken, bool isJS,
     bool isSnippet, checker::Checker* typeChecker,

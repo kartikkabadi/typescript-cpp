@@ -324,11 +324,16 @@ std::vector<std::string> CompilerBaselineRunner::EnumerateTestFiles() {
 void CompilerBaselineRunner::RunTests(gostd::testing::T* t) {
 	cleanUpLocal(t);
 	auto files = EnumerateTestFiles();
+	auto filter =
+	    compilerTestFileFilter(std::string(compilerTestRunPattern()));
 
 	for (auto& filename : files) {
 		if (slicesContains(
 		        skippedTests(),
 		        std::string_view(tspath::getBaseFileName(filename)))) {
+			continue;
+		}
+		if (!filter(tspath::getBaseFileName(filename))) {
 			continue;
 		}
 		runTest(t, filename);

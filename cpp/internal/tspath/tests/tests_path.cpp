@@ -59,6 +59,8 @@ static void TestGetRootLength(T* t) {
 	gotest::assert::Equal(t, getRootLength("file://localhost/c%3A"), 21);
 	gotest::assert::Equal(t, getRootLength("file://localhost/c%3Ad"), 17);
 	gotest::assert::Equal(t, getRootLength("file://localhost/c%3A/path"), 22);
+	gotest::assert::Equal(t, getRootLength("FILE:///C:/path"), 11);
+	gotest::assert::Equal(t, getRootLength("file://LOCALHOST/C%3A/path"), 22);
 	gotest::assert::Equal(t, getRootLength("file://server"), 13);
 	gotest::assert::Equal(t, getRootLength("file://server/"), 14);
 	gotest::assert::Equal(t, getRootLength("file://server/path"), 14);
@@ -187,55 +189,55 @@ static void TestRemoveAnyFileExtension(T* t) {
 
 static void TestGetPathComponents(T* t) {
 	t->Parallel();
-	gotest::assert::Equal(t, getPathComponents("", ""),
+	gotest::assert::Equal(t, getPathComponents(""),
 	                      std::vector<std::string>{""});
-	gotest::assert::Equal(t, getPathComponents("a", ""),
+	gotest::assert::Equal(t, getPathComponents("a"),
 	                      std::vector<std::string>{"", "a"});
-	gotest::assert::Equal(t, getPathComponents("./a", ""),
+	gotest::assert::Equal(t, getPathComponents("./a"),
 	                      std::vector<std::string>{"", ".", "a"});
-	gotest::assert::Equal(t, getPathComponents("/", ""),
+	gotest::assert::Equal(t, getPathComponents("/"),
 	                      std::vector<std::string>{"/"});
-	gotest::assert::Equal(t, getPathComponents("/a", ""),
+	gotest::assert::Equal(t, getPathComponents("/a"),
 	                      std::vector<std::string>{"/", "a"});
-	gotest::assert::Equal(t, getPathComponents("/a/", ""),
+	gotest::assert::Equal(t, getPathComponents("/a/"),
 	                      std::vector<std::string>{"/", "a"});
-	gotest::assert::Equal(t, getPathComponents("c:", ""),
+	gotest::assert::Equal(t, getPathComponents("c:"),
 	                      std::vector<std::string>{"c:"});
-	gotest::assert::Equal(t, getPathComponents("c:d", ""),
+	gotest::assert::Equal(t, getPathComponents("c:d"),
 	                      std::vector<std::string>{"", "c:d"});
-	gotest::assert::Equal(t, getPathComponents("c:/", ""),
+	gotest::assert::Equal(t, getPathComponents("c:/"),
 	                      std::vector<std::string>{"c:/"});
-	gotest::assert::Equal(t, getPathComponents("c:/path", ""),
+	gotest::assert::Equal(t, getPathComponents("c:/path"),
 	                      std::vector<std::string>{"c:/", "path"});
-	gotest::assert::Equal(t, getPathComponents("//server", ""),
+	gotest::assert::Equal(t, getPathComponents("//server"),
 	                      std::vector<std::string>{"//server"});
-	gotest::assert::Equal(t, getPathComponents("//server/", ""),
+	gotest::assert::Equal(t, getPathComponents("//server/"),
 	                      std::vector<std::string>{"//server/"});
-	gotest::assert::Equal(t, getPathComponents("//server/share", ""),
+	gotest::assert::Equal(t, getPathComponents("//server/share"),
 	                      std::vector<std::string>{"//server/", "share"});
-	gotest::assert::Equal(t, getPathComponents("file:///", ""),
+	gotest::assert::Equal(t, getPathComponents("file:///"),
 	                      std::vector<std::string>{"file:///"});
-	gotest::assert::Equal(t, getPathComponents("file:///path", ""),
+	gotest::assert::Equal(t, getPathComponents("file:///path"),
 	                      std::vector<std::string>{"file:///", "path"});
-	gotest::assert::Equal(t, getPathComponents("file:///c:", ""),
+	gotest::assert::Equal(t, getPathComponents("file:///c:"),
 	                      std::vector<std::string>{"file:///c:"});
-	gotest::assert::Equal(t, getPathComponents("file:///c:d", ""),
+	gotest::assert::Equal(t, getPathComponents("file:///c:d"),
 	                      std::vector<std::string>{"file:///", "c:d"});
-	gotest::assert::Equal(t, getPathComponents("file:///c:/", ""),
+	gotest::assert::Equal(t, getPathComponents("file:///c:/"),
 	                      std::vector<std::string>{"file:///c:/"});
-	gotest::assert::Equal(t, getPathComponents("file:///c:/path", ""),
+	gotest::assert::Equal(t, getPathComponents("file:///c:/path"),
 	                      std::vector<std::string>{"file:///c:/", "path"});
-	gotest::assert::Equal(t, getPathComponents("file://server", ""),
+	gotest::assert::Equal(t, getPathComponents("file://server"),
 	                      std::vector<std::string>{"file://server"});
-	gotest::assert::Equal(t, getPathComponents("file://server/", ""),
+	gotest::assert::Equal(t, getPathComponents("file://server/"),
 	                      std::vector<std::string>{"file://server/"});
-	gotest::assert::Equal(t, getPathComponents("file://server/path", ""),
+	gotest::assert::Equal(t, getPathComponents("file://server/path"),
 	                      std::vector<std::string>{"file://server/", "path"});
-	gotest::assert::Equal(t, getPathComponents("http://server", ""),
+	gotest::assert::Equal(t, getPathComponents("http://server"),
 	                      std::vector<std::string>{"http://server"});
-	gotest::assert::Equal(t, getPathComponents("http://server/", ""),
+	gotest::assert::Equal(t, getPathComponents("http://server/"),
 	                      std::vector<std::string>{"http://server/"});
-	gotest::assert::Equal(t, getPathComponents("http://server/path", ""),
+	gotest::assert::Equal(t, getPathComponents("http://server/path"),
 	                      std::vector<std::string>{"http://server/", "path"});
 }
 
@@ -465,6 +467,7 @@ static void TestToPath(T* t) {
 	gotest::assert::Equal(t, std::string(toPath("file.ext", "path/to", false)), "path/to/file.ext");
 	gotest::assert::Equal(t, std::string(toPath("file.ext", "/path/to", true)), "/path/to/file.ext");
 	gotest::assert::Equal(t, std::string(toPath("/path/to/../file.ext", "path/to", true)), "/path/file.ext");
+	gotest::assert::Equal(t, std::string(toPath("^/~ts-uri~/custom/ts-nul-authority/CaseSensitive.ts", "/", false)), "^/~ts-uri~/custom/ts-nul-authority/CaseSensitive.ts");
 }
 
 static void TestTrimFilePathPrefix(T* t) {
@@ -572,7 +575,7 @@ static void TestGetCommonParents(T* t) {
 	t->Run("empty input", [&](T* t) {
 		t->Parallel();
 		std::vector<std::string> paths;
-		auto [got, ignored] = getCommonParents(paths, 1, getPathComponents, opts);
+		auto [got, ignored] = getCommonParents(paths, 1, resolvePathComponents, opts);
 		gotest::assert::Equal(t, (int)ignored.size(), 0);
 		gotest::assert::Equal(t, got.empty(), true);
 	});
@@ -580,7 +583,7 @@ static void TestGetCommonParents(T* t) {
 	t->Run("single path returns itself", [&](T* t) {
 		t->Parallel();
 		std::vector<std::string> paths = {"/a/b/c/d"};
-		auto [got, ignored] = getCommonParents(paths, 1, getPathComponents, opts);
+		auto [got, ignored] = getCommonParents(paths, 1, resolvePathComponents, opts);
 		gotest::assert::Equal(t, (int)ignored.size(), 0);
 		gotest::assert::Equal(t, got, std::vector<std::string>{paths[0]});
 	});
@@ -588,7 +591,7 @@ static void TestGetCommonParents(T* t) {
 	t->Run("paths shorter than minComponents are ignored", [&](T* t) {
 		t->Parallel();
 		std::vector<std::string> paths = {"/a/b/c/d", "/a/b/c/e", "/a/b/f/g", "/x/y"};
-		auto [got, ignored] = getCommonParents(paths, 4, getPathComponents, opts);
+		auto [got, ignored] = getCommonParents(paths, 4, resolvePathComponents, opts);
 		gotest::assert::Equal(t, ignored, std::unordered_set<std::string>{"/x/y"});
 		gotest::assert::Equal(t, got, std::vector<std::string>({"/a/b/c", "/a/b/f/g"}));
 	});
@@ -596,7 +599,7 @@ static void TestGetCommonParents(T* t) {
 	t->Run("three paths share /a/b", [&](T* t) {
 		t->Parallel();
 		std::vector<std::string> paths = {"/a/b/c/d", "/a/b/c/e", "/a/b/f/g"};
-		auto [got, ignored] = getCommonParents(paths, 1, getPathComponents, opts);
+		auto [got, ignored] = getCommonParents(paths, 1, resolvePathComponents, opts);
 		gotest::assert::Equal(t, (int)ignored.size(), 0);
 		gotest::assert::Equal(t, got, std::vector<std::string>({"/a/b"}));
 	});
@@ -604,7 +607,7 @@ static void TestGetCommonParents(T* t) {
 	t->Run("mixed with short path collapses to root when minComponents=1", [&](T* t) {
 		t->Parallel();
 		std::vector<std::string> paths = {"/a/b/c/d", "/a/b/c/e", "/a/b/f/g", "/x/y/z"};
-		auto [got, ignored] = getCommonParents(paths, 1, getPathComponents, opts);
+		auto [got, ignored] = getCommonParents(paths, 1, resolvePathComponents, opts);
 		gotest::assert::Equal(t, (int)ignored.size(), 0);
 		gotest::assert::Equal(t, got, std::vector<std::string>({"/"}));
 	});
@@ -612,7 +615,7 @@ static void TestGetCommonParents(T* t) {
 	t->Run("mixed with short path preserves both when minComponents=3", [&](T* t) {
 		t->Parallel();
 		std::vector<std::string> paths = {"/a/b/c/d", "/a/b/c/e", "/a/b/f/g", "/x/y/z"};
-		auto [got, ignored] = getCommonParents(paths, 3, getPathComponents, opts);
+		auto [got, ignored] = getCommonParents(paths, 3, resolvePathComponents, opts);
 		gotest::assert::Equal(t, (int)ignored.size(), 0);
 		gotest::assert::Equal(t, got, std::vector<std::string>({"/a/b", "/x/y/z"}));
 	});
@@ -620,7 +623,7 @@ static void TestGetCommonParents(T* t) {
 	t->Run("different volumes are returned individually", [&](T* t) {
 		t->Parallel();
 		std::vector<std::string> paths = {"c:/a/b/c/d", "d:/a/b/c/d"};
-		auto [got, ignored] = getCommonParents(paths, 1, getPathComponents, opts);
+		auto [got, ignored] = getCommonParents(paths, 1, resolvePathComponents, opts);
 		gotest::assert::Equal(t, (int)ignored.size(), 0);
 		gotest::assert::Equal(t, got, std::vector<std::string>({paths[0], paths[1]}));
 	});
@@ -628,7 +631,7 @@ static void TestGetCommonParents(T* t) {
 	t->Run("duplicate paths deduplicate result", [&](T* t) {
 		t->Parallel();
 		std::vector<std::string> paths = {"/a/b/c/d", "/a/b/c/d"};
-		auto [got, ignored] = getCommonParents(paths, 1, getPathComponents, opts);
+		auto [got, ignored] = getCommonParents(paths, 1, resolvePathComponents, opts);
 		gotest::assert::Equal(t, (int)ignored.size(), 0);
 		gotest::assert::Equal(t, got, std::vector<std::string>({paths[0]}));
 	});
@@ -636,7 +639,7 @@ static void TestGetCommonParents(T* t) {
 	t->Run("paths with few components are returned as-is when minComponents met", [&](T* t) {
 		t->Parallel();
 		std::vector<std::string> paths = {"/a/b/c/d", "/x/y"};
-		auto [got, ignored] = getCommonParents(paths, 2, getPathComponents, opts);
+		auto [got, ignored] = getCommonParents(paths, 2, resolvePathComponents, opts);
 		gotest::assert::Equal(t, (int)ignored.size(), 0);
 		gotest::assert::Equal(t, got, std::vector<std::string>({"/a/b/c/d", "/x/y"}));
 	});
@@ -644,7 +647,7 @@ static void TestGetCommonParents(T* t) {
 	t->Run("minComponents=2", [&](T* t) {
 		t->Parallel();
 		std::vector<std::string> paths = {"/a/b/c/d", "/a/z/c/e", "/a/aaa/f/g", "/x/y/z"};
-		auto [got, ignored] = getCommonParents(paths, 2, getPathComponents, opts);
+		auto [got, ignored] = getCommonParents(paths, 2, resolvePathComponents, opts);
 		gotest::assert::Equal(t, (int)ignored.size(), 0);
 		gotest::assert::Equal(t, got, std::vector<std::string>({"/a", "/x/y/z"}));
 	});
@@ -652,7 +655,7 @@ static void TestGetCommonParents(T* t) {
 	t->Run("trailing separators are handled", [&](T* t) {
 		t->Parallel();
 		std::vector<std::string> paths = {"/a/b/", "/a/b/c"};
-		auto [got, ignored] = getCommonParents(paths, 1, getPathComponents, opts);
+		auto [got, ignored] = getCommonParents(paths, 1, resolvePathComponents, opts);
 		gotest::assert::Equal(t, (int)ignored.size(), 0);
 		gotest::assert::Equal(t, got, std::vector<std::string>({"/a/b"}));
 	});
@@ -660,7 +663,7 @@ static void TestGetCommonParents(T* t) {
 	t->Run("nested fan-out keeps every result", [&](T* t) {
 		t->Parallel();
 		std::vector<std::string> paths = {"/a/x/1/p", "/a/x/2/q", "/a/y/3/r"};
-		auto [got, ignored] = getCommonParents(paths, 4, getPathComponents, opts);
+		auto [got, ignored] = getCommonParents(paths, 4, resolvePathComponents, opts);
 		gotest::assert::Equal(t, (int)ignored.size(), 0);
 		gotest::assert::Equal(t, got, std::vector<std::string>({"/a/x/1/p", "/a/x/2/q", "/a/y/3/r"}));
 	});

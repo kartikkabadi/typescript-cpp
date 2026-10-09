@@ -244,13 +244,7 @@ void Checker::markLinkedReferences(Node* location, ReferenceHint hint, Symbol* p
 					return;
 				}
 			}
-			// Computed property names on enum members are a grammar error and are never checked
-			// (checkEnumMember only checks the member initializer, not the name), so resolving
-			// identifiers in them here would report a spurious "Cannot find name" diagnostic.
 			if (computedName != nullptr) {
-				if (isEnumMember(computedName->parent)) {
-					return;
-				}
 				if (isInvalidComputedPropertyName(computedName)) {
 					return;
 				}
@@ -296,7 +290,8 @@ void Checker::markLinkedReferences(Node* location, ReferenceHint hint, Symbol* p
 		if (isPropertyAccessOrQualifiedName(location)) {
 			Node* topProp = location;
 			while (isPropertyAccessOrQualifiedName(topProp)) {
-				if (isPartOfTypeNode(topProp)) {
+				// Names in an import type's qualifier (`ns.y` in `typeof import("./b").ns.y`) are exports of the imported module, not references to this file's imports
+				if (isPartOfTypeNode(topProp) || isImportTypeQualifierPart(topProp) != nullptr) {
 					return;
 				}
 				topProp = topProp->parent;

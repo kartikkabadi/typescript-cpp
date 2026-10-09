@@ -86,6 +86,10 @@ bool pluginsEqual(const std::vector<PluginImport>& a,
 }
 // compilerOptionsDeepEqual — reflect.DeepEqual on *core.CompilerOptions:
 // every field of the struct, in declaration order.
+bool CompilerOptions::Equals(const CompilerOptions* other) const {
+	return compilerOptionsDeepEqual(this, other);
+}
+
 bool compilerOptionsDeepEqual(const CompilerOptions* a,
                               const CompilerOptions* b) {
 	if (a == b) {

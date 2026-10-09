@@ -93,6 +93,8 @@ std::string formatEncodedSourceFile(const std::vector<uint8_t>& encoded) {
 
 void TestEncodeSourceFile(T* t) {
 	t->Parallel();
+	assert::Equal(t, (int)HeaderSize, 64);
+	assert::Equal(t, (int)NodeSize, 28);;
 	SourceFile* sourceFile = parseSourceFile(
 	    SourceFileParseOptions{
 	        .FileName = "/test.ts",

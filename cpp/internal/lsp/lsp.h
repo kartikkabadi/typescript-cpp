@@ -14,6 +14,7 @@
 #include <deque>
 #include <exception>
 #include <functional>
+#include <future>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -714,7 +715,8 @@ struct ServerOptions {
 	std::string TypingsLocation;
 	std::shared_ptr<project::ParseCache> ParseCache;
 	std::function<std::pair<std::vector<uint8_t>, gostd::Error>(
-		const std::string& cwd, const std::vector<std::string>& args)>
+		const gostd::Context& ctx, const std::string& cwd,
+		const std::vector<std::string>& args)>
 		NpmInstall;
 	// Spawn launches a child process, returning its stdio as an
 	// io.ReadWriteCloser (Read is its stdout, Write is its stdin). It is nil
@@ -773,6 +775,51 @@ T valueOrZero(const std::optional<T>& value) {
 	}
 	return *value;
 }
+
+// apiSessionState — server.go:255.
+struct apiSessionState {
+	std::shared_ptr<api::Session> session;
+	std::shared_ptr<ipc::PipeTransport> transport;
+	gostd::CancelFunc cancel;
+	std::promise<void> done; // Go: done chan struct{} closed by the goroutine
+	std::future<void> doneFuture = done.get_future();
+
+	std::mutex mu;
+	std::shared_ptr<gostd::io::ReadWriteCloser> connection;
+	bool stopped = false;
+
+	// attachConnection — server.go:264.
+	bool attachConnection(
+	    const std::shared_ptr<gostd::io::ReadWriteCloser>& connection) {
+		std::lock_guard<std::mutex> lock(mu);
+		if (stopped) {
+			(void)connection->close();
+			return false;
+		}
+		this->connection = connection;
+		return true;
+	}
+
+	// stop — server.go:275.
+	void stop() {
+		{
+			std::lock_guard<std::mutex> lock(mu);
+			if (!stopped) {
+				stopped = true;
+				if (cancel) {
+					cancel();
+				}
+				if (transport) {
+					(void)transport->Close();
+				}
+				if (connection) {
+					(void)connection->close();
+				}
+			}
+		}
+		doneFuture.wait();
+	}
+};
 
 // Server — server.go:171. Implements project.Client and ata.NpmExecutor.
 class Server : public project::Client,
@@ -846,7 +893,7 @@ public:
 	project::Session* session = nullptr;       // server.go:224
 
 	// apiSessions holds active API sessions keyed by their ID.
-	std::unordered_map<std::string, std::shared_ptr<api::Session>>
+	std::unordered_map<std::string, std::shared_ptr<apiSessionState>>
 		apiSessions;                           // server.go:227
 	std::mutex apiSessionsMu;                  // server.go:228
 
@@ -870,7 +917,8 @@ public:
 	std::shared_ptr<project::ParseCache> parseCache; // server.go:240
 
 	std::function<std::pair<std::vector<uint8_t>, gostd::Error>(
-		const std::string&, const std::vector<std::string>&)>
+		const gostd::Context&, const std::string&,
+		const std::vector<std::string>&)>
 		npmInstall;                              // server.go:242
 	std::function<std::pair<std::shared_ptr<gostd::io::ReadWriteCloser>,
 	                        gostd::Error>(
@@ -1221,12 +1269,13 @@ public:
 		const std::shared_ptr<lsproto::RequestMessage>& req);
 	std::string generateAPIPipePath();
 	void removeAPISession(const std::string& id);
+	void closeAPISessions();
 	// SetCompilerOptionsForInferredProjects — server.go:2363.
 	void SetCompilerOptionsForInferredProjects(gostd::Context ctx,
 	                                           CompilerOptions* options);
 	// NpmInstall — server.go:2371 (ata.NpmExecutor).
 	std::pair<std::string, gostd::Error> NpmInstall(
-		const std::string& cwd,
+		const gostd::Context& ctx, const std::string& cwd,
 		const std::vector<std::string>& args) override;
 	// contentMapperSpawner — server.go:2377.
 	std::shared_ptr<contentmapper::Spawner> contentMapperSpawner();

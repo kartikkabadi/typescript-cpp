@@ -261,22 +261,39 @@ struct referenceFileLocation {
 	                       std::vector<std::string> args = {}) const;
 };
 
+// fileInclude.go:27 — a5c43c4d54 + ed480721 replaced the `data any`
+// variant with typed fields (index/isDefaultLib replace the int slot;
+// isDefaultLib distinguishes a compilerOptions-Lib reference from the
+// implicit default lib; canonicalSourceFile carries the
+// ContentMapperSupplemental path key).
 struct FileIncludeReason {
-	using DataV =
-	    std::variant<std::monostate, int, referencedFileData,
-	                 automaticTypeDirectiveFileData, tspath::Path>;
 	FileIncludeKind kind{};
-	DataV data;
+	int index{};
+	bool isDefaultLib{};
+	std::optional<referencedFileData> referencedFile;
+	std::optional<automaticTypeDirectiveFileData> automaticTypeDirective;
+	tspath::Path canonicalSourceFile;
 
+	int asIndex() const { return index; }
+	// asLibFileIndex — (index, !isDefaultLib).
+	std::pair<int, bool> asLibFileIndex() const {
+		return {index, !isDefaultLib};
+	}
 	bool isReferencedFile() const {
 		return static_cast<int>(kind) <=
 		       static_cast<int>(FileIncludeKind::LibReferenceDirective);
 	}
 	const referencedFileData* asReferencedFileData() const {
-		return std::get_if<referencedFileData>(&data);
+		return referencedFile ? &*referencedFile : nullptr;
+	}
+	const automaticTypeDirectiveFileData* asAutomaticTypeDirectiveFileData()
+	    const {
+		return automaticTypeDirective ? &*automaticTypeDirective : nullptr;
 	}
 	referenceFileLocation getReferencedLocation(SimpleProgram* p) const;
-	Diagnostic* toDiagnostic(SimpleProgram* p, bool relativeFileName) const;
+	Diagnostic* toDiagnostic(
+	    SimpleProgram* p, bool relativeFileName,
+	    const tspath::Path& relativeTo = {}) const;
 	Diagnostic* computeDiagnostic(
 	    SimpleProgram* p,
 	    const std::function<std::string(std::string_view)>& toFileName) const;
@@ -310,6 +327,25 @@ struct processingDiagnostic {
 };
 
 // --- includeprocessor.go ---
+// includeprocessor.go:31 — cache key for reason→diagnostic; relativeTo
+// is a rooted directory path ("" when the diagnostic is emitted without
+// a base directory).
+struct includeReasonDiagnosticKey {
+	const FileIncludeReason* reason{};
+	bool relativeFileName{};
+	tspath::Path relativeTo;
+	bool operator==(const includeReasonDiagnosticKey&) const = default;
+};
+
+struct includeReasonDiagnosticKeyHash {
+	size_t operator()(const includeReasonDiagnosticKey& k) const {
+		size_t h = std::hash<const FileIncludeReason*>{}(k.reason);
+		h = h * 31u + std::hash<bool>{}(k.relativeFileName);
+		h = h * 31u + std::hash<tspath::Path>{}(k.relativeTo);
+		return h;
+	}
+};
+
 struct includeProcessor {
 	// arenaMu guards the three arenas below — parse workers allocate
 	// reasons/diagnostics concurrently inside their per-path data.mu
@@ -333,13 +369,11 @@ struct includeProcessor {
 	std::shared_ptr<std::vector<std::unique_ptr<Diagnostic>>> diagArena =
 	    std::make_shared<std::vector<std::unique_ptr<Diagnostic>>>();
 
-	const FileIncludeReason* newReason(FileIncludeKind kind,
-	                                   FileIncludeReason::DataV data) {
+	const FileIncludeReason* newReason(FileIncludeReason reason) {
 		std::lock_guard<std::mutex> lock(arenaMu);
 		return reasonArena
-		    ->emplace_back(
-		        std::make_unique<FileIncludeReason>(FileIncludeReason{kind,
-		                                                            data}))
+		    ->emplace_back(std::make_unique<FileIncludeReason>(
+		        std::move(reason)))
 		    .get();
 	}
 	processingDiagnostic* newProcessingDiagnostic(
@@ -376,6 +410,12 @@ struct includeProcessor {
 	    const std::function<std::string(std::string_view)>& toFileName);
 
 	std::unique_ptr<DiagnosticsCollection> computedDiagnostics_;
+	// includeprocessor.go:21 reasonDiagnostics — SyncMap keyed on
+	// (reason, relativeFileName, relativeTo); cleared by
+	// updateFileIncludeProcessor like the other caches.
+	std::unordered_map<includeReasonDiagnosticKey, Diagnostic*,
+	                   includeReasonDiagnosticKeyHash>
+	    reasonDiagnostics;
 	std::unordered_map<const FileIncludeReason*, referenceFileLocation>
 	    reasonToReferenceLocation;
 	std::unordered_map<const FileIncludeReason*, Diagnostic*>
@@ -541,6 +581,241 @@ struct filesParser {
 };
 
 // filesLoader — fileloader.go's fileLoader struct.
+
+// ===========================================================================
+// projectreferencefilemapper.go / projectreferenceparser.go /
+// projectreferencedtsfakinghost.go
+// ===========================================================================
+
+// projectreferenceparser.go:13.
+struct projectReferenceParser;
+struct projectReferenceParseTask {
+	std::string configName;
+	tsoptions::ParsedCommandLine* resolved{};
+	std::vector<projectReferenceParseTask*> subTasks;
+
+	// projectreferenceparser.go:19 — resolve the config through the
+	// loader's host and build sub-tasks for its own project references.
+	void parse(projectReferenceParser* parser);
+};
+
+// projectreferencefilemapper.go:14 — the source/dts <->
+// project-reference mapping built by projectReferenceParser; the loader
+// and host links are released once parsing finishes.
+// projectreferencefilemapper.go:14 — a5c43c4d54: the mapper no longer
+// holds opts/host/loader; it carries just the config, the one-time
+// useSourceOfProjectReference decision, and the shared dtsDirectories
+// set (the loader's links live on projectReferenceFileMapperBuilder).
+struct projectReferenceFileMapper {
+	tsoptions::ParsedCommandLine* config{};
+	bool useSourceOfProjectReference{};
+	// projectreferencefilemapper.go:15 — declaration directories of
+	// project references (filled by initMapperWorker); a shared_ptr like
+	// the old loader field so the faking vfs outlives its builder.
+	std::shared_ptr<collections::Set<tspath::Path>> dtsDirectories =
+	    std::make_shared<collections::Set<tspath::Path>>();
+
+	// All the resolved references needed (config path -> resolved config;
+	// a null value marks a reference that failed to resolve).
+	std::unordered_map<tspath::Path, tsoptions::ParsedCommandLine*>
+	    configToProjectReference;
+	// Map of config file to its references.
+	std::unordered_map<tspath::Path, std::vector<tspath::Path>>
+	    referencesInConfigFile;
+	// Source file path -> project reference.
+	std::unordered_map<tspath::Path,
+	                   tsoptions::SourceOutputAndProjectReference*>
+	    sourceToProjectReference;
+	// Declared output file path -> project reference.
+	std::unordered_map<tspath::Path,
+	                   tsoptions::SourceOutputAndProjectReference*>
+	    outputDtsToProjectReference;
+
+	// projectreferencefilemapper.go:25 — realpath dts -> source memo
+	// (needed only while parsing); a stored nullptr marks probed misses.
+	collections::SyncMap<tspath::Path,
+	                     tsoptions::SourceOutputAndProjectReference*>
+	    realpathDtsToSource;
+
+	// The faking hosts (+ their vfs and cached wrappers) — Go's
+	// resolutionHost() builds a fresh host per call and the GC keeps
+	// them alive; arena'd here so resolvers built by newResolver() keep
+	// valid hosts for the program's life.
+	std::vector<std::unique_ptr<struct projectReferenceDtsFakingVfs>>
+	    fakingVfsImpls;
+	std::vector<std::shared_ptr<vfs::FS>> fakingVfss;
+	std::vector<std::unique_ptr<struct projectReferenceDtsFakingHost>>
+	    fakingHosts;
+
+	tspath::Path rootConfigPath() const;
+	std::string getParseFileRedirect(const HasFileName& file);
+	// projectreferencefilemapper.go:31 — wraps host in the dts-faking
+	// host when useSourceOfProjectReference && outputs are mapped.
+	module::ResolutionHost* resolutionHost(module::ResolutionHost* host);
+	std::vector<tsoptions::ParsedCommandLine*>
+	getResolvedProjectReferences();
+	tsoptions::SourceOutputAndProjectReference*
+	getProjectReferenceFromSource(const tspath::Path& path);
+	tsoptions::SourceOutputAndProjectReference*
+	getProjectReferenceFromOutputDts(const tspath::Path& path);
+	bool isSourceFromProjectReference(const tspath::Path& path);
+	const CompilerOptions*
+	getCompilerOptionsForFile(const HasFileName& file);
+	tsoptions::ParsedCommandLine*
+	getRedirectParsedCommandLineForResolution(const HasFileName& file);
+	std::pair<tsoptions::ParsedCommandLine*, std::string>
+	getRedirectForResolution(const HasFileName& file);
+	std::pair<tsoptions::ParsedCommandLine*, bool>
+	getResolvedReferenceFor(const tspath::Path& path);
+	bool rangeResolvedProjectReference(
+	    const std::function<bool(tspath::Path,
+	                             tsoptions::ParsedCommandLine*,
+	                             tsoptions::ParsedCommandLine*, int)>& f);
+	// projectreferencefilemapper.go:129 — recursive worker shared by
+	// both range entry points.
+	bool rangeResolvedReferenceWorker(
+	    const std::vector<tspath::Path>& references,
+	    const std::function<bool(tspath::Path,
+	                             tsoptions::ParsedCommandLine*,
+	                             tsoptions::ParsedCommandLine*, int)>& f,
+	    tsoptions::ParsedCommandLine* parent,
+	    collections::Set<tspath::Path>* seenRef);
+	bool rangeResolvedProjectReferenceInChildConfig(
+	    tsoptions::ParsedCommandLine* childConfig,
+	    const std::function<bool(tspath::Path,
+	                             tsoptions::ParsedCommandLine*,
+	                             tsoptions::ParsedCommandLine*, int)>& f);
+	tsoptions::SourceOutputAndProjectReference*
+	getSourceToDtsIfSymlink(const HasFileName& file);
+};
+
+// projectreferencedtsfakinghost.go:46 — a vfs.FS that fakes
+// project-reference .d.ts existence from their source files so the
+// projectreferencefilemapper.go:28 — loader-side view: the mapper plus
+// the (possibly dts-faking) resolution host used while parsing. Go's
+// struct embeds *projectReferenceFileMapper; C++ names it `mapper`.
+struct projectReferenceFileMapperBuilder {
+	std::shared_ptr<projectReferenceFileMapper> mapper;
+	module::ResolutionHost* host{};
+
+	std::string getParseFileRedirect(const HasFileName& file);
+	std::pair<tsoptions::ParsedCommandLine*, std::string>
+	getRedirectForResolution(const HasFileName& file);
+	const CompilerOptions*
+	getCompilerOptionsForFile(const HasFileName& file);
+	tsoptions::ParsedCommandLine*
+	getRedirectParsedCommandLineForResolution(const HasFileName& file);
+	// projectreferencefilemapper.go:197 — probe the realpath once and
+	// memo into mapper->realpathDtsToSource.
+	void resolveSymlink(const HasFileName& file);
+};
+
+// resolver can resolve through them when useSourceOfProjectReference is
+// on. Wrapped in cachedvfs like Go.
+struct projectReferenceDtsFakingVfs : vfs::FS {
+	projectReferenceFileMapper* mapper{};
+	// projectreferencedtsfakinghost.go:23 — the wrapped resolution host
+	// (used for FS()/GetCurrentDirectory).
+	module::ResolutionHost* host{};
+	// projectreferencedtsfakinghost.go:29 — Go copies the map header,
+	// sharing the underlying Set and keeping it alive via GC. A raw
+	// pointer into the stack-local loader used to dangle here: post-ctor
+	// resolutions (auto-import specifiers -> DirectoryExists -> Keys())
+	// iterated a dead unordered_set — the paths_stripSrc/paths_toDist
+	// SIGSEGVs. shared_ptr mirrors Go's shared-reference lifetime.
+	std::shared_ptr<collections::Set<tspath::Path>> dtsDirectories;
+	// A fresh KnownSymlinks (Go: `symlinks.KnownSymlinks{}` — empty,
+	// zero-value cwd/case flag).
+	symlinks::KnownSymlinks knownSymlinks{"", false};
+
+	// projectreferencedtsfakinghost.go:75/81 — out-of-line: ProgramOptions
+	// is only forward-declared at this point in the header.
+	bool UseCaseSensitiveFileNames() override;
+	bool FileExists(const std::string& path) override;
+	// ReadFile — passthrough: cannot mimick a dts read (Go comments).
+	std::pair<std::string, bool>
+	ReadFile(const std::string& path) override;
+	vfs::Error WriteFile(const std::string& /*path*/,
+	                     const std::string& /*data*/) override {
+		TSC_UNREACHABLE(
+		    "projectReferenceDtsFakingVfs::WriteFile — should not be "
+		    "called by resolver");
+	}
+	vfs::Error AppendFile(const std::string& /*path*/,
+	                      const std::string& /*data*/) override {
+		TSC_UNREACHABLE(
+		    "projectReferenceDtsFakingVfs::AppendFile — should not be "
+		    "called by resolver");
+	}
+	vfs::Error Remove(const std::string& /*path*/) override {
+		TSC_UNREACHABLE(
+		    "projectReferenceDtsFakingVfs::Remove — should not be called "
+		    "by resolver");
+	}
+	vfs::Error Chtimes(const std::string& /*path*/, vfs::TimePoint,
+	                   vfs::TimePoint) override {
+		TSC_UNREACHABLE(
+		    "projectReferenceDtsFakingVfs::Chtimes — should not be "
+		    "called by resolver");
+	}
+	bool DirectoryExists(const std::string& path) override;
+	vfs::Entries GetAccessibleEntries(const std::string& /*path*/) override {
+		TSC_UNREACHABLE(
+		    "projectReferenceDtsFakingVfs::GetAccessibleEntries — should "
+		    "not be called by resolver");
+	}
+	std::shared_ptr<vfs::FileInfo>
+	Stat(const std::string& /*path*/) override {
+		TSC_UNREACHABLE(
+		    "projectReferenceDtsFakingVfs::Stat — should not be called "
+		    "by resolver");
+	}
+	std::string Realpath(const std::string& path) override;
+
+	tspath::Path toPath(const std::string& path) const;
+	void handleDirectoryCouldBeSymlink(const std::string& directory);
+	bool fileOrDirectoryExistsUsingSource(const std::string& fileOrDirectory,
+	                                      bool isFile);
+	Tristate fileExistsIfProjectReferenceDts(const std::string& file);
+	Tristate directoryExistsIfProjectReferenceDeclDir(const std::string& dir);
+};
+
+// projectreferencedtsfakinghost.go:16 — a module.ResolutionHost whose
+// file ops run over the faking vfs; captures the wrapped host's
+// currentDirectory (a5c43c4d54 — the host link itself is not stored).
+struct projectReferenceDtsFakingHost : module::ResolutionHost {
+	std::string currentDirectory;
+	vfs::FS* fs{}; // the cachedvfs-wrapped projectReferenceDtsFakingVfs
+
+	bool FileExists(std::string_view path) override {
+		return fs->FileExists(std::string(path));
+	}
+	bool DirectoryExists(std::string_view path) override {
+		return fs->DirectoryExists(std::string(path));
+	}
+	std::optional<std::string> ReadFile(std::string_view path) override {
+		auto [text, ok] = fs->ReadFile(std::string(path));
+		if (!ok) {
+			return std::nullopt;
+		}
+		return text;
+	}
+	std::string Realpath(std::string_view path) override {
+		return fs->Realpath(std::string(path));
+	}
+	std::string GetCurrentDirectory() override {
+		return currentDirectory;
+	}
+	bool UseCaseSensitiveFileNames() override {
+		return fs->UseCaseSensitiveFileNames();
+	}
+	AccessibleEntries GetAccessibleEntries(
+	    std::string_view /*path*/) override {
+		TSC_UNREACHABLE(
+		    "projectReferenceDtsFakingHost::GetAccessibleEntries — the "
+		    "faking vfs has none");
+	}
+};
 struct filesLoader {
 	// fileloader.go:60 — the ProgramOptions this loader was constructed
 	// with (borrowed; points at the owning program's opts_ or the ctor's
@@ -555,19 +830,10 @@ struct filesLoader {
 	std::shared_ptr<module::Resolver> resolverOwned;
 	filesParser* parser{};
 	SimpleProgram* program{};
-	// fileloader.go:66 — declaration directories of project references
-	// (filled by projectReferenceParser::initMapperWorker). Go's
-	// collections.Set is a map — a reference type: the faking vfs at
-	// projectreferencedtsfakinghost.go:29 copies the map header and
-	// keeps the shared map alive past the loader's lifetime. Mirrored
-	// with a shared_ptr so the post-ctor resolution host doesn't
-	// dereference the destroyed stack loader's field.
-	std::shared_ptr<collections::Set<tspath::Path>> dtsDirectories =
-	    std::make_shared<collections::Set<tspath::Path>>();
-	// fileloader.go:67 — the source/dts <-> project-reference mapping;
-	// shared with the produced program. Its loader/host links are
-	// released after parsing (fileloader.go:223).
-	std::shared_ptr<projectReferenceFileMapper> projectReferenceFileMapper;
+	// fileloader.go — the mapper builder (a5c43c4d54): the mapper is
+	// shared with the produced program; the host link lives only on the
+	// builder for the loader's lifetime.
+	projectReferenceFileMapperBuilder projectReferences;
 	// fileloader.go:77-78 — first module-resolution error. The C++
 	// module::Resolver interface has no error channel (callback resolvers
 	// throw instead), so the two ResolveModuleName call sites catch the
@@ -665,208 +931,6 @@ struct filesLoader {
 	                                const std::string& label);
 
 	includeProcessor* ip{};
-};
-
-// ===========================================================================
-// projectreferencefilemapper.go / projectreferenceparser.go /
-// projectreferencedtsfakinghost.go
-// ===========================================================================
-
-// projectreferenceparser.go:13.
-struct projectReferenceParser;
-struct projectReferenceParseTask {
-	std::string configName;
-	tsoptions::ParsedCommandLine* resolved{};
-	std::vector<projectReferenceParseTask*> subTasks;
-
-	// projectreferenceparser.go:19 — resolve the config through the
-	// loader's host and build sub-tasks for its own project references.
-	void parse(projectReferenceParser* parser);
-};
-
-// projectreferencefilemapper.go:14 — the source/dts <->
-// project-reference mapping built by projectReferenceParser; the loader
-// and host links are released once parsing finishes.
-struct projectReferenceFileMapper {
-	const ProgramOptions* opts{};
-	module::ResolutionHost* host{};
-	// Only present during populating the mapper and parsing, released
-	// after that (fileloader.go:223).
-	filesLoader* loader{};
-
-	// All the resolved references needed (config path -> resolved config;
-	// a null value marks a reference that failed to resolve).
-	std::unordered_map<tspath::Path, tsoptions::ParsedCommandLine*>
-	    configToProjectReference;
-	// Map of config file to its references.
-	std::unordered_map<tspath::Path, std::vector<tspath::Path>>
-	    referencesInConfigFile;
-	// Source file path -> project reference.
-	std::unordered_map<tspath::Path,
-	                   tsoptions::SourceOutputAndProjectReference*>
-	    sourceToProjectReference;
-	// Declared output file path -> project reference.
-	std::unordered_map<tspath::Path,
-	                   tsoptions::SourceOutputAndProjectReference*>
-	    outputDtsToProjectReference;
-
-	// projectreferencefilemapper.go:25 — realpath dts -> source memo
-	// (needed only while parsing); a stored nullptr marks probed misses.
-	collections::SyncMap<tspath::Path,
-	                     tsoptions::SourceOutputAndProjectReference*>
-	    realpathDtsToSource;
-
-	// The faking host (+ its vfs and cached wrapper) when
-	// canUseProjectReferenceSource() — owned here so the resolver that
-	// captured mapper->host keeps a live host after parse clears the
-	// mapper->host link.
-	std::unique_ptr<struct projectReferenceDtsFakingVfs> fakingVfsImpl;
-	std::shared_ptr<vfs::FS> fakingVfs;
-	std::unique_ptr<struct projectReferenceDtsFakingHost> fakingHost;
-
-	tspath::Path rootConfigPath() const;
-	std::string getParseFileRedirect(const HasFileName& file);
-	std::vector<tsoptions::ParsedCommandLine*>
-	getResolvedProjectReferences();
-	tsoptions::SourceOutputAndProjectReference*
-	getProjectReferenceFromSource(const tspath::Path& path);
-	tsoptions::SourceOutputAndProjectReference*
-	getProjectReferenceFromOutputDts(const tspath::Path& path);
-	bool isSourceFromProjectReference(const tspath::Path& path);
-	const CompilerOptions*
-	getCompilerOptionsForFile(const HasFileName& file);
-	tsoptions::ParsedCommandLine*
-	getRedirectParsedCommandLineForResolution(const HasFileName& file);
-	std::pair<tsoptions::ParsedCommandLine*, std::string>
-	getRedirectForResolution(const HasFileName& file);
-	std::pair<tsoptions::ParsedCommandLine*, bool>
-	getResolvedReferenceFor(const tspath::Path& path);
-	bool rangeResolvedProjectReference(
-	    const std::function<bool(tspath::Path,
-	                             tsoptions::ParsedCommandLine*,
-	                             tsoptions::ParsedCommandLine*, int)>& f);
-	// projectreferencefilemapper.go:129 — recursive worker shared by
-	// both range entry points.
-	bool rangeResolvedReferenceWorker(
-	    const std::vector<tspath::Path>& references,
-	    const std::function<bool(tspath::Path,
-	                             tsoptions::ParsedCommandLine*,
-	                             tsoptions::ParsedCommandLine*, int)>& f,
-	    tsoptions::ParsedCommandLine* parent,
-	    collections::Set<tspath::Path>* seenRef);
-	bool rangeResolvedProjectReferenceInChildConfig(
-	    tsoptions::ParsedCommandLine* childConfig,
-	    const std::function<bool(tspath::Path,
-	                             tsoptions::ParsedCommandLine*,
-	                             tsoptions::ParsedCommandLine*, int)>& f);
-	tsoptions::SourceOutputAndProjectReference*
-	getSourceToDtsIfSymlink(const HasFileName& file);
-};
-
-// projectreferencedtsfakinghost.go:46 — a vfs.FS that fakes
-// project-reference .d.ts existence from their source files so the
-// resolver can resolve through them when useSourceOfProjectReference is
-// on. Wrapped in cachedvfs like Go.
-struct projectReferenceDtsFakingVfs : vfs::FS {
-	projectReferenceFileMapper* mapper{};
-	// projectreferencedtsfakinghost.go:29 — Go copies the map header,
-	// sharing the underlying Set and keeping it alive via GC. A raw
-	// pointer into the stack-local loader used to dangle here: post-ctor
-	// resolutions (auto-import specifiers -> DirectoryExists -> Keys())
-	// iterated a dead unordered_set — the paths_stripSrc/paths_toDist
-	// SIGSEGVs. shared_ptr mirrors Go's shared-reference lifetime.
-	std::shared_ptr<collections::Set<tspath::Path>> dtsDirectories;
-	// A fresh KnownSymlinks (Go: `symlinks.KnownSymlinks{}` — empty,
-	// zero-value cwd/case flag).
-	symlinks::KnownSymlinks knownSymlinks{"", false};
-
-	// projectreferencedtsfakinghost.go:75/81 — out-of-line: ProgramOptions
-	// is only forward-declared at this point in the header.
-	bool UseCaseSensitiveFileNames() override;
-	bool FileExists(const std::string& path) override;
-	// ReadFile — passthrough: cannot mimick a dts read (Go comments).
-	std::pair<std::string, bool>
-	ReadFile(const std::string& path) override;
-	vfs::Error WriteFile(const std::string& /*path*/,
-	                     const std::string& /*data*/) override {
-		TSC_UNREACHABLE(
-		    "projectReferenceDtsFakingVfs::WriteFile — should not be "
-		    "called by resolver");
-	}
-	vfs::Error AppendFile(const std::string& /*path*/,
-	                      const std::string& /*data*/) override {
-		TSC_UNREACHABLE(
-		    "projectReferenceDtsFakingVfs::AppendFile — should not be "
-		    "called by resolver");
-	}
-	vfs::Error Remove(const std::string& /*path*/) override {
-		TSC_UNREACHABLE(
-		    "projectReferenceDtsFakingVfs::Remove — should not be called "
-		    "by resolver");
-	}
-	vfs::Error Chtimes(const std::string& /*path*/, vfs::TimePoint,
-	                   vfs::TimePoint) override {
-		TSC_UNREACHABLE(
-		    "projectReferenceDtsFakingVfs::Chtimes — should not be "
-		    "called by resolver");
-	}
-	bool DirectoryExists(const std::string& path) override;
-	vfs::Entries GetAccessibleEntries(const std::string& /*path*/) override {
-		TSC_UNREACHABLE(
-		    "projectReferenceDtsFakingVfs::GetAccessibleEntries — should "
-		    "not be called by resolver");
-	}
-	std::shared_ptr<vfs::FileInfo>
-	Stat(const std::string& /*path*/) override {
-		TSC_UNREACHABLE(
-		    "projectReferenceDtsFakingVfs::Stat — should not be called "
-		    "by resolver");
-	}
-	std::string Realpath(const std::string& path) override;
-
-	tspath::Path toPath(const std::string& path) const;
-	void handleDirectoryCouldBeSymlink(const std::string& directory);
-	bool fileOrDirectoryExistsUsingSource(const std::string& fileOrDirectory,
-	                                      bool isFile);
-	Tristate fileExistsIfProjectReferenceDts(const std::string& file);
-	Tristate directoryExistsIfProjectReferenceDeclDir(const std::string& dir);
-};
-
-// projectreferencedtsfakinghost.go:16 — a module.ResolutionHost whose
-// file ops run over the faking vfs; GetCurrentDirectory defers to the
-// real host.
-struct projectReferenceDtsFakingHost : module::ResolutionHost {
-	CompilerHost* host{};
-	vfs::FS* fs{}; // the cachedvfs-wrapped projectReferenceDtsFakingVfs
-
-	bool FileExists(std::string_view path) override {
-		return fs->FileExists(std::string(path));
-	}
-	bool DirectoryExists(std::string_view path) override {
-		return fs->DirectoryExists(std::string(path));
-	}
-	std::optional<std::string> ReadFile(std::string_view path) override {
-		auto [text, ok] = fs->ReadFile(std::string(path));
-		if (!ok) {
-			return std::nullopt;
-		}
-		return text;
-	}
-	std::string Realpath(std::string_view path) override {
-		return fs->Realpath(std::string(path));
-	}
-	std::string GetCurrentDirectory() override {
-		return host->GetCurrentDirectory();
-	}
-	bool UseCaseSensitiveFileNames() override {
-		return fs->UseCaseSensitiveFileNames();
-	}
-	AccessibleEntries GetAccessibleEntries(
-	    std::string_view /*path*/) override {
-		TSC_UNREACHABLE(
-		    "projectReferenceDtsFakingHost::GetAccessibleEntries — the "
-		    "faking vfs has none");
-	}
 };
 
 // projectreferenceparser.go:42 projectReferenceParser — defined in
@@ -986,6 +1050,26 @@ public:
 	// program.go:120 resolver — module.Resolver; shared with a reused
 	// program (processedFiles.resolver).
 	std::shared_ptr<module::Resolver> resolver_;
+	// program.go — a5c43c4d54: the program's ResolutionData outlives
+	// individual resolvers (options lifetimes); resolver_ was built
+	// from it during processAllProgramFiles.
+	std::shared_ptr<module::ResolutionData> resolutionData_;
+	// compilerResolutionHost — fileloader.go:148: wraps hosts.Host but
+	// reports BaseDirectory for later resolver construction; arena'd so
+	// resolvers created by newResolver() keep a valid host.
+	struct compilerResolutionHost : module::ResolutionHost {
+		CompilerHost* host{};
+		std::string baseDirectory;
+		bool FileExists(std::string_view p) override { return host->FileExists(p); }
+		bool DirectoryExists(std::string_view p) override { return host->DirectoryExists(p); }
+		std::optional<std::string> ReadFile(std::string_view p) override { return host->ReadFile(p); }
+		std::string Realpath(std::string_view p) override { return host->Realpath(p); }
+		std::string GetCurrentDirectory() override { return baseDirectory; }
+		bool UseCaseSensitiveFileNames() override { return host->UseCaseSensitiveFileNames(); }
+		AccessibleEntries GetAccessibleEntries(std::string_view p) override { return host->GetAccessibleEntries(p); }
+	};
+	std::deque<std::unique_ptr<compilerResolutionHost>>
+	    compilerResolutionHostArena;
 	std::vector<Diagnostic*> programDiagnostics;
 	// program.go:76 contentMapperDiagnostics — diagnostics reported once per
 	// content mapper when it fails fatally (moved in from the loader).
@@ -1368,6 +1452,12 @@ public:
 	tsoptions::ParsedCommandLine* CommandLine() { return commandLine_; }
 	tracing::Tracing* Tracing() { return tr_; }
 	void SetTracing(tracing::Tracing* t) { tr_ = t; }
+	// program.go:150 BaseDirectory — opts.Config.BaseDirectory().
+	std::string BaseDirectory() { return opts_.Config->BaseDirectory(); }
+	// program.go:191 newResolver — a fresh DefaultResolver over the
+	// program's resolution data, resolving through the mapper's
+	// (possibly dts-faking) host rooted at BaseDirectory.
+	module::DefaultResolver* newResolver();
 	// program.go PackageJsonCacheEntries — delegates to the resolver's
 	// package-json scope cache.
 	void PackageJsonCacheEntries(
@@ -1396,8 +1486,10 @@ public:
 	    const {
 		return filesByPath;
 	}
-	// program.go:2120 ExplainFiles.
-	void ExplainFiles(std::ostream& w, const locale::Locale& locale);
+	// program.go:2144 ExplainFiles — currentDirectory is the rooted
+	// directory relative paths are computed against (ed480721).
+	void ExplainFiles(std::ostream& w, const locale::Locale& locale,
+	                  const tspath::Path& currentDirectory);
 	// program.go:332 ReuseProgram — the UpdateProgram single-file fast
 	// path. The reuse machinery (processedFiles replay, lazyValue
 	// program state, updateFileIncludeProcessor, checker pool) is not

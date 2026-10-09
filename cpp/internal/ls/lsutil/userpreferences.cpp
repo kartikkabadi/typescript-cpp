@@ -57,9 +57,9 @@ JsxAttributeCompletionStyle parseJsxAttributeCompletionStyle(const JsonAny& val)
 
 IncludeInlayParameterNameHints parseIncludeInlayParameterNameHints(const JsonAny& val) {
 	if (val.is(JsonAny::K::String)) {
-		// NOTE: Go does not lowercase here — exact match only.
-		if (val.s == "all") return IncludeInlayParameterNameHintsAll;
-		if (val.s == "literals") return IncludeInlayParameterNameHintsLiterals;
+		std::string s = detail::goToLower(val.s);
+		if (s == "all") return IncludeInlayParameterNameHintsAll;
+		if (s == "literals") return IncludeInlayParameterNameHintsLiterals;
 	}
 	return IncludeInlayParameterNameHintsNone;
 }
@@ -84,19 +84,31 @@ OrganizeImportsCollation parseOrganizeImportsCollation(const JsonAny& val) {
 
 OrganizeImportsCaseFirst parseOrganizeImportsCaseFirst(const JsonAny& val) {
 	if (val.is(JsonAny::K::String)) {
-		if (val.s == "lower") return OrganizeImportsCaseFirstLower;
-		if (val.s == "upper") return OrganizeImportsCaseFirstUpper;
+		std::string s = detail::goToLower(val.s);
+		if (s == "lower") return OrganizeImportsCaseFirstLower;
+		if (s == "upper") return OrganizeImportsCaseFirstUpper;
 	}
 	return OrganizeImportsCaseFirstFalse;
 }
 
 OrganizeImportsTypeOrder parseOrganizeImportsTypeOrder(const JsonAny& val) {
 	if (val.is(JsonAny::K::String)) {
-		if (val.s == "last") return OrganizeImportsTypeOrderLast;
-		if (val.s == "inline") return OrganizeImportsTypeOrderInline;
-		if (val.s == "first") return OrganizeImportsTypeOrderFirst;
+		std::string s = detail::goToLower(val.s);
+		if (s == "last") return OrganizeImportsTypeOrderLast;
+		if (s == "inline") return OrganizeImportsTypeOrderInline;
+		if (s == "first") return OrganizeImportsTypeOrderFirst;
 	}
 	return OrganizeImportsTypeOrderAuto;
+}
+
+// parseWorkspaceSymbolsScope — userpreferences_generated.go:371.
+WorkspaceSymbolsScope parseWorkspaceSymbolsScope(const JsonAny& val) {
+	if (val.is(JsonAny::K::String)) {
+		std::string s = detail::goToLower(val.s);
+		if (s == "allopenprojects") return WorkspaceSymbolsScopeAllOpenProjects;
+		if (s == "currentproject") return WorkspaceSymbolsScopeCurrentProject;
+	}
+	return WorkspaceSymbolsScope("");
 }
 
 tsc::modulespecifiers::ImportModuleSpecifierPreference parseImportModuleSpecifierPreference(const JsonAny& val) {
@@ -466,9 +478,9 @@ const std::vector<fieldInfo>& fieldInfoCache() {
 		  "includeCompletionsWithObjectLiteralMethodSnippets", "suggest.objectLiteralMethodSnippets.enabled");
 		F(makeAccParsed(&UserPreferences::JsxAttributeCompletionStyle, parseJsxAttributeCompletionStyle, serializeJsxAttributeCompletionStyle),
 		  "jsxAttributeCompletionStyle", "preferences.jsxAttributeCompletionStyle");
-		F(makeAccParsed(&UserPreferences::EnableAutoClosingTags, parseTristate, serializeTristate),
+		F(makeAccParsed(&UserPreferences::AutoClosingTags, parseTristate, serializeTristate),
 		  "autoClosingTags", "autoClosingTags.enabled", {{"autoClosingTags"}});
-		F(makeAccParsed(&UserPreferences::EnableJSDocCompletions, parseTristate, serializeTristate),
+		F(makeAccParsed(&UserPreferences::CompleteJSDocs, parseTristate, serializeTristate),
 		  "completeJSDocs", "suggest.jsdoc.enabled", {{"suggest.completeJSDocs"}});
 		F(makeAccParsed(&UserPreferences::GenerateReturnInDocTemplate, parseTristate, serializeTristate),
 		  "generateReturnInDocTemplate", "suggest.jsdoc.generateReturns");
@@ -511,7 +523,7 @@ const std::vector<fieldInfo>& fieldInfoCache() {
 		F(makeAccParsed(&UserPreferences::AllowTextChangesInNewFiles, parseTristate, serializeTristate),
 		  "allowTextChangesInNewFiles", nullptr);
 
-		F(makeAccParsed(&UserPreferences::UseAliasesForRename, parseTristate, serializeTristate),
+		F(makeAccParsed(&UserPreferences::ProvidePrefixAndSuffixTextForRename, parseTristate, serializeTristate),
 		  "providePrefixAndSuffixTextForRename", "preferences.useAliasesForRenames");
 		F(makeAccParsed(&UserPreferences::AllowRenameOfImportPath, parseTristate, serializeTristate),
 		  "allowRenameOfImportPath", nullptr);
@@ -520,47 +532,47 @@ const std::vector<fieldInfo>& fieldInfoCache() {
 		  "provideRefactorNotApplicableReason", nullptr);
 
 		// InlayHints (embedded, untagged) — recursed at declaration position.
-		F(makeAcc2Parsed(&UserPreferences::InlayHints, &InlayHintsPreferences::IncludeInlayParameterNameHints,
+		F(makeAcc2Parsed(&UserPreferences::InlayHintsPreferences, &InlayHintsPreferences::IncludeInlayParameterNameHints,
 						 parseIncludeInlayParameterNameHints, serializeString),
 		  "includeInlayParameterNameHints", "inlayHints.parameterNames.enabled");
-		F(makeAcc2Parsed(&UserPreferences::InlayHints, &InlayHintsPreferences::IncludeInlayParameterNameHintsWhenArgumentMatchesName,
+		F(makeAcc2Parsed(&UserPreferences::InlayHintsPreferences, &InlayHintsPreferences::IncludeInlayParameterNameHintsWhenArgumentMatchesName,
 						 parseTristate, serializeTristate),
 		  "includeInlayParameterNameHintsWhenArgumentMatchesName",
 		  "inlayHints.parameterNames.suppressWhenArgumentMatchesName", {}, false, true);
-		F(makeAcc2Parsed(&UserPreferences::InlayHints, &InlayHintsPreferences::IncludeInlayFunctionParameterTypeHints,
+		F(makeAcc2Parsed(&UserPreferences::InlayHintsPreferences, &InlayHintsPreferences::IncludeInlayFunctionParameterTypeHints,
 						 parseTristate, serializeTristate),
 		  "includeInlayFunctionParameterTypeHints", "inlayHints.parameterTypes.enabled");
-		F(makeAcc2Parsed(&UserPreferences::InlayHints, &InlayHintsPreferences::IncludeInlayVariableTypeHints,
+		F(makeAcc2Parsed(&UserPreferences::InlayHintsPreferences, &InlayHintsPreferences::IncludeInlayVariableTypeHints,
 						 parseTristate, serializeTristate),
 		  "includeInlayVariableTypeHints", "inlayHints.variableTypes.enabled");
-		F(makeAcc2Parsed(&UserPreferences::InlayHints, &InlayHintsPreferences::IncludeInlayVariableTypeHintsWhenTypeMatchesName,
+		F(makeAcc2Parsed(&UserPreferences::InlayHintsPreferences, &InlayHintsPreferences::IncludeInlayVariableTypeHintsWhenTypeMatchesName,
 						 parseTristate, serializeTristate),
 		  "includeInlayVariableTypeHintsWhenTypeMatchesName",
 		  "inlayHints.variableTypes.suppressWhenTypeMatchesName", {}, false, true);
-		F(makeAcc2Parsed(&UserPreferences::InlayHints, &InlayHintsPreferences::IncludeInlayPropertyDeclarationTypeHints,
+		F(makeAcc2Parsed(&UserPreferences::InlayHintsPreferences, &InlayHintsPreferences::IncludeInlayPropertyDeclarationTypeHints,
 						 parseTristate, serializeTristate),
 		  "includeInlayPropertyDeclarationTypeHints", "inlayHints.propertyDeclarationTypes.enabled");
-		F(makeAcc2Parsed(&UserPreferences::InlayHints, &InlayHintsPreferences::IncludeInlayFunctionLikeReturnTypeHints,
+		F(makeAcc2Parsed(&UserPreferences::InlayHintsPreferences, &InlayHintsPreferences::IncludeInlayFunctionLikeReturnTypeHints,
 						 parseTristate, serializeTristate),
 		  "includeInlayFunctionLikeReturnTypeHints", "inlayHints.functionLikeReturnTypes.enabled");
-		F(makeAcc2Parsed(&UserPreferences::InlayHints, &InlayHintsPreferences::IncludeInlayEnumMemberValueHints,
+		F(makeAcc2Parsed(&UserPreferences::InlayHintsPreferences, &InlayHintsPreferences::IncludeInlayEnumMemberValueHints,
 						 parseTristate, serializeTristate),
 		  "includeInlayEnumMemberValueHints", "inlayHints.enumMemberValues.enabled");
 
 		// CodeLens (embedded, untagged) — recursed at declaration position.
-		F(makeAcc2Parsed(&UserPreferences::CodeLens, &CodeLensUserPreferences::ReferencesCodeLensEnabled,
+		F(makeAcc2Parsed(&UserPreferences::CodeLensUserPreferences, &CodeLensUserPreferences::ReferencesCodeLensEnabled,
 						 parseTristate, serializeTristate),
 		  "referencesCodeLensEnabled", "referencesCodeLens.enabled");
-		F(makeAcc2Parsed(&UserPreferences::CodeLens, &CodeLensUserPreferences::ImplementationsCodeLensEnabled,
+		F(makeAcc2Parsed(&UserPreferences::CodeLensUserPreferences, &CodeLensUserPreferences::ImplementationsCodeLensEnabled,
 						 parseTristate, serializeTristate),
 		  "implementationsCodeLensEnabled", "implementationsCodeLens.enabled");
-		F(makeAcc2Parsed(&UserPreferences::CodeLens, &CodeLensUserPreferences::ReferencesCodeLensShowOnAllFunctions,
+		F(makeAcc2Parsed(&UserPreferences::CodeLensUserPreferences, &CodeLensUserPreferences::ReferencesCodeLensShowOnAllFunctions,
 						 parseTristate, serializeTristate),
 		  "referencesCodeLensShowOnAllFunctions", "referencesCodeLens.showOnAllFunctions");
-		F(makeAcc2Parsed(&UserPreferences::CodeLens, &CodeLensUserPreferences::ImplementationsCodeLensShowOnInterfaceMethods,
+		F(makeAcc2Parsed(&UserPreferences::CodeLensUserPreferences, &CodeLensUserPreferences::ImplementationsCodeLensShowOnInterfaceMethods,
 						 parseTristate, serializeTristate),
 		  "implementationsCodeLensShowOnInterfaceMethods", "implementationsCodeLens.showOnInterfaceMethods");
-		F(makeAcc2Parsed(&UserPreferences::CodeLens, &CodeLensUserPreferences::ImplementationsCodeLensShowOnAllClassMethods,
+		F(makeAcc2Parsed(&UserPreferences::CodeLensUserPreferences, &CodeLensUserPreferences::ImplementationsCodeLensShowOnAllClassMethods,
 						 parseTristate, serializeTristate),
 		  "implementationsCodeLensShowOnAllClassMethods", "implementationsCodeLens.showOnAllClassMethods");
 
@@ -570,13 +582,13 @@ const std::vector<fieldInfo>& fieldInfoCache() {
 
 		F(makeAccParsed(&UserPreferences::ExcludeLibrarySymbolsInNavTo, parseTristate, serializeTristate),
 		  "excludeLibrarySymbolsInNavTo", "workspaceSymbols.excludeLibrarySymbols");
-		F(makeAcc(&UserPreferences::WorkspaceSymbolsScope,
-				  [](const JsonAny& val) { return parseString(val); }, serializeString),
-		  nullptr, "workspaceSymbols.scope");
+		F(makeAccParsed(&UserPreferences::WorkspaceSymbolsScope, parseWorkspaceSymbolsScope,
+				serializeString),
+		  "workspaceSymbolsScope", "workspaceSymbols.scope");
 
-		F(makeAccParsed(&UserPreferences::EnableFormatting, parseTristate, serializeTristate),
+		F(makeAccParsed(&UserPreferences::FormatEnabled, parseTristate, serializeTristate),
 		  "formatEnabled", "format.enabled", {{"format.enable"}});
-		F(makeAccParsed(&UserPreferences::EnableValidation, parseTristate, serializeTristate),
+		F(makeAccParsed(&UserPreferences::ValidateEnabled, parseTristate, serializeTristate),
 		  "validateEnabled", "validate.enabled", {{"validate.enable"}});
 		F(makeAccParsed(&UserPreferences::DisableSuggestions, parseTristate, serializeTristate),
 		  "disableSuggestions", nullptr);
@@ -814,7 +826,8 @@ UserPreferences AllFieldsNonZeroUserPreferences() {
 	    "non-relative", "project-relative", "minimal", "index", "js",
 	    "always", "prompt", "never", "on", "off", "default", "first",
 	    "last", "natural", "ordinal", "caseSensitive", "caseInsensitive",
-	    "unicode", "lower", "upper", "inline", ".", "..", "en", "normal",
+	    "unicode", "lower", "upper", "inline", "allOpenProjects",
+	    "currentProject", ".", "..", "en", "normal",
 	    "verbose", "classic", "node", "preserve", "es2015", "esnext",
 	    "commonjs", "system", "amd", "umd",
 	};
@@ -852,13 +865,13 @@ UserPreferences NewDefaultUserPreferences() {
 	p.FormatCodeSettings = GetDefaultFormatCodeSettings();
 	p.IncludeCompletionsForModuleExports = Tristate::True;
 	p.IncludeCompletionsForImportStatements = Tristate::True;
-	p.EnableAutoClosingTags = Tristate::True;
-	p.EnableJSDocCompletions = Tristate::True;
+	p.AutoClosingTags = Tristate::True;
+	p.CompleteJSDocs = Tristate::True;
 	p.GenerateReturnInDocTemplate = Tristate::True;
 	p.AllowRenameOfImportPath = Tristate::True;
 	p.ProvideRefactorNotApplicableReason = Tristate::True;
-	p.EnableFormatting = Tristate::True;
-	p.EnableValidation = Tristate::True;
+	p.FormatEnabled = Tristate::True;
+	p.ValidateEnabled = Tristate::True;
 	p.DisplayPartsForJSDoc = Tristate::True;
 	p.DisableLineTextInReferences = Tristate::True;
 	p.ReportStyleChecksAsWarnings = Tristate::True;

@@ -104,6 +104,7 @@ EncodeSourceFile(SourceFile* sourceFile);
 
 // encoder.go:434 — sets the session-scoped lease ID in an encoded source file.
 void SetSourceFileLease(std::vector<uint8_t>& data, uint64_t lease);
+void SetSourceFileID(std::vector<uint8_t>& data, uint64_t id);
 
 // encoder.go:442 — encodes an arbitrary AST node and its descendants into the
 // binary format. The sourceFile is needed to provide the source text for

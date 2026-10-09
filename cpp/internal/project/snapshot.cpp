@@ -571,11 +571,15 @@ Snapshot* Snapshot::Clone(
 			openFiles[path] = overlay->FileName();
 		}
 		auto prepareAutoImports = tspath::Path("");
+		std::string prepareAutoImportsFileName;
 		if (!localChange.AutoImports.empty()) {
 			prepareAutoImports =
 			    lsp::lsproto::documentUriPath(
 			        localChange.AutoImports,
 			        UseCaseSensitiveFileNames());
+			prepareAutoImportsFileName =
+			    lsp::lsproto::documentUriFileName(
+			        localChange.AutoImports);
 		}
 		auto* oldAutoImports = AutoImports;
 		std::unique_ptr<ls::autoimport::Registry>
@@ -590,6 +594,8 @@ Snapshot* Snapshot::Clone(
 		    autoImportsWatch = nullptr;
 		ls::autoimport::RegistryChange registryChange;
 		registryChange.RequestedFile = prepareAutoImports;
+		registryChange.RequestedFileName =
+		    prepareAutoImportsFileName;
 		registryChange.OpenFiles = openFiles;
 		registryChange.Changed =
 		    localChange.fileChanges.Changed;

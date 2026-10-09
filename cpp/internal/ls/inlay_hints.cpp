@@ -1273,7 +1273,7 @@ lsp::lsproto::InlayHintResponse LanguageService::ProvideInlayHint(
 	gostd::Context ctx, lsp::lsproto::InlayHintParams* params) {
 	lsutil::UserPreferences userPreferences = UserPreferences();
 	lsutil::InlayHintsPreferences inlayHintPreferences =
-		userPreferences.InlayHints;
+		userPreferences.InlayHintsPreferences;
 	lsp::lsproto::InlayHintsOrNull nullResult;
 	if (!isAnyInlayHintEnabled(inlayHintPreferences)) {
 		nullResult.InlayHints = nullptr;

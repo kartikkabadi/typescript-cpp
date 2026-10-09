@@ -48,7 +48,7 @@ LanguageService::toLSProtoTextEdits(SourceFile* file,
 lsp::lsproto::DocumentFormattingResponse LanguageService::ProvideFormatDocument(
 	gostd::Context ctx, lsp::lsproto::DocumentUri documentURI,
 	lsp::lsproto::FormattingOptions* options) {
-	if (tristateIsFalse(UserPreferences().EnableFormatting)) {
+	if (tristateIsFalse(UserPreferences().FormatEnabled)) {
 		return lsp::lsproto::TextEditsOrNull{};
 	}
 
@@ -176,7 +176,7 @@ std::vector<mappedFormattingRange> nonOverlappingFormattingRanges(
 lsp::lsproto::DocumentRangeFormattingResponse LanguageService::ProvideFormatDocumentRange(
 	gostd::Context ctx, lsp::lsproto::DocumentUri documentURI,
 	lsp::lsproto::FormattingOptions* options, lsp::lsproto::Range r) {
-	if (tristateIsFalse(UserPreferences().EnableFormatting)) {
+	if (tristateIsFalse(UserPreferences().FormatEnabled)) {
 		return lsp::lsproto::TextEditsOrNull{};
 	}
 	SourceFile* file = getProgramAndFile(documentURI).second;
@@ -210,7 +210,7 @@ lsp::lsproto::DocumentOnTypeFormattingResponse LanguageService::ProvideFormatDoc
 	gostd::Context ctx, lsp::lsproto::DocumentUri documentURI,
 	lsp::lsproto::FormattingOptions* options, lsp::lsproto::Position position,
 	std::string character) {
-	if (tristateIsFalse(UserPreferences().EnableFormatting)) {
+	if (tristateIsFalse(UserPreferences().FormatEnabled)) {
 		return lsp::lsproto::TextEditsOrNull{};
 	}
 	SourceFile* file = getProgramAndFile(documentURI).second;

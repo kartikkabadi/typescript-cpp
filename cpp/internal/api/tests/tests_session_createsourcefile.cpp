@@ -3,12 +3,14 @@
 #include <mutex>
 #include <string>
 
+#include "internal/api/encoder/encoder.h"
 #include "internal/api/proto.h"
 #include "internal/api/session.h"
 #include "internal/ast/ast.h"
 #include "internal/core/types.h"
 #include "internal/gostd/gostd.h"
 #include "internal/gostd/testing.h"
+#include "internal/json/json.h"
 #include "internal/lsp/lsproto/lsproto.h"
 #include "internal/project/project.h"
 #include "internal/testutil/projecttestutil/projecttestutil.h"
@@ -166,6 +168,167 @@ void TestCreateSourceFile(T* t) {
 		assert::NilError(t, err5);
 	});
 
+	t->Run("retain by descriptor", [session](T* t) {
+		t->Parallel();
+
+		const std::string fileName = "/src/retained.ts";
+		const std::string sourceText = "export const retained = true;";
+		auto [created, err] = session->createSourceFile(
+		    fileName, sourceText, CreateSourceFileOptions{});
+		assert::NilError(t, err);
+		auto* sourceFile = created->SourceFile_();
+		auto descriptor = newSourceFileDescriptor(sourceFile);
+
+		RetainSourceFileParams params;
+		params.File = descriptor;
+		auto [result, rerr] = session->handleRetainSourceFile(&params);
+		assert::NilError(t, rerr);
+		std::unordered_map<std::string, int64_t> retainResp;
+		assert::Assert(
+		    t, json::unmarshal(std::string_view(result.data), &retainResp)
+		           .empty());
+		SourceFileLeaseID lease{uint64_t(retainResp["lease"])};
+		assert::Assert(t, lease != SourceFileLeaseID{0});
+		{
+			std::lock_guard<std::mutex> lk(session->sourceFileLeasesMu);
+			auto* retainedSourceFile =
+			    session->sourceFileLeases[lease]->SourceFile_();
+			assert::Assert(t, retainedSourceFile == sourceFile);
+		}
+
+		created->Release();
+		auto [key, kerr] = descriptor.parseCacheKey();
+		assert::NilError(t, kerr);
+		auto* acquired = session->snapshotHost->AcquireExistingSourceFile(key);
+		assert::Assert(t, acquired != nullptr);
+		acquired->Release();
+
+		ReleaseSourceFileParams rp;
+		rp.Lease = lease;
+		auto [_r, relerr] = session->handleReleaseSourceFile(&rp);
+		assert::NilError(t, relerr);
+		assert::Assert(
+		    t, session->snapshotHost->AcquireExistingSourceFile(key) ==
+		           nullptr);
+	});
+
+	t->Run("retain cache miss", [session](T* t) {
+		t->Parallel();
+
+		SourceFileDescriptor descriptor{
+		    .FileName = "/src/missing.ts",
+		    .Path = "/src/missing.ts",
+		    .ContentHash = "00000000000000000000000000000000",
+		    .ParseOptionsKey = "0",
+		    .ScriptKind = ScriptKind::TS,
+		    .NodeID = "1",
+		};
+		RetainSourceFileParams params;
+		params.File = descriptor;
+		auto [_r, err] = session->handleRetainSourceFile(&params);
+		assert::Assert(t, err != nullptr &&
+		                      err->Error().find(
+		                          "source file is not available") !=
+		                          std::string::npos);
+	});
+
+	t->Run("declaration symbol lookup", [session](T* t) {
+		t->Parallel();
+
+		auto [created, err] = session->createSourceFile(
+		    "/src/symbols.ts",
+		    "function present() {}\nimport {} from './missing';",
+		    CreateSourceFileOptions{});
+		assert::NilError(t, err);
+		auto createdPtr = created;
+		t->Cleanup([createdPtr] { createdPtr->Release(); });
+
+		SourceFile* sourceFile = created->SourceFile_();
+		auto* table = encoder::GetNodeIndexTable(sourceFile);
+		auto descriptor = newSourceFileDescriptor(sourceFile);
+
+		GetSymbolOfDeclarationParams presentParams;
+		presentParams.File = descriptor;
+		presentParams.Index =
+		    table->GetIndex(sourceFile->statements()[0]);
+		auto [presentR, perr] =
+		    session->handleGetSymbolOfDeclaration(&presentParams);
+		assert::NilError(t, perr);
+		assert::Assert(t, !presentR.data.empty());
+		auto [dom, derr] = json::parse(std::string_view(presentR.data));
+		assert::NilError(t, derr);
+		auto* nameNode = json::objGet(dom, "name");
+		assert::Assert(t, nameNode != nullptr);
+		auto [nameStr, serr] = json::asString(*nameNode, "string");
+		assert::NilError(t, serr);
+		assert::Assert(t, nameStr == "present");
+		auto* refNode = json::objGet(dom, "reference");
+		assert::Assert(t, refNode != nullptr);
+		auto* kindNode = json::objGet(*refNode, "kind");
+		assert::Assert(t, kindNode != nullptr);
+		auto [kind, kerr] = json::asInt32(*kindNode, "int");
+		assert::NilError(t, kerr);
+		assert::Assert(t, kind == static_cast<int32_t>(SymbolOwnerKind::File));
+
+		GetSymbolOfDeclarationParams oobParams;
+		oobParams.File = descriptor;
+		oobParams.Index = 0;
+		auto [_oob, oerr] =
+		    session->handleGetSymbolOfDeclaration(&oobParams);
+		assert::Assert(t, oerr != nullptr &&
+		                      oerr->Error().find("out of range") !=
+		                          std::string::npos);
+	});
+
+	t->Run("rejects stale node ID", [session](T* t) {
+		t->Parallel();
+
+		auto [created, err] = session->createSourceFile(
+		    "/src/stale.ts", "export {};", CreateSourceFileOptions{});
+		assert::NilError(t, err);
+		auto createdPtr = created;
+		t->Cleanup([createdPtr] { createdPtr->Release(); });
+		auto descriptor = newSourceFileDescriptor(created->SourceFile_());
+		descriptor.NodeID = "0";
+
+		RetainSourceFileParams params;
+		params.File = descriptor;
+		auto [_r, rerr] = session->handleRetainSourceFile(&params);
+		assert::Assert(t, rerr != nullptr &&
+		                      rerr->Error().find("cached source file") !=
+		                          std::string::npos);
+	});
+
+	t->Run("rejects an evicted file after equal-key recreation",
+	       [session](T* t) {
+		t->Parallel();
+
+		const std::string fileName = "/src/recreated.ts";
+		const std::string sourceText = "export {};";
+		auto [first, err] = session->createSourceFile(
+		    fileName, sourceText, CreateSourceFileOptions{});
+		assert::NilError(t, err);
+		auto staleDescriptor =
+		    newSourceFileDescriptor(first->SourceFile_());
+		first->Release();
+
+		auto [second, err2] = session->createSourceFile(
+		    fileName, sourceText, CreateSourceFileOptions{});
+		assert::NilError(t, err2);
+		auto secondPtr = second;
+		t->Cleanup([secondPtr] { secondPtr->Release(); });
+		assert::Assert(
+		    t, newSourceFileDescriptor(second->SourceFile_()).NodeID !=
+		           staleDescriptor.NodeID);
+
+		RetainSourceFileParams params;
+		params.File = staleDescriptor;
+		auto [_r, rerr] = session->handleRetainSourceFile(&params);
+		assert::Assert(t, rerr != nullptr &&
+		                      rerr->Error().find("cached source file") !=
+		                          std::string::npos);
+	});
+
 	t->Run("unknown extension defaults to TypeScript", [session](T* t) {
 		t->Parallel();
 		auto [lease, err] = session->createSourceFile(
@@ -214,6 +377,25 @@ void TestCreateSourceFile(T* t) {
 		    err != nullptr &&
 		        err->Error().find("could not read file \"/src/missing.ts\"") !=
 		            std::string::npos);
+	});
+
+	t->Run("empty file name", [session](T* t) {
+		t->Parallel();
+		CreateSourceFileParams params;
+		auto [_r, err] = session->handleCreateSourceFile(
+		    gostd::contextBackground(), &params);
+		assert::Assert(
+		    t, err != nullptr &&
+		           err->Error().find("fileName must not be empty") !=
+		               std::string::npos);
+
+		CreateSourceFileFromFileParams params2;
+		auto [_r2, err2] = session->handleCreateSourceFileFromFile(
+		    gostd::contextBackground(), &params2);
+		assert::Assert(
+		    t, err2 != nullptr &&
+		           err2->Error().find("fileName must not be empty") !=
+		               std::string::npos);
 	});
 }
 REGISTER_UNIT_TEST("api.TestCreateSourceFile", TestCreateSourceFile);

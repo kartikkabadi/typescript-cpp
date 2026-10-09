@@ -6,7 +6,8 @@ implementation of the TypeScript compiler (the "corsa" rewrite that ships as
 that is *significantly faster* than both the JS (`typescript.js`) and Go
 implementations, with **zero behavioral regressions** — verified byte-for-byte
 against the Go implementation, which is kept in-tree as the conformance
-oracle.
+oracle. Oracle pin: `microsoft/TypeScript@fed0bf24` (2026-10-08) — see
+`cpp/ORACLE_BUMP.md` for the bump ledger.
 
 ## Status
 

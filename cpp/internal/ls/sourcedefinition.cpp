@@ -879,10 +879,17 @@ LanguageService::provideSourceDefinitionAtPosition(
 
 	auto [originSelectionRange, _f] = createLspRangeFromNode(node, file);
 
-	// If the cursor is directly on a module specifier string, resolve to the
-	// implementation file's entry point.
 	::tsc::Node* containingModuleSpecifier =
 		findContainingModuleSpecifier(node);
+	if (containingModuleSpecifier != nullptr &&
+	    isSourcePhaseImport(containingModuleSpecifier->parent)) {
+		return {provideDefinitionAtPosition(ctx, program, file, textPos,
+		                                    clientSupportsLink),
+		        nullptr};
+	}
+
+	// If the cursor is directly on a module specifier string, resolve to the
+	// implementation file's entry point.
 	if (node == containingModuleSpecifier) {
 		ResolutionMode specifierMode =
 			program->GetModeForUsageLocation(file, containingModuleSpecifier);

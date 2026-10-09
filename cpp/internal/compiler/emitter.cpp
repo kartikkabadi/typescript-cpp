@@ -84,11 +84,12 @@ std::pair<std::unique_ptr<emitHost>, std::function<void()>> newEmitHost(
 	// which mutates per-checker state — the non-exclusive path is only
 	// safe for read-only use. Two emit workers can otherwise collide on
 	// one checker's free-list/map state (SIGSEGV).
-	auto [checker, done] =
-	    program->GetTypeCheckerForFileExclusive(file);
+	auto __pair = program->GetTypeCheckerForFileExclusive(file);
+	auto* checker = __pair.first;
+	auto done = __pair.second;
 	auto host = std::make_unique<emitHost>();
 	host->program = program;
-	host->emitResolver = checker->GetEmitResolver();
+	host->newEmitResolver = [checker](printer::EmitContext* ctx) { return checker->NewEmitResolver(ctx); };
 	return {std::move(host), std::move(done)};
 }
 
@@ -103,22 +104,24 @@ void emitter::emit() {
 	        return tracing::TraceArgs{{"path", std::string(sourceFile->Path())}};
 	    },
 	    true);
-	emitJSFile(sourceFile, paths->JsFilePath(), paths->SourceMapFilePath());
-	emitDeclarationFile(sourceFile, paths->DeclarationFilePath(),
+	auto* emitContext = printer::NewEmitContext();
+	auto* emitResolver = host->NewEmitResolver(emitContext);
+	emitJSFile(emitResolver, sourceFile, paths->JsFilePath(), paths->SourceMapFilePath());
+	emitDeclarationFile(emitResolver, sourceFile, paths->DeclarationFilePath(),
 	                    paths->DeclarationMapPath());
 	emitResult.Diagnostics = emitterDiagnostics.GetDiagnostics();
 }
 
 // emitter.go:60 getDeclarationTransformers
 std::vector<transformers::declarations::DeclarationTransformer*>
-emitter::getDeclarationTransformers(printer::EmitContext* emitContext,
+emitter::getDeclarationTransformers(checker::EmitResolver* emitResolver,
                                     SourceFile* sourceFile,
                                     const std::string& declarationFilePath,
                                     const std::string& declarationMapPath) {
 	bool forceDtsEmit = emitOnly == EmitOnly::EmitOnlyBuilderSignature ||
 	                    (forceEmit && emitOnly == EmitOnly::EmitOnlyDts);
 	return {
-	    transformers::declarations::NewDeclarationTransformer(host, emitContext,
+	    transformers::declarations::NewDeclarationTransformer(host, emitResolver,
 	                                            host->Options(),
 	                                            declarationFilePath,
 	                                            declarationMapPath),
@@ -128,7 +131,7 @@ emitter::getDeclarationTransformers(printer::EmitContext* emitContext,
 }
 
 // emitter.go:72 runScriptTransformers
-SourceFile* emitter::runScriptTransformers(printer::EmitContext* emitContext,
+SourceFile* emitter::runScriptTransformers(checker::EmitResolver* emitResolver,
                                          SourceFile* sourceFile) {
 	// emitter.go:70 — `defer e.tr.Push(..., "transformNodes", {"path"}, false)()`.
 	tracing::TraceScope traceTransform(
@@ -138,7 +141,7 @@ SourceFile* emitter::runScriptTransformers(printer::EmitContext* emitContext,
 	    },
 	    false);
 	for (auto* transformer :
-	     getScriptTransformers(emitContext, host, sourceFile)) {
+	     getScriptTransformers(emitResolver, host, sourceFile)) {
 		sourceFile = transformer->transformSourceFile(sourceFile);
 	}
 	return sourceFile;
@@ -146,7 +149,7 @@ SourceFile* emitter::runScriptTransformers(printer::EmitContext* emitContext,
 
 // emitter.go:83 runDeclarationTransformers
 std::pair<SourceFile*, std::vector<Diagnostic*>>
-emitter::runDeclarationTransformers(printer::EmitContext* emitContext,
+emitter::runDeclarationTransformers(checker::EmitResolver* emitResolver,
                                     SourceFile* sourceFile,
                                     const std::string& declarationFilePath,
                                     const std::string& declarationMapPath) {
@@ -159,7 +162,7 @@ emitter::runDeclarationTransformers(printer::EmitContext* emitContext,
 	    false);
 	std::vector<Diagnostic*> diags;
 	for (auto* transformer :
-	     getDeclarationTransformers(emitContext, sourceFile,
+	     getDeclarationTransformers(emitResolver, sourceFile,
 	                                declarationFilePath, declarationMapPath)) {
 		sourceFile = transformer->TransformSourceFile(sourceFile);
 		auto d = transformer->GetDiagnostics();
@@ -195,8 +198,12 @@ Transformer* getModuleTransformer(TransformOptions* opts) {
 
 // emitter.go:107 getScriptTransformers
 std::vector<Transformer*> getScriptTransformers(
-    printer::EmitContext* emitContext, printer::EmitHost* host,
+    checker::EmitResolver* emitResolver, printer::EmitHost* host,
     SourceFile* sourceFile) {
+	if (emitResolver == nullptr || emitResolver->EmitContext() == nullptr) {
+		TSC_UNREACHABLE("Script transformers require an EmitResolver with an EmitContext");
+	}
+	auto* emitContext = emitResolver->EmitContext();
 	std::vector<Transformer*> tx;
 	const CompilerOptions* options = host->Options();
 
@@ -208,8 +215,6 @@ std::vector<Transformer*> getScriptTransformers(
 	bool jsxTransformEnabled = options->GetJSXTransformEnabled() &&
 	                           sourceFile->LanguageVariant ==
 	                               LanguageVariant::JSX;
-
-	checker::EmitResolver* emitResolver = host->GetEmitResolver();
 
 	binder::ReferenceResolver* referenceResolver;
 	if (importElisionEnabled || jsxTransformEnabled ||
@@ -289,8 +294,10 @@ std::vector<Transformer*> getScriptTransformers(
 }
 
 // emitter.go:184 emitJSFile
-void emitter::emitJSFile(SourceFile* sourceFile, const std::string& jsFilePath,
+void emitter::emitJSFile(checker::EmitResolver* emitResolver, SourceFile* sourceFile,
+                         const std::string& jsFilePath,
                          const std::string& sourceMapFilePath) {
+	auto* emitContext = emitResolver->EmitContext();
 	const CompilerOptions* options = host->Options();
 
 	if (sourceFile == nullptr ||
@@ -312,9 +319,7 @@ void emitter::emitJSFile(SourceFile* sourceFile, const std::string& jsFilePath,
 	    [&] { return tracing::TraceArgs{{"jsFilePath", jsFilePath}}; },
 	    true);
 
-	auto [emitContext, putEmitContext] = printer::GetEmitContext();
-
-	sourceFile = runScriptTransformers(emitContext, sourceFile);
+	sourceFile = runScriptTransformers(emitResolver, sourceFile);
 
 	printer::PrinterOptions printerOptions;
 	printerOptions.RemoveComments = options->RemoveComments == Tristate::True;
@@ -331,17 +336,17 @@ void emitter::emitJSFile(SourceFile* sourceFile, const std::string& jsFilePath,
 	                                               printer::PrintHandlers{},
 	                                               emitContext);
 
-	printSourceFile(jsFilePath, sourceMapFilePath, sourceFile, printer_,
+	printSourceFile(emitContext, jsFilePath, sourceMapFilePath, sourceFile, printer_,
 	                options,
 	                shouldEmitSourceMaps(options, sourceFile));
-
-	putEmitContext();
 }
 
 // emitter.go:219 emitDeclarationFile
-void emitter::emitDeclarationFile(SourceFile* sourceFile,
+void emitter::emitDeclarationFile(checker::EmitResolver* emitResolver,
+                                  SourceFile* sourceFile,
                                   const std::string& declarationFilePath,
                                   const std::string& declarationMapPath) {
+	auto* emitContext = emitResolver->EmitContext();
 	const CompilerOptions* options = host->Options();
 
 	if (sourceFile == nullptr || emitOnly == EmitOnly::EmitOnlyJs ||
@@ -363,9 +368,8 @@ void emitter::emitDeclarationFile(SourceFile* sourceFile,
 	    },
 	    true);
 
-	auto [emitContext, putEmitContext] = printer::GetEmitContext();
 	auto [sf, diags] =
-	    runDeclarationTransformers(emitContext, sourceFile,
+	    runDeclarationTransformers(emitResolver, sourceFile,
 	                               declarationFilePath, declarationMapPath);
 	sourceFile = sf;
 
@@ -378,7 +382,6 @@ void emitter::emitDeclarationFile(SourceFile* sourceFile,
 	    (options->NoEmit == Tristate::True ||
 	     host->IsEmitBlocked(declarationFilePath))) {
 		emitResult.EmitSkipped = true;
-		putEmitContext();
 		return;
 	}
 
@@ -386,7 +389,6 @@ void emitter::emitDeclarationFile(SourceFile* sourceFile,
 	                   emitOnly != EmitOnly::EmitOnlyBuilderSignature;
 	if (declBlocked) {
 		emitResult.EmitSkipped = true;
-		putEmitContext();
 		return;
 	}
 
@@ -433,15 +435,14 @@ void emitter::emitDeclarationFile(SourceFile* sourceFile,
 	declarationMapOptions.MapRoot = options->MapRoot;
 	// Explicitly do not pass through either inline option.
 
-	printSourceFile(declarationFilePath, declarationMapPath, sourceFile,
+	printSourceFile(emitContext, declarationFilePath, declarationMapPath, sourceFile,
 	                printer_, &declarationMapOptions,
 	                shouldEmitSourceMaps(&declarationMapOptions, sourceFile));
-
-	putEmitContext();
 }
 
 // emitter.go:294 printSourceFile
-void emitter::printSourceFile(const std::string& jsFilePath,
+void emitter::printSourceFile(printer::EmitContext* emitContext,
+                              const std::string& jsFilePath,
                               const std::string& sourceMapFilePath,
                               SourceFile* sourceFile,
                               printer::Printer* printer_,
@@ -464,6 +465,7 @@ void emitter::printSourceFile(const std::string& jsFilePath,
 
 	printer_->Write(sourceFile->asNode(), sourceFile, writer,
 	                sourceMapGenerator);
+	emitContext->releaseArenas();
 
 	int sourceMapUrlPos = -1;
 	if (sourceMapGenerator != nullptr) {
@@ -777,8 +779,9 @@ std::vector<Diagnostic*> getDeclarationDiagnostics(emitHost* host,
 		return {};
 	}
 	const CompilerOptions* options = host->Options();
+	auto* emitResolver = host->NewEmitResolver(printer::NewEmitContext());
 	auto* transform = transformers::declarations::NewDeclarationTransformer(
-	    host, nullptr, options, "", "");
+	    host, emitResolver, options, "", "");
 	transform->TransformSourceFile(file);
 	return transform->GetDiagnostics();
 }

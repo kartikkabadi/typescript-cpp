@@ -240,22 +240,6 @@ std::string TypeAcquisition::marshalJSONTo(json::Encoder& enc) const {
 	return w.end();
 }
 
-// WatchOptions — watchoptions.go tagged fields.
-std::string WatchOptions::unmarshalJSONFrom(json::Decoder& dec) {
-	return api::readFields(dec, [this](std::string_view n, json::Decoder& d) -> std::string {
-		if (api::fieldIs(n, "watchInterval")) return json::unmarshalDecode(d, &Interval);
-		if (api::fieldIs(n, "watchFile")) return json::unmarshalDecode(d, &FileKind);
-		if (api::fieldIs(n, "watchDirectory")) return json::unmarshalDecode(d, &DirectoryKind);
-		if (api::fieldIs(n, "fallbackPolling")) return json::unmarshalDecode(d, &FallbackPolling);
-		if (api::fieldIs(n, "synchronousWatchDirectory"))
-			return json::unmarshalDecode(d, &SyncWatchDir);
-		if (api::fieldIs(n, "excludeDirectories"))
-			return json::unmarshalDecode(d, &ExcludeDir);
-		if (api::fieldIs(n, "excludeFiles"))
-			return json::unmarshalDecode(d, &ExcludeFiles);
-		return d.skipValue();
-	});
-}
 
 }  // namespace tsc
 
@@ -692,21 +676,43 @@ std::pair<bool, std::string> DocumentIdentifier::unmarshalField(std::string_view
 }
 
 std::string DocumentIdentifier::unmarshalJSONFrom(json::Decoder& dec) {
+	*this = DocumentIdentifier{};
 	auto [tok, err] = dec.readToken();
 	if (!err.empty()) return err;
 	switch (tok.kind()) {
 	case '"':
+		if (tok.string().empty()) {
+			return "DocumentIdentifier: file name must not be empty";
+		}
 		FileName = tok.string();
 		return {};
 	case '{': {
-		// Read the object fields
+		bool foundURI = false;
 		while (dec.peekKind() != '}') {
 			auto [key, e] = dec.readToken();
 			if (!e.empty()) return e;
-			bool isURI = key.string() == "uri";
-			auto [val, e2] = dec.readToken();
-			if (!e2.empty()) return e2;
-			if (isURI) URI = lsproto::DocumentUri(val.string());
+			if (key.kind() != '"') {
+				return std::string(
+				    "DocumentIdentifier: expected object field name, got ") +
+				       std::to_string((int)key.kind());
+			}
+			if (key.string() == "uri") {
+				if (foundURI) {
+					return std::string(
+					    "DocumentIdentifier: duplicate field \"uri\"");
+				}
+				auto [val, e2] = dec.readToken();
+				if (!e2.empty()) return e2;
+				if (val.kind() != '"' || val.string().empty()) {
+					return std::string(
+					    "DocumentIdentifier: uri must be a non-empty "
+					    "string");
+				}
+				URI = lsproto::DocumentUri(val.string());
+				foundURI = true;
+			} else if (auto e3 = dec.skipValue(); !e3.empty()) {
+				return e3;
+			}
 		}
 		// Consume the closing brace
 		if (auto [t, e] = dec.readToken(); !e.empty()) return e;
@@ -798,6 +804,8 @@ std::string SnapshotRequestChangesParams::unmarshalJSONFrom(json::Decoder& dec) 
 
 // unmarshalField — CreateSnapshotParams.go member decode; returns {false, ""} for unmatched names.
 std::pair<bool, std::string> CreateSnapshotParams::unmarshalField(std::string_view n, json::Decoder& d) {
+	if (fieldIs(n, "userPreferences")) return {true, json::unmarshalDecode(d, &UserPreferences)};
+	if (fieldIs(n, "prepareAutoImports")) return {true, json::unmarshalDecode(d, &PrepareAutoImports)};
 	if (fieldIs(n, "fileNotifications")) return {true, json::unmarshalDecode(d, &FileNotifications)};
 	if (fieldIs(n, "fileSystem")) return {true, json::unmarshalDecode(d, &FileSystem)};
 	return SnapshotRequestChangesParams::unmarshalField(n, d);
@@ -1226,6 +1234,146 @@ std::string ReleaseSourceFileParams::unmarshalJSONFrom(json::Decoder& dec) {
 		if (handled) return err;
 		return d.skipValue();
 	});
+}
+
+// unmarshalField — SourceFileDescriptor member decode.
+std::pair<bool, std::string> SourceFileDescriptor::unmarshalField(std::string_view n, json::Decoder& d) {
+	if (fieldIs(n, "fileName")) return {true, json::unmarshalDecode(d, &FileName)};
+	if (fieldIs(n, "path")) return {true, json::unmarshalDecode(d, &Path)};
+	if (fieldIs(n, "contentHash")) return {true, json::unmarshalDecode(d, &ContentHash)};
+	if (fieldIs(n, "parseOptionsKey")) return {true, json::unmarshalDecode(d, &ParseOptionsKey)};
+	if (fieldIs(n, "scriptKind")) return {true, json::unmarshalDecode(d, &ScriptKind)};
+	if (fieldIs(n, "nodeId")) return {true, json::unmarshalDecode(d, &NodeID)};
+	return {false, {}};
+}
+
+std::string SourceFileDescriptor::unmarshalJSONFrom(json::Decoder& dec) {
+	return readFields(dec, [this](std::string_view n, json::Decoder& d) -> std::string {
+		auto [handled, err] = unmarshalField(n, d);
+		if (handled) return err;
+		return d.skipValue();
+	});
+}
+
+std::string SourceFileDescriptor::marshalJSONTo(json::Encoder& enc) const {
+	objWriter w{enc};
+	w.begin();
+	w.member("fileName", FileName);
+	w.member("path", Path);
+	w.member("contentHash", ContentHash);
+	w.member("parseOptionsKey", ParseOptionsKey);
+	w.member("scriptKind", ScriptKind);
+	w.member("nodeId", NodeID);
+	return w.end();
+}
+
+// unmarshalField — RetainSourceFileParams member decode.
+std::pair<bool, std::string> RetainSourceFileParams::unmarshalField(std::string_view n, json::Decoder& d) {
+	if (fieldIs(n, "file")) return {true, json::unmarshalDecode(d, &File)};
+	return {false, {}};
+}
+
+std::string RetainSourceFileParams::unmarshalJSONFrom(json::Decoder& dec) {
+	return readFields(dec, [this](std::string_view n, json::Decoder& d) -> std::string {
+		auto [handled, err] = unmarshalField(n, d);
+		if (handled) return err;
+		return d.skipValue();
+	});
+}
+
+std::string RetainSourceFileParams::marshalJSONTo(json::Encoder& enc) const {
+	objWriter w{enc};
+	w.begin();
+	w.member("file", File);
+	return w.end();
+}
+
+std::string RetainSourceFileResponse::marshalJSONTo(json::Encoder& enc) const {
+	objWriter w{enc};
+	w.begin();
+	w.member("lease", Lease);
+	return w.end();
+}
+
+// unmarshalField — GetCachedSourceFileParams member decode.
+std::pair<bool, std::string> GetCachedSourceFileParams::unmarshalField(std::string_view n, json::Decoder& d) {
+	if (fieldIs(n, "file")) return {true, json::unmarshalDecode(d, &File)};
+	return {false, {}};
+}
+
+std::string GetCachedSourceFileParams::unmarshalJSONFrom(json::Decoder& dec) {
+	return readFields(dec, [this](std::string_view n, json::Decoder& d) -> std::string {
+		auto [handled, err] = unmarshalField(n, d);
+		if (handled) return err;
+		return d.skipValue();
+	});
+}
+
+std::string GetCachedSourceFileParams::marshalJSONTo(json::Encoder& enc) const {
+	objWriter w{enc};
+	w.begin();
+	w.member("file", File);
+	return w.end();
+}
+
+// unmarshalField — GetSymbolOfDeclarationParams member decode.
+std::pair<bool, std::string> GetSymbolOfDeclarationParams::unmarshalField(std::string_view n, json::Decoder& d) {
+	if (fieldIs(n, "file")) return {true, json::unmarshalDecode(d, &File)};
+	if (fieldIs(n, "index")) return {true, json::unmarshalDecode(d, &Index)};
+	return {false, {}};
+}
+
+std::string GetSymbolOfDeclarationParams::unmarshalJSONFrom(json::Decoder& dec) {
+	return readFields(dec, [this](std::string_view n, json::Decoder& d) -> std::string {
+		auto [handled, err] = unmarshalField(n, d);
+		if (handled) return err;
+		return d.skipValue();
+	});
+}
+
+std::string GetSymbolOfDeclarationParams::marshalJSONTo(json::Encoder& enc) const {
+	objWriter w{enc};
+	w.begin();
+	w.member("file", File);
+	w.member("index", Index);
+	return w.end();
+}
+
+// unmarshalField — SymbolReference member decode.
+std::pair<bool, std::string> SymbolReference::unmarshalField(std::string_view n, json::Decoder& d) {
+	if (fieldIs(n, "kind")) return {true, json::unmarshalDecode(d, &Kind)};
+	if (fieldIs(n, "file")) return {true, json::unmarshalDecode(d, &File)};
+	if (fieldIs(n, "snapshot")) return {true, json::unmarshalDecode(d, &Snapshot)};
+	if (fieldIs(n, "project")) return {true, json::unmarshalDecode(d, &Project)};
+	if (fieldIs(n, "id")) return {true, json::unmarshalDecode(d, &Id)};
+	return {false, {}};
+}
+
+std::string SymbolReference::unmarshalJSONFrom(json::Decoder& dec) {
+	return readFields(dec, [this](std::string_view n, json::Decoder& d) -> std::string {
+		auto [handled, err] = unmarshalField(n, d);
+		if (handled) return err;
+		return d.skipValue();
+	});
+}
+
+std::string SymbolReference::marshalJSONTo(json::Encoder& enc) const {
+	objWriter w{enc};
+	w.begin();
+	w.member("kind", Kind);
+	if (File) w.member("file", *File);
+	if (!api::isZeroVal(Snapshot)) w.member("snapshot", Snapshot);
+	if (!Project.empty()) w.member("project", Project);
+	w.member("id", Id);
+	return w.end();
+}
+
+std::string CompactSymbolReference::marshalJSONTo(json::Encoder& enc) const {
+	objWriter w{enc};
+	w.begin();
+	w.member("id", Id);
+	if (!File.empty()) w.member("file", File);
+	return w.end();
 }
 
 // unmarshalField — ProfileParams.go member decode; returns {false, ""} for unmatched names.
@@ -1661,9 +1809,7 @@ std::string GetTypePropertyParams::unmarshalJSONFrom(json::Decoder& dec) {
 
 // unmarshalField — GetSymbolPropertyParams.go member decode; returns {false, ""} for unmatched names.
 std::pair<bool, std::string> GetSymbolPropertyParams::unmarshalField(std::string_view n, json::Decoder& d) {
-	if (fieldIs(n, "snapshot")) return {true, json::unmarshalDecode(d, &Snapshot)};
-	if (fieldIs(n, "project")) return {true, json::unmarshalDecode(d, &Project)};
-	if (fieldIs(n, "objectId")) return {true, json::unmarshalDecode(d, &Symbol)};
+	if (fieldIs(n, "symbol")) return {true, json::unmarshalDecode(d, &Symbol)};
 	return {false, {}};
 }
 
@@ -2406,7 +2552,7 @@ std::string DiagnosticResponse::unmarshalJSONFrom(json::Decoder& dec) {
 std::string InitializeResponse::marshalJSONTo(json::Encoder& enc) const {
 	objWriter w{enc};
 	w.begin();
-	w.member("useCaseSensitiveFileNames", UseCaseSensitiveFileNames);
+	w.member("caseSensitivity", CaseSensitivity.value);
 	w.member("currentDirectory", CurrentDirectory);
 	return w.end();
 }
@@ -2438,6 +2584,8 @@ std::string SnapshotRequestChangesParams::marshalJSONTo(json::Encoder& enc) cons
 std::string CreateSnapshotParams::marshalJSONTo(json::Encoder& enc) const {
 	objWriter w{enc};
 	w.begin();
+	if (UserPreferences) w.member("userPreferences", UserPreferences);
+	if (PrepareAutoImports) w.member("prepareAutoImports", PrepareAutoImports);
 	if (FileNotifications) w.member("fileNotifications", FileNotifications);
 	if (FileSystem) w.member("fileSystem", FileSystem);
 	return w.end();
@@ -2909,15 +3057,14 @@ std::string GetSymbolsAtLocationsParams::marshalJSONTo(json::Encoder& enc) const
 std::string SymbolResponse::marshalJSONTo(json::Encoder& enc) const {
 	objWriter w{enc};
 	w.begin();
-	w.member("id", Id);
-	w.member("project", Project);
+	w.member("reference", Reference);
 	w.member("name", Name);
 	w.member("flags", Flags);
 	w.member("checkFlags", CheckFlags);
 	if (!Declarations.empty()) w.member("declarations", Declarations);
 	if (!ValueDeclaration.empty()) w.member("valueDeclaration", ValueDeclaration);
-	if (!api::isZeroVal(Parent)) w.member("parent", Parent);
-	if (!api::isZeroVal(ExportSymbol)) w.member("exportSymbol", ExportSymbol);
+	if (Parent) w.member("parent", *Parent);
+	if (ExportSymbol) w.member("exportSymbol", *ExportSymbol);
 	return w.end();
 }
 
@@ -2972,8 +3119,8 @@ std::string TypeResponse::marshalJSONTo(json::Encoder& enc) const {
 	if (!api::isZeroVal(ThisType)) w.member("thisType", ThisType);
 	if (!IntrinsicName.empty()) w.member("intrinsicName", IntrinsicName);
 	if (!AliasTypeArguments.empty()) w.member("aliasTypeArguments", AliasTypeArguments);
-	if (!api::isZeroVal(AliasSymbol)) w.member("aliasSymbol", AliasSymbol);
-	if (!api::isZeroVal(Symbol)) w.member("symbol", Symbol);
+	if (AliasSymbol) w.member("aliasSymbol", *AliasSymbol);
+	if (Symbol) w.member("symbol", *Symbol);
 	return w.end();
 }
 
@@ -2993,7 +3140,7 @@ std::string SignatureResponse::marshalJSONTo(json::Encoder& enc) const {
 	if (!Declaration.empty()) w.member("declaration", Declaration);
 	if (!TypeParameters.empty()) w.member("typeParameters", TypeParameters);
 	if (!Parameters.empty()) w.member("parameters", Parameters);
-	if (!api::isZeroVal(ThisParameter)) w.member("thisParameter", ThisParameter);
+	if (ThisParameter) w.member("thisParameter", *ThisParameter);
 	if (!api::isZeroVal(Target)) w.member("target", Target);
 	return w.end();
 }
@@ -3162,9 +3309,7 @@ std::string GetTypePropertyParams::marshalJSONTo(json::Encoder& enc) const {
 std::string GetSymbolPropertyParams::marshalJSONTo(json::Encoder& enc) const {
 	objWriter w{enc};
 	w.begin();
-	w.member("snapshot", Snapshot);
-	w.member("project", Project);
-	w.member("objectId", Symbol);
+	w.member("symbol", Symbol);
 	return w.end();
 }
 
@@ -3834,53 +3979,6 @@ json::Value literalValueToJSON(const checker::LiteralValue& value) {
 // nextBuildOrchestratorId — proto.go:49.
 static std::atomic<uint64_t> nextBuildOrchestratorId;
 
-// isWatchOptionKey — the only option names whose enum maps produce
-// core.WatchFileKind/WatchDirectoryKind/PollingKind values
-// (commandlineoption.go's commandLineOptionEnumMap). See toProtocolJSONValue.
-static bool isWatchOptionKey(std::string_view key) {
-	return key == "watchFile" || key == "watchDirectory" ||
-	       key == "fallbackPolling";
-}
-
-// toProtocolJSONValue — proto.go:1011. Go type-switches on the value's dynamic
-// type: the three watch enums become int(value)-1 (the wire enums are 0-based
-// while core's are 1-based), OrderedMap/[]any are deep-copied recursively, and
-// everything else passes through.
-//
-// In C++ every enum kind and plain int shares the CompilerOptionsValue int64
-// arm, so the dynamic enum type is unrecoverable from the value alone. The
-// kind is instead recovered from the key: those three enum types can only be
-// produced under "watchFile"/"watchDirectory"/"fallbackPolling" — the only
-// options whose EnumMap() yields them — so converting int64 leaves under those
-// keys (and inside arrays nested under them) covers exactly the Go cases.
-static tsoptions::CompilerOptionsValue toProtocolJSONValue(
-    const tsoptions::CompilerOptionsValue& value, bool watchOptionKey) {
-	if (watchOptionKey) {
-		if (const auto* i = value.get<int64_t>()) {
-			return tsoptions::CompilerOptionsValue(*i - 1);
-		}
-	}
-	if (const auto* object = value.get<tsoptions::JsonObjectPtr>()) {
-		tsoptions::JsonObjectPtr result = std::make_shared<tsoptions::JsonObject>(
-		    *object != nullptr ? (*object)->Size() : 0);
-		if (*object != nullptr) {
-			for (const auto& key : (*object)->Keys()) {
-				result->Set(key, toProtocolJSONValue(
-				                     *(*object)->Get(key).first,
-				                     isWatchOptionKey(key)));
-			}
-		}
-		return tsoptions::CompilerOptionsValue(std::move(result));
-	}
-	if (const auto* array = value.get<tsoptions::JsonArray>()) {
-		tsoptions::JsonArray result(array->size());
-		for (size_t i = 0; i < array->size(); ++i) {
-			result[i] = toProtocolJSONValue((*array)[i], watchOptionKey);
-		}
-		return tsoptions::CompilerOptionsValue(std::move(result));
-	}
-	return value;
-}
 
 // NewBuildOrchestratorID — proto.go:51.
 BuildOrchestratorID NewBuildOrchestratorID() {
@@ -3970,7 +4068,7 @@ std::shared_ptr<ConfigFileResponse> NewConfigFileResponse(
 	// `raw,omitempty`: Go's nil `any` omits the member; only marshal non-nil Raw.
 	if (!parsedCommandLine->Raw.isNil()) {
 		resp->Raw = json::Value(
-		    tsoptions::jsonMarshal(toProtocolJSONValue(parsedCommandLine->Raw, false)));
+		    tsoptions::jsonMarshal(parsedCommandLine->Raw));
 	}
 	resp->Errors = std::move(errors);
 	return resp;
@@ -3996,33 +4094,14 @@ std::shared_ptr<ProjectResponse> NewProjectResponse(project::Project* p) {
 	return resp;
 }
 
-// symbolHandles — proto.go:1107.
-std::vector<SymbolID> symbolHandles(const std::vector<Symbol*>& symbols) {
-	if (symbols.empty()) {
-		return {};
-	}
-	std::vector<SymbolID> handles(symbols.size());
-	for (size_t i = 0; i < symbols.size(); i++) {
-		handles[i] = SymbolHandle(symbols[i]);
-	}
-	return handles;
-}
-
 // newTypeResponse — proto.go:1196.
 std::shared_ptr<TypeResponse> newTypeResponse(checker::Type* t, TypeID id) {
 	auto resp = std::make_shared<TypeResponse>();
 	resp->Id = id;
 	resp->Flags = uint32_t(t->flags);
 
-	if (t->symbol != nullptr) {
-		resp->Symbol = SymbolHandle(t->symbol);
-	}
-
 	if (t->alias != nullptr) {
 		resp->AliasTypeArguments = typeHandles(t->alias->TypeArguments());
-		if (t->alias->symbol != nullptr) {
-			resp->AliasSymbol = SymbolHandle(t->alias->symbol);
-		}
 	}
 
 	checker::TypeFlags flags = t->flags;

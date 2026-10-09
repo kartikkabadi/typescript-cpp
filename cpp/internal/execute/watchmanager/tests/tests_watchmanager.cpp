@@ -1,5 +1,6 @@
 // tests_watchmanager.cpp — port of
 // tsc/internal/execute/watchmanager/watchmanager_test.go.
+#include <unordered_map>
 #include <vector>
 
 #include "internal/execute/watchmanager/watchmanager.h"
@@ -200,6 +201,103 @@ void TestDirWatchSetDirs(T* t) {
 	}
 }
 REGISTER_UNIT_TEST("watchmanager.TestDirWatchSetDirs", TestDirWatchSetDirs);
+
+
+// TestResolveDesiredDirsShallowProject — watchmanager_test.go: a directory
+// that exists and was asked for is watched at any depth; a project close to
+// the filesystem root (/app, /srv/app, a Docker WORKDIR) must not be
+// silently ignored.
+void TestResolveDesiredDirsShallowProject(T* t) {
+	t->Parallel();
+
+	std::unordered_map<std::string, bool> existing{
+	    {"/", true},
+	    {"/app", true},
+	    {"/app/src", true},
+	    {"/srv", true},
+	    {"/srv/app", true},
+	    {"/home", true},
+	    {"/home/user", true},
+	    {"/home/user/project", true},
+	};
+	WatchManager wm{nullptr, [&](const std::string& dir) {
+		                return existing[dir];
+	                }};
+
+	auto resolved = wm.ResolveDesiredDirs({
+	    {"/app", true},
+	    {"/app/src", false},
+	    {"/srv/app", true},
+	    {"/home/user/project", true},
+	});
+
+	std::unordered_map<std::string, bool> want{
+	    {"/app", true},
+	    {"/app/src", false},
+	    {"/srv/app", true},
+	    {"/home/user/project", true},
+	};
+	if (resolved != want) {
+		t->Errorf("ResolveDesiredDirs mismatch: got %v entries",
+		          {resolved.size()});
+	}
+}
+REGISTER_UNIT_TEST("watchmanager.TestResolveDesiredDirsShallowProject",
+                   TestResolveDesiredDirsShallowProject);
+
+// TestResolveDesiredDirsAncestorFallback — watchmanager_test.go: the depth
+// check still guards the fallback to an ancestor, so a missing directory
+// never turns into a watch on something too generic like /, /home or
+// /home/user.
+void TestResolveDesiredDirsAncestorFallback(T* t) {
+	t->Parallel();
+
+	std::unordered_map<std::string, bool> existing{
+	    {"/", true},          {"/app", true},    {"/home", true},
+	    {"/home/user", true}, {"/repo", true},   {"/repo/a", true},
+	    {"/repo/a/b", true},  {"/repo/a/b/c", true},
+	};
+	WatchManager wm{nullptr, [&](const std::string& dir) {
+		                return existing[dir];
+	                }};
+
+	auto resolved = wm.ResolveDesiredDirs({
+	    {"/app/missing", true},             // ancestor /app is too shallow
+	    {"/home/user/missing", true},       // ancestor /home/user too shallow
+	    {"/repo/a/b/c/missing/deep", true}, // /repo/a/b/c deep enough
+	    {"/nothing/exists/anywhere/", true},// no existing ancestor except /
+	});
+
+	std::unordered_map<std::string, bool> want{{"/repo/a/b/c", false}};
+	if (resolved != want) {
+		t->Errorf("ResolveDesiredDirs mismatch: got %v entries",
+		          {resolved.size()});
+	}
+}
+REGISTER_UNIT_TEST("watchmanager.TestResolveDesiredDirsAncestorFallback",
+                   TestResolveDesiredDirsAncestorFallback);
+
+// TestResolveDesiredDirsSkipsNonDiskPaths — watchmanager_test.go: a directory
+// that is not on disk, such as the embedded libs (bundled:///libs), is never
+// watched, even though the wrapped FS reports that it exists.
+void TestResolveDesiredDirsSkipsNonDiskPaths(T* t) {
+	t->Parallel();
+
+	WatchManager wm{nullptr, [](const std::string&) { return true; }};
+
+	auto resolved = wm.ResolveDesiredDirs({
+	    {"bundled:///libs", false},
+	    {"/app", true},
+	});
+
+	std::unordered_map<std::string, bool> want{{"/app", true}};
+	if (resolved != want) {
+		t->Errorf("ResolveDesiredDirs mismatch: got %v entries",
+		          {resolved.size()});
+	}
+}
+REGISTER_UNIT_TEST("watchmanager.TestResolveDesiredDirsSkipsNonDiskPaths",
+                   TestResolveDesiredDirsSkipsNonDiskPaths);
 
 } // namespace
 } // namespace tsc

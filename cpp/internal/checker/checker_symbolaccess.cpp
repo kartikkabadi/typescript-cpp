@@ -218,7 +218,7 @@ printer::SymbolAccessibilityResult* Checker::IsAnySymbolAccessible(
 			hadAccessibleChain = symbol;
 			// TODO: going through emit resolver here is weird. Relayer these APIs.
 			printer::SymbolAccessibilityResult* hasAccessibleDeclarations =
-				GetEmitResolver()->hasVisibleDeclarations(
+				hasVisibleDeclarations(
 					accessibleSymbolChain[0], shouldComputeAliasesToMakeVisible);
 			if (hasAccessibleDeclarations != nullptr) {
 				return hasAccessibleDeclarations;
@@ -404,21 +404,75 @@ std::vector<Symbol*> Checker::getAlternativeContainingModules(
 	if (links->extendedContainers != nullptr) {
 		return *links->extendedContainers;
 	}
-	// No results from files already being imported by this file - expand search (expensive, but not location-specific, so cached)
-	std::vector<SourceFile*> otherFiles = program->SourceFiles();
-	for (SourceFile* file : otherFiles) {
+	// No results from files already being imported by this file - expand search (not location-specific, so cached)
+	results = getExternalModuleContainers(symbol);
+	links->extendedContainers = new std::vector<Symbol*>(results);
+	return results;
+}
+
+// getExternalModuleContainers — symbolaccessibility.go:220
+std::vector<Symbol*> Checker::getExternalModuleContainers(Symbol* symbol) {
+	if (externalModuleContainers == nullptr) {
+		buildExternalModuleContainerIndex();
+	}
+	auto* index = externalModuleContainers;
+	if (!index->complete) {
+		// Re-entered from an alias resolved while building the index; answer this query without it.
+		return scanExternalModuleContainers(symbol);
+	}
+	auto it = index->containersByTarget.find(getResolvedTarget(symbol));
+	std::vector<Symbol*> containers;
+	if (it != index->containersByTarget.end()) {
+		containers = it->second;
+	}
+	Symbol* parent = getParentOfSymbol(symbol);
+	auto moIt = index->moduleOrder.find(parent);
+	if (moIt == index->moduleOrder.end()) {
+		return containers;
+	}
+	int parentOrder = moIt->second;
+	// The parent module contains the symbol even when the symbol is absent from its exports.
+	auto at = std::lower_bound(containers.begin(), containers.end(), parentOrder,
+		[index](Symbol* container, int order) { return index->moduleOrder[container] < order; });
+	if (at == containers.end() || index->moduleOrder[*at] != parentOrder) {
+		containers.insert(at, parent);
+	}
+	return containers;
+}
+
+// buildExternalModuleContainerIndex — symbolaccessibility.go:241
+void Checker::buildExternalModuleContainerIndex() {
+	auto* index = new externalModuleContainerIndex();
+	externalModuleContainers = index;
+	for (SourceFile* file : program->SourceFiles()) {
 		if (!isExternalModule(file)) {
 			continue;
 		}
-		Symbol* sym = getSymbolOfDeclaration(file->asNode());
-		Symbol* ref = getAliasForSymbolInContainer(sym, symbol);
-		if (ref == nullptr) {
+		Symbol* container = getSymbolOfDeclaration(file->asNode());
+		index->moduleOrder[container] = (int)index->moduleOrder.size();
+		for (auto& [name, exported] : getExportsOfSymbol(container)) {
+			index->add(getResolvedTarget(exported), container);
+		}
+		if (Symbol* exportEquals = getSymbolFromTable(container->exports, InternalSymbolNameExportEquals)) {
+			index->add(getResolvedTarget(exportEquals), container);
+		}
+	}
+	index->complete = true;
+}
+
+// scanExternalModuleContainers — symbolaccessibility.go:259
+std::vector<Symbol*> Checker::scanExternalModuleContainers(Symbol* symbol) {
+	std::vector<Symbol*> containers;
+	for (SourceFile* file : program->SourceFiles()) {
+		if (!isExternalModule(file)) {
 			continue;
 		}
-		results.push_back(sym);
+		if (Symbol* container = getSymbolOfDeclaration(file->asNode());
+		    getAliasForSymbolInContainer(container, symbol) != nullptr) {
+			containers.push_back(container);
+		}
 	}
-	links->extendedContainers = new std::vector<Symbol*>(results);
-	return results;
+	return containers;
 }
 
 // --- getVariableDeclarationOfObjectLiteral — symbolaccessibility.go:226 ------
@@ -861,6 +915,22 @@ bool Checker::isAccessible(accessibleSymbolChainContext ctx,
 	}
 	if (symbol == getMergedSymbol(symbolFromSymbolTable)) {
 		likeSymbols = true;
+	}
+	if (!likeSymbols && resolvedAliasSymbol != nullptr &&
+	    (resolvedAliasSymbol->flags & SymbolFlagsAlias) != 0) {
+		// Follow the alias chain in case a merged alias points back at the
+		// symbol through an intermediate alias (symbolaccessibility.go).
+		std::unordered_set<Symbol*> seenAliases;
+		while ((resolvedAliasSymbol->flags & SymbolFlagsAlias) != 0 &&
+		       seenAliases.count(resolvedAliasSymbol) == 0) {
+			seenAliases.insert(resolvedAliasSymbol);
+			resolvedAliasSymbol =
+			    getMergedSymbol(resolveAlias(resolvedAliasSymbol));
+			if (symbol == resolvedAliasSymbol) {
+				likeSymbols = true;
+				break;
+			}
+		}
 	}
 	if (!likeSymbols) {
 		return false;

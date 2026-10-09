@@ -498,6 +498,7 @@ std::pair<lsproto::ShutdownResponse, gostd::Error> Server::handleShutdown(
 	if (builtinWatcher != nullptr) {
 		builtinWatcher->Close();
 	}
+	closeAPISessions();
 	session->Close();
 	return {lsproto::ShutdownResponse{}, nullptr};
 }
@@ -1021,8 +1022,26 @@ Server::handleCompletionItemResolve(
 	if (data == nullptr) {
 		return {nullptr, gostd::newError("completion item data is nil")};
 	}
-	auto [languageService, err] = session->GetLanguageService(
-		ctx, lsconv::FileNameToDocumentURI(data->FileName));
+	if (!tspath::pathIsAbsolute(data->FileName)) {
+		return {nullptr,
+		        gostd::newError(
+		            "completion item data fileName must be absolute")};
+	}
+	lsproto::DocumentUri uri;
+	if (tspath::isDynamicFileName(data->FileName)) {
+		auto [u, ok] =
+		    lsproto::tryDynamicFileNameToDocumentUri(data->FileName);
+		if (!ok) {
+			return {nullptr,
+			        gostd::newError(
+			            "completion item data fileName must be a valid "
+			            "dynamic path")};
+		}
+		uri = u;
+	} else {
+		uri = lsconv::FileNameToDocumentURI(data->FileName);
+	}
+	auto [languageService, err] = session->GetLanguageService(ctx, uri);
 	if (err != nullptr) {
 		return {nullptr, err};
 	}
@@ -1327,10 +1346,30 @@ Server::handleInitializeAPISession(
 	}
 	auto transport = std::move(transportRes.first);
 
+	auto apiCtxAndCancel = gostd::contextWithCancel(backgroundCtx);
+	auto apiCtx = apiCtxAndCancel.first;
+	auto apiCancel = apiCtxAndCancel.second;
+	auto state = std::make_shared<apiSessionState>();
+	state->session = apiSession;
+	state->transport = transport;
+	state->cancel = apiCancel;
+	apiSessions[apiSession->ID()] = state;
+
 	// Start accepting connections in the background
 	std::weak_ptr<Server> weakSelf = shared_from_this();
-	std::thread([weakSelf, apiSession, transport] {
+	std::thread([weakSelf, state, apiCtx] {
 		auto s = weakSelf.lock();
+		auto apiSession = state->session;
+		// defer close(state.done)
+		struct doneGuard {
+			std::shared_ptr<apiSessionState> state;
+			~doneGuard() { state->done.set_value(); }
+		} doneGuard{state};
+		// defer apiCancel()
+		struct cancelGuard {
+			gostd::CancelFunc f;
+			~cancelGuard() { if (f) f(); }
+		} cancelGuard{state->cancel};
 		// defer { apiSession.Close(); s.removeAPISession(apiSession.ID()) }
 		struct cleanupSession {
 			std::shared_ptr<api::Session> apiSession;
@@ -1343,8 +1382,7 @@ Server::handleInitializeAPISession(
 			}
 		} sessionGuard{apiSession, weakSelf};
 
-		auto [rwc, acceptErr] = transport->Accept();
-		(void)transport->Close();
+		auto [rwc, acceptErr] = state->transport->Accept();
 		if (acceptErr != nullptr) {
 			if (s != nullptr) {
 				s->logger->Errorf(
@@ -1354,15 +1392,13 @@ Server::handleInitializeAPISession(
 			}
 			return;
 		}
-
-		// Create a cancellable context for the API connection
-		auto [apiCtx, apiCancel] =
-			s != nullptr ? gostd::contextWithCancel(s->backgroundCtx)
-			             : gostd::contextWithCancel(gostd::contextBackground());
-		struct deferCancel {
-			gostd::CancelFunc f;
-			~deferCancel() { f(); }
-		} cancelGuard{apiCancel};
+		if (!state->attachConnection(rwc)) {
+			return;
+		}
+		struct rwcGuard {
+			std::shared_ptr<gostd::io::ReadWriteCloser> c;
+			~rwcGuard() { (void)c->close(); }
+		} connGuard{rwc};
 
 		try {
 			auto conn = ipc::NewAsyncConn(rwc, apiSession);
@@ -1383,12 +1419,8 @@ Server::handleInitializeAPISession(
 				                   gostd::fmtArg(std::string_view(r)),
 				                   gostd::fmtArg(std::string_view(stack))});
 			}
-			apiCancel();
-			rwc->close();
 		}
 	}).detach();
-
-	apiSessions[apiSession->ID()] = apiSession;
 
 	auto result = std::make_shared<lsproto::InitializeAPISessionResult>();
 	result->SessionId = apiSession->ID();
@@ -1409,10 +1441,26 @@ std::string Server::generateAPIPipePath() {
 		                gostd::fmtArg(static_cast<uint64_t>(rnd()))}));
 }
 
-// removeAPISession — server.go:2358.
+// removeAPISession — server.go:2414.
 void Server::removeAPISession(const std::string& id) {
 	std::lock_guard<std::mutex> lock(apiSessionsMu);
 	apiSessions.erase(id);
+}
+
+// closeAPISessions — server.go:2420.
+void Server::closeAPISessions() {
+	std::vector<std::shared_ptr<apiSessionState>> sessions;
+	{
+		std::lock_guard<std::mutex> lock(apiSessionsMu);
+		sessions.reserve(apiSessions.size());
+		for (auto& [id, state] : apiSessions) {
+			sessions.push_back(state);
+		}
+		apiSessions.clear();
+	}
+	for (auto& state : sessions) {
+		state->stop();
+	}
 }
 
 // SetCompilerOptionsForInferredProjects — server.go:2363.
@@ -1428,8 +1476,9 @@ void Server::SetCompilerOptionsForInferredProjects(
 
 // NpmInstall — server.go:2371 (ata.NpmExecutor).
 std::pair<std::string, gostd::Error> Server::NpmInstall(
-	const std::string& cwd, const std::vector<std::string>& args) {
-	auto [out, err] = npmInstall(cwd, args);
+	const gostd::Context& ctx, const std::string& cwd,
+	const std::vector<std::string>& args) {
+	auto [out, err] = npmInstall(ctx, cwd, args);
 	return {std::string(out.begin(), out.end()), err};
 }
 

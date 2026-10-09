@@ -47,6 +47,24 @@ struct OrderedMap {
 		return {&it->second, true};
 	}
 
+	// EqualFunc — ordered_map.go:215. Compares keys in insertion order and
+	// values using equal. A null `other` differs from any non-null map.
+	template <class Eq>
+	bool EqualFunc(const OrderedMap* other, Eq equal) const {
+		if (other == nullptr) {
+			return false;
+		}
+		if (keys != other->keys) {
+			return false;
+		}
+		for (const auto& k : keys) {
+			if (!equal(mp.at(k), other->mp.at(k))) {
+				return false;
+			}
+		}
+		return true;
+	}
+
 	// GetOrZero — returns the value or a default-constructed V.
 	V GetOrZero(const K& key) const {
 		auto it = mp.find(key);

@@ -82,3 +82,69 @@ foo.bar;)";
 } // namespace
 
 REGISTER_UNIT_TEST("checker.TestGetSymbolAtLocation", TestGetSymbolAtLocation);
+
+namespace {
+
+void TestGetTypeAtLocationOfTypeOnlyImportClause(T* t) {
+	t->Parallel();
+
+	auto fs = vfs::vfstest::FromMap(
+	    {
+	        {"/types.ts", "export type U = number;\nexport default interface D { x: number }"},
+	        {"/main.ts", "import type { U } from \"./types\";\nimport type * as types from \"./types\";\nimport { U as V } from \"./types\";\nimport type D from \"./types\";\nexport const u: U = 1;\nexport const v: V = 1;\nexport type W = types.U;\nexport type E = D;"},
+	        {"/tsconfig.json", R"(
+				{
+					"compilerOptions": {},
+					"files": ["types.ts", "main.ts"]
+				}
+			)"},
+	    },
+	    false /*useCaseSensitiveFileNames*/);
+	fs = bundled::WrapFS(fs);
+
+	std::string cd = "/";
+	auto* host = compiler::NewCompilerHost(cd, fs, bundled::LibPath(),
+	                                       nullptr, nullptr, nullptr);
+
+	CompilerOptions opts;
+	auto [parsed, errors] = tsoptions::GetParsedCommandLineOfConfigFile(
+	    "/tsconfig.json", &opts, nullptr, host, nullptr);
+	assert::Equal(t, errors.size(), 0,
+	              "Expected no errors in parsed command line");
+
+	compiler::ProgramOptions programOpts;
+	programOpts.Config = parsed;
+	programOpts.Host = host;
+	auto* p = compiler::NewProgram(programOpts);
+	p->BindSourceFiles();
+	auto [c, done] = p->GetTypeChecker(ContextPtr{});
+	(void)done;
+	auto* file = p->GetSourceFile("/main.ts");
+	auto importClauseAt = [file](int index) -> Node* {
+		return file->Statements->nodes[index]
+		    ->as<ImportDeclaration>()
+		    ->ImportClause;
+	};
+	// An import clause without a default binding has no symbol of its own. A
+	// type-only one should get the same type as the equivalent regular import
+	// instead of crashing.
+	checker::Type* regular = c->GetTypeAtLocation(importClauseAt(2));
+	for (int index : {0, 1}) {
+		checker::Type* typ = c->GetTypeAtLocation(importClauseAt(index));
+		if (typ == nullptr) {
+			t->Fatalf("Expected type of import clause %d to be non-nil",
+			          {std::to_string(index)});
+		}
+		assert::Equal(t, typ, regular);
+	}
+
+	checker::Type* defaultClause = c->GetTypeAtLocation(importClauseAt(3));
+	checker::Type* defaultReference = c->GetTypeAtLocation(
+	    file->Statements->nodes[7]->as<TypeAliasDeclaration>()->Type);
+	assert::Equal(t, defaultClause, defaultReference);
+}
+
+} // namespace
+
+REGISTER_UNIT_TEST("checker.TestGetTypeAtLocationOfTypeOnlyImportClause",
+                   TestGetTypeAtLocationOfTypeOnlyImportClause);

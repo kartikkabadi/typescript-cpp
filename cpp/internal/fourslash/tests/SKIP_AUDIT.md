@@ -7,7 +7,7 @@ Suite baseline: **4,560 registered → 4,130 PASS / 0 FAIL / 430 SKIP.**
 - For each name: located the C++ registration in `cpp/internal/fourslash/tests/tests_*.cpp`, the port-side skip site, and the corresponding Go test func in `tsc/internal/fourslash/tests/`.
 - Go oracle: `go test ./internal/fourslash/tests/ -run '^(<all 417 non-GOOS-gated names>)$' -v` → every one reports `--- SKIP:` upstream. Harness-driven reasons verified per-test with `-parallel 1` (31/31 exact match).
 - GOOS: the 13 `*_js_test.go` files compile only when `GOOS=js`; they are absent from a linux test binary, so the port's gate is the faithful equivalent.
-- Reverse check: Go's skip set (417 names) equals our skip set exactly — no test passes here that upstream skips, and vice versa.
+- Reverse check: Go's skip set (415 names) equals our skip set exactly — no test passes here that upstream skips, and vice versa.
 
 ## Summary
 | Category | Count |
@@ -21,7 +21,7 @@ Every skip is mirrored upstream — either a literal `t.Skip`/`t.Skipf` in the G
 ## Breakdown by upstream mechanism
 | Upstream mechanism | n | Category |
 |---|---|---|
-| `t.Skip("Known failing fourslash test")` in test body | 385 | FAITHFUL |
+| `t.Skip("Known failing fourslash test")` in test body | 383 | FAITHFUL |
 | `t.Skip()` (bare) in test body | 1 | FAITHFUL |
 | `harnessutil.SkipUnsupportedCompilerOptions` via `fourslash.go:218` | 31 | FAITHFUL |
 | `*_js_test.go` GOOS=js gate (never compiled on linux) | 13 | FAITHFUL |
@@ -248,8 +248,6 @@ Go and the port fire the identical check in `SkipUnsupportedCompilerOptions`; ve
 | `TestFindAllRefs_importType_js2` | FAITHFUL | findAllRefs_importType_js2_test.go:11 — `t.Skip("Known failing fourslash test")` |
 | `TestFindAllRefs_importType_js3` | FAITHFUL | findAllRefs_importType_js3_test.go:11 — `t.Skip("Known failing fourslash test")` |
 | `TestFormatDotAfterNumber` | FAITHFUL | formatDotAfterNumber_test.go:11 — `t.Skip("Known failing fourslash test")` |
-| `TestFormatNoSpaceAfterTemplateHeadAndMiddle` | FAITHFUL | formatNoSpaceAfterTemplateHeadAndMiddle_test.go:12 — `t.Skip("Known failing fourslash test")` |
-| `TestFormatSpaceAfterTemplateHeadAndMiddle` | FAITHFUL | formatSpaceAfterTemplateHeadAndMiddle_test.go:12 — `t.Skip("Known failing fourslash test")` |
 | `TestFormatV8Directive` | FAITHFUL | formatV8Directive_test.go:11 — `t.Skip("Known failing fourslash test")` |
 | `TestFormattingObjectLiteralOpenCurlyNewlineTyping` | FAITHFUL | formattingObjectLiteralOpenCurlyNewlineTyping_test.go:11 — `t.Skip("Known failing fourslash test")` |
 | `TestFormattingObjectLiteralOpenCurlySingleLine` | FAITHFUL | formattingObjectLiteralOpenCurlySingleLine_test.go:11 — `t.Skip("Known failing fourslash test")` |

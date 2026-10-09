@@ -27,6 +27,7 @@
 
 #include "internal/gostd/gostd.h"
 #include "internal/gostd/testing.h"
+#include "internal/testrunner/testrunner.h"
 #include "internal/testutil/contentmappertest/contentmappertest.h"
 #include "internal/testutil/unittests/registry.h"
 
@@ -303,6 +304,9 @@ int main(int argc, char** argv) {
 			return 0;
 		}
 	}
+
+	// compiler_test_filter.go — Go's RunTests reads flag.Lookup("test.run").
+	tsc::testrunner::setCompilerTestRunPattern(runFilter);
 
 	std::regex re;
 	try {

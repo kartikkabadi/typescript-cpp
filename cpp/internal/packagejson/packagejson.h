@@ -504,6 +504,18 @@ struct InfoCache {
 			return f(k, v);
 		});
 	}
+
+	// cache.go:230 Clone — a new cache table holding the same entries.
+	std::shared_ptr<InfoCache> Clone() {
+		auto clone = std::make_shared<InfoCache>(currentDirectory,
+		                                       useCaseSensitiveFileNames);
+		cache.Range([&](const std::string& k,
+		                const std::shared_ptr<InfoCacheEntry>& v) {
+			clone->cache.Store(k, v);
+			return true;
+		});
+		return clone;
+	}
 };
 
 }  // namespace tsc::packagejson

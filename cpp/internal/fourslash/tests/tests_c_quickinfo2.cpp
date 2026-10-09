@@ -1108,9 +1108,7 @@ type DeeplyMapped/*6*/ = {[K in keyof Foo]: {[K2 in keyof Foo]: [K, K2, Foo[K], 
         _499: [...];
     };
     ... 498 more ...;
-    _499: {
-        ...;
-    };
+    _499: ...;
 })TS", "");
 	});
 }

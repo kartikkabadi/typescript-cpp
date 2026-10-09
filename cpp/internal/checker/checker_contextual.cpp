@@ -1126,9 +1126,14 @@ Type* Checker::getContextualTypeForBindingElement(Node* declaration,
 Type* Checker::getContextualTypeForStaticPropertyDeclaration(
 	Node* declaration, ContextFlags contextFlags) {
 	if (isExpression(declaration->parent)) {
+		// Don't contextually type a static property by its own class, its
+		// type might still be in-progress and that would cause spurious
+		// circularities
 		if (Type* parentType =
 				getContextualType(declaration->parent, contextFlags);
-			parentType != nullptr) {
+			parentType != nullptr &&
+			parentType->symbol !=
+			    getSymbolOfDeclaration(declaration->parent)) {
 			return getTypeOfPropertyOfContextualType(
 				parentType, getSymbolOfDeclaration(declaration)->name);
 		}

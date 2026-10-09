@@ -1031,10 +1031,11 @@ Type* Checker::checkMetaProperty(Node* node) {
 	case Kind::NewKeyword:
 		return checkNewTargetMetaProperty(node);
 	case Kind::ImportKeyword:
-		if (node->name()->text() == "defer") {
-			TSC_ASSERT(!isCallExpression(node->parent) ||
-			               node->parent->expression() != node,
-			           "Trying to get the type of `import.defer` in `import.defer(...)`");
+		if (isImportPhaseMetaProperty(node)) {
+			if (isCallExpression(node->parent)) {
+				TSC_ASSERT(node->parent->expression() != node,
+				           "Trying to get the type of a phase import meta-property in its call");
+			}
 			return errorType;
 		}
 		return checkImportMetaProperty(node);
@@ -1904,14 +1905,15 @@ Type* Checker::getFlowTypeOfAccessExpression(Node* node, Symbol* prop,
 		Node* declaration = prop->valueDeclaration;
 		if (declaration != nullptr) {
 			if (strictPropertyInitialization && isAccessExpression(node) &&
-			    node->expression()->kind == Kind::ThisKeyword &&
-			    isPropertyWithoutInitializer(declaration) &&
-			    !isStatic(declaration)) {
-				Node* flowContainer = getControlFlowContainer(node);
-				if (isConstructorDeclaration(flowContainer) &&
-				    flowContainer->parent == declaration->parent &&
-				    (declaration->flags & NodeFlagsAmbient) == 0) {
-					assumeUninitialized = true;
+			    node->expression()->kind == Kind::ThisKeyword) {
+				if (isPropertyWithoutInitializer(declaration) &&
+				    !isStatic(declaration)) {
+					Node* flowContainer = getControlFlowContainer(node);
+					if (isConstructorDeclaration(flowContainer) &&
+					    flowContainer->parent == declaration->parent &&
+					    (declaration->flags & NodeFlagsAmbient) == 0) {
+						assumeUninitialized = true;
+					}
 				}
 			} else if (isBinaryExpression(declaration) &&
 			           isPropertyAccessExpression(

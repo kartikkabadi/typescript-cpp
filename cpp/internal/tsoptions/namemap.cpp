@@ -71,11 +71,6 @@ const NameMap& BuildNameMap() {
 	    GetNameMapFromList(BuildOpts());
 	return *m;
 }
-const NameMap& WatchNameMap() {
-	static const std::shared_ptr<NameMap> m =
-	    GetNameMapFromList(OptionsForWatch());
-	return *m;
-}
 
 // CommandLineOptionNameMap — tsconfigparsing.go:596.
 const CommandLineOption* CommandLineOptionNameMap::Get(

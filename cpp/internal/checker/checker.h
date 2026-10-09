@@ -721,14 +721,21 @@ inline constexpr ExpandingFlags ExpandingFlagsBoth = ExpandingFlagsSource | Expa
 // InferenceKey / InferenceState (free-list pooled) — inference.go:11-30
 
 struct InferenceKey {
-	TypeId s{};
-	TypeId t{};
+	TypeId source{};
+	TypeId target{};
+	InferencePriority priority{};
+	bool contravariant{};
+	bool bivariant{};
 	bool operator==(const InferenceKey&) const = default;
 };
 
 struct InferenceKeyHash {
 	size_t operator()(const InferenceKey& k) const noexcept {
-		return (static_cast<size_t>(k.s) << 32) | static_cast<size_t>(k.t);
+		return (static_cast<size_t>(k.source) << 32) |
+		       static_cast<size_t>(k.target) ^
+		       ((static_cast<size_t>(k.priority) << 3) |
+		        (static_cast<size_t>(k.contravariant) << 1) |
+		        static_cast<size_t>(k.bivariant));
 	}
 };
 
@@ -941,20 +948,27 @@ NodeBuilder* NewNodeBuilderEx(
 
 // EmitResolver — emitresolver.go:34. Go's checkerMu is elided: the C++ checker
 // is single-threaded, so every lock in emitresolver.go compiles away.
-struct EmitResolver : binder::ReferenceResolver {
-	Checker* checker{};
-	std::function<bool(Node*)> isValueAliasDeclaration;
-	std::function<bool(Node*)> aliasMarkingVisitor;
-	binder::ReferenceResolver* referenceResolver{};
-
+struct EmitResolverLinks {
 	Arena jsxLinksArena;
 	LinkStore<Node*, JSXLinks> jsxLinks{&jsxLinksArena};
 	Arena declarationLinksArena;
 	LinkStore<Node*, DeclarationLinks> declarationLinks{&declarationLinksArena};
 	Arena declarationFileLinksArena;
 	LinkStore<Node*, DeclarationFileLinks> declarationFileLinks{&declarationFileLinksArena};
+};
+
+struct EmitResolver : binder::ReferenceResolver {
+	Checker* checker{};
+	std::function<bool(Node*)> isValueAliasDeclaration;
+	std::function<bool(Node*)> aliasMarkingVisitor;
+	binder::ReferenceResolver* referenceResolver{};
+
+	printer::EmitContext* emitContext{};
+	NodeBuilder* requestNodeBuilder{};
 
 	// Locking API surface (locks elided — see note above).
+	printer::EmitContext* EmitContext();
+	NodeBuilder* nodeBuilder();
 	Node* GetJsxFactoryEntity(Node* location);
 	Node* GetJsxFragmentFactoryEntity(Node* location);
 	bool IsOptionalParameter(Node* node);
@@ -989,31 +1003,22 @@ struct EmitResolver : binder::ReferenceResolver {
 	std::string GetElementAccessExpressionName(
 	    ElementAccessExpression* expression) override;
 	Node* GetReferencedMemberValueDeclaration(Node* node) override;
-	Node* CreateReturnTypeOfSignatureDeclaration(printer::EmitContext* emitContext, Node* signatureDeclaration, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
-	std::vector<Node*> CreateTypeParametersOfSignatureDeclaration(printer::EmitContext* emitContext, Node* signatureDeclaration, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
-	Node* CreateTypeOfDeclaration(printer::EmitContext* emitContext, Node* declaration, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
-	Node* CreateLiteralConstValue(printer::EmitContext* emitContext, Node* node, nodebuilder::SymbolTracker* tracker);
-	Node* CreateTypeOfExpression(printer::EmitContext* emitContext, Node* expression, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
-	std::vector<Node*> CreateLateBoundIndexSignatures(printer::EmitContext* emitContext, Node* container, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
+	Node* CreateReturnTypeOfSignatureDeclaration(Node* signatureDeclaration, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
+	std::vector<Node*> CreateTypeParametersOfSignatureDeclaration(Node* signatureDeclaration, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
+	Node* CreateTypeOfDeclaration(Node* declaration, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
+	Node* CreateLiteralConstValue(Node* node, nodebuilder::SymbolTracker* tracker);
+	Node* CreateTypeOfExpression(Node* expression, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
+	std::vector<Node*> CreateLateBoundIndexSignatures(Node* container, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
 	ModifierFlags GetEffectiveDeclarationFlags(Node* node, ModifierFlags flags);
 	LiteralValue GetConstantValue(Node* node);
 	printer::TypeReferenceSerializationKind GetTypeReferenceSerializationKind(Node* typeName, Node* location);
 	std::vector<Symbol*> GetPropertiesOfContainerFunction(Node* node);
-	Node* TryJSTypeNodeToTypeNode(printer::EmitContext* emitContext, Node* typeNode, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
+	Node* TryJSTypeNodeToTypeNode(Node* typeNode, Node* enclosingDeclaration, nodebuilder::Flags flags, nodebuilder::InternalFlags internalFlags, nodebuilder::SymbolTracker* tracker);
 	bool IsThisPropertyAssignmentDeclarationRedundant(Node* node);
 
 	// Internal workers (unlocked in Go).
-	bool isDeclarationVisible(Node* node);
-	bool determineIfDeclarationIsVisible(Node* node);
 	bool aliasMarkingVisitorWorker(Node* node);
 	void markLinkedAliases(Node* node);
-	printer::SymbolAccessibilityResult isEntityNameVisible(Node* entityName, Node* enclosingDeclaration, bool shouldComputeAliasToMakeVisible);
-	printer::SymbolAccessibilityResult* hasVisibleDeclarations(Symbol* symbol, bool shouldComputeAliasToMakeVisible);
-	bool requiresAddingImplicitUndefined(Node* declaration, Symbol* symbol, Node* enclosingDeclaration);
-	bool requiresAddingImplicitUndefinedWorker(Node* parameter, Node* enclosingDeclaration);
-	bool declaredParameterTypeContainsUndefined(Node* parameter);
-	bool isOptionalUninitializedParameterProperty(Node* parameter);
-	bool isRequiredInitializedParameter(Node* parameter, Node* enclosingDeclaration);
 	bool isOptionalParameter(Node* node);
 	printer::SymbolAccessibilityResult isSymbolAccessible(Symbol* symbol, Node* enclosingDeclaration, SymbolFlags meaning, bool shouldComputeAliasToMarkVisible);
 	bool isValueAliasDeclarationWorker(Node* node);
@@ -1022,7 +1027,7 @@ struct EmitResolver : binder::ReferenceResolver {
 };
 
 // newEmitResolver — emitresolver.go:45
-EmitResolver* newEmitResolver(Checker* checker);
+EmitResolver* newEmitResolver(Checker* checker, printer::EmitContext* emitContext);
 
 // Relater (relater.go)
 
@@ -1040,6 +1045,7 @@ struct ResolvedModule {
 	std::string resolvedFileName{};
 	bool resolvedUsingTsExtension{};
 	bool isExternalLibraryImport{};
+	bool isCustomResolution{};
 	std::string extension{};
 	std::string alternateResult{};
 	PackageId packageId{};
@@ -1485,6 +1491,7 @@ public:
 	Arena linksArena; // arena backing symbolArenaLinkStore + link stores
 	Arena typeArena;  // arena backing all Type allocations (types never move)
 	std::unordered_map<Symbol*, Symbol*> mergedSymbols;
+	std::unordered_set<Symbol*> mergedExportsChecked;
 	NodeFactory factory;
 	nodeLinkStore<NodeLinks> nodeLinks;
 	nodeLinkStore<SignatureLinks> signatureLinks;
@@ -1512,6 +1519,7 @@ public:
 	LinkStore<Symbol*, ReverseMappedSymbolLinks> reverseMappedSymbolLinks{&linksArena};
 	LinkStore<Symbol*, MarkedAssignmentSymbolLinks> markedAssignmentSymbolLinks{&linksArena};
 	LinkStore<Symbol*, ContainingSymbolLinks> symbolContainerLinks{&linksArena};
+	externalModuleContainerIndex* externalModuleContainers{};
 	LinkStore<SourceFile*, SourceFileLinks> sourceFileLinks{&linksArena};
 	std::optional<Scanner> regExpScanner;
 	std::unordered_map<Type*, Node*> patternForType;
@@ -1676,6 +1684,7 @@ public:
 	std::function<Type*()> getGlobalPromiseType;
 	std::function<Type*()> getGlobalPromiseTypeChecked;
 	std::function<Type*()> getGlobalPromiseLikeType;
+	std::function<Type*()> getGlobalAbstractModuleSourceType;
 	std::function<Symbol*()> getGlobalPromiseConstructorSymbol;
 	std::function<Symbol*()> getGlobalPromiseConstructorSymbolOrNil;
 	std::function<Symbol*()> getGlobalOmitSymbol;
@@ -1713,8 +1722,7 @@ public:
 	std::function<bool(Type*)> isStringIndexSignatureOnlyType;
 	std::function<bool(Node*)> markNodeAssignments;
 	TypeComparer compareTypesAssignable{};
-	EmitResolver* emitResolver{};
-	std::once_flag emitResolverOnce;
+	EmitResolverLinks emitResolverLinks;
 	std::string _jsxNamespace;
 	Node* _jsxFactoryEntity{};
 	std::unordered_set<Node*> skipDirectInferenceNodes;
@@ -2079,6 +2087,10 @@ public:
 	Symbol* getSymbolOfDeclaration(Node* node);
 	Symbol* getSymbolOfNode(Node* node);
 	Symbol* getMergedSymbol(Symbol* symbol);
+	Symbol* getResolvedTarget(Symbol* symbol);
+	std::vector<Symbol*> getExternalModuleContainers(Symbol* symbol);
+	void buildExternalModuleContainerIndex();
+	std::vector<Symbol*> scanExternalModuleContainers(Symbol* symbol);
 	void recordMergedSymbol(Symbol* target, Symbol* source);
 	Symbol* mergeSymbol(Symbol* target, Symbol* source, bool unidirectional);
 	void mergeSymbolTable(SymbolTable& target, const SymbolTable& source, bool unidirectional,
@@ -2428,6 +2440,7 @@ public:
 	void checkVariableDeclaration(Node* node);
 	void checkBindingElement(Node* node);
 	void checkClassDeclaration(Node* node);
+	void checkConstructorDeclaredProperties(Node* node);
 	void checkInterfaceDeclaration(Node* node);
 	void checkTypeAliasDeclaration(Node* node);
 	void checkEnumDeclaration(Node* node);
@@ -3633,7 +3646,18 @@ public:
 	Symbol* getApplicableIndexSymbol(Type* t, Type* keyType);
 	Type* getRegularTypeOfExpression(Node* expr);
 	Type* GetTypeAtLocation(Node* node);
-	EmitResolver* GetEmitResolver();
+	EmitResolver* NewEmitResolver(printer::EmitContext* emitContext);
+
+	// Emit-support workers moved off EmitResolver (emitsupport.go)
+	bool isDeclarationVisible(Node* node);
+	bool determineIfDeclarationIsVisible(Node* node);
+	printer::SymbolAccessibilityResult isEntityNameVisible(Node* entityName, Node* enclosingDeclaration, bool shouldComputeAliasToMakeVisible);
+	printer::SymbolAccessibilityResult* hasVisibleDeclarations(Symbol* symbol, bool shouldComputeAliasToMakeVisible);
+	bool requiresAddingImplicitUndefined(Node* declaration, Symbol* symbol, Node* enclosingDeclaration);
+	bool requiresAddingImplicitUndefinedWorker(Node* parameter, Node* enclosingDeclaration);
+	bool declaredParameterTypeContainsUndefined(Node* parameter);
+	bool isOptionalUninitializedParameterProperty(Node* parameter);
+	bool isRequiredInitializedParameter(Node* parameter, Node* enclosingDeclaration);
 	Type* getImportAttributesTypeForModuleSpecifier(Node* moduleSpecifier);
 	Symbol* getSymbolOfPartOfRightHandSideOfImportEquals(Node* entityName);
 	// expr/jsx/emitresolver-owned deps (stubs until those slices land)
@@ -3792,6 +3816,8 @@ public:
 	InferenceState* getInferenceState();
 	void putInferenceState(InferenceState* n);
 	void inferFromTypes(InferenceState* n, Type* source, Type* target);
+	void inferFromAliasTypeArguments(InferenceState* n, Type* source, Type* target);
+	void inferFromReferenceTypeArguments(InferenceState* n, Type* source, Type* target);
 	void inferFromTypeArguments(InferenceState* n, const std::vector<Type*>& sourceTypes,
 								const std::vector<Type*>& targetTypes,
 								const std::vector<VarianceFlags>& variances);
@@ -4586,6 +4612,9 @@ public:
 	Symbol* GetGlobalSymbol(const std::string& name, SymbolFlags meaning,
 							const DiagnosticMessage* diagnostic);
 	Symbol* GetMergedSymbol(Symbol* symbol);
+	Symbol* GetSymbolOfNode(Node* node);
+	Symbol* GetSymbolOfDeclaration(Node* node);
+	Symbol* GetParentOfSymbol(Symbol* symbol);
 	Symbol* TryFindAmbientModule(const std::string& moduleName);
 	Symbol* GetImmediateAliasedSymbol(Symbol* symbol);
 	Symbol* GetTargetSymbol(Symbol* symbol);
@@ -4802,6 +4831,9 @@ struct CompositeTypeCacheIdentity {
 	TypeId typeId = 0;
 	nodebuilder::Flags flags = 0;
 	nodebuilder::InternalFlags internalFlags = 0;
+	// nodebuilderimpl.go — distinguishes entries keyed under different
+	// in-flight inference contexts (empty when none).
+	CacheKey inferTypeParameters;
 	bool operator==(const CompositeTypeCacheIdentity&) const = default;
 };
 
@@ -4809,7 +4841,8 @@ struct CompositeTypeCacheIdentityHash {
 	size_t operator()(const CompositeTypeCacheIdentity& k) const {
 		size_t h = static_cast<size_t>(k.typeId);
 		h = h * 0x9E3779B97F4A7C15ull ^ static_cast<size_t>(k.flags);
-		return h * 0x9E3779B97F4A7C15ull ^ static_cast<size_t>(k.internalFlags);
+		h = h * 0x9E3779B97F4A7C15ull ^ static_cast<size_t>(k.internalFlags);
+		return h * 0x9E3779B97F4A7C15ull ^ CacheKeyHash{}(k.inferTypeParameters);
 	}
 };
 
@@ -5110,6 +5143,7 @@ struct NodeBuilderImpl {
 	bool isActivelyExpanding();
 	Node* appendReferenceToType(Node* root, Node* ref);
 	Node* createElidedInformationPlaceholder();
+	Node* createCyclicStructurePlaceholder();
 	NodeList* mapToTypeNodes(std::vector<Type*> list, bool isBareList);
 	void setCommentRange(Node* node, Node* range_);
 	bool typeNodeIsEquivalentToType(Node* annotatedDeclaration, Type* t,
@@ -5217,6 +5251,7 @@ struct NodeBuilderImpl {
 	Node* typeToTypeNodeOrCircularityElision(Type* t);
 	Node* conditionalTypeToTypeNode(Type* _t);
 	Symbol* getParentSymbolOfTypeParameter(Type* typeParameter);
+	Node* arrayOrTupleTypeToNode(Type* t);
 	Node* typeReferenceToTypeNode(Type* t);
 	Node* visitAndTransformType(Type* t,
 	                            Node* (NodeBuilderImpl::*transform)(Type*));
@@ -5411,6 +5446,7 @@ int compareTypeLists(const std::vector<Type*>& s1, const std::vector<Type*>& s2)
 int compareTypeMappers(TypeMapper* m1, TypeMapper* m2);
 bool isCompoundLikeAssignment(Node* assignment);
 bool isShorthandAmbientModuleSymbol(Symbol* moduleSymbol);
+Node* getModuleSpecifierFromNode(Node* node);
 bool isShorthandAmbientModule(Node* node);
 bool isExponentiationOperator(Kind kind);
 bool isMultiplicativeOperator(Kind kind);

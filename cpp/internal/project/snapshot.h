@@ -56,6 +56,8 @@ struct APIReconfigureProgramRequest : APICreateProgramRequest {
 
 // APISnapshotRequest — snapshot.go:340.
 struct APISnapshotRequest {
+	ls::lsutil::UserPreferences* UserPreferences = nullptr;
+	lsp::lsproto::DocumentUri PrepareAutoImports;
 	collections::Set<std::string>* OpenProjects = nullptr;
 	collections::Set<tspath::Path>* CloseProjects = nullptr;
 	std::unordered_map<tspath::Path, std::string>* OpenFiles =

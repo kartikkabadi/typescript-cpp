@@ -168,6 +168,21 @@ void ProjectCollectionBuilder::forEachProject(
 // HandleAPIRequest — projectcollectionbuilder.go:183.
 gostd::Error ProjectCollectionBuilder::HandleAPIRequest(
     APISnapshotRequest* apiRequest, logging::LogTree* logger) {
+	// Clone apiState up front and restore it if the request fails partway.
+	APIState previousAPIState = apiState;
+	apiState = apiState.clone();
+	gostd::Error errResult;
+	struct apiStateGuard {
+		APIState* live;
+		APIState* previous;
+		gostd::Error* err;
+		~apiStateGuard() {
+			if (*err != nullptr) {
+				*live = *previous;
+			}
+		}
+	} guard{&apiState, &previousAPIState, &errResult};
+
 	std::unordered_set<tspath::Path> projectsToClose;
 	if (apiRequest->CloseProjects != nullptr) {
 		for (auto& projectPath : apiRequest->CloseProjects->Keys()) {
@@ -196,7 +211,7 @@ gostd::Error ProjectCollectionBuilder::HandleAPIRequest(
 				projectsToClose.erase(configPath);
 				updateProgram(entry.get(), logger);
 			} else {
-				return gostd::newError(
+				return errResult = gostd::newError(
 				    "project not found for open: " +
 				    configFileName);
 			}
@@ -253,7 +268,7 @@ gostd::Error ProjectCollectionBuilder::HandleAPIRequest(
 				if (findDefaultConfiguredProject(fileName, path) ==
 				        nullptr &&
 				    !isSupportedInInferredProject(fileName)) {
-					return gostd::newError(
+					return errResult = gostd::newError(
 					    "no project found for opened file: " +
 					    fileName);
 				}
@@ -265,7 +280,7 @@ gostd::Error ProjectCollectionBuilder::HandleAPIRequest(
 			retain.Union(result.retain);
 			if (result.project == nullptr) {
 				if (!isSupportedInInferredProject(fileName)) {
-					return gostd::newError(
+					return errResult = gostd::newError(
 					    "no project found for opened file: " +
 					    fileName);
 				}
@@ -283,7 +298,7 @@ gostd::Error ProjectCollectionBuilder::HandleAPIRequest(
 	collections::Set<SyntheticProjectID> seenReconfiguredPrograms;
 	for (auto* request : apiRequest->ReconfigurePrograms) {
 		if (seenReconfiguredPrograms.Has(request->ProgramID)) {
-			return gostd::newError(
+			return errResult = gostd::newError(
 			    "synthetic program reconfigured more than once: " +
 			    std::string{request->ProgramID});
 		}
@@ -291,7 +306,7 @@ gostd::Error ProjectCollectionBuilder::HandleAPIRequest(
 		// Go: (*collections.Set).Has is nil-receiver safe.
 		if (apiRequest->RemovePrograms != nullptr &&
 		    apiRequest->RemovePrograms->Has(request->ProgramID)) {
-			return gostd::newError(
+			return errResult = gostd::newError(
 			    "synthetic program cannot be reconfigured and "
 			    "removed: " +
 			    std::string{request->ProgramID});
@@ -299,7 +314,7 @@ gostd::Error ProjectCollectionBuilder::HandleAPIRequest(
 		if (auto res =
 		        syntheticProjects->Load(request->ProgramID);
 		    !res.second) {
-			return gostd::newError(
+			return errResult = gostd::newError(
 			    "synthetic program not found for reconfiguration: " +
 			    std::string{request->ProgramID});
 		}
@@ -309,7 +324,7 @@ gostd::Error ProjectCollectionBuilder::HandleAPIRequest(
 		for (auto& programID : apiRequest->RemovePrograms->Keys()) {
 			auto res = syntheticProjects->Load(programID);
 			if (!res.second) {
-				return gostd::newError(
+				return errResult = gostd::newError(
 				    "synthetic program not found for removal: " +
 				    std::string{programID});
 			}
@@ -376,7 +391,7 @@ gostd::Error ProjectCollectionBuilder::HandleAPIRequest(
 		didRequestFile(fileName, path,
 		               false /*configuredProjectsOnly*/, logger);
 		if (findDefaultProject(fileName, path) == nullptr) {
-			return gostd::newError(
+			return errResult = gostd::newError(
 			    "no project found for opened file: " + fileName);
 		}
 	}
@@ -401,7 +416,7 @@ gostd::Error ProjectCollectionBuilder::HandleAPIRequest(
 		}
 		return moduleResolutionError == nullptr;
 	});
-	return moduleResolutionError;
+	return errResult = moduleResolutionError;
 }
 
 // nextSyntheticProjectID — projectcollectionbuilder.go:343.
@@ -959,6 +974,14 @@ void ProjectCollectionBuilder::DidRequestProjectTrees(
 		});
 	}
 	wg->RunAndWait();
+
+	// Updated configured projects may have moved open files in or out of
+	// the inferred project. Callers iterate over all language service
+	// projects, so the inferred one needs a program too.
+	cleanupInferredProject(logger);
+	if (inferredProject->Value() != nullptr) {
+		updateProgram(inferredProject, logger);
+	}
 
 	auto elapsed =
 	    duration_cast<nanoseconds>(steady_clock::now() - startTime);
@@ -1755,8 +1778,7 @@ ProjectCollectionBuilder::updateOrCreateSyntheticProject(
 	    [&](Project* p) {
 		    return p->CommandLine->FileNames() !=
 		               newCommandLine->FileNames() ||
-		           !compilerOptionsDeepEqual(
-		               p->CommandLine->CompilerOptions(),
+		           !p->CommandLine->CompilerOptions()->Equals(
 		               compilerOptions) ||
 		           !projectReferencesEqual(
 		               p->CommandLine->ProjectReferences(),
@@ -1859,8 +1881,7 @@ bool ProjectCollectionBuilder::updateOrCreateInferredProject(
 	    [&](Project* p) {
 		    return p->CommandLine->FileNames() !=
 		               newCommandLine->FileNames() ||
-		           !compilerOptionsDeepEqual(
-		               p->CommandLine->CompilerOptions(),
+		           !p->CommandLine->CompilerOptions()->Equals(
 		               compilerOptions) ||
 		           !projectReferencesEqual(
 		               p->CommandLine->ProjectReferences(),

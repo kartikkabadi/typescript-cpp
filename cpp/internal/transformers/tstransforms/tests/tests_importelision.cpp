@@ -209,11 +209,12 @@ void TestImportElision(T* t) {
 			auto* c = new checker::Checker();
 			c->init(&program);
 
-			auto* emitResolver = c->GetEmitResolver();
+			auto* emitContext = printer::NewEmitContext();
+			auto* emitResolver = c->NewEmitResolver(emitContext);
 
 			transformers::TransformOptions opts;
 			opts.CompilerOptions = compilerOptions;
-			opts.Context = printer::NewEmitContext();
+			opts.Context = emitContext;
 			opts.EmitResolver = emitResolver;
 			opts.Resolver = emitResolver;
 			file = tstransforms::NewTypeEraserTransformer(&opts)

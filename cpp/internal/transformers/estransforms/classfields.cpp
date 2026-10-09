@@ -62,6 +62,21 @@ inline bool isObjectBindingOrAssignmentElement(Node* node) {
 	}
 }
 
+// ast.IsObjectLiteralElement — ast.go helpers (file-local copy)
+inline bool isObjectLiteralElement(Node* element) {
+	switch (element->kind) {
+	case Kind::PropertyAssignment:
+	case Kind::ShorthandPropertyAssignment:
+	case Kind::SpreadAssignment:
+	case Kind::MethodDeclaration:
+	case Kind::GetAccessor:
+	case Kind::SetAccessor:
+		return true;
+	default:
+		return false;
+	}
+}
+
 // ast.IsArrayBindingOrAssignmentElement — utilities.go:3381
 inline bool isArrayBindingOrAssignmentElement(Node* node) {
 	switch (node->kind) {
@@ -985,9 +1000,11 @@ Node* classFieldsTransformer::visitMethodOrAccessorDeclaration(Node* node) {
 	}
 
 	// leave invalid code untransformed
-	privateIdentifierInfo* info = accessPrivateIdentifier(node->name());
+	privateIdentifierInfo* info =
+	    getPrivateIdentifier(getPrivateIdentifierEnvironment(), node->name());
 	debugAssert(info != nullptr, "Undeclared private name for property declaration.");
-	if (!info->isValid) {
+	if (info->kind == printer::PrivateIdentifierKind::Untransformed ||
+	    !info->isValid) {
 		return node;
 	}
 
@@ -1196,11 +1213,13 @@ Node* classFieldsTransformer::transformAutoAccessor(PropertyDeclaration* node) {
 Node* classFieldsTransformer::transformPrivateFieldInitializer(PropertyDeclaration* node) {
 	if (shouldTransformClassElementToWeakMap(node->asNode())) {
 		// If we are transforming private elements into WeakMap/WeakSet, we should elide the node.
-		privateIdentifierInfo* info = accessPrivateIdentifier(node->name);
+		privateIdentifierInfo* info = getPrivateIdentifier(
+		    getPrivateIdentifierEnvironment(), node->name);
 		debugAssert(info != nullptr, "Undeclared private name for property declaration.");
 
 		// Leave invalid code untransformed
-		if (!info->isValid) {
+		if (info->kind == printer::PrivateIdentifierKind::Untransformed ||
+		    !info->isValid) {
 			return node->asNode();
 		}
 
@@ -3708,7 +3727,7 @@ Node* classFieldsTransformer::visitAssignmentRestProperty(Node* node) {
 }
 
 Node* classFieldsTransformer::visitObjectAssignmentElement(Node* node) {
-	debugAssert(node != nullptr && isObjectBindingOrAssignmentElement(node));
+	debugAssert(node != nullptr && isObjectLiteralElement(node));
 	if (isSpreadAssignment(node)) {
 		return visitAssignmentRestProperty(node);
 	}

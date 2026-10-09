@@ -115,6 +115,18 @@ void TestGetTextOfNodeFromJSDocTypePreservesAsteriskType(T* t) {
 	              "*");
 }
 
+
+void TestScanSourceKeyword(T* t) {
+	t->Parallel();
+	Scanner s;
+	s.setText("source sourceValue");
+	assert::Equal(t, s.scan(), Kind::SourceKeyword);
+	assert::Equal(t, std::string(tokenToString(Kind::SourceKeyword)),
+	              std::string("source"));
+	assert::Equal(t, stringToToken("source"), Kind::SourceKeyword);
+	assert::Equal(t, s.scan(), Kind::Identifier);
+	assert::Equal(t, std::string(s.tokenValue()), std::string("sourceValue"));
+}
 } // namespace
 
 REGISTER_UNIT_TEST("scanner.TestScanStringPreservesLoneSurrogates",
@@ -125,3 +137,5 @@ REGISTER_UNIT_TEST("scanner.TestIsJSDocTypeExpressionOrChild",
                    TestIsJSDocTypeExpressionOrChild);
 REGISTER_UNIT_TEST("scanner.TestGetTextOfNodeFromJSDocTypePreservesAsteriskType",
                    TestGetTextOfNodeFromJSDocTypePreservesAsteriskType);
+
+REGISTER_UNIT_TEST("scanner.TestScanSourceKeyword", TestScanSourceKeyword);

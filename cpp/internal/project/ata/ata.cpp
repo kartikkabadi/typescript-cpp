@@ -214,13 +214,14 @@ bool TypingsInstaller::IsKnownTypesPackageName(
 	}
 	// Strada did this lazily - is that needed here to not waiting on and
 	// returning false on first request
-	init(projectID->String(), fs, logger);
+	init(gostd::contextBackground(), projectID->String(), fs, logger);
 	return typesRegistry.find(name) != typesRegistry.end();
 }
 
 std::pair<std::unique_ptr<TypingsInstallResult>, gostd::Error>
-TypingsInstaller::InstallTypings(const TypingsInstallRequest* request) {
-	auto [result, err] = discoverAndInstallTypings(request);
+TypingsInstaller::InstallTypings(
+    const gostd::Context& ctx, const TypingsInstallRequest* request) {
+	auto [result, err] = discoverAndInstallTypings(ctx, request);
 	if (err == nullptr) {
 		std::sort(result->TypingsFiles.begin(), result->TypingsFiles.end());
 		std::sort(result->FilesToWatch.begin(), result->FilesToWatch.end());
@@ -233,8 +234,8 @@ TypingsInstaller::InstallTypings(const TypingsInstallRequest* request) {
 
 std::pair<std::unique_ptr<TypingsInstallResult>, gostd::Error>
 TypingsInstaller::discoverAndInstallTypings(
-    const TypingsInstallRequest* request) {
-	init(request->ProjectID->String(), request->FS, request->Logger);
+    const gostd::Context& ctx, const TypingsInstallRequest* request) {
+	init(ctx, request->ProjectID->String(), request->FS, request->Logger);
 
 	auto discovered = DiscoverTypings(
 	    request->FS, request->Logger, request->TypingsInfo,
@@ -248,7 +249,7 @@ TypingsInstaller::discoverAndInstallTypings(
 		    filterTypings(request->Logger, discovered.newTypingNames);
 		if (!filteredTypings.empty()) {
 			auto [typingsFiles, err] =
-			    installTypings(requestId, discovered.cachedTypingPaths,
+			    installTypings(ctx, requestId, discovered.cachedTypingPaths,
 			                   filteredTypings, request->Logger);
 			if (err != nullptr) {
 				return {nullptr, err};
@@ -277,7 +278,7 @@ TypingsInstaller::discoverAndInstallTypings(
 
 std::pair<std::vector<std::string>, gostd::Error>
 TypingsInstaller::installTypings(
-    int32_t requestID,
+    const gostd::Context& ctx, int32_t requestID,
     const std::vector<std::string>& currentlyCachedTypings,
     const std::vector<std::string>& filteredTypings,
     logging::Logger* logger) {
@@ -306,7 +307,7 @@ TypingsInstaller::installTypings(
 	}
 
 	auto [packageNames, ok] =
-	    installWorker(requestID, scopedTypings, logger);
+	    installWorker(ctx, requestID, scopedTypings, logger);
 	if (ok) {
 		logging::logf(logger, "ATA:: Installed typings %v",
 		              fmtStringList(packageNames));
@@ -408,14 +409,14 @@ TypingsInstaller::installTypings(
 }
 
 std::pair<std::vector<std::string>, bool> TypingsInstaller::installWorker(
-    int32_t requestId, const std::vector<std::string>& packageNames,
+    const gostd::Context& ctx, int32_t requestId,
+    const std::vector<std::string>& packageNames,
     logging::Logger* logger) {
 	logging::logf(logger, "ATA:: #%d with cwd: %s arguments: %v", requestId,
 	              typingsLocation.c_str(), fmtStringList(packageNames));
-	auto ctx = gostd::contextBackground();
 	gostd::Error err = installNpmPackages(
 	    ctx, packageNames, &concurrencySemaphore,
-	    [this, logger](const std::vector<std::string>& packageNames)
+	    [this, ctx, logger](const std::vector<std::string>& packageNames)
 	        -> gostd::Error {
 		    std::vector<std::string> npmArgs;
 		    npmArgs.push_back("install");
@@ -426,7 +427,7 @@ std::pair<std::vector<std::string>, bool> TypingsInstaller::installWorker(
 		    npmArgs.push_back("--user-agent=\"typesInstaller/" +
 		                      std::string(version()) + "\"");
 		    auto [output, err] =
-		        host->NpmInstall(typingsLocation, npmArgs);
+		        host->NpmInstall(ctx, typingsLocation, npmArgs);
 		    if (err != nullptr) {
 			    logging::logf(logger, "ATA:: Output is: %s",
 			                  output.c_str());
@@ -484,9 +485,10 @@ std::vector<std::string> TypingsInstaller::filterTypings(
 	return result;
 }
 
-void TypingsInstaller::init(const std::string& projectID, vfs::FS* fs,
+void TypingsInstaller::init(const gostd::Context& ctx,
+                            const std::string& projectID, vfs::FS* fs,
                             logging::Logger* logger) {
-	std::call_once(initOnce, [this, &projectID, fs, logger] {
+	std::call_once(initOnce, [this, ctx, &projectID, fs, logger] {
 		logging::log(logger, "ATA:: Global cache location '" +
 		                         typingsLocation +
 		                         "'"); //, safe file path '" + safeListPath + "', types map path '" + typesMapLocation + "`")
@@ -507,7 +509,7 @@ void TypingsInstaller::init(const std::string& projectID, vfs::FS* fs,
 		logging::log(logger,
 		             "ATA:: Updating types-registry@latest npm package...");
 		auto [_, err] = host->NpmInstall(
-		    typingsLocation,
+		    ctx, typingsLocation,
 		    {"install", "--ignore-scripts", "types-registry@latest"});
 		if (err == nullptr) {
 			logging::log(logger,

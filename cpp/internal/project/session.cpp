@@ -63,7 +63,10 @@ Session* NewSession(SessionInit* init) {
 	session->options = init->Options;
 	session->logger = sessionLogger;
 	session->keepAlive = init->KeepAlive;
-	session->backgroundCtx = init->BackgroundCtx;
+	auto [backgroundCtx, backgroundCancel] =
+	    gostd::contextWithCancel(init->BackgroundCtx);
+	session->backgroundCtx = backgroundCtx;
+	session->backgroundCancel = backgroundCancel;
 	session->toPath = snapshotHost->toPath;
 	session->client = init->Client;
 	session->npmExecutor = init->NpmExecutor;
@@ -598,17 +601,35 @@ void Session::cancelWarmAutoImportCache() {
 void Session::scheduleIdleCacheClean() {
 	std::lock_guard<std::mutex> lk(idleCacheCleanMu);
 
+	if (idleCacheCleanClosed) {
+		return;
+	}
 	if (idleCacheCleanTimer != nullptr) {
-		idleCacheCleanTimer->Stop();
+		if (idleCacheCleanTimer->Stop()) {
+			idleCacheCleanWG--;
+		}
 	}
 
+	idleCacheCleanWG++;
 	auto* timer = new idleTimer();
 	idleCacheCleanTimer = timer;
 	auto* self = this;
 	timer->start(idleCacheCleanDelay, [self, timer] {
-		self->idleCacheCleanMu.lock();
-		self->idleCacheCleanTimer = nullptr;
-		self->idleCacheCleanMu.unlock();
+		struct wgGuard {
+			Session* s;
+			~wgGuard() {
+				std::lock_guard<std::mutex> lk(s->idleCacheCleanMu);
+				if (--s->idleCacheCleanWG == 0) {
+					s->idleCacheCleanWGCv.notify_all();
+				}
+			}
+		} wg{self};
+		{
+			std::lock_guard<std::mutex> lk(self->idleCacheCleanMu);
+			if (self->idleCacheCleanTimer == timer) {
+				self->idleCacheCleanTimer = nullptr;
+			}
+		}
 		delete timer;
 
 		std::lock_guard<std::mutex> lk(self->snapshotUpdateMu);
@@ -633,9 +654,30 @@ void Session::scheduleIdleCacheClean() {
 void Session::cancelIdleCacheClean() {
 	std::lock_guard<std::mutex> lk(idleCacheCleanMu);
 	if (idleCacheCleanTimer != nullptr) {
-		idleCacheCleanTimer->Stop();
+		if (idleCacheCleanTimer->Stop()) {
+			if (--idleCacheCleanWG == 0) {
+				idleCacheCleanWGCv.notify_all();
+			}
+		}
 		idleCacheCleanTimer = nullptr;
 	}
+}
+
+// closeIdleCacheClean — session.go:712.
+void Session::closeIdleCacheClean() {
+	{
+		std::lock_guard<std::mutex> lk(idleCacheCleanMu);
+		idleCacheCleanClosed = true;
+		if (idleCacheCleanTimer != nullptr) {
+			if (idleCacheCleanTimer->Stop()) {
+				idleCacheCleanWG--;
+			}
+			idleCacheCleanTimer = nullptr;
+		}
+	}
+	std::unique_lock<std::mutex> lk(idleCacheCleanMu);
+	idleCacheCleanWGCv.wait(lk,
+	                        [this] { return idleCacheCleanWG == 0; });
 }
 
 // StartPerformanceTelemetry — session.go:733.
@@ -1978,10 +2020,25 @@ void Session::Close() {
 	// Cancel any pending auto-import cache warming
 	cancelWarmAutoImportCache();
 	// Cancel any pending idle cache clean
-	cancelIdleCacheClean();
+	closeIdleCacheClean();
 	// Cancel periodic performance telemetry
 	stopPerformanceTelemetry();
+	if (backgroundCancel) {
+		backgroundCancel();
+	}
 	backgroundQueue->Close();
+
+	{
+		std::lock_guard<std::mutex> ulk(snapshotUpdateMu);
+		std::unique_lock<std::shared_mutex> slk(snapshotMu);
+		auto* old = snapshot;
+		snapshot = nullptr;
+		slk.unlock();
+		if (old != nullptr) {
+			old->Deref();
+		}
+	}
+
 	snapshotHost->Close();
 }
 
@@ -2227,16 +2284,16 @@ void Session::logCacheStats(project::Snapshot* snapshot) {
 
 // NpmInstall — session.go:1849.
 std::pair<std::string, gostd::Error> Session::NpmInstall(
-    const std::string& cwd,
+    const gostd::Context& ctx, const std::string& cwd,
     const std::vector<std::string>& npmInstallArgs) {
-	return npmExecutor->NpmInstall(cwd, npmInstallArgs);
+	return npmExecutor->NpmInstall(ctx, cwd, npmInstallArgs);
 }
 
 // refreshInlayHintsIfNeeded — session.go:1853.
 void Session::refreshInlayHintsIfNeeded(
     const lsutil::UserPreferences& oldPrefs,
     const lsutil::UserPreferences& newPrefs) {
-	if (!(oldPrefs.InlayHints == newPrefs.InlayHints)) {
+	if (!(oldPrefs.InlayHintsPreferences == newPrefs.InlayHintsPreferences)) {
 		if (client->RefreshInlayHints(backgroundContext()) !=
 		        nullptr &&
 		    options->LoggingEnabled) {
@@ -2249,7 +2306,7 @@ void Session::refreshInlayHintsIfNeeded(
 void Session::refreshCodeLensIfNeeded(
     const lsutil::UserPreferences& oldPrefs,
     const lsutil::UserPreferences& newPrefs) {
-	if (!(oldPrefs.CodeLens == newPrefs.CodeLens)) {
+	if (!(oldPrefs.CodeLensUserPreferences == newPrefs.CodeLensUserPreferences)) {
 		if (client->RefreshCodeLens(backgroundContext()) !=
 		        nullptr &&
 		    options->LoggingEnabled) {
@@ -2266,7 +2323,7 @@ void Session::refreshDiagnosticsIfNeeded(
 	        newPrefs.CustomConfigFileName ||
 	    oldPrefs.ReportStyleChecksAsWarnings !=
 	        newPrefs.ReportStyleChecksAsWarnings ||
-	    !(oldPrefs.EnableValidation == newPrefs.EnableValidation)) {
+	    !(oldPrefs.ValidateEnabled == newPrefs.ValidateEnabled)) {
 		ScheduleDiagnosticsRefresh();
 	}
 }
@@ -2289,9 +2346,9 @@ void Session::publishProgramDiagnostics(
 	if (!options->PushDiagnosticsEnabled) {
 		return;
 	}
-	if (newSnapshot->UserPreferences().EnableValidation == Tristate::False) {
+	if (newSnapshot->UserPreferences().ValidateEnabled == Tristate::False) {
 		if (oldSnapshot->UserPreferences()
-		        .EnableValidation == Tristate::False) {
+		        .ValidateEnabled == Tristate::False) {
 			return;
 		}
 		for (auto& kv :
@@ -2414,7 +2471,7 @@ void Session::publishProjectDiagnostics(
     lsconv::Converters* converters) {
 	auto diagnostics = diagnostics_;
 	auto ctx = ctx_;
-	if (Config().EnableValidation == Tristate::False) {
+	if (Config().ValidateEnabled == Tristate::False) {
 		diagnostics.clear();
 	}
 	ctx = WithCurrentLocale(ctx);
@@ -2440,7 +2497,7 @@ void Session::publishProjectDiagnostics(
 // EnqueuePublishGlobalDiagnostics — session.go:1965.
 void Session::EnqueuePublishGlobalDiagnostics() {
 	if (!options->PushDiagnosticsEnabled ||
-	    Config().EnableValidation == Tristate::False) {
+	    Config().ValidateEnabled == Tristate::False) {
 		return;
 	}
 	bool expected = false;
@@ -2547,7 +2604,7 @@ void Session::triggerATAForUpdatedProjects(
 				    }
 				    auto [result, err] =
 				        self->typingsInstaller
-				            ->InstallTypings(&request);
+				            ->InstallTypings(ctx, &request);
 				    if (self->client != nullptr) {
 					    self->client->ProgressFinish(
 					        tsc::Installing_types_for_0,

@@ -12,6 +12,7 @@
 
 #include "internal/core/version.h"
 #include "internal/module/vfsmatch.h"
+#include "internal/tspath/typed_paths.h"
 #include "internal/stringutil/stringutil.h"
 
 namespace tsc::module {
@@ -129,24 +130,56 @@ const CompilerOptions* GetCompilerOptionsWithRedirect(
 
 // --- DefaultResolver ---
 
-DefaultResolver::DefaultResolver(ResolverOptions opts)
-    : host(opts.Host),
-      compilerOptions(opts.CompilerOptions),
-      typingsLocation(std::move(opts.TypingsLocation)),
-      projectName(std::move(opts.ProjectName)),
-      extraExtensions(std::move(opts.ExtraExtensions)) {
-	if (opts.PackageJsonCache != nullptr) {
-		packageJsonInfoCache = opts.PackageJsonCache;
-	} else {
-		static_cast<caches&>(*this) = newCaches(
-		    opts.Host->GetCurrentDirectory(),
-		    opts.Host->UseCaseSensitiveFileNames(), opts.CompilerOptions);
+// cache.go:75 newResolutionData — a5c43c4d54: the options + package-json
+// cache live as long as the program's resolution data, not the resolver.
+std::shared_ptr<ResolutionData> newResolutionData(ResolverOptions opts) {
+	auto data = std::make_shared<ResolutionData>(
+	    opts.CompilerOptions, std::move(opts.TypingsLocation),
+	    std::move(opts.ProjectName), std::move(opts.ExtraExtensions),
+	    opts.PackageJsonCache);
+	if (data->packageJsonInfoCache == nullptr) {
+		data->packageJsonInfoCache =
+		    std::make_shared<packagejson::InfoCache>(
+		        opts.Host->GetCurrentDirectory(),
+		        opts.Host->UseCaseSensitiveFileNames());
 	}
+	return data;
+}
+
+DefaultResolver::DefaultResolver(std::shared_ptr<ResolutionData> data,
+                                 ResolutionHost* host_)
+    : host(host_),
+      resolutionData(std::move(data)),
+      compilerOptions(resolutionData->compilerOptions),
+      typingsLocation(resolutionData->typingsLocation),
+      projectName(resolutionData->projectName),
+      extraExtensions(resolutionData->extraExtensions),
+      packageJsonInfoCache(resolutionData->packageJsonInfoCache) {}
+
+DefaultResolver::DefaultResolver(ResolverOptions opts)
+    : DefaultResolver(newResolutionData(std::move(opts)), opts.Host) {}
+
+// resolver.go:371 — a fresh resolver over the same resolution data (new
+// per-resolver caches; the package-json cache table is shared).
+DefaultResolver* ResolutionData::NewResolver(ResolutionHost* host_) {
+	auto baseDirectory = host_->GetCurrentDirectory();
+	if (baseDirectory.empty()) {
+		throw std::runtime_error(
+		    "resolver must have a rooted base directory");
+	}
+	if (packageJsonInfoCache->useCaseSensitiveFileNames !=
+	    host_->UseCaseSensitiveFileNames()) {
+		throw std::runtime_error(
+		    "package JSON cache and resolver must use the same case "
+		    "sensitivity");
+	}
+	auto data = shared_from_this();
+	return new DefaultResolver(std::move(data), host_);
 }
 
 // resolver.go:167 NewResolver — the ctor above performs the field init.
 DefaultResolver* NewResolver(ResolverOptions opts) {
-	return new DefaultResolver(std::move(opts));
+	return newResolutionData(opts)->NewResolver(opts.Host);
 }
 
 std::unique_ptr<tracer> DefaultResolver::newTraceBuilder() {
@@ -527,8 +560,7 @@ resolutionState::resolveTypeReferenceDirective(
 				if (auto resolvedFromFile = loadModuleFromFile(
 				        extensionsDeclaration, candidate);
 				    !shouldContinueSearching(resolvedFromFile)) {
-					auto packageDirectory = ParseNodeModuleFromPath(
-					    resolvedFromFile->path, false);
+					auto packageDirectory = NodeModulePackageRootForFile(resolvedFromFile->path);
 					if (!packageDirectory.empty()) {
 						resolvedFromFile->packageId = getPackageId(
 						    resolvedFromFile->path,
@@ -626,8 +658,7 @@ std::unique_ptr<resolved> resolutionState::resolveFromTypeRoot() {
 		if (auto resolvedFromFile =
 		        loadModuleFromFile(extensionsDeclaration, candidate);
 		    !shouldContinueSearching(resolvedFromFile)) {
-			auto packageDirectory = ParseNodeModuleFromPath(
-			    resolvedFromFile->path, false);
+			auto packageDirectory = NodeModulePackageRootForFile(resolvedFromFile->path);
 			if (!packageDirectory.empty()) {
 				resolvedFromFile->packageId = getPackageId(
 				    resolvedFromFile->path,
@@ -778,8 +809,8 @@ resolutionState::loadModuleFromSelfNameReference() {
 	if (!ok) {
 		return nullptr;
 	}
-	auto parts = tspath::getPathComponents(name, "");
-	auto nameParts = tspath::getPathComponents(pkgName, "");
+	auto parts = tspath::resolvePathComponents(name, "");
+	auto nameParts = tspath::resolvePathComponents(pkgName, "");
 	if (parts.size() < nameParts.size() ||
 	    !std::equal(nameParts.begin(), nameParts.end(), parts.begin())) {
 		return nullptr;
@@ -1055,10 +1086,10 @@ resolutionState::loadModuleFromTargetExportOrImport(
 		}
 		std::vector<std::string> parts;
 		if (tspath::pathIsRelative(targetString)) {
-			auto pc = tspath::getPathComponents(targetString, "");
+			auto pc = tspath::resolvePathComponents(targetString, "");
 			parts.assign(pc.begin() + 1, pc.end());
 		} else {
-			parts = tspath::getPathComponents(targetString, "");
+			parts = tspath::resolvePathComponents(targetString, "");
 		}
 		std::vector<std::string> partsAfterFirst(parts.begin() + 1,
 		                                         parts.end());
@@ -1072,13 +1103,11 @@ resolutionState::loadModuleFromTargetExportOrImport(
 			}
 			return nullptr;
 		}
-		auto resolvedTarget = tspath::combinePaths(
-		    scope->PackageDirectory, {targetString});
-		// TODO: Assert that `resolvedTarget` is actually within the
+		// TODO: Assert that the resolved target is actually within the
 		// package directory? That's what the spec says.... but I'm not
 		// sure we need to be in the business of validating everyone's
 		// import and export map correctness.
-		auto subpathParts = tspath::getPathComponents(subpath, "");
+		auto subpathParts = tspath::resolvePathComponents(subpath, "");
 		if (contains(subpathParts, "..") || contains(subpathParts, ".") ||
 		    contains(subpathParts, "node_modules")) {
 			if (traceBuilder != nullptr) {
@@ -1101,16 +1130,15 @@ resolutionState::loadModuleFromTargetExportOrImport(
 			    std::string{isImports ? "imports" : "exports"}, key,
 			    messageTarget);
 		}
-		std::string finalPath;
+		std::string targetPath;
 		if (isPattern) {
-			finalPath = tspath::getNormalizedAbsolutePath(
-			    replaceAll(resolvedTarget, "*", subpath),
-			    resolver->host->GetCurrentDirectory());
+			targetPath = replaceAll(targetString, "*", subpath);
 		} else {
-			finalPath = tspath::getNormalizedAbsolutePath(
-			    resolvedTarget + subpath,
-			    resolver->host->GetCurrentDirectory());
+			targetPath = targetString + subpath;
 		}
+		std::string finalPath = resolvePathForModule(
+		    scope->PackageDirectory, targetPath,
+		    tspath::hasTrailingDirectorySeparator(targetPath));
 		if (auto inputLink = tryLoadInputFileForPath(
 		        finalPath, subpath,
 		        tspath::combinePaths(scope->PackageDirectory,
@@ -1466,15 +1494,16 @@ resolutionState::loadModuleFromSpecificNodeModulesDirectory(
 	// `loadNodeModuleFromDirectoryWorker`'s `ComparePaths(candidate, ...)`
 	// check to fail and skip loading the package's `main`/`types` entry.
 	// https://github.com/microsoft/TypeScript/tsc/issues/3526
-	auto candidate = std::string{tspath::removeTrailingDirectorySeparator(
-	    tspath::normalizePath(
-	        tspath::combinePaths(nodeModulesDirectory, {moduleName})))};
+	auto candidate = resolvePathForModule(
+	    nodeModulesDirectory,
+	    tspath::removeTrailingDirectorySeparator(moduleName), false);
+	std::string candidateDirectory = dynamicDirectoryCandidate(candidate);
 	auto [packageName, rest] = ParsePackageName(moduleName);
 	const std::string restStr{rest};
-	auto packageDirectory =
-	    tspath::combinePaths(nodeModulesDirectory, {packageName});
+	auto packageDirectory = std::string{tspath::removeTrailingDirectorySeparator(
+	    resolvePathForModule(nodeModulesDirectory, packageName, true))};
 	if (packageName.empty()) {
-		packageDirectory = candidate;
+		packageDirectory = candidateDirectory;
 	}
 
 	if (resolvePackageDirectoryOnly) {
@@ -1489,7 +1518,7 @@ resolutionState::loadModuleFromSpecificNodeModulesDirectory(
 	std::shared_ptr<packagejson::InfoCacheEntry> rootPackageInfo;
 	// First look for a nested package.json, as in
 	// `node_modules/foo/bar/package.json`
-	auto packageInfo = getPackageJsonInfo(candidate);
+	auto packageInfo = getPackageJsonInfo(candidateDirectory);
 	// But only if we're not respecting export maps (if we are, we might
 	// redirect around this location)
 	if (!rest.empty() && pkgExists(packageInfo)) {
@@ -1504,9 +1533,8 @@ resolutionState::loadModuleFromSpecificNodeModulesDirectory(
 				return fromFile;
 			}
 
-			if (auto fromDirectory =
-			        loadNodeModuleFromDirectoryWorker(ext_, candidate,
-			                                          packageInfo);
+			if (auto fromDirectory = loadNodeModuleFromDirectoryWorker(
+			        ext_, candidateDirectory, packageInfo);
 			    !shouldContinueSearching(fromDirectory)) {
 				fromDirectory->packageId =
 				    getPackageId(fromDirectory->path, packageInfo);
@@ -1519,6 +1547,8 @@ resolutionState::loadModuleFromSpecificNodeModulesDirectory(
 	    [this, packageInfo, &restStr](
 	        extensions extensions_,
 	        const std::string& candidate_) -> std::unique_ptr<resolved> {
+		auto loaderCandidateDirectory =
+		    dynamicDirectoryCandidate(candidate_);
 		if (!restStr.empty() || !esmMode) {
 			if (auto fromFile =
 			        loadModuleFromFile(extensions_, candidate_);
@@ -1529,7 +1559,7 @@ resolutionState::loadModuleFromSpecificNodeModulesDirectory(
 			}
 		}
 		if (auto fromDirectory = loadNodeModuleFromDirectoryWorker(
-		        extensions_, candidate_, packageInfo);
+		        extensions_, loaderCandidateDirectory, packageInfo);
 		    !shouldContinueSearching(fromDirectory)) {
 			fromDirectory->packageId =
 			    getPackageId(fromDirectory->path, packageInfo);
@@ -1546,8 +1576,9 @@ resolutionState::loadModuleFromSpecificNodeModulesDirectory(
 			// non-relative package resolutions still assume a default
 			// `index.js` entrypoint if no `main` or `exports` are present
 			if (auto indexResult = loadModuleFromFile(
-			        extensions_,
-			        tspath::combinePaths(candidate_, {"index.js"}));
+			        extensions_, tspath::combinePaths(
+			                         loaderCandidateDirectory,
+			                         {"index.js"}));
 			    !shouldContinueSearching(indexResult)) {
 				indexResult->packageId =
 				    getPackageId(indexResult->path, packageInfo);
@@ -1755,8 +1786,9 @@ std::unique_ptr<resolved> resolutionState::tryLoadModuleUsingPaths(
 		}
 		for (auto& subst : pathsGetOrZero(paths, matchedPattern.text)) {
 			auto path = replaceFirst(subst, "*", matchedStar);
-			auto candidate = tspath::normalizePath(
-			    tspath::combinePaths(containingDirectory_, {path}));
+			auto candidate = resolvePathForModule(
+			    containingDirectory_, path,
+			    tspath::hasTrailingDirectorySeparator(path));
 			if (traceBuilder != nullptr) {
 				traceBuilder->write(
 				    Trying_substitution_0_candidate_module_location_Colon_1,
@@ -1803,8 +1835,9 @@ std::unique_ptr<resolved> resolutionState::tryLoadModuleUsingRootDirs() {
 		    name);
 	}
 
-	auto candidate = tspath::normalizePath(
-	    tspath::combinePaths(containingDirectory, {name}));
+	auto candidate = resolvePathForModule(
+	    containingDirectory, name,
+	    tspath::hasTrailingDirectorySeparator(name));
 
 	std::string matchedRootDir;
 	std::string matchedNormalizedPrefix;
@@ -1867,8 +1900,34 @@ std::unique_ptr<resolved> resolutionState::tryLoadModuleUsingRootDirs() {
 				// skip the initially matched entry
 				continue;
 			}
-			auto candidate2 = tspath::combinePaths(
-			    tspath::normalizePath(rootDir), {suffix});
+			bool directoryOnly = suffix.empty() ||
+			                     tspath::hasTrailingDirectorySeparator(suffix);
+			std::string_view logicalSuffix = suffix;
+			std::string candidate2;
+			if (tspath::isEncodedDynamicFileName(rootDir) &&
+			    tspath::isEncodedDynamicFileName(matchedRootDir)) {
+				candidate2 = resolveDynamicLogicalPath(
+				    tspath::normalizePath(rootDir),
+				    tspath::decodeDynamicURIPath(logicalSuffix),
+				    directoryOnly);
+			} else if (tspath::isEncodedDynamicFileName(rootDir)) {
+				candidate2 = resolveDynamicLogicalPath(
+				    tspath::normalizePath(rootDir), logicalSuffix,
+				    directoryOnly);
+			} else if (tspath::isEncodedDynamicFileName(matchedRootDir)) {
+				auto [decoded, ok] = tspath::decodeDynamicURIPathForDisk(
+				    logicalSuffix);
+				if (!ok) {
+					continue;
+				}
+				candidate2 = resolvePathForModule(
+				    tspath::normalizePath(rootDir), decoded,
+				    directoryOnly);
+			} else {
+				candidate2 = resolvePathForModule(
+				    tspath::normalizePath(rootDir), logicalSuffix,
+				    directoryOnly);
+			}
 			if (traceBuilder != nullptr) {
 				traceBuilder->write(
 				    Loading_0_from_the_root_dir_1_candidate_location_2,
@@ -1907,8 +1966,7 @@ std::unique_ptr<resolved> resolutionState::nodeLoadModuleByRelativeName(
 		auto resolvedFromFile = loadModuleFromFile(ext_, candidate);
 		if (resolvedFromFile != nullptr) {
 			if (considerPackageJson) {
-				if (auto packageDirectory = ParseNodeModuleFromPath(
-				        resolvedFromFile->path, false /*isFolder*/);
+				if (auto packageDirectory = NodeModulePackageRootForFile(resolvedFromFile->path);
 				    !packageDirectory.empty()) {
 					resolvedFromFile->packageId = getPackageId(
 					    resolvedFromFile->path,
@@ -1918,11 +1976,12 @@ std::unique_ptr<resolved> resolutionState::nodeLoadModuleByRelativeName(
 			return resolvedFromFile;
 		}
 	}
-	if (!resolver->host->DirectoryExists(candidate)) {
+	std::string directoryCandidate = dynamicDirectoryCandidate(candidate);
+	if (!resolver->host->DirectoryExists(directoryCandidate)) {
 		if (traceBuilder != nullptr) {
 			traceBuilder->write(
 			    Directory_0_does_not_exist_skipping_all_lookups_in_it,
-			    candidate);
+			    directoryCandidate);
 		}
 		return nullptr;
 	}
@@ -1931,7 +1990,7 @@ std::unique_ptr<resolved> resolutionState::nodeLoadModuleByRelativeName(
 	// notable departure from cjs norms, where `./foo/pkg` could have been
 	// redirected by `./foo/pkg/package.json` to an arbitrary location!
 	if (!esmMode) {
-		return loadNodeModuleFromDirectory(ext_, candidate,
+		return loadNodeModuleFromDirectory(ext_, directoryCandidate,
 		                                 considerPackageJson);
 	}
 	return nullptr;
@@ -2323,6 +2382,9 @@ std::unique_ptr<resolved> resolutionState::loadNodeModuleFromDirectoryWorker(
 			moduleName = tspath::getRelativePathFromDirectory(
 			    candidate, indexPath, tspath::ComparePathsOptions{});
 		}
+		if (tspath::isEncodedDynamicFileName(candidate)) {
+			moduleName = tspath::decodeDynamicURIPath(moduleName);
+		}
 		if (traceBuilder != nullptr) {
 			traceBuilder->write(
 			    X_package_json_has_a_typesVersions_entry_0_that_matches_compiler_version_1_looking_for_a_pattern_to_match_module_name_2,
@@ -2559,8 +2621,8 @@ std::string resolutionState::readPackageJsonPeerDependencies(
 	std::sort(names.begin(), names.end());
 	std::string builder;
 	for (auto& name_ : names) {
-		auto peerPackageJson =
-		    getPackageJsonInfo(nodeModules + name_);
+		auto peerPackageJson = getPackageJsonInfo(
+		    resolvePathForModule(nodeModules, name_, true));
 		if (pkgExists(peerPackageJson)) {
 			auto version = peerPackageJson->Contents->Version.Value;
 			builder += "+";
@@ -2773,8 +2835,10 @@ Pattern MatchPatternOrExact(const ParsedPatterns* patterns,
 // must keep the trailing separator so we look inside `foo`.
 std::string normalizePathForCJSResolution(
     std::string_view containingDirectory, std::string_view moduleName) {
-	auto combined = tspath::combinePaths(containingDirectory, {moduleName});
-	auto parts = tspath::getPathComponents(combined, "");
+	auto combined = tspath::combinePaths(
+	    containingDirectory,
+	    {pathForDynamicResolution(containingDirectory, moduleName, false)});
+	auto parts = tspath::resolvePathComponents(combined, "");
 	auto& lastPart = parts.back();
 	if (lastPart == "." || lastPart == "..") {
 		return tspath::ensureTrailingDirectorySeparator(
@@ -2936,10 +3000,17 @@ DefaultResolver::GetEntrypointsFromPackageJsonInfo(
 	state.ext = exts;
 	state.features = features;
 	state.compilerOptions = compilerOptions;
+	bool dynamicPackage =
+	    tspath::isEncodedDynamicFileName(packageJson->PackageDirectory);
+	std::string sourcePackageName = packageName;
+	if (dynamicPackage) {
+		sourcePackageName =
+		    tspath::dynamicURIPathToModuleSpecifier(packageName);
+	}
 	if (pkgExists(packageJson) &&
 	    packageJson->Contents->Exports.IsPresent()) {
 		return state.loadEntrypointsFromExportMap(
-		    packageJson, packageName, packageJson->Contents->Exports);
+		    packageJson, sourcePackageName, packageJson->Contents->Exports);
 	}
 
 	std::vector<std::unique_ptr<ResolvedEntrypoint>> result;
@@ -2948,7 +3019,7 @@ DefaultResolver::GetEntrypointsFromPackageJsonInfo(
 
 	if (mainResolution != nullptr && mainResolution->isResolved()) {
 		result.push_back(createResolvedEntrypointHandlingSymlink(
-		    mainResolution->path, packageName, nullptr, nullptr,
+		    mainResolution->path, sourcePackageName, nullptr, nullptr,
 		    Ending::Fixed));
 	}
 
@@ -2958,23 +3029,30 @@ DefaultResolver::GetEntrypointsFromPackageJsonInfo(
 		    packageJson->PackageDirectory, extensionsArray(exts),
 		    {"node_modules"}, {"**/*"}, vfsmatch::UnlimitedDepth);
 
-		tspath::ComparePathsOptions comparePathsOptions;
-		comparePathsOptions.useCaseSensitiveFileNames =
-		    host->UseCaseSensitiveFileNames();
+		tspath::CaseSensitivity caseSensitivity{
+		    (uint8_t)(host->UseCaseSensitiveFileNames()
+			          ? tspath::CaseSensitivity::CaseSensitiveV
+			          : tspath::CaseSensitivity::CaseInsensitiveV)};
+		tspath::RootedDirectoryPath packageDirectory(
+		    packageJson->PackageDirectory);
 		for (auto& file : otherFiles) {
 			if (mainResolution != nullptr && mainResolution->isResolved() &&
-			    tspath::comparePaths(file, mainResolution->path,
-			                         comparePathsOptions) == 0) {
+			    caseSensitivity.compareFilePaths(
+				tspath::RootedFilePath(file),
+				tspath::RootedFilePath(mainResolution->path)) == 0) {
 				continue;
 			}
 
+			auto [relative, _relOk] =
+			    caseSensitivity.relativeFilePathFromDirectory(
+				packageDirectory, tspath::RootedFilePath(file));
+			std::string relativeSpecifier = relative;
+			if (dynamicPackage) {
+				relativeSpecifier =
+				    tspath::dynamicURIPathToModuleSpecifier(relativeSpecifier);
+			}
 			result.push_back(createResolvedEntrypointHandlingSymlink(
-			    file,
-			    tspath::resolvePath(
-			        packageName,
-			        {tspath::getRelativePathFromDirectory(
-			            packageJson->PackageDirectory, file,
-			            comparePathsOptions)}),
+			    file, sourcePackageName + "/" + relativeSpecifier,
 			    nullptr, nullptr, Ending::Changeable));
 		}
 	}
@@ -3012,35 +3090,62 @@ resolutionState::loadEntrypointsFromExportMap(
 				    exports_.AsString().rfind('*')) {
 					return;
 				}
-				auto patternPath = tspath::resolvePath(
-				    packageJson->PackageDirectory,
-				    {exports_.AsString()});
+				bool dynamicPackage = tspath::isEncodedDynamicFileName(
+				    packageJson->PackageDirectory);
+				std::vector<std::string> includePatterns =
+				    {tspath::changeFullExtension(
+				        replaceFirst(exports_.AsString(), "*", "**/*"),
+				        ".*")};
+				if (dynamicPackage) {
+					includePatterns = {"**/*"};
+				}
+				auto patternPath = std::string{
+				    exports_.AsString().substr(
+				        exports_.AsString().starts_with("./") ? 2 : 0)};
 				auto starPos = patternPath.find('*');
 				auto leadingSlice = patternPath.substr(0, starPos);
 				auto trailingSlice = patternPath.substr(starPos + 1);
 				bool caseSensitive =
+				    dynamicPackage ||
 				    resolver->host->UseCaseSensitiveFileNames();
 				auto files = vfsmatch::ReadDirectory(
 				    resolver->host,
 				    resolver->host->GetCurrentDirectory(),
 				    packageJson->PackageDirectory,
 				    extensionsArray(ext),
-				    {},
-				    {tspath::changeFullExtension(
-				        replaceFirst(exports_.AsString(), "*", "**/*"),
-				        ".*")},
+				    {}, includePatterns,
 				    vfsmatch::UnlimitedDepth);
 				for (auto& file : files) {
+					std::string logicalFile =
+					    tspath::getRelativePathFromDirectory(
+					        packageJson->PackageDirectory, file,
+					        tspath::ComparePathsOptions{
+					            caseSensitive});
+					if (dynamicPackage) {
+						logicalFile =
+						    tspath::decodeDynamicURIPath(logicalFile);
+					}
 					auto [matchedStar, ok] =
 					    getMatchedStarForPatternEntrypoint(
-					        file, leadingSlice, trailingSlice,
+					        logicalFile, leadingSlice, trailingSlice,
 					        caseSensitive);
 					if (!ok) {
 						continue;
 					}
+					if (dynamicPackage) {
+						matchedStar = tspath::
+						    encodeDynamicLogicalModuleSpecifier(matchedStar);
+					}
+					std::string resolvedSubpath = std::string{
+					    replaceFirst(subpath, "*", matchedStar)};
+					if (resolvedSubpath.starts_with("./")) {
+						resolvedSubpath = resolvedSubpath.substr(2);
+					}
+					if (resolvedSubpath.empty()) {
+						continue;
+					}
 					auto moduleSpecifier = tspath::resolvePath(
-					    packageName,
-					    {replaceFirst(subpath, "*", matchedStar)});
+					    packageName, {resolvedSubpath});
 					entrypoints.push_back(
 					    resolver
 					        ->createResolvedEntrypointHandlingSymlink(
@@ -3053,7 +3158,7 @@ resolutionState::loadEntrypointsFromExportMap(
 				}
 			} else {
 				auto pc =
-				    tspath::getPathComponents(exports_.AsString(), "");
+				    tspath::resolvePathComponents(exports_.AsString(), "");
 				std::vector<std::string> partsAfterFirst(pc.begin() + 2,
 				                                         pc.end());
 				if (contains(partsAfterFirst, "..") ||

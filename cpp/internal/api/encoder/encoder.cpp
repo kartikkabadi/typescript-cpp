@@ -416,6 +416,12 @@ void SetSourceFileLease(std::vector<uint8_t>& data, uint64_t lease) {
 	writeLE64(data, HeaderOffsetSourceFileLease, lease);
 }
 
+// SetSourceFileID sets the source file node ID used to validate remote
+// references.
+void SetSourceFileID(std::vector<uint8_t>& data, uint64_t id) {
+	writeLE64(data, HeaderOffsetSourceFileID, id);
+}
+
 // EncodeNode encodes an arbitrary AST node and its descendants into the binary
 // format. The sourceFile is needed to provide the source text for efficient
 // string encoding. When encoding a non-SourceFile node, the header hash and

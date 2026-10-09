@@ -136,6 +136,7 @@ add_library(tsc STATIC
 	internal/checker/checker_flow.cpp
 	internal/checker/checker_relater.cpp
 	internal/checker/checker_emitresolver.cpp
+	internal/checker/checker_emitsupport.cpp
 	internal/checker/mapper.cpp
 	internal/compiler/checkerpool.cpp
 	internal/compiler/emitter.cpp
@@ -291,7 +292,6 @@ add_library(tsc STATIC
 	internal/tsoptions/declsbuild.cpp
 	internal/tsoptions/declscompiler.cpp
 	internal/tsoptions/declstypeacquisition.cpp
-	internal/tsoptions/declswatch.cpp
 	internal/tsoptions/diagnostics.cpp
 	internal/tsoptions/enummaps.cpp
 	internal/tsoptions/errors.cpp
@@ -302,6 +302,8 @@ add_library(tsc STATIC
 	internal/tsoptions/showconfig.cpp
 	internal/tsoptions/tsconfigparsing.cpp
 	internal/tsoptions/wildcarddirectories.cpp
+	internal/tspath/dynamic.cpp
+	internal/tspath/typed_paths.cpp
 	# === slice: infra ===
 	internal/diagnosticwriter/diagnosticwriter.cpp
 	internal/diagnostics/localize.cpp
@@ -356,6 +358,7 @@ add_library(tsc STATIC
 	internal/testrunner/testrunner_deps.cpp
 	internal/testrunner/transpile_runner.cpp
 	internal/testrunner/compiler_runner.cpp
+	internal/testrunner/compiler_test_filter.cpp
 	# === slice: testutil ===
 	internal/patience/patience.cpp
 	internal/testutil/harnessutil/harnessutil.cpp

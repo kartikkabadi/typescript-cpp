@@ -231,28 +231,10 @@ callbackModuleResolver::ResolveTypeReferenceDirective(
 	    redirectedReference);
 }
 
-// GetPackageScopeForPath — module_resolution.go:126.
-std::shared_ptr<packagejson::InfoCacheEntry>
-callbackModuleResolver::GetPackageScopeForPath(const std::string& directory) {
-	return fallbackResolver->GetPackageScopeForPath(directory);
-}
-
-// PackageJsonCacheEntries — module_resolution.go:130.
-void callbackModuleResolver::PackageJsonCacheEntries(
-    const std::function<bool(
-        const std::string&,
-        std::shared_ptr<packagejson::InfoCacheEntry>)>& f) {
-	fallbackResolver->PackageJsonCacheEntries(f);
-}
-
-// ResolvePackageDirectory — module_resolution.go:136.
-std::shared_ptr<module::ResolvedModule>
-callbackModuleResolver::ResolvePackageDirectory(
-    std::string_view moduleName, std::string_view containingFile,
-    ResolutionMode resolutionMode,
-    const module::ResolvedProjectReference* redirectedReference) {
-	return fallbackResolver->ResolvePackageDirectory(
-	    moduleName, containingFile, resolutionMode, redirectedReference);
+// GetResolutionData — module_resolution.go:134.
+std::shared_ptr<module::ResolutionData>
+callbackModuleResolver::GetResolutionData() {
+	return fallbackResolver->GetResolutionData();
 }
 
 // compileModuleResolutionSpec — module_resolution.go:149.
@@ -349,6 +331,7 @@ staticModuleResolutionToResolvedModule(
 	result->ResolvedFileName = tspath::getNormalizedAbsolutePath(
 	    staticResolution->ResolvedFileName->ToAbsoluteFileName(currentDirectory),
 	    currentDirectory);
+	result->IsCustomResolution = true;
 	if (staticResolution->OriginalPath) {
 		result->OriginalPath = tspath::getNormalizedAbsolutePath(
 		    staticResolution->OriginalPath->ToAbsoluteFileName(

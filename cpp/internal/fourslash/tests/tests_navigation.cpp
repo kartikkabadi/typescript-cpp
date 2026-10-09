@@ -168,3 +168,41 @@ export const [|weirdName|];
 REGISTER_FOURSLASH_TEST(TestNavto_excludeLib1, TestNavto_excludeLib1);
 
 }  // namespace
+
+// workspaceSymbolNewInferredProject_test.go
+static void TestWorkspaceSymbolNewInferredProject(gostd::testing::T* t) {
+	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
+		const std::string content = R"TS(
+// @Filename: /home/src/projects/p/tsconfig.json
+// @noOpen: true
+{ "files": ["a.ts", "b.ts"] }
+
+// @Filename: /home/src/projects/p/a.ts
+import "./e";
+
+// @Filename: /home/src/projects/p/b.ts
+// @noOpen: true
+export const b = 1;
+
+// @Filename: /home/src/projects/p/e.ts
+export const e = 1;
+)TS";
+		auto __fsp = fourslash::NewFourslash(t, nullptr, content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());
+
+		// e.ts isn't listed in tsconfig.json, it only gets pulled in by the import in a.ts.
+		// Once that import is gone, e.ts should move to the inferred project.
+		f->GoToFile(t, "/home/src/projects/p/a.ts");
+		f->Replace(t, 0, (int)std::string("import \"./e\";").size(), "");
+		f->VerifyWorkspaceSymbol(t, std::vector<std::shared_ptr<fourslash::VerifyWorkspaceSymbolCase>>{
+			std::make_shared<fourslash::VerifyWorkspaceSymbolCase>(fourslash::VerifyWorkspaceSymbolCase{.Pattern = "b", .Includes = std::make_shared<std::vector<std::shared_ptr<lsproto::SymbolInformation>>>(std::vector<std::shared_ptr<lsproto::SymbolInformation>>{})}),
+			std::make_shared<fourslash::VerifyWorkspaceSymbolCase>(fourslash::VerifyWorkspaceSymbolCase{.Pattern = "e", .Includes = std::make_shared<std::vector<std::shared_ptr<lsproto::SymbolInformation>>>(std::vector<std::shared_ptr<lsproto::SymbolInformation>>{std::make_shared<lsproto::SymbolInformation>(lsproto::SymbolInformation{.Name = "e", .Kind = lsproto::SymbolKindVariable, .Location = lsproto::Location{.Uri = "file:///home/src/projects/p/e.ts", .Range = lsproto::Range{.Start = lsproto::Position{.Line = 0, .Character = 13}, .End = lsproto::Position{.Line = 0, .Character = 14}}}})})}),
+		});
+
+		// The tsconfig project is already up to date, so opening b.ts takes the fast path.
+		f->GoToFile(t, "/home/src/projects/p/b.ts");
+		f->VerifyWorkspaceSymbol(t, std::vector<std::shared_ptr<fourslash::VerifyWorkspaceSymbolCase>>{
+			std::make_shared<fourslash::VerifyWorkspaceSymbolCase>(fourslash::VerifyWorkspaceSymbolCase{.Pattern = "b", .Includes = std::make_shared<std::vector<std::shared_ptr<lsproto::SymbolInformation>>>(std::vector<std::shared_ptr<lsproto::SymbolInformation>>{})}),
+		});
+	});
+}
+REGISTER_FOURSLASH_TEST(TestWorkspaceSymbolNewInferredProject, TestWorkspaceSymbolNewInferredProject);

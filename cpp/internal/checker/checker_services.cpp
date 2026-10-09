@@ -208,8 +208,7 @@ Symbol* Checker::getSymbolAtLocation(Node* node, bool ignoreErrors) {
 		}
 		return nullptr;
 	case Kind::ImportKeyword:
-		if (isMetaProperty(node->parent) &&
-		    node->parent->text() == "defer") {
+		if (isImportPhaseMetaProperty(node->parent)) {
 			return nullptr;
 		}
 		[[fallthrough]];
@@ -709,10 +708,9 @@ Type* Checker::GetTypeAtLocation(Node* node) {
 	return getTypeOfNode(getReparsedNodeForNode(node));
 }
 
-// checker.go:32652 — GetEmitResolver
-EmitResolver* Checker::GetEmitResolver() {
-	std::call_once(emitResolverOnce, [&] { emitResolver = newEmitResolver(this); });
-	return emitResolver;
+// checker.go:32652 — NewEmitResolver
+EmitResolver* Checker::NewEmitResolver(printer::EmitContext* emitContext) {
+	return newEmitResolver(this, emitContext);
 }
 
 // === dep stubs — removed when owner slice lands ===

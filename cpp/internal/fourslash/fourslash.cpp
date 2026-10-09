@@ -296,7 +296,7 @@ newFourslash(gostd::testing::T* t, const std::string& content,
 		    return it->second->lineMap;
 	    });
 	f->testData = std::make_shared<TestData>(std::move(testData));
-	f->stateEnableFormatting = true;
+	f->stateFormatEnabled = true;
 	f->reportFormatOnTypeCrash = true;
 	f->userPreferences = lsutil::NewDefaultUserPreferences();
 	f->vfs = fs;
@@ -325,7 +325,7 @@ newFourslash(gostd::testing::T* t, const std::string& content,
 	// stored pointer stays valid after NewFourslash returns.
 	client->SetCompilerOptionsForInferredProjects(
 	    new CompilerOptions(compilerOptions));
-	f->initialize(t, options->Capabilities, options->RunExternalCode);
+	f->initialize(t, options.get());
 
 	if (f->testData->isStateBaseliningEnabled()) {
 		// Single baseline, so initialize project state baseline too
@@ -452,15 +452,15 @@ std::string getBaseFileNameFromTest(gostd::testing::T* t) {
 // fourslash.go:368-395 — initialize
 // ===========================================================================
 
-void FourslashTest::initialize(
-    gostd::testing::T* t,
-    const std::shared_ptr<lsproto::ClientCapabilities>& capabilities,
-    bool runExternalCode) {
+void FourslashTest::initialize(gostd::testing::T* t,
+                               const struct FourslashOptions* options) {
 	auto initializationOptions =
 	    std::make_shared<lsproto::InitializationOptions>();
 	initializationOptions->CodeLensShowLocationsCommandName =
 	    showCodeLensLocationsCommandName;
-	if (runExternalCode) {
+	initializationOptions->TrackFlakyDiagnostics =
+	    options->TrackFlakyDiagnostics;
+	if (options->RunExternalCode) {
 		initializationOptions->RunExternalCode = true;
 	}
 	auto params = std::make_shared<lsproto::InitializeParams>();
@@ -470,7 +470,8 @@ void FourslashTest::initialize(
 	        lsproto::InitializationOptionsOrNull{
 	            .InitializationOptions = initializationOptions,
 	        });
-	params->Capabilities = getCapabilitiesWithDefaults(capabilities);
+	params->Capabilities =
+	    getCapabilitiesWithDefaults(options->Capabilities);
 	this->capabilities = params->Capabilities;
 	auto [resp, result, ok] =
 	    client->SendRequest(t, lsproto::InitializeInfo, params);
@@ -5081,7 +5082,7 @@ void FourslashTest::Paste(gostd::testing::T* t,
 	editScriptAndUpdateMarkers(t, activeFilename, start, start, text);
 
 	// post-paste fomatting
-	if (stateEnableFormatting) {
+	if (stateFormatEnabled) {
 		auto params = std::make_shared<
 		    lsproto::DocumentRangeFormattingParams>();
 		params->TextDocument.Uri =
@@ -5256,7 +5257,7 @@ void FourslashTest::typeText(gostd::testing::T* t,
 		        script, (TextPos)offset);
 
 		// Handle post-keystroke formatting
-		if (stateEnableFormatting) {
+		if (stateFormatEnabled) {
 			auto params = std::make_shared<
 			    lsproto::DocumentOnTypeFormattingParams>();
 			params->TextDocument.Uri =
@@ -6290,11 +6291,11 @@ void FourslashTest::verifyBaselineRename(
 
 		gostr::Builder renameOptions;
 		if (preferences != nullptr) {
-			if (preferences->UseAliasesForRename !=
+			if (preferences->ProvidePrefixAndSuffixTextForRename !=
 			    Tristate::Unknown) {
 				renameOptions.WriteString(gostd::sprintf(
 				    "// @useAliasesForRename: %v\n",
-				    {preferences->UseAliasesForRename ==
+				    {preferences->ProvidePrefixAndSuffixTextForRename ==
 				         Tristate::True}));
 			}
 			if (preferences->QuotePreference !=

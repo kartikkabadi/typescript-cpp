@@ -256,19 +256,28 @@ referenceFileLocation FileIncludeReason::getReferencedLocation(
 	}
 }
 
-Diagnostic* FileIncludeReason::toDiagnostic(SimpleProgram* program,
-                                          bool relativeFileName) const {
-	if (relativeFileName) {
-		return computeDiagnostic(
-		    program, [program](std::string_view fileName) {
-			    return tspath::getRelativePathFromDirectory(
-			        program->GetCurrentDirectory(), fileName,
-			        program->comparePathsOptions());
-		    });
+Diagnostic* FileIncludeReason::toDiagnostic(
+    SimpleProgram* program, bool relativeFileName,
+    const tspath::Path& relativeTo) const {
+	// fileInclude.go:148 — a5c43c4d54 moved the once-cached diagnostics
+	// off the reason into includeProcessor.reasonDiagnostics; ed480721
+	// added the explicit relativeTo root (empty => fileName as-is).
+	includeReasonDiagnosticKey key{this, relativeFileName, relativeTo};
+	if (auto it = program->includeProcessor_.reasonDiagnostics.find(key);
+	    it != program->includeProcessor_.reasonDiagnostics.end()) {
+		return it->second;
 	}
-	return computeDiagnostic(program, [](std::string_view fileName) {
+	Diagnostic* diagnostic = computeDiagnostic(
+	    program, [program, relativeFileName, relativeTo](
+	                 std::string_view fileName) {
+		if (relativeFileName && !relativeTo.empty()) {
+			return tspath::getRelativePathFromDirectory(
+			    relativeTo, fileName, program->comparePathsOptions());
+		}
 		return std::string(fileName);
 	});
+	program->includeProcessor_.reasonDiagnostics.emplace(key, diagnostic);
+	return diagnostic;
 }
 
 Diagnostic* FileIncludeReason::computeDiagnostic(
@@ -286,7 +295,7 @@ Diagnostic* FileIncludeReason::computeDiagnostic(
 				auto* config = program->opts_.Config;
 				std::string fileName =
 				    tspath::getNormalizedAbsolutePath(
-				        config->FileNames()[std::get<int>(data)],
+				        config->FileNames()[asIndex()],
 				        program->GetCurrentDirectory());
 				if (std::string matchedFileSpec =
 				        config->GetMatchedFileSpec(fileName);
@@ -313,8 +322,7 @@ Diagnostic* FileIncludeReason::computeDiagnostic(
 			    Root_file_specified_for_compilation);
 		}
 		case FileIncludeKind::AutomaticTypeDirectiveFile: {
-			auto* data =
-			    std::get_if<automaticTypeDirectiveFileData>(&this->data);
+			auto* data = asAutomaticTypeDirectiveFileData();
 			if (!program->Options()->UsesWildcardTypes()) {
 				if (!data->PackageId.Name.empty()) {
 					return tsoptions::newCompilerDiagnostic(
@@ -340,10 +348,11 @@ Diagnostic* FileIncludeReason::computeDiagnostic(
 			    {data->typeReference});
 		}
 		case FileIncludeKind::LibFile: {
-			if (auto* index = std::get_if<int>(&data); index != nullptr) {
+			if (auto [libIndex, isLibIndex] = asLibFileIndex();
+			    isLibIndex) {
 				return tsoptions::newCompilerDiagnostic(
 				    Library_0_specified_in_compilerOptions,
-				    {program->Options()->Lib[*index]});
+				    {program->Options()->Lib[libIndex]});
 			}
 			std::string target =
 			    scriptTargetString(
@@ -357,9 +366,8 @@ Diagnostic* FileIncludeReason::computeDiagnostic(
 			    Default_library);
 		}
 		case FileIncludeKind::ContentMapperSupplemental: {
-			auto* path = std::get_if<tspath::Path>(&data);
 			SourceFile* canonical =
-			    program->GetSourceFileByPath(*path);
+			    program->GetSourceFileByPath(canonicalSourceFile);
 			return tsoptions::newCompilerDiagnostic(
 			    
 			        Supplemental_virtual_file_produced_by_the_content_mapper_for_file_0,
@@ -503,7 +511,7 @@ Diagnostic* FileIncludeReason::toRelatedInfo(SimpleProgram* program) const {
 	switch (kind) {
 		case FileIncludeKind::RootFile: {
 			std::string fileName = tspath::getNormalizedAbsolutePath(
-			    config->FileNames()[std::get<int>(data)],
+			    config->FileNames()[asIndex()],
 			    program->GetCurrentDirectory());
 			if (std::string matchedFileSpec =
 			        config->GetMatchedFileSpec(fileName);
@@ -539,8 +547,7 @@ Diagnostic* FileIncludeReason::toRelatedInfo(SimpleProgram* program) const {
 		}
 		case FileIncludeKind::AutomaticTypeDirectiveFile:
 			if (!program->Options()->UsesWildcardTypes()) {
-				auto* tdata = std::get_if<automaticTypeDirectiveFileData>(
-				    &this->data);
+				auto* tdata = asAutomaticTypeDirectiveFileData();
 				if (Node* typesSyntax =
 				        tsoptions::GetOptionsSyntaxByArrayElementValue(
 				            program->includeProcessor_
@@ -556,13 +563,14 @@ Diagnostic* FileIncludeReason::toRelatedInfo(SimpleProgram* program) const {
 			}
 			break;
 		case FileIncludeKind::LibFile:
-			if (auto* index = std::get_if<int>(&data)) {
+			if (auto [libIndex, isLibIndex] = asLibFileIndex();
+			    isLibIndex) {
 				if (Node* libSyntax =
 				        tsoptions::GetOptionsSyntaxByArrayElementValue(
 				            program->includeProcessor_
 				                .getCompilerOptionsObjectLiteralSyntax(
 				                    program),
-				            "lib", program->Options()->Lib[*index]);
+				            "lib", program->Options()->Lib[libIndex]);
 				    libSyntax != nullptr) {
 					return tsoptions::
 					    CreateDiagnosticForNodeInSourceFile(
@@ -691,7 +699,7 @@ Diagnostic* processingDiagnostic::createDiagnosticExplainingFile(
 		if (!seenReasons.insert(includeReason).second)
 			return;
 		includeDetails.push_back(
-		    includeReason->toDiagnostic(program, false));
+		    includeReason->toDiagnostic(program, false, {}));
 		processRelatedInfo(includeReason);
 	};
 
@@ -858,6 +866,7 @@ void updateFileIncludeProcessor(SimpleProgram* p) {
 	old.computedDiagnostics_ = std::move(fresh.computedDiagnostics_);
 	old.reasonToReferenceLocation =
 	    std::move(fresh.reasonToReferenceLocation);
+	old.reasonDiagnostics = std::move(fresh.reasonDiagnostics);
 	old.includeReasonToRelatedInfo =
 	    std::move(fresh.includeReasonToRelatedInfo);
 	old.redirectAndFileFormat = std::move(fresh.redirectAndFileFormat);
