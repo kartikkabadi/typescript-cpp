@@ -466,6 +466,10 @@ inline std::pair<globPattern, bool> compileGlobPattern(std::string_view spec,
                                                      Usage usage,
                                                      bool caseSensitive) {
 	auto parts = tspath::getNormalizedPathComponents(spec, basePath);
+	if (!parts.empty() &&
+	    tspath::isEncodedDynamicFileName(parts[0])) {
+		caseSensitive = true;
+	}
 
 	// "src/**" without a filename matches nothing (for include patterns).
 	if (usage != Usage::Exclude && !parts.empty() && parts.back() == "**") {
@@ -475,6 +479,26 @@ inline std::pair<globPattern, bool> compileGlobPattern(std::string_view spec,
 	// Normalize root: "/home/" -> "/home".
 	parts[0] = std::string{
 	    tspath::removeTrailingDirectorySeparator(parts[0])};
+	if (!parts.empty() &&
+	    tspath::isEncodedDynamicFileName(parts[0])) {
+		// Encoded dynamic roots carry the scheme/authority inside the
+		// first component — split it so each segment matches on its
+		// own (vfsmatch.go:155).
+		std::vector<std::string> rootParts;
+		size_t start = 0;
+		while (true) {
+			auto slash = parts[0].find('/', start);
+			if (slash == std::string::npos) {
+				rootParts.push_back(parts[0].substr(start));
+				break;
+			}
+			rootParts.push_back(parts[0].substr(start, slash - start));
+			start = slash + 1;
+		}
+		rootParts.insert(rootParts.end(),
+		                 std::next(parts.begin()), parts.end());
+		parts = std::move(rootParts);
+	}
 
 	// Directories implicitly match all files: "src" -> "src/**/*".
 	if (!parts.empty() && IsImplicitGlob(parts.back())) {

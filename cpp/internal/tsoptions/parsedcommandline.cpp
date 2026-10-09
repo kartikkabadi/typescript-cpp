@@ -67,6 +67,10 @@ ParsedCommandLine* NewParsedCommandLine(
 	    .ProjectReferences = projectReferences,
 	};
 	parsed->comparePathsOptions = comparePathsOptions;
+	// Go's NewParsedCommandLine takes (baseDirectory, caseSensitivity);
+	// this port carries both inside ComparePathsOptions — keep the
+	// typed-path fields in sync so BaseDirectory() is rooted.
+	parsed->baseDirectory = comparePathsOptions.currentDirectory;
 	return parsed;
 }
 
@@ -82,6 +86,7 @@ ParsedCommandLine* ParsedCommandLine::WithFileNames(
 	parsed->Raw = Raw;
 	parsed->CompileOnSave = CompileOnSave;
 	parsed->comparePathsOptions = comparePathsOptions;
+	parsed->baseDirectory = baseDirectory;
 	parsed->wildcardDirectories = wildcardDirectories;
 	parsed->includeGlobs = includeGlobs;
 	parsed->literalFileNamesLen = literalFileNamesLen;
@@ -491,6 +496,7 @@ ParsedCommandLine* ParsedCommandLine::ReloadFileNamesOfParsedCommandLine(
 	parsedCommandLine->Raw = Raw;
 	parsedCommandLine->CompileOnSave = CompileOnSave;
 	parsedCommandLine->comparePathsOptions = comparePathsOptions;
+	parsedCommandLine->baseDirectory = baseDirectory;
 	parsedCommandLine->wildcardDirectories = wildcardDirectories;
 	parsedCommandLine->includeGlobs = includeGlobs;
 	parsedCommandLine->literalFileNamesLen = newLiteralFileNamesLen;
