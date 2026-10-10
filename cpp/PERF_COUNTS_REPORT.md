@@ -89,4 +89,4 @@ re-fire at checker_typenodes.cpp:720) were left untouched.
 - emit conformance (`emit_triage.py` vs `emitdump` oracle): 500/500 PASS.
 - decl-emit (`EMIT_FLAGS="--declaration --emitDeclarationOnly"`): 500/500 PASS.
 - tsctestrunner: 117/117. unittestrunner: 1,122/1,122.
-- fourslashrunner: see commit message / session for sample result.
+- fourslashrunner: 4,145/4,145 pass, 428 faithful skips, 0 fail (baseline parity).
