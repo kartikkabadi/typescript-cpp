@@ -57,14 +57,20 @@ gostd::Error StdioServer::Run(gostd::Context ctx) {
 	sessionInit.BackgroundCtx = ctx;
 	// Logger: nil — TODO: Add logging support
 	sessionInit.FS = fs;
-	sessionInit.Options = new project::SessionOptions{
-	    .CurrentDirectory = options->Cwd,
-	    .DefaultLibraryPath = options->DefaultLibraryPath,
-	    .PositionEncoding = lsproto::PositionEncodingKindUTF8,
-	    .WatchEnabled = false,
-	    .LoggingEnabled = false,
-	    .RunExternalCode = options->RunExternalCode,
-	};
+	// KeepAlive ownership: the session reads Options for its whole
+	// lifetime (background work included); Go's *SessionOptions stays
+	// reachable via GC, so keep a heap copy in session->keepAlive.
+	auto optionsOwner = std::make_shared<project::SessionOptions>(
+	    project::SessionOptions{
+	        .CurrentDirectory = options->Cwd,
+	        .DefaultLibraryPath = options->DefaultLibraryPath,
+	        .PositionEncoding = lsproto::PositionEncodingKindUTF8,
+	        .WatchEnabled = false,
+	        .LoggingEnabled = false,
+	        .RunExternalCode = options->RunExternalCode,
+	    });
+	sessionInit.Options = optionsOwner.get();
+	sessionInit.KeepAlive = {std::static_pointer_cast<void>(optionsOwner)};
 	sessionInit.Spawner = options->ContentMapperSpawner.get();
 
 	SessionOptions sessionOpts{

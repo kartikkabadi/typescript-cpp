@@ -27,6 +27,7 @@
 #include "internal/win32/w32compat.h"
 #else
 #include <fcntl.h>
+#include <poll.h>
 #include <signal.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
@@ -65,18 +66,33 @@ public:
 	pid_t pid = -1;
 	int stdinFd = -1;
 	int stdoutFd = -1;
+	int stderrFd = -1;
 	std::thread stderrPump;
 	std::atomic<bool> reaped{false};
+	std::atomic<bool> stopPump{false};
 	int exitStatus = 0;
 
-	childProcess(pid_t pid, int stdinFd, int stdoutFd, std::thread&& pump)
+	childProcess(pid_t pid, int stdinFd, int stdoutFd, int stderrFd,
+	             std::thread&& pump)
 	    : pid(pid), stdinFd(stdinFd), stdoutFd(stdoutFd),
-	      stderrPump(std::move(pump)) {}
+	      stderrFd(stderrFd), stderrPump(std::move(pump)) {}
 
-	~childProcess() override {
+	// stopPumpAndJoin — bounds the pump wait: a descendant that inherited
+	// the stderr write end keeps the pipe open past the child's exit, so
+	// joining without this can hang forever (Go's cmd.WaitDelay case).
+	void stopPumpAndJoin() {
+		stopPump.store(true);
+		if (stderrFd >= 0) {
+			::close(stderrFd);
+			stderrFd = -1;
+		}
 		if (stderrPump.joinable()) {
 			stderrPump.join();
 		}
+	}
+
+	~childProcess() override {
+		stopPumpAndJoin();
 		if (stdinFd >= 0) {
 			::close(stdinFd);
 		}
@@ -163,9 +179,7 @@ public:
 			exitStatus = status;
 			reaped.store(true);
 		}
-		if (stderrPump.joinable()) {
-			stderrPump.join();
-		}
+		stopPumpAndJoin();
 		return nullptr;
 	}
 };
@@ -182,6 +196,11 @@ spawnProcess(const std::vector<std::string>& command, const std::string& dir,
 	int stdinPipe[2] = {-1, -1};
 	int stdoutPipe[2] = {-1, -1};
 	int stderrPipe[2] = {-1, -1};
+	// errPipe reports chdir/execvp failures to the parent — Go's
+	// exec.Cmd.Start returns them via exactly this CLOEXEC-pipe trick:
+	// a successful exec closes the write end (EOF), a failure writes
+	// errno before _exit.
+	int errPipe[2] = {-1, -1};
 	// O_CLOEXEC (Go os/exec uses CLOEXEC pipes): without it, a second spawned
 	// process inherits the first's parent-side fds and pins its stdin open,
 	// so the first child never sees EOF. Windows: CreatePipe handles are
@@ -200,11 +219,12 @@ spawnProcess(const std::vector<std::string>& command, const std::string& dir,
 		return 0;
 	};
 	if (pipeCloexec(stdinPipe) != 0 || pipeCloexec(stdoutPipe) != 0 ||
-	    pipeCloexec(stderrPipe) != 0) {
+	    pipeCloexec(stderrPipe) != 0 || pipeCloexec(errPipe) != 0) {
 #else
 	if (::pipe2(stdinPipe, O_CLOEXEC) != 0 ||
 	    ::pipe2(stdoutPipe, O_CLOEXEC) != 0 ||
-	    ::pipe2(stderrPipe, O_CLOEXEC) != 0) {
+	    ::pipe2(stderrPipe, O_CLOEXEC) != 0 ||
+	    ::pipe2(errPipe, O_CLOEXEC) != 0) {
 #endif
 		return {nullptr,
 		        gostd::newError(std::string("pipe: ") + w32ErrText(errno))};
@@ -215,6 +235,9 @@ spawnProcess(const std::vector<std::string>& command, const std::string& dir,
 	io.stdoutFd = stdoutPipe[1];
 	io.stderrFd = stderrPipe[1];
 	pid_t pid = w32::spawnvp(command, io, dir);
+	// errPipe only exists for the fork/exec path — close it on Windows.
+	::close(errPipe[0]);
+	::close(errPipe[1]);
 	if (pid < 0) {
 		return {nullptr,
 		        gostd::newError(std::string("spawn: ") +
@@ -246,46 +269,106 @@ spawnProcess(const std::vector<std::string>& command, const std::string& dir,
 		::close(stdoutPipe[1]);
 		::close(stderrPipe[0]);
 		::close(stderrPipe[1]);
+		::close(errPipe[0]);
 		if (!dir.empty() && ::chdir(dir.c_str()) != 0) {
-			// Go's exec.Cmd.Start reports the chdir error; the closest we can
-			// get post-fork is a nonzero exit with the reason on stderr.
+			int e = errno;
 			std::string msg =
-			    std::string("chdir: ") + w32ErrText(errno) + "\n";
+			    std::string("chdir: ") + w32ErrText(e) + "\n";
 			(void)!::write(STDERR_FILENO, msg.data(), msg.size());
+			(void)!::write(errPipe[1], &e, sizeof(e));
 			::_exit(1);
 		}
 		::execvp(argv[0], argv.data());
+		{
+			int e = errno;
+			(void)!::write(errPipe[1], &e, sizeof(e));
+		}
 		::_exit(127);
 	}
 #endif // !_WIN32
 	::close(stdinPipe[0]);
 	::close(stdoutPipe[1]);
 	::close(stderrPipe[1]);
-
-	// cmd.Stderr = stderr (io.Writer): pump the child's stderr bytes into it.
-	std::thread pump([fd = stderrPipe[0], stderr_]() mutable {
-		std::array<char, 4096> buf{};
-		if (stderr_ == nullptr) {
-			char discard[4096];
-			while (::read(fd, discard, sizeof(discard)) > 0) {
-			}
-			::close(fd);
-			return;
+#ifndef _WIN32
+	// Await the child's exec result (what Go's cmd.Start waits on):
+	// CLOEXEC makes a clean exec read as EOF; anything else is errno.
+	::close(errPipe[1]);
+	int childErr = 0;
+	{
+		ssize_t n;
+		do {
+			n = ::read(errPipe[0], &childErr, sizeof(childErr));
+		} while (n < 0 && errno == EINTR);
+	}
+	::close(errPipe[0]);
+	if (childErr != 0) {
+		int status;
+		while (::waitpid(pid, &status, 0) < 0 && errno == EINTR) {
 		}
+		::close(stdinPipe[1]);
+		::close(stdoutPipe[0]);
+		::close(stderrPipe[0]);
+		return {nullptr,
+		        gostd::newError(std::string("spawn: ") +
+		                        w32ErrText(childErr))};
+	}
+#endif
+
+	// cmd.Stderr = stderr (io.Writer): pump the child's stderr bytes into
+	// it. poll() + stopPump bounds the wait when a descendant inherits the
+	// write end — read() alone could block past the child's exit.
+	auto* proc = new childProcess(pid, stdinPipe[1], stdoutPipe[0],
+	                              stderrPipe[0], std::thread());
+	std::thread pump([fd = stderrPipe[0], stderr_,
+	                  stop = &proc->stopPump]() mutable {
+#ifndef _WIN32
+		std::array<char, 4096> buf{};
+		auto drain = [&](auto emit) {
+			for (;;) {
+				pollfd pfd{fd, POLLIN, 0};
+				int pr = ::poll(&pfd, 1, 50);
+				if (pr <= 0) {
+					if (pr == 0 && stop->load()) {
+						return;
+					}
+					if (pr < 0 && errno == EINTR) {
+						continue;
+					}
+					if (pr < 0) {
+						return;
+					}
+					continue;
+				}
+				ssize_t n = ::read(fd, buf.data(), buf.size());
+				if (n <= 0) {
+					return;
+				}
+				emit(n);
+			}
+		};
+		if (stderr_ == nullptr) {
+			drain([](ssize_t) {});
+		} else {
+			drain([&](ssize_t n) {
+				stderr_->write(std::string_view(buf.data(), n));
+			});
+		}
+#else
+		std::array<char, 4096> buf{};
 		for (;;) {
 			ssize_t n = ::read(fd, buf.data(), buf.size());
 			if (n <= 0) {
 				break;
 			}
-			stderr_->write(std::string_view(buf.data(), n));
+			if (stderr_ != nullptr) {
+				stderr_->write(std::string_view(buf.data(), n));
+			}
 		}
-		::close(fd);
+#endif
 	});
+	proc->stderrPump = std::move(pump);
 
-	return {std::shared_ptr<gostd::io::ReadWriteCloser>(
-	            new childProcess(pid, stdinPipe[1], stdoutPipe[0],
-	                             std::move(pump))),
-	        nullptr};
+	return {std::shared_ptr<gostd::io::ReadWriteCloser>(proc), nullptr};
 }
 
 namespace {

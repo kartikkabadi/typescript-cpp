@@ -62,7 +62,18 @@ run_one() {
 		if [ -n "$TIMEOUT_BIN" ]; then
 			"$TIMEOUT_BIN" "$TIMEOUT" $bin $args_clean >"$prefix.stdout" 2>"$prefix.stderr"
 		else
-			$bin $args_clean >"$prefix.stdout" 2>"$prefix.stderr"
+			# No timeout(1)/gtimeout(1): keep the watchdog anyway — a
+			# background sleeper kills the child at the deadline so a hung
+			# oracle/compiler can't block parity forever.
+			$bin $args_clean >"$prefix.stdout" 2>"$prefix.stderr" &
+			local pid=$!
+			( sleep "$TIMEOUT"; kill -9 "$pid" 2>/dev/null ) &
+			local watchdog=$!
+			wait "$pid"
+			local rc=$?
+			kill "$watchdog" 2>/dev/null
+			wait "$watchdog" 2>/dev/null
+			exit "$rc"
 		fi
 		echo "$?" >"$prefix.exit"
 	)

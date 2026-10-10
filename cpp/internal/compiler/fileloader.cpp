@@ -123,22 +123,27 @@ LibFile* filesLoader::pathForLibFile(const std::string& name) {
 		    compilerOptions, host->GetCurrentDirectory(), name);
 		// fileloader.go:989 — resolveLibrary's `defer tr.Push(PhaseProgram,
 		// "resolveLibrary", {"resolveFrom"}, false)()`.
-		tracing::TraceScope traceResolveLibrary(
-		    tracing, tracing::PhaseProgram, "resolveLibrary",
-		    tracing::TraceArgs{{"resolveFrom", resolveFrom}}, false);
-		// fileloader.go:991-996 — Go records the first resolver error
-		// via moduleResolutionErrorOnce; C++ catches the throw.
 		std::shared_ptr<module::ResolvedModule> resolutionShared;
 		std::vector<module::DiagAndArgs> libTrace;
-		try {
-			std::tie(resolutionShared, libTrace) =
-			    resolver->ResolveModuleName(
-			        libraryName, resolveFrom, ModuleKind::CommonJS,
-			        nullptr);
-		} catch (const std::exception& e) {
-			moduleResolutionErrorOnce.run([&] {
-				moduleResolutionError = gostd::newError(e.what());
-			});
+		{
+			// fileloader.go:982-990 — resolveLibrary's `defer tr.Push(
+			// PhaseProgram, "resolveLibrary", {"resolveFrom"}, false)()`
+			// spans only the resolver call + error record, not path
+			// selection or the resolutions-map store.
+			tracing::TraceScope traceResolveLibrary(
+			    tracing, tracing::PhaseProgram, "resolveLibrary",
+			    tracing::TraceArgs{{"resolveFrom", resolveFrom}},
+			    false);
+			try {
+				std::tie(resolutionShared, libTrace) =
+				    resolver->ResolveModuleName(
+				        libraryName, resolveFrom,
+				        ModuleKind::CommonJS, nullptr);
+			} catch (const std::exception& e) {
+				moduleResolutionErrorOnce.run([&] {
+					moduleResolutionError = gostd::newError(e.what());
+				});
+			}
 		}
 		module::ResolvedModule* resolution = resolutionShared.get();
 		if (resolution != nullptr) {

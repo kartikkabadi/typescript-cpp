@@ -47,6 +47,16 @@ struct APICreateProgramRequest {
 	std::vector<Diagnostic*> ConfigFileParsingDiagnostics;
 	ModuleResolverFactory* ModuleResolverFactory = nullptr;
 	uint64_t ModuleResolverID = 0;
+
+	// owned_ owns lazily-allocated members (ModuleResolverFactory et al.)
+	// so a request freed by its owner doesn't leak them.
+	std::vector<std::shared_ptr<void>> owned_;
+	template <typename T>
+	T* own(std::unique_ptr<T> p) {
+		T* raw = p.get();
+		owned_.emplace_back(std::move(p));
+		return raw;
+	}
 };
 
 // APIReconfigureProgramRequest — snapshot.go:335.
@@ -74,6 +84,19 @@ struct APISnapshotRequest {
 	// Layers use per-path file changes instead of invalidating all
 	// inherited state.
 	bool ReplaceFileSystem = false;
+
+	// owned_ gives RAII ownership to lazily-allocated members (OpenProjects,
+	// OpenFiles, CreatePrograms[i], ...). The raw pointer fields stay —
+	// they mirror Go's nil-able fields — but the objects behind them are
+	// per-request allocations that Go's GC would reclaim; without an owner
+	// every snapshot request leaks them. own() attaches one.
+	std::vector<std::shared_ptr<void>> owned_;
+	template <typename T>
+	T* own(std::unique_ptr<T> p) {
+		T* raw = p.get();
+		owned_.emplace_back(std::move(p));
+		return raw;
+	}
 };
 
 // ProjectTreeRequest — snapshot.go:357.

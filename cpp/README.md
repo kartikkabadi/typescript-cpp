@@ -27,7 +27,7 @@ oracle. Oracle pin: `microsoft/TypeScript@2d8450f9` (2026-10-09) — see
 | Transformers | `transformers/` | `cpp/internal/transformers` | complete — root package (transformer/chain/modifiervisitor/utilities/destructuring) + all sub-packages: estransforms (17 files incl. classfields 4k, esdecorator, namedevaluation, classthis, async family), jsxtransforms, moduletransforms, inliners, tstransforms (6 files), declarations (transform/diagnostics/tracker/supplementalreferences/util) |
 | Emitter | `printer/`, `compiler/emitter.go`, `compiler/emitHost.go` | `cpp/internal/printer`, `cpp/internal/compiler/emitter.cpp` | emitter + emitHost + `Program::Emit` ported; `tscpp emit`/`tscpp emitdump` byte-identical to the Go `emitdump` oracle on the full corpus (12,734/12,734); sourcemap/spanmap/contentmapper/incremental landed |
 | Stage-5 | `tsoptions`, `format`, `contentmapper`+`spanmap`, `execute/incremental`, `vfs`, `locale`, `json`, `jsonrpc`, `xxh3`, `gostd`, `transpile` | `cpp/internal/{tsoptions,format,contentmapper,spanmap,execute/incremental,vfs,locale,json,jsonrpc,xxh3,gostd,transpile}` | complete — incl. `tsoptions::ParseCommandLine` CLI wiring (real flag parsing in tscpp), contentmapper→fileloader seam (`parseContentMappedFile` + host mapping + program diagnostics), transpile API (byte-identical to `transpiledump` oracle) |
-| Stage-5 (merged) | `fswatch`, `ipc`, `execute/tsc`+`build`, `watchmanager`, `ls`, `api`, `project`, `lsp`, `fourslash`, `tsctests`, `lsconv`, `lspwatcher`, `collections`, `testutil/*` | `cpp/internal/...` | complete — `lsp` server + `proto.go` tail landed; `--lsp`/`--api` event streams byte-identical; `tsctestrunner` 99/99 tsc scenarios; `fourslashrunner` **4,130/4,130 (100%)** across 4,560 ported tests — full oracle parity |
+| Stage-5 (merged) | `fswatch`, `ipc`, `execute/tsc`+`build`, `watchmanager`, `ls`, `api`, `project`, `lsp`, `fourslash`, `tsctests`, `lsconv` (partial — see `cpp/internal/ls/lsconv/lsconv.h`), `lspwatcher`, `collections`, `testutil/*` | `cpp/internal/...` | complete — `lsp` server + `proto.go` tail landed; `--lsp`/`--api` event streams byte-identical; `tsctestrunner` 99/99 tsc scenarios; `fourslashrunner` **4,130/4,130 (100%)** across 4,560 ported tests — full oracle parity |
 
 ## Conformance
 
@@ -90,10 +90,12 @@ based — an entire SourceFile's nodes are freed in one shot, and parsing
 performs no per-node refcount/GC work.
 
 Project-level (`tsc -p`, 100-file synthetic project, Linux/x86): after the
-FENNEL checker pool (~250% CPU) and emit-arena release fixes, tscpp is
-currently ~2× slower than Go `tsc` (emit 1.95×, --noEmit 2.33×,
---declaration 2.37×; decl-emit RSS 462 MB vs Go 274 MB). The ROADMAP ≥3×
-gate is not yet met — remaining gap is per-CPU hot-path work; see
+FENNEL checker pool (~250% CPU) and emit-arena release fixes — plus a
+~50% Go-side regression that moved the baseline — tscpp reached
+wall-clock parity with Go `tsc` (emit 1.05×, --noEmit 0.99×,
+--declaration 1.00×; decl-emit RSS ~340 MB vs Go ~264 MB). The ROADMAP
+≥3× gate was closed as contract-incompatible; residual gap is per-CPU
+hot-path work; see
 `cpp/tools/perf/PERF_REPORT.md` and `run_all.sh` for the reproducible
 harness.
 

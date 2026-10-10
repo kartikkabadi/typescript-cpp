@@ -8,7 +8,7 @@ byte-identical-equivalent vs the Go oracle (only dead/uncalled code removed).
 
 Every site flagged in `cpp/CLEANUP_AUDIT.md` was checked against `tsc/internal/`
 (greped for the Go counterpart, including generic decls and differently-named
-helpers). Result: **10 dead scaffolding functions deleted** across 5 files,
+helpers). Result: **11 dead scaffolding functions deleted** across 5 files,
 **9 file-level keeps annotated** with the Go function each ports.
 
 ### Deleted — dead port scaffolding (no Go counterpart needed, zero callers)
@@ -80,7 +80,10 @@ and a `SourceFile` deepClone override — left for a dedicated generator-sync pa
 
 ## 4. Tooling hardening (`cpp/tools/`)
 
-All scripts pass `bash -n`; `set -euo pipefail` already present everywhere.
+All scripts pass `bash -n`; the harnesses run under `set -u`, the
+corpus-list pipelines and the fourslash/tsctest CI steps are
+`pipefail`-protected, and per-worker exit status is propagated (xargs
+status → script exit) so upstream failures fail closed.
 
 | Script | Fix |
 |---|---|

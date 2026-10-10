@@ -227,6 +227,8 @@ struct ConfigFileRegistry {
 	}
 
 	// ForEachTestConfigEntry — configfileregistry.go:168 (For testing).
+	// Go tolerates a nil receiver (`if c != nil`) — callers that may hold
+	// a null registry guard at the call site (statebaseline.cpp).
 	template <typename Cb>
 	void ForEachTestConfigEntry(Cb&& cb) const {
 		for (auto& [path, entry] : configs) {

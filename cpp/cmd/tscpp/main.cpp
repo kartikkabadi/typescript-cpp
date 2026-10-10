@@ -37,6 +37,7 @@
 #include "internal/binder/binder.h"
 #include "internal/compiler/program.h"
 #include "internal/execute/execute.h"
+#include "cmd/tscpp/notify.h"
 #include "cmd/tscpp/sys.h"
 
 // sys.cpp — tsc/cmd/tsc/sys.go
@@ -513,8 +514,11 @@ static void transpiledumpFile(int argc, char** argv) {
 	if (out == nullptr) {
 		return;
 	}
-	std::printf("%s\ndiags:%d", out->OutputText.c_str(),
-	            int(out->Diagnostics.size()));
+	// OutputText can contain embedded NULs (byte-parity with the Go
+	// dump); %s on c_str() would truncate — write the full length.
+	std::fwrite(out->OutputText.data(), 1, out->OutputText.size(),
+	            stdout);
+	std::printf("\ndiags:%d", int(out->Diagnostics.size()));
 	for (auto* d : out->Diagnostics) {
 		diagnosticwriter::ASTDiagnostic ad(d);
 		std::printf("\n%d %s", d->Code(),
@@ -722,11 +726,17 @@ static void parseAll(const char* path, int workers) {
 // conformance runs see the same status the Go oracle reports rather than
 // a signal death. The alternate stack keeps the handler runnable when the
 // fault is itself stack overflow.
+// Cached at install time: getenv/snprintf aren't async-signal-safe —
+// calling them inside the handler can deadlock against libc locks.
+static int g_debugCrash;
 static void crashExit(int sig) {
-	if (std::getenv("TSCPP_DEBUG_CRASH")) {
-		char b[64];
-		int n = std::snprintf(b, sizeof(b), "TSCPP-CRASH sig=%d\n", sig);
-		(void)!write(STDERR_FILENO, b, n);
+	if (g_debugCrash) {
+		// sig fits in 3 digits; build the message without snprintf.
+		char b[] = "TSCPP-CRASH sig=___\n";
+		b[15] = char('0' + (sig / 100) % 10);
+		b[16] = char('0' + (sig / 10) % 10);
+		b[17] = char('0' + sig % 10);
+		(void)!write(STDERR_FILENO, b, sizeof(b) - 1);
 	}
 	if (tsc::tscEmitdumpPanicExit) {
 		// write() is async-signal-safe; mirror the panic path's `EXIT 2`.
@@ -765,6 +775,8 @@ static void installCrashExitHandlers() {
 
 int main(int argc, char** argv) {
 	installCrashExitHandlers();
+	// Cache before any signal can arrive: getenv is not async-signal-safe.
+	g_debugCrash = std::getenv("TSCPP_DEBUG_CRASH") != nullptr;
 	// Go's runtime ignores SIGPIPE except for writes to stdout/stderr —
 	// writes to a dead mapper child's stdin must fail with EPIPE, not kill
 	// the process. (No SIGPIPE exists on Windows; the ignore is a no-op.)
@@ -811,8 +823,12 @@ int main(int argc, char** argv) {
 			}
 		}
 		tsc::execute::tsc::System* sys = newSystem();
-		auto result = tsc::execute::CommandLine(gostd::contextBackground(), sys,
-		                                   args, nullptr);
+		// main.go:29 — signal.NotifyContext(ctx, SIGINT, SIGTERM): watch
+		// mode relies on ctx cancellation for RunLoop cleanup.
+		auto [ctx, stopNotify] =
+		    tsc::cmd_notify::signalNotifyContext();
+		auto result = tsc::execute::CommandLine(ctx, sys, args, nullptr);
+		stopNotify();
 		return static_cast<int>(result.Status);
 	}
 	if (mode != "lex" && mode != "lex-json" && mode != "bench" &&

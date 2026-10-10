@@ -489,16 +489,26 @@ void FourslashTest::printConfigFileRegistryDiff(
 		return;
 	}
 	diffTableOptions options{.indent = "    ", .sortKeys = true};
+	// ForEach*/GetTest* accessors allocate fresh entry objects per call
+	// (Go's GC would reclaim them); keep them owned until the deferred
+	// table callbacks have printed.
+	std::vector<std::unique_ptr<project::TestConfigEntry>> ownedEntries;
+	std::vector<std::unique_ptr<project::TestConfigFileNamesEntry>>
+	    ownedFileNamesEntries;
 	configFileRegistry->ForEachTestConfigEntry(
 	    [&](tspath::Path path, project::TestConfigEntry* entry) {
+		    ownedEntries.emplace_back(entry);
 		    std::string configChange;
 		    // Go: serializedConfigFileRegistry.GetTestConfigEntry is a
 		    // nil-receiver-safe method (`if c != nil`).
 		    auto* serializedRegistry =
 		        stateBaseline_->serializedConfigFileRegistry;
-		    auto oldEntry =
+		    auto* oldEntry =
 		        serializedRegistry != nullptr
-		            ? serializedRegistry->GetTestConfigEntry(path)
+		            ? ownedEntries
+		                  .emplace_back(
+		                      serializedRegistry->GetTestConfigEntry(path))
+		                  .get()
 		            : nullptr;
 		    if (oldEntry == nullptr) {
 			    configChange = "*new*";
@@ -584,14 +594,18 @@ void FourslashTest::printConfigFileRegistryDiff(
 	configFileRegistry->ForEachTestConfigFileNamesEntry(
 	    [&](tspath::Path path,
 	        project::TestConfigFileNamesEntry* entry) {
+		    ownedFileNamesEntries.emplace_back(entry);
 		    std::string configFileNamesChange;
 		    auto* serializedRegistry =
 		        stateBaseline_->serializedConfigFileRegistry;
 		    // nil-receiver-safe (`if c != nil`).
-		    auto oldEntry =
+		    auto* oldEntry =
 		        serializedRegistry != nullptr
-		            ? serializedRegistry
-		                  ->GetTestConfigFileNamesEntry(path)
+		            ? ownedFileNamesEntries
+		                  .emplace_back(
+		                      serializedRegistry
+		                          ->GetTestConfigFileNamesEntry(path))
+		                  .get()
 		            : nullptr;
 		    if (oldEntry == nullptr) {
 			    configFileNamesChange = "*new*";
@@ -682,8 +696,10 @@ void FourslashTest::printConfigFileRegistryDiff(
 	    serializedRegistry != nullptr) {
 		serializedRegistry->ForEachTestConfigEntry(
 		    [&](tspath::Path path, project::TestConfigEntry* entry) {
-			    if (configFileRegistry->GetTestConfigEntry(path) ==
-			        nullptr) {
+			    ownedEntries.emplace_back(entry);
+			    std::unique_ptr<project::TestConfigEntry> current(
+			        configFileRegistry->GetTestConfigEntry(path));
+			    if (current == nullptr) {
 				    configDiffsTable->setHasChange();
 				    configDiffsTable->add(
 				        std::string(path),
@@ -703,9 +719,10 @@ void FourslashTest::printConfigFileRegistryDiff(
 		serializedRegistry->ForEachTestConfigFileNamesEntry(
 		    [&](tspath::Path path,
 		        project::TestConfigFileNamesEntry* entry) {
-			    if (configFileRegistry
-			            ->GetTestConfigFileNamesEntry(path) ==
-			        nullptr) {
+			    ownedFileNamesEntries.emplace_back(entry);
+			    std::unique_ptr<project::TestConfigFileNamesEntry> current(
+			        configFileRegistry->GetTestConfigFileNamesEntry(path));
+			    if (current == nullptr) {
 				    configFileNamesDiffsTable->setHasChange();
 				    configFileNamesDiffsTable->add(
 				        std::string(path),

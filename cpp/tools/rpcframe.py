@@ -129,7 +129,10 @@ class RpcSession:
             self.proc.kill()
 
 def uri_for(path):
-    return "file://" + os.path.abspath(path)
+    # as_uri() percent-encodes URI-reserved chars ('#', '%', spaces) that
+    # would otherwise fragment/alter the document URI.
+    from pathlib import Path
+    return Path(path).resolve().as_uri()
 
 def normalize(obj, _key=""):
     """Recursively normalize volatile bits for byte-diff.
@@ -147,10 +150,18 @@ def normalize(obj, _key=""):
     if isinstance(obj, list):
         return [normalize(v, _key) for v in obj]
     if isinstance(obj, str):
-        return obj.replace("\\", "/")
+        # Backslash→slash only for path/URI-valued fields; blanket
+        # conversion would equate distinct text values like C:\foo.
+        if _PATH_KEY.search(_key):
+            return obj.replace("\\", "/")
+        return obj
     return obj
 
-def transcript_lines(log, skip_notifs=("$/", "window/logMessage", "telemetry/")):
+_PATH_KEY = __import__("re").compile(
+    r"uri|file|path|dir|folder|root|location|target", __import__("re").I)
+
+def transcript_lines(log, skip_notifs=("$/", "window/logMessage", "telemetry/",
+                                        "textDocument/publishDiagnostics")):
     out = []
     for side, msg in log:
         m = msg.get("method", "")

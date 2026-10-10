@@ -166,9 +166,10 @@ lsp::lsproto::VSContainerElement* buildVSHoverRawContent(
 	}
 
 	auto* imageElement = new lsp::lsproto::VSImageElement;
+	// Owning shared_ptrs: these objects are freshly allocated per hover
+	// response — Go's GC reclaims them; no-op deleters leak them.
 	imageElement->ImageId =
-	    std::shared_ptr<lsp::lsproto::VSImageId>(
-	        imageId, [](lsp::lsproto::VSImageId*) {});
+	    std::shared_ptr<lsp::lsproto::VSImageId>(imageId);
 	auto* qiElement = new lsp::lsproto::VSClassifiedTextElement;
 	qiElement->Runs = quickInfoRuns;
 
@@ -177,13 +178,10 @@ lsp::lsproto::VSContainerElement* buildVSHoverRawContent(
 	displayLine->Elements = std::vector<
 	    lsp::lsproto::
 	        VSImageElementOrClassifiedTextElementOrContainerElement>{
-	    {std::shared_ptr<lsp::lsproto::VSImageElement>(
-	        imageElement, [](lsp::lsproto::VSImageElement*) {}),
+	    {std::shared_ptr<lsp::lsproto::VSImageElement>(imageElement),
 	     nullptr, nullptr},
 	    {nullptr,
-	     std::shared_ptr<lsp::lsproto::VSClassifiedTextElement>(
-	         qiElement,
-	         [](lsp::lsproto::VSClassifiedTextElement*) {}),
+	     std::shared_ptr<lsp::lsproto::VSClassifiedTextElement>(qiElement),
 	     nullptr},
 	};
 
@@ -200,12 +198,9 @@ lsp::lsproto::VSContainerElement* buildVSHoverRawContent(
 	    lsp::lsproto::
 	        VSImageElementOrClassifiedTextElementOrContainerElement>{
 	    {nullptr, nullptr,
-	     std::shared_ptr<lsp::lsproto::VSContainerElement>(
-	         displayLine, [](lsp::lsproto::VSContainerElement*) {})},
+	     std::shared_ptr<lsp::lsproto::VSContainerElement>(displayLine)},
 	    {nullptr,
-	     std::shared_ptr<lsp::lsproto::VSClassifiedTextElement>(
-	         docElement,
-	         [](lsp::lsproto::VSClassifiedTextElement*) {}),
+	     std::shared_ptr<lsp::lsproto::VSClassifiedTextElement>(docElement),
 	     nullptr},
 	};
 	return stacked;
