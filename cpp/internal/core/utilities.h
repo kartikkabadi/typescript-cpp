@@ -4,6 +4,7 @@
 #include "internal/gostd/gostd.h" // TSC_UNREACHABLE
 #include <atomic>
 #include <condition_variable>
+#include <deque>
 #include <functional>
 #include <limits>
 #include <memory>
@@ -47,58 +48,118 @@ struct workGroup {
 };
 
 struct parallelWorkGroup final : workGroup {
+	// Go runs each queued fn on a new goroutine; the runtime multiplexes
+	// them over GOMAXPROCS OS threads. A std::thread per task matches the
+	// semantics but not the cost model (thousands of spawned threads thrash
+	// the scheduler, malloc arenas and shared mutexes), so this port runs a
+	// bounded pool of workers — the same effective parallelism as Go —
+	// pulling queued fns. Task granularity, concurrency guarantees and
+	// RunAndWait's wait-for-all contract are unchanged.
 	std::atomic<bool> done{false};
 	std::mutex mu;
 	std::condition_variable cv;
+	std::deque<std::function<void()>> pending;
+	std::vector<std::thread> threads;
 	int running = 0;
+	int workers = 0;
 
 	~parallelWorkGroup() override {
-		// Detached workers' tails (running-- + cv.notify_all) can still
-		// be in flight when RunAndWait returns. Both run under mu, so a
-		// single lock acquisition here happens-after the last worker's
-		// tail and makes destroying mu/cv safe (Go: no dtor — GC).
-		std::lock_guard<std::mutex> lock(mu);
+		// Workers are joinable so destruction waits for every worker's
+		// last use of mu/cv: after RunAndWait returns a worker's loop
+		// tail can still re-lock mu (checking pending once more), which
+		// would otherwise touch a destroyed mutex.
+		{
+			std::lock_guard<std::mutex> lock(mu);
+			done.store(true);
+		}
+		cv.notify_all();
+		for (auto& t : threads) {
+			if (t.joinable()) {
+				t.join();
+			}
+		}
 	}
 
 	void Queue(std::function<void()> fn) override {
 		if (done.load()) {
 			TSC_UNREACHABLE("Queue called after RunAndWait returned");
 		}
+		bool runInline = false;
 		{
 			std::lock_guard<std::mutex> lock(mu);
-			running++;
+			pending.push_back(std::move(fn));
+			if (workers < maxWorkers()) {
+				workers++;
+				runInline = !spawnWorker();
+			}
 		}
-		try {
-			std::thread([this, fn = std::move(fn)]() mutable {
-				fn();
-				{
-					// notify under mu so the destructor's lock
-					// acquisition is a happens-after edge for the
-					// worker's last use of cv/running.
-					std::lock_guard<std::mutex> lock(mu);
-					running--;
-					cv.notify_all();
-				}
-			}).detach();
-		} catch (const std::system_error&) {
-			// Thread creation failed under resource pressure (e.g.
-			// EAGAIN on memory-starved hosts). Go goroutines cannot
-			// fail to spawn; keep the output contract intact by
-			// running the task inline instead of letting the
-			// exception terminate the process.
-			fn();
-			std::lock_guard<std::mutex> lock(mu);
-			running--;
-			cv.notify_all();
+		cv.notify_one();
+		if (runInline) {
+			workerLoop();
 		}
 	}
 
 	void RunAndWait() override {
 		{
 			std::unique_lock<std::mutex> lock(mu);
-			cv.wait(lock, [&] { return running == 0; });
+			cv.wait(lock, [&] { return pending.empty() && running == 0; });
 		}
 		done.store(true);
+	}
+
+private:
+	static int maxWorkers() {
+		// Go's effective parallelism bound is GOMAXPROCS, which defaults
+		// to the number of CPUs.
+		int n = static_cast<int>(std::thread::hardware_concurrency());
+		return n > 0 ? n : 1;
+	}
+
+	// spawnWorker — caller must hold mu; returns false when thread
+	// creation fails (caller then drains the queue inline, unlocked).
+	bool spawnWorker() {
+		try {
+			threads.emplace_back([this] { workerLoop(); });
+			return true;
+		} catch (const std::system_error&) {
+			// Thread creation failed under resource pressure (e.g.
+			// EAGAIN on memory-starved hosts). Go goroutines cannot
+			// fail to spawn; the caller runs the work inline instead
+			// of letting the exception terminate the process. The
+			// workers slot stays counted — workerLoop's own exit
+			// path decrements it.
+			return false;
+		}
+	}
+
+	void workerLoop() {
+		for (;;) {
+			std::function<void()> fn;
+			{
+				std::lock_guard<std::mutex> lock(mu);
+				if (pending.empty()) {
+					workers--;
+					if (workers == 0) {
+						cv.notify_all();
+					}
+					return;
+				}
+				fn = std::move(pending.front());
+				pending.pop_front();
+				running++;
+			}
+			fn();
+			{
+				// notify under mu so the destructor's lock
+				// acquisition is a happens-after edge for the
+				// worker's last use of cv/running.
+				std::lock_guard<std::mutex> lock(mu);
+				running--;
+				if (pending.empty() && running == 0) {
+					cv.notify_all();
+				}
+			}
+		}
 	}
 };
 

@@ -5,6 +5,7 @@
 #include <utility>
 
 #include "internal/checker/checker.h"
+#include "internal/core/utilities.h"
 #include "internal/execute/incremental/incremental.h"
 
 namespace tsc::execute::incremental {
@@ -497,8 +498,7 @@ struct affectedFilesHandler {
 }  // namespace
 
 // affectedfileshandler.go:335 collectAllAffectedFiles — ctx checks dropped
-// (no cancellation in this port); work runs inline like the rest of the
-// port.
+// (no cancellation in this port).
 void collectAllAffectedFiles(Program* program) {
 	if (program->snapshot_->changedFilesSet.Size() == 0) {
 		return;
@@ -506,27 +506,37 @@ void collectAllAffectedFiles(Program* program) {
 
 	affectedFilesHandler handler;
 	handler.program = program;
+	// affectedfileshandler.go:365 — Go: `wg := core.NewWorkGroup(...)`.
+	std::unique_ptr<workGroup> wg(
+	    newWorkGroup(program->program_->SingleThreaded()));
 	collections::SyncSet<SourceFile*> result;
 	program->snapshot_->changedFilesSet.Range(
 	    [&](const tspath::Path& file) {
-		    for (auto* affectedFile :
-		         handler.getFilesAffectedBy(file)) {
-			    result.Add(affectedFile);
-		    }
+		    wg->Queue([&, file] {
+			    for (auto* affectedFile :
+			         handler.getFilesAffectedBy(file)) {
+				    result.Add(affectedFile);
+			    }
+		    });
 		    return true;
 	    });
+	wg->RunAndWait();
 
 	// For all the affected files, get all the files that would need to
 	// change their dts or js files, update their diagnostics
+	wg.reset(newWorkGroup(program->program_->SingleThreaded()));
 	auto emitKind = GetFileEmitKind(program->snapshot_->options);
 	result.Range([&](SourceFile* file) {
 		// remove the cached semantic diagnostics and handle dts emit
 		// and js emit if needed
 		auto* change =
 		    handler.getDtsMayChange(file->Path(), emitKind);
-		handler.handleDtsMayChangeOfAffectedFile(change, file);
+		wg->Queue([&, file, change] {
+			handler.handleDtsMayChangeOfAffectedFile(change, file);
+		});
 		return true;
 	});
+	wg->RunAndWait();
 
 	// Update the snapshot with the new state
 	handler.updateSnapshot();

@@ -6,6 +6,7 @@
 
 #include "internal/binder/binder.h"
 #include "internal/checker/checker.h"
+#include "internal/core/utilities.h"
 #include "internal/execute/incremental/incremental.h"
 
 namespace tsc::execute::incremental {
@@ -92,7 +93,7 @@ struct toProgramSnapshot {
 	}
 
 	// programtosnapshot.go:64 computeProgramFileChanges. Go runs the loop
-	// through a WorkGroup; this port runs it inline (single-threaded).
+	// through a WorkGroup (programtosnapshot.go:91).
 	void computeProgramFileChanges() {
 		bool canCopySemanticDiagnostics =
 		    oldProgram != nullptr &&
@@ -126,7 +127,12 @@ struct toProgramSnapshot {
 		         Tristate::True);
 
 		auto files = program->GetSourceFiles();
+		std::unique_ptr<workGroup> wg(
+		    newWorkGroup(program->SingleThreaded()));
 		for (auto* file : files) {
+			wg->Queue([this, file, canCopySemanticDiagnostics,
+			           copyDeclarationFileDiagnostics,
+			           copyLibFileDiagnostics, canCopyEmitSignatures] {
 			std::string versionText = file->Text();
 			if (!file->ContentMapper().empty()) {
 				versionText = file->OriginalText() + std::string("\x00", 1) +
@@ -241,7 +247,9 @@ struct toProgramSnapshot {
 			info->affectsGlobalScope = affectsGlobalScope;
 			info->impliedNodeFormat = impliedNodeFormat;
 			snapshot->fileInfos.Store(file->Path(), info);
+			});
 		}
+		wg->RunAndWait();
 	}
 
 	// programtosnapshot.go:166 handleFileDelete.
