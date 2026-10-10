@@ -231,6 +231,7 @@ std::string Checker::symbolToStringEx(Symbol* symbol,
 		sourceFile = getSourceFileOfNode(enclosingDeclaration);
 	}
 	printer::Printer* p;
+	std::unique_ptr<printer::Printer> pOwner;
 	// add neverAsciiEscape for GH#39027
 	if (enclosingDeclaration != nullptr &&
 	    enclosingDeclaration->kind == Kind::SourceFile) {
@@ -240,6 +241,9 @@ std::string Checker::symbolToStringEx(Symbol* symbol,
 		p = createPrinterWithRemoveCommentsOmitTrailingSemicolon(
 			nodeBuilder->EmitContext());
 	}
+	// NewPrinter allocates `new Printer()` per call — Go's GC reclaims it;
+	// own it here so repeated symbolToStringEx calls don't leak.
+	pOwner.reset(p);
 
 	Node* entity;
 	if ((flags & SymbolFormatFlagsAllowAnyNodeKind) != 0) {
