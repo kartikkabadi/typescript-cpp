@@ -181,7 +181,7 @@ static bool isConstEnumSymbol(Symbol* symbol) {
 	return (symbol->flags & SymbolFlagsConstEnum) != 0;
 }
 
-// ast.isEnumConst (ast/utilities.go).
+// ast.IsEnumConst — ast/utilities.go:1907.
 [[maybe_unused]] static bool isEnumConst(Node* node) {
 	return (node->modifierFlags() & ModifierFlagsConst) != 0;
 }

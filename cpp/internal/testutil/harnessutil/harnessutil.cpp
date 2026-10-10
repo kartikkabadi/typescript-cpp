@@ -54,7 +54,7 @@ CompilationResult* newCompilationResult(compiler::CompilerHost* host,
                                         std::vector<Diagnostic*> diagnostics,
                                         HarnessOptions* harnessOptions);
 
-// strings helpers used below (Go strings.CutPrefix / CutSuffix / Cut).
+// strings helpers used below (Go strings.CutPrefix / CutSuffix).
 bool cutPrefix(std::string_view s, std::string_view prefix,
                std::string_view* rest) {
 	if (s.size() >= prefix.size() && s.substr(0, prefix.size()) == prefix) {
@@ -74,14 +74,6 @@ bool cutSuffix(std::string_view s, std::string_view suffix,
 	return false;
 }
 
-[[maybe_unused]] std::pair<std::string_view, std::string_view> cut(std::string_view s,
-                                                  char sep) {
-	auto i = s.find(sep);
-	if (i == std::string_view::npos) {
-		return {s, {}};
-	}
-	return {s.substr(0, i), s.substr(i + 1)};
-}
 
 bool eqFold(std::string_view a, std::string_view b) { // strings.EqualFold
 	if (a.size() != b.size()) return false;

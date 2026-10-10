@@ -34,6 +34,12 @@ echo "corpus: $(wc -l < "$RESULTDIR/tscpp_corpus.list" | tr -d ' ') files"
 xargs_rc=0
 xargs -P "$JOBS" -I{} "$REPO_ROOT/cpp/tools/conformance_parse.sh" {} \
   < "$RESULTDIR/tscpp_corpus.list" > "$RESULTDIR/tscpp_results.txt" || xargs_rc=$?
+# Fail closed: empty results mean every worker produced nothing (e.g. the
+# output dir was wiped mid-run) — never report a clean corpus over nothing.
+if [ ! -s "$RESULTDIR/tscpp_results.txt" ]; then
+  echo "empty results — conformance workers produced nothing" >&2
+  exit 2
+fi
 grep FAIL "$RESULTDIR/tscpp_results.txt" > "$RESULTDIR/tscpp_fails.txt" || true
 echo "PASS: $(grep -c PASS "$RESULTDIR/tscpp_results.txt")  FAIL: $(wc -l < "$RESULTDIR/tscpp_fails.txt" | tr -d ' ')"
 cat "$RESULTDIR/tscpp_fails.txt"

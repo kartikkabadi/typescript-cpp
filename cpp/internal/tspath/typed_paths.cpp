@@ -12,6 +12,8 @@ namespace tsc::tspath {
 
 namespace {
 
+// C++-only adapters: unwrap the typed paths to string_view for generic
+// helpers below. Go operates on plain string types — no oracle counterpart.
 [[maybe_unused]] std::string_view asSv(const RootedPath& p) { return p; }
 [[maybe_unused]] std::string_view asSv(const RootedFilePath& p) { return p; }
 [[maybe_unused]] std::string_view asSv(const RootedDirectoryPath& p) { return p; }

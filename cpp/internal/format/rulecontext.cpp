@@ -6,7 +6,7 @@
 
 namespace tsc::format {
 
-// Go: ast.IsTrivia / ast.IsTokenKind.
+// Go: ast.IsTrivia / ast.IsTokenKind (ast_generated.go:9862).
 static bool isTrivia(Kind kind) {
 	return kind >= KindFirstTriviaToken && kind <= KindLastTriviaToken;
 }

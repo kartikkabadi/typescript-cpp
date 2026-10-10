@@ -79,7 +79,7 @@ bool isCompoundAssignment_(Kind kind) {
 	return false;
 }
 
-// ast.utilities.go:150 — IsArrayBindingOrAssignmentElement.
+// ast.utilities.go:587 — IsObjectLiteralElement.
 bool isObjectLiteralElement(Node* element) {
 	switch (element->kind) {
 	case Kind::PropertyAssignment:
@@ -94,6 +94,7 @@ bool isObjectLiteralElement(Node* element) {
 	}
 }
 
+// ast.utilities.go:151 — IsArrayBindingOrAssignmentElement.
 [[maybe_unused]] bool isArrayBindingOrAssignmentElement(Node* node) {
 	switch (node->kind) {
 	case Kind::BindingElement:

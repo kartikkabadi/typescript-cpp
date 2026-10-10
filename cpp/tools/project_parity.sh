@@ -37,6 +37,16 @@ REPORT="${REPORT:-/tmp/projreport}"
 TIMEOUT="${TIMEOUT:-180}"
 JOBS="${JOBS:-1}"
 
+# macOS parity runs need coreutils' gtimeout; with neither binary present,
+# run without a timeout rather than failing to spawn.
+if command -v timeout >/dev/null 2>&1; then
+	TIMEOUT_BIN=timeout
+elif command -v gtimeout >/dev/null 2>&1; then
+	TIMEOUT_BIN=gtimeout
+else
+	TIMEOUT_BIN=""
+fi
+
 if [ ! -x "$TSGO" ]; then echo "missing oracle: $TSGO" >&2; exit 2; fi
 if [ ! -x "$TSCPP" ]; then echo "missing tscpp: $TSCPP" >&2; exit 2; fi
 
@@ -49,7 +59,11 @@ run_one() {
 	(
 		cd "$dir" || exit 99
 		# shellcheck disable=SC2086
-		timeout "$TIMEOUT" $bin $args_clean >"$prefix.stdout" 2>"$prefix.stderr"
+		if [ -n "$TIMEOUT_BIN" ]; then
+			"$TIMEOUT_BIN" "$TIMEOUT" $bin $args_clean >"$prefix.stdout" 2>"$prefix.stderr"
+		else
+			$bin $args_clean >"$prefix.stdout" 2>"$prefix.stderr"
+		fi
 		echo "$?" >"$prefix.exit"
 	)
 }
@@ -58,8 +72,6 @@ run_one() {
 norm() {
 	sed -e "s|$2|__ROOT__|g" "$1" 2>/dev/null
 }
-
-verdicts=()
 
 run_project() {
 	local proj="$1"
@@ -169,7 +181,7 @@ fi
 
 if [ "$JOBS" -gt 1 ]; then
 	export -f run_one norm run_project
-	export TSGO TSCPP CORPUS RUN REPORT TIMEOUT
+	export TSGO TSCPP CORPUS RUN REPORT TIMEOUT TIMEOUT_BIN
 	printf '%s\n' "${projs[@]}" | xargs -d '\n' -P "$JOBS" -I{} bash -c 'run_project "$@"' _ {}
 else
 	for p in "${projs[@]}"; do

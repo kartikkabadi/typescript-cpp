@@ -55,7 +55,7 @@ bool isConstEnumOrConstEnumOnlyModule(Symbol* s) {
 	return hasQuestionToken(declaration);
 }
 
-// ast/utilities.go:2639 — getDeclarationContainer
+// ast/utilities.go:2670 — GetDeclarationContainer
 [[maybe_unused]] Node* getDeclarationContainer(Node* node) {
 	return findAncestor(getRootDeclaration(node), [](Node* n) -> bool {
 		switch (n->kind) {
@@ -72,7 +72,7 @@ bool isConstEnumOrConstEnumOnlyModule(Symbol* s) {
 	})->parent;
 }
 
-// ast/utilities.go:1286 — walkUpBindingElementsAndPatterns
+// ast/utilities.go:1286 — WalkUpBindingElementsAndPatterns
 [[maybe_unused]] Node* walkUpBindingElementsAndPatterns(Node* node) {
 	node = node->parent;
 	while (isBindingElement(node->parent)) {

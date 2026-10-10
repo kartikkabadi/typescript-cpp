@@ -29,7 +29,9 @@ static bool hasNarrowableArgument(Node* expr);
 static bool isNarrowingTypeOfOperands(Node* expr1, Node* expr2);
 static bool isTopLevelLogicalExpression(Node* node);
 static bool isStatementCondition(Node* node);
-[[maybe_unused]] static bool isSignedNumericLiteralBinder(Node* node); // unused; parity note
+// binder.go:2747 isSignedNumericLiteral — declared for parity; dead in Go
+// too. The live body is tsc::isSignedNumericLiteral (ast.cpp:1840).
+[[maybe_unused]] static bool isSignedNumericLiteralBinder(Node* node);
 static Node* getParentOfPropertyAssignment(Node* node);
 static Symbol* getInitializerSymbol(Symbol* symbol);
 

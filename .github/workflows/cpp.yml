@@ -20,7 +20,8 @@ on:
 jobs:
   conformance:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # Successful runs take ~46min; slow-runner variance hit the old 60min cap.
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup-go
@@ -65,6 +66,9 @@ jobs:
           xargs -P 4 -I{} cpp/tools/conformance_parse.sh {} \
             < "$RESULTDIR/smoke.list" > "$RESULTDIR/parse_results.txt" || true
           cpp/tools/conformance_bind.sh "$RESULTDIR/smoke.list" 4 > "$RESULTDIR/bind_results.txt" || true
+          # Guard: || true above also masks a dead xargs/script run; empty
+          # results would otherwise pass the FAIL check below spuriously.
+          test -s "$RESULTDIR/parse_results.txt" && test -s "$RESULTDIR/bind_results.txt"
           grep FAIL "$RESULTDIR/parse_results.txt" "$RESULTDIR/bind_results.txt" || true
           if grep -q FAIL "$RESULTDIR/parse_results.txt" "$RESULTDIR/bind_results.txt"; then
             echo "conformance failures above" >&2
@@ -80,6 +84,7 @@ jobs:
           find tsc/testdata/tests/cases/compiler -type f -name '*.ts' \
             | grep -v '/node_modules/' | sort | head -150 > "$RESULTDIR/check.list"
           cpp/tools/conformance_check.sh "$RESULTDIR/check.list" 4 > "$RESULTDIR/check_results.txt" || true
+          test -s "$RESULTDIR/check_results.txt"
           grep FAIL "$RESULTDIR/check_results.txt" || true
           ! grep -q FAIL "$RESULTDIR/check_results.txt"
 

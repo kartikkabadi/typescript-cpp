@@ -573,38 +573,6 @@ bool unmarshalOptionalStringArray(
 	return true;
 }
 
-[[maybe_unused]] bool unmarshalRawSourceMap(const JsonValue& v, RawSourceMap& out) {
-	if (v.kind == JsonValue::Null) {
-		return true; // unmarshaling null into a struct is a no-op
-	}
-	if (v.kind != JsonValue::Object) {
-		return false;
-	}
-	for (auto& member : v.members) {
-		const std::string& name = member.name;
-		const JsonValue& val = member.value;
-		if (name == "version") {
-			if (!unmarshalInt(val, out.Version)) return false;
-		} else if (name == "file") {
-			if (!unmarshalString(val, out.File)) return false;
-		} else if (name == "sourceRoot") {
-			if (!unmarshalString(val, out.SourceRoot)) return false;
-		} else if (name == "sources") {
-			if (!unmarshalStringArray(val, out.Sources)) return false;
-		} else if (name == "names") {
-			if (!unmarshalStringArray(val, out.Names)) return false;
-		} else if (name == "mappings") {
-			if (!unmarshalString(val, out.Mappings)) return false;
-		} else if (name == "sourcesContent") {
-			if (!unmarshalOptionalStringArray(val, out.SourcesContent)) {
-				return false;
-			}
-		}
-		// unknown members are ignored (already syntax-validated)
-	}
-	return true;
-}
-
 // ---------------------------------------------------------------------------
 // source_mapper.go
 // ---------------------------------------------------------------------------

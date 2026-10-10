@@ -11,28 +11,6 @@ namespace {
 
 // --- strings helpers (Go stdlib strings) ----------------------------------
 
-bool stringsHasPrefix(std::string_view s, std::string_view prefix) {
-	return s.size() >= prefix.size() && s.substr(0, prefix.size()) == prefix;
-}
-
-// strings.Cut
-[[maybe_unused]] inline std::tuple<std::string_view, std::string_view, bool>
-stringsCut(std::string_view s, std::string_view sep) {
-	if (auto i = s.find(sep); i != std::string_view::npos) {
-		return {s.substr(0, i), s.substr(i + sep.size()), true};
-	}
-	return {s, "", false};
-}
-
-// strings.CutPrefix
-[[maybe_unused]] inline std::pair<std::string_view, bool>
-stringsCutPrefix(std::string_view s, std::string_view prefix) {
-	if (stringsHasPrefix(s, prefix)) {
-		return {s.substr(prefix.size()), true};
-	}
-	return {s, false};
-}
-
 std::string stringsTrimRight(std::string_view s, std::string_view cutset) {
 	while (!s.empty() && cutset.find(s.back()) != std::string_view::npos) {
 		s.remove_suffix(1);
@@ -42,82 +20,6 @@ std::string stringsTrimRight(std::string_view s, std::string_view cutset) {
 
 bool stringsContains(std::string_view s, std::string_view substr) {
 	return s.find(substr) != std::string_view::npos;
-}
-
-[[maybe_unused]] std::vector<std::string_view> stringsSplit(std::string_view s, std::string_view sep) {
-	std::vector<std::string_view> out;
-	size_t pos = 0;
-	while (true) {
-		auto i = s.find(sep, pos);
-		if (i == std::string_view::npos) {
-			out.push_back(s.substr(pos));
-			return out;
-		}
-		out.push_back(s.substr(pos, i - pos));
-		pos = i + sep.size();
-	}
-}
-
-[[maybe_unused]] std::string stringsJoin(const std::vector<std::string>& parts, std::string_view sep) {
-	std::string out;
-	for (size_t i = 0; i < parts.size(); i++) {
-		if (i != 0) {
-			out += sep;
-		}
-		out += parts[i];
-	}
-	return out;
-}
-
-// url.PathEscape (encodePathSegment): escapes everything outside the
-// unreserved set plus '/', ';', ',' and '?' — Go's path-segment mode keeps
-// the sub-delims ("$&+:;=?@" minus the four above, plus "!'()*").
-[[maybe_unused]] std::string urlPathEscape(std::string_view s) {
-	static const char* hex = "0123456789ABCDEF";
-	auto shouldEscape = [](char c) {
-		if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
-		    (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.' ||
-		    c == '~') {
-			return false;
-		}
-		switch (c) {
-		case '$': case '&': case '+': case ':': case '=': case '@':
-		case '!': case '\'': case '(': case ')': case '*':
-			return false;
-		}
-		return true;
-	};
-	std::string out;
-	for (char c : s) {
-		if (shouldEscape(c)) {
-			out += '%';
-			out += hex[(unsigned char)c >> 4];
-			out += hex[(unsigned char)c & 0xF];
-		} else {
-			out += c;
-		}
-	}
-	return out;
-}
-
-// extraEscapeReplacer — converters.go:308 (vscode-uri compat).
-[[maybe_unused]] std::string extraEscapeReplace(std::string_view s) {
-	static const std::pair<char, const char*> map[] = {
-	    {':', "%3A"}, {'/', "%2F"}, {'?', "%3F"}, {'#', "%23"},
-	    {'[', "%5B"}, {']', "%5D"}, {'@', "%40"}, {'!', "%21"},
-	    {'$', "%24"}, {'&', "%26"}, {'\'', "%27"}, {'(', "%28"},
-	    {')', "%29"}, {'*', "%2A"}, {'+', "%2B"}, {',', "%2C"},
-	    {';', "%3B"}, {'=', "%3D"}, {' ', "%20"},
-	};
-	std::string out;
-	for (char c : s) {
-		const char* rep = nullptr;
-		for (auto& m : map) {
-			if (m.first == c) { rep = m.second; break; }
-		}
-		out += rep ? rep : std::string(1, c);
-	}
-	return out;
 }
 
 } // namespace

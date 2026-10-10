@@ -49,7 +49,7 @@ inline bool isInitializedProperty(Node* member) {
 	return member->kind == Kind::PropertyDeclaration && member->initializer() != nullptr;
 }
 
-// ast.IsObjectBindingOrAssignmentElement — utilities.go:3404
+// ast.IsObjectBindingOrAssignmentElement — utilities.go:140
 [[maybe_unused]] inline bool isObjectBindingOrAssignmentElement(Node* node) {
 	switch (node->kind) {
 	case Kind::BindingElement:

@@ -35,6 +35,7 @@ static std::vector<fourslash::MarkerOrRangeOrName> asMonVec(
 }
 
 
+// newContentMapperFourslash — fourslash/tests/contentMapper_test.go.
 [[maybe_unused]] static std::pair<std::shared_ptr<fourslash::FourslashTest>, std::function<void()>> newContentMapperFourslash(gostd::testing::T* t, std::string content, std::string mapper, const std::vector<std::string>& extensions) {
 	t->Helper();
 	auto quotedExtensions = std::vector<std::string>(int(extensions.size()));

@@ -62,6 +62,7 @@ std::string moduleKindString(ModuleKind i) {
 	return "ModuleKind(" + std::to_string(v) + ")";
 }
 
+// ScriptTarget.String — core/scripttarget_stringer_generated.go:41.
 [[maybe_unused]] std::string scriptTargetStringForOptions(ScriptTarget i) {
 	static const char* name0 =
 	    "NoneES5ES2015ES2016ES2017ES2018ES2019ES2020ES2021ES2022ES2023ES2024"

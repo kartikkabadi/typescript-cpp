@@ -3033,12 +3033,6 @@ ModifierFlags Checker::getCombinedModifierFlagsCached(Node* node) {
 // definition here; the owning slice replaces the body when it lands.
 // ---------------------------------------------------------------------------
 
-namespace {
-[[maybe_unused]] [[noreturn]] void decltypesDepUnreachable(const char* name) {
-	TSC_UNREACHABLE(name);
-}
-} // namespace
-
 // (deduped: checkExpressionCachedEx defined in cpp/internal/checker/checker_walk.cpp)
 
 // (deduped: checkExpressionEx defined in cpp/internal/checker/checker_walk.cpp)

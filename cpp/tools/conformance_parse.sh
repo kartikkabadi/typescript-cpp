@@ -28,8 +28,8 @@ case "$f" in
   *)  input="$REPO_ROOT/$f" ;;
 esac
 
-cpp_out="$(mktemp /tmp/cppout.XXXXXX)" || exit 2
-go_out="$(mktemp /tmp/goout.XXXXXX)" || { rm -f "$cpp_out"; exit 2; }
+cpp_out="$(mktemp "${TMPDIR:-/tmp}/cppout.XXXXXX")" || exit 2
+go_out="$(mktemp "${TMPDIR:-/tmp}/goout.XXXXXX")" || { rm -f "$cpp_out"; exit 2; }
 trap 'rm -f "$cpp_out" "$go_out"' EXIT
 
 if command -v timeout >/dev/null 2>&1; then

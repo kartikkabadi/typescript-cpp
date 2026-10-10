@@ -13,17 +13,23 @@ run_one() {
   case "$F" in /*) ;; *) F="$REPO_ROOT/$F" ;; esac
   if [ ! -f "$F" ]; then echo "FAIL $F (missing)"; return 1; fi
   ID=$(printf '%s' "$F" | md5sum | cut -c1-12)
-  (cd "$REPO_ROOT" && "$BINDUMP" "$F") > "/tmp/bind_go_$ID.txt" 2>/dev/null
+  # mktemp-named scratch files: fixed /tmp names collide when two corpus
+  # runs overlap, and identical PASS dumps are just litter over 12k files.
+  go_out="$(mktemp "${TMPDIR:-/tmp}/bind_go_${ID}.XXXXXX")" || return 2
+  cpp_out="$(mktemp "${TMPDIR:-/tmp}/bind_cpp_${ID}.XXXXXX")" || { rm -f "$go_out"; return 2; }
+  (cd "$REPO_ROOT" && "$BINDUMP" "$F") > "$go_out" 2>/dev/null
   go_rc=$?
-  (cd "$REPO_ROOT" && "$TSCPP" bind "$F") > "/tmp/bind_cpp_$ID.txt" 2>/dev/null
+  (cd "$REPO_ROOT" && "$TSCPP" bind "$F") > "$cpp_out" 2>/dev/null
   cpp_rc=$?
   # Fail closed: rc >= 126 means the tool never ran (not found / crashed) —
   # never compare two empty dumps and call it a match. Legit nonzero exits
   # on error files still get compared on output.
-  if [ "$cpp_rc" -lt 126 ] && [ "$go_rc" -lt 126 ] && [ "$cpp_rc" -eq "$go_rc" ] && cmp -s "/tmp/bind_go_$ID.txt" "/tmp/bind_cpp_$ID.txt"; then
+  if [ "$cpp_rc" -lt 126 ] && [ "$go_rc" -lt 126 ] && [ "$cpp_rc" -eq "$go_rc" ] && cmp -s "$go_out" "$cpp_out"; then
+    rm -f "$go_out" "$cpp_out"
     echo "PASS $F"
   else
     echo "FAIL $F"
+    echo "dumps: $cpp_out vs $go_out (exit $cpp_rc/$go_rc)" >&2
     return 1
   fi
 }

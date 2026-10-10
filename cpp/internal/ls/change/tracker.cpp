@@ -34,16 +34,6 @@ std::string getNewLineCharacter(NewLineKind newLine) {
 	}
 }
 
-// slices.Collect over the scanner's comment-range iterators.
-[[maybe_unused]] std::vector<CommentRange> collectCommentRanges(
-	const std::function<void(const std::function<bool(const CommentRange&)>&)>& seq) {
-	std::vector<CommentRange> out;
-	seq([&out](const CommentRange& r) {
-		out.push_back(r);
-		return true;
-	});
-	return out;
-}
 
 // positionsAreOnSameLine — delete.go:247
 bool positionsAreOnSameLine(int pos1, int pos2, SourceFile* sourceFile) {
