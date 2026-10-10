@@ -1678,15 +1678,17 @@ Symbol* Checker::instantiateSymbol(Symbol* symbol, TypeMapper* m) {
 	}
 	// If the type of the symbol is already resolved, and if that type could not possibly
 	// be affected by instantiation, simply return the symbol itself.
+	// checker.go:21177 — Go reads the checker's links.resolvedType which lives
+	// for the whole checker lifetime; no per-check-file invalidation exists
+	// (this cache holds a pure type, no diagnostics to re-fire — same
+	// precedent as getTypeOfInstantiatedSymbol, commit 51caecaece).
 	if (links->resolvedType != nullptr &&
-		!staleForCheckFile(links->resolvedTypeCheckFile) &&
 		!couldContainTypeVariables(links->resolvedType)) {
 		if (!(symbol->flags & SymbolFlagsSetAccessor)) {
 			return symbol;
 		}
 		// If we're a setter, check writeType.
 		if (links->writeType != nullptr &&
-			!staleForCheckFile(links->writeTypeCheckFile) &&
 			!couldContainTypeVariables(links->writeType)) {
 			return symbol;
 		}

@@ -617,10 +617,10 @@ Type* Checker::getTypeFromLiteralTypeNode(Node* node) {
 
 Type* Checker::getTypeFromTypeLiteralOrFunctionOrConstructorTypeNode(Node* node) {
 	auto* links = typeNodeLinks.Get(node);
-	if (links->resolvedType == nullptr ||
-		staleForCheckFile(links->resolvedTypeCheckFile)) {
-		// Go: fresh per-checker cache — recompute under this file.
-		links->resolvedType = nullptr;
+	// checker.go:23445 — Go's links.resolvedType lives for the whole
+	// checker lifetime; no per-check-file invalidation exists (pure type
+	// cache — member resolution's own links carry any diagnostics).
+	if (links->resolvedType == nullptr) {
 		links->resolvedTypeCheckFile = checkFileTag();
 		// Deferred resolution of members is handled by resolveObjectTypeMembers
 		TypeAlias* alias = getAliasForTypeNode(node);

@@ -1229,10 +1229,11 @@ Type* Checker::getWidenedLiteralTypeForInitializer(Node* declaration, Type* t) {
 // getTypeOfFuncClassEnumModule — checker.go:17224
 Type* Checker::getTypeOfFuncClassEnumModule(Symbol* symbol) {
 	auto* links = valueSymbolLinks.Get(symbol);
-	if (links->resolvedType == nullptr ||
-		staleForCheckFile(links->resolvedTypeCheckFile)) {
-		// Go: fresh per-checker cache — recompute under this file.
-		links->resolvedType = nullptr;
+	// checker.go:17304 — Go's links.resolvedType lives for the whole
+	// checker lifetime; no per-check-file invalidation exists (pure type
+	// cache, diagnostics re-fire nowhere else — same precedent as
+	// getTypeOfInstantiatedSymbol, commit 51caecaece).
+	if (links->resolvedType == nullptr) {
 		links->resolvedTypeCheckFile = checkFileTag();
 		links->resolvedType = getTypeOfFuncClassEnumModuleWorker(symbol);
 	}
