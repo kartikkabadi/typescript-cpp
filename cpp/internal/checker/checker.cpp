@@ -5530,23 +5530,25 @@ Symbol* Checker::getSpellingSuggestionForName(
 
 static std::unordered_map<std::string, Symbol*>&
 primitiveTypeAliasSuggestions() {
-	// checker.go:1786 — sync.OnceValue: Symbols are plain heap objects that
-	// live for the process lifetime. They MUST NOT be arena-allocated: the
-	// static map outlives any single checker's typeArena, and arena clear /
-	// sweep would leave dangling Symbol* behind.
-	static std::unordered_map<std::string, Symbol*>* result = nullptr;
-	if (result == nullptr) {
-		result = new std::unordered_map<std::string, Symbol*>();
-		for (auto& e : std::vector<std::pair<const char*, const char*>>{
-		         {"string", "String"}, {"number", "Number"},
-		         {"boolean", "Boolean"}, {"object", "Object"},
-		         {"bigint", "BigInt"}, {"symbol", "Symbol"}}) {
-			Symbol* sym = new Symbol();
-			sym->flags = SymbolFlagsTypeAlias | SymbolFlagsTransient;
-			sym->data->name = e.first;
-			(*result)[e.second] = sym;
-		}
-	}
+	// checker.go:1786 — sync.OnceValue: function-local static init is
+	// the C++ equivalent (thread-safe once). Symbols are plain heap
+	// objects that live for the process lifetime. They MUST NOT be
+	// arena-allocated: the static map outlives any single checker's
+	// typeArena, and arena clear / sweep would leave dangling Symbol*.
+	static std::unordered_map<std::string, Symbol*>* result =
+	    [] {
+		    auto* m = new std::unordered_map<std::string, Symbol*>();
+		    for (auto& e : std::vector<std::pair<const char*, const char*>>{
+		             {"string", "String"}, {"number", "Number"},
+		             {"boolean", "Boolean"}, {"object", "Object"},
+		             {"bigint", "BigInt"}, {"symbol", "Symbol"}}) {
+			    Symbol* sym = new Symbol();
+			    sym->flags = SymbolFlagsTypeAlias | SymbolFlagsTransient;
+			    sym->data->name = e.first;
+			    (*m)[e.second] = sym;
+		    }
+		    return m;
+	    }();
 	return *result;
 }
 

@@ -368,11 +368,12 @@ inline BreadthFirstSearchResult<N> BreadthFirstSearchParallelEx(
 	const int64_t kMaxInt64 = std::numeric_limits<int64_t>::max();
 
 	using Job = detail::breadthFirstSearchJob<N>;
-	// Jobs are arena-allocated so parent links survive across levels.
-	std::vector<std::unique_ptr<Job>> arena;
+	// Jobs are heap-allocated (Go: GC heap; parent links survive
+	// across levels). The level workers run newJob in parallel, so
+	// a shared container here would need locking — bare new matches
+	// Go semantics exactly (objects are never deleted anyway).
 	auto newJob = [&](const N& node, Job* parent) -> Job* {
-		arena.push_back(std::make_unique<Job>());
-		Job* j = arena.back().get();
+		Job* j = new Job();
 		j->node = node;
 		j->parent = parent;
 		return j;
