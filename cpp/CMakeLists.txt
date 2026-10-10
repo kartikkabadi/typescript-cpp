@@ -29,6 +29,30 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
 	endif()
 endif()
 
+# PGO — opt-in profile-guided optimization. TSCPP_PGO is the path to a
+# merged llvm .profdata (produced by tools/perf/gen_pgo.sh); when set,
+# every TU compiles with -fprofile-use=<path>. Profile generation is a
+# separate instrumented build — zig c++ silently drops -fprofile-generate
+# (its compiler_rt has no profile runtime), so the instrumented stage
+# needs a real clang; -fprofile-use is a pure compile-time consumer and
+# works under zig. Off by default: this is a build-time opt-in.
+set(TSCPP_PGO "" CACHE FILEPATH
+	"Path to a merged .profdata to compile with -fprofile-use (empty = off)")
+if(TSCPP_PGO)
+	if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+		message(FATAL_ERROR
+			"TSCPP_PGO requires clang's -fprofile-use; CXX compiler is "
+			"${CMAKE_CXX_COMPILER_ID}")
+	endif()
+	if(NOT EXISTS "${TSCPP_PGO}")
+		message(FATAL_ERROR "TSCPP_PGO file not found: ${TSCPP_PGO}")
+	endif()
+	add_compile_options("-fprofile-use=${TSCPP_PGO}"
+		-Wno-profile-instr-unprofiled -Wno-profile-instr-out-of-date)
+	add_link_options("-fprofile-use=${TSCPP_PGO}")
+	message(STATUS "PGO enabled: ${TSCPP_PGO}")
+endif()
+
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 # mimalloc drop-in allocator (vendored third_party/mimalloc, v2.1.7).
