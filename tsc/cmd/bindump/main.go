@@ -34,17 +34,17 @@ import (
 
 func symLine(s *ast.Symbol, out *strings.Builder) {
 	vpos, vend := -1, -1
-	if s.ValueDeclaration != nil {
-		vpos, vend = s.ValueDeclaration.Pos(), s.ValueDeclaration.End()
+	if vd := s.ValueDeclaration(); vd != nil {
+		vpos, vend = vd.Pos(), vd.End()
 	}
 	pname, pflags := "-", uint32(0)
-	if s.Parent != nil {
-		pname = ast.EscapeAllInternalSymbolNames(ast.SymbolName(s.Parent))
-		pflags = uint32(s.Parent.Flags)
+	if p := s.Parent(); p != nil {
+		pname = ast.EscapeAllInternalSymbolNames(ast.SymbolName(p))
+		pflags = uint32(p.Flags())
 	}
 	fmt.Fprintf(out, "S %s %d %d %d:%d %s:%d\n",
 		ast.EscapeAllInternalSymbolNames(ast.SymbolName(s)),
-		uint32(s.Flags), len(s.Declarations), vpos, vend, pname, pflags)
+		uint32(s.Flags()), len(s.Declarations()), vpos, vend, pname, pflags)
 }
 
 func dumpNode(n *ast.Node, out *strings.Builder) {
@@ -57,7 +57,7 @@ func dumpNode(n *ast.Node, out *strings.Builder) {
 	if e := n.ExportableData(); e != nil && e.LocalSymbol != nil {
 		fmt.Fprintf(out, "X %s %d\n",
 			ast.EscapeAllInternalSymbolNames(ast.SymbolName(e.LocalSymbol)),
-			uint32(e.LocalSymbol.Flags))
+			uint32(e.LocalSymbol.Flags()))
 	}
 	if f := n.FlowNodeData(); f != nil && f.FlowNode != nil {
 		fn := f.FlowNode
@@ -97,7 +97,7 @@ func dumpNode(n *ast.Node, out *strings.Builder) {
 			var parts []string
 			for _, k := range keys {
 				parts = append(parts, fmt.Sprintf("%s:%d",
-					ast.EscapeAllInternalSymbolNames(k), uint32(l[k].Flags)))
+					ast.EscapeAllInternalSymbolNames(k), uint32(l[k].Flags())))
 			}
 			fmt.Fprintf(out, "L %s\n", strings.Join(parts, ";"))
 		}
@@ -139,7 +139,7 @@ func main() {
 	for _, p := range file.PatternAmbientModules {
 		fmt.Fprintf(&out, "P %s %s:%d\n", p.Pattern.Text,
 			ast.EscapeAllInternalSymbolNames(ast.SymbolName(p.Symbol)),
-			uint32(p.Symbol.Flags))
+			uint32(p.Symbol.Flags()))
 	}
 	var gkeys []string
 	for k := range file.GlobalExports {
@@ -149,7 +149,7 @@ func main() {
 	for _, k := range gkeys {
 		fmt.Fprintf(&out, "G %s %d\n",
 			ast.EscapeAllInternalSymbolNames(k),
-			uint32(file.GlobalExports[k].Flags))
+			uint32(file.GlobalExports[k].Flags()))
 	}
 	for _, d := range file.BindDiagnostics() {
 		fmt.Fprintf(&out, "B %d %d %d\n", d.Code(), d.Pos(), d.End())
