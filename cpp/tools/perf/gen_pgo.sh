@@ -40,6 +40,13 @@ WORK="${WORK:-/tmp/tscpp-pgo}"
 PROFRAW="$WORK/profraw"
 PROFDATA="$WORK/tscpp.profdata"
 LLVM_PROFDATA="${LLVM_PROFDATA:-llvm-profdata}"
+if ! command -v "$LLVM_PROFDATA" >/dev/null 2>&1; then
+	for v in 21 20 19 18; do
+		if command -v "llvm-profdata-$v" >/dev/null 2>&1; then
+			LLVM_PROFDATA="llvm-profdata-$v"; break
+		fi
+	done
+fi
 PROJ="${PROJ:-/tmp/perfproj}"
 CONFORMANCE_N="${CONFORMANCE_N:-150}"
 FOURSLASH_RUN="${FOURSLASH_RUN:-TestQuickInfo|TestCompletions|TestFormatting|TestFindAllRefs}"
@@ -81,7 +88,7 @@ cmake --build "$INSTR_DIR" --target tscpp fourslashrunner -j "$(nproc)"
 TSCPP="$INSTR_DIR/tscpp"
 FSRUN="$INSTR_DIR/fourslashrunner"
 
-export LLVM_PROFILE_FILE="$PROFRAW/%p-%c.profraw"
+export LLVM_PROFILE_FILE="$PROFRAW/%p.profraw"
 
 # --- stage 2: representative workload --------------------------------------
 # 2a. perfproj project mode: emit, --noEmit, declaration-only emit.
@@ -112,6 +119,10 @@ done < "$LIST"
 echo "== conformance sample profiled: $(wc -l < "$LIST") files"
 
 # 2c. fourslashrunner slice (language-service surface).
+# Caveat: the runner forks per test and the child _exit()s, which skips the
+# profile atexit flush — child counts are lost; only the parent's merged
+# in-process counters land in the profraw. LS code still benefits indirectly
+# via shared parser/checker paths covered by 2a/2b.
 "$FSRUN" -run "$FOURSLASH_RUN" >/dev/null 2>&1 || true
 echo "== fourslash slice profiled ($FOURSLASH_RUN)"
 
