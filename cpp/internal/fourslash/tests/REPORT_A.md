@@ -6,10 +6,12 @@
   completions, find-all-refs, formatting, go-to-definition, document-highlights,
   outlining, semantic-classification, navigation/navto, occurrences, quickinfo,
   rename, signature-help — 14 feature areas).
-- C++ runner: **87 PASS / 4 FAIL / 2 SKIP** (`87/91 pass` excluding skips).
+- C++ runner: **91 PASS / 2 SKIP** (`91/91 pass` excluding skips).
 - Go oracle (`go test ./tsc/internal/fourslash/tests/`): **91 PASS / 2 SKIP**.
-- Outcome parity: **89/93 ≈ 95.7%** (≥90% bar met). The 2 SKIPs are Go's own
+- Outcome parity: **93/93 = 100%**. The 2 SKIPs are Go's own
   `t.Skip("Known failing fourslash test")` — identical in C++.
+  (Earlier batch write-ups below describe the intermediate 87-PASS state
+  before the remaining divergences were fixed.)
 
 ## Per-test outcomes
 
