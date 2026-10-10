@@ -68,17 +68,29 @@ struct parallelWorkGroup final : workGroup {
 			std::lock_guard<std::mutex> lock(mu);
 			running++;
 		}
-		std::thread([this, fn = std::move(fn)]() mutable {
+		try {
+			std::thread([this, fn = std::move(fn)]() mutable {
+				fn();
+				{
+					// notify under mu so the destructor's lock
+					// acquisition is a happens-after edge for the
+					// worker's last use of cv/running.
+					std::lock_guard<std::mutex> lock(mu);
+					running--;
+					cv.notify_all();
+				}
+			}).detach();
+		} catch (const std::system_error&) {
+			// Thread creation failed under resource pressure (e.g.
+			// EAGAIN on memory-starved hosts). Go goroutines cannot
+			// fail to spawn; keep the output contract intact by
+			// running the task inline instead of letting the
+			// exception terminate the process.
 			fn();
-			{
-				// notify under mu so the destructor's lock
-				// acquisition is a happens-after edge for the
-				// worker's last use of cv/running.
-				std::lock_guard<std::mutex> lock(mu);
-				running--;
-				cv.notify_all();
-			}
-		}).detach();
+			std::lock_guard<std::mutex> lock(mu);
+			running--;
+			cv.notify_all();
+		}
 	}
 
 	void RunAndWait() override {

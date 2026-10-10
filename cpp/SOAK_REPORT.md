@@ -105,12 +105,33 @@ and fourslash.
   never loses an append in practice (12/12 clean on the same fixture at
   12× concurrency). The C++ race fires at ~10–40% of runs under load.
 - Fix (`cpp/cmd/tscpp/main.cpp`): a mutex now serializes the appends.
-  Post-fix verification: 60× concurrent moduleSpecifiers runs → 48×78,
-  12 exec-failures under resource starvation (exit 127/OOM-adjacent, not
-  output corruption); a controlled 12× run → 12×78 exit-0; all 87
-  previously-differing corpus files ×2 sequential → 0 diffs.
+  Post-fix verification: 12× concurrent moduleSpecifiers runs → 12×78
+  exit-0; all 87 previously-differing corpus files ×2 sequential → 0 diffs;
+  emit corpus run4 ≡ run5 — 26,172/26,172 byte-identical.
 
-### 5. `.d.ts` union member order — excluded per task (oracle-side map-order nondeterminism, documented in `cpp/E2E_REPORT.md`). No order flake observed belongs to this class.
+### 5. `parallelWorkGroup::Queue` — thread-spawn failure crash under memory pressure (FIXED, hardening)
+
+- Symptom: emit corpus run3 (post-mutex binary, -P 12 wave) recorded
+  `EXIT 2 / RC 2` for exactly one file
+  (`baselines/reference/compiler/undeclaredBase.js`) where the sibling
+  runs report `G 6504 / RC 0`. `EXIT 2` is the signal-crash shim
+  (SIGSEGV/SIGBUS/SIGFPE/SIGILL/SIGABRT → `_exit(2)`).
+- Repro: `ulimit -v` caps show resource-starved failure modes:
+  `thread constructor failed: Resource temporarily unavailable`
+  (`std::system_error` from `std::thread`) and SIGABRT from
+  `std::terminate` on `bad_alloc`. Under a 12-way mixed corpus wave,
+  transient pressure kills a task's thread spawn ~1/26k files.
+- Go parity: goroutine spawn cannot fail, and OOM kills the Go runtime
+  too — the crash class is environmental, not a determinism bug. The
+  fix nonetheless preserves the output contract under partial pressure:
+  `Queue` now catches `std::system_error` from thread creation and runs
+  the task inline on the caller (`cpp/internal/core/utilities.h`).
+  General `bad_alloc` remains fatal in both languages — unavoidable.
+- Verification: `unittestrunner` 1122/1122 post-change; emit run5
+  (with fallback) ≡ run4 byte-identical including the previously
+  crashed file.
+
+### 6. `.d.ts` union member order — excluded per task (oracle-side map-order nondeterminism, documented in `cpp/E2E_REPORT.md`). No order flake observed belongs to this class.
 
 ### Harness lesson: wave poisoning
 
@@ -131,8 +152,11 @@ never rebuild the binary under test while a dump wave is in flight.
 - decl run1-vs-run2 (pre-fix binary): 340 RC-127 artifacts excluded;
   40 diffs, all whole-W losses (the same race — decl shares
   `emitdumpFile`).
-- emit run3/run4 (post-fix): launched; hash diff will be appended here
-  before final commit.
+- emit run3-vs-run4 (post-fix binary): 26,171/26,172 — one `EXIT 2`
+  resource-pressure crash on `undeclaredBase.js` (flake #5, hardened).
+- emit run4 ≡ run5 (post-Queue-hardening): **26,172/26,172
+  byte-identical** — no residual emit nondeterminism.
+- decl run3 (post-fix): in flight; diff vs run1 recorded below if landed.
 
 ## Threaded stress
 
@@ -144,7 +168,8 @@ and `.tsbuildinfo` files byte-identical under concurrency.
 ## Commits on this branch
 
 - `74ddbb0d3f` soak: fix 2 flake classes found by repeated runs
-- pending: emitdump WriteFile append mutex (flake #4)
+- `3274f07dba` soak: fix emitdump WriteFile append race under parallel emit
+- pending: workgroup thread-spawn fallback (flake #5) + final corpus counts
 
 ## Notes / non-findings
 
