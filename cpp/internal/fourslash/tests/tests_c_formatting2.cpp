@@ -975,6 +975,7 @@ static void TestFormatInterfaceWithMissingBraceAndLaterTemplateString1(gostd::te
 interface Props {
   iconOnly?: boolean
 
+
 const ResourceCard: React.FC<Props> = (props) => {
   return (
     <IoLayersOutline
@@ -989,6 +990,7 @@ export default ResourceCard
 		f->FormatDocument(t, "");
 		f->VerifyCurrentFileContent(t, ((((std::string(R"TS(interface Props {
     iconOnly?: boolean
+
 
 const ResourceCard: React.FC<Props> = (props) => {
     return (
