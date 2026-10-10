@@ -185,8 +185,10 @@ inline uint64_t xxh3Avalanche(uint64_t x) {
 	return x;
 }
 
-// utils.go:92 — the small-input avalanche used by Hash64 (xxh64AvalancheSmall
-// is identical; kept under the Go name).
+// utils.go:92 — the small-input avalanche used by Hash64. xxh64AvalancheSmall
+// (below) ports the same Go function minus the leading `x >> 33` stage; the
+// two are NOT identical — Go names them xxhAvalancheSmall/xxh64AvalancheSmall
+// and they differ in exactly that first xor-shift.
 inline uint64_t xxhAvalancheSmall(uint64_t x) {
 	x ^= x >> 33;
 	x *= prime64_2;

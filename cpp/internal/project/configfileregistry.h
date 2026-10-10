@@ -227,8 +227,13 @@ struct ConfigFileRegistry {
 	}
 
 	// ForEachTestConfigEntry — configfileregistry.go:168 (For testing).
+	// Go tolerates a nil receiver (`if c != nil`) — callers may invoke
+	// through a null serializedConfigFileRegistry.
 	template <typename Cb>
 	void ForEachTestConfigEntry(Cb&& cb) const {
+		if (this == nullptr) {
+			return;
+		}
 		for (auto& [path, entry] : configs) {
 			cb(path, new TestConfigEntry{
 			           entry->fileName,
@@ -241,6 +246,9 @@ struct ConfigFileRegistry {
 
 	// GetTestConfigEntry — configfileregistry.go:182 (For testing).
 	TestConfigEntry* GetTestConfigEntry(const tspath::Path& path) const {
+		if (this == nullptr) {
+			return nullptr;
+		}
 		if (auto it = configs.find(path); it != configs.end()) {
 			auto* entry = it->second;
 			return new TestConfigEntry{
@@ -257,6 +265,9 @@ struct ConfigFileRegistry {
 	// (For testing).
 	template <typename Cb>
 	void ForEachTestConfigFileNamesEntry(Cb&& cb) const {
+		if (this == nullptr) {
+			return;
+		}
 		for (auto& [path, entry] : configFileNames) {
 			cb(path, new TestConfigFileNamesEntry{
 			           entry->nearestConfigFileName, entry->ancestors,
@@ -268,6 +279,9 @@ struct ConfigFileRegistry {
 	// (For testing).
 	TestConfigFileNamesEntry*
 	GetTestConfigFileNamesEntry(const tspath::Path& path) const {
+		if (this == nullptr) {
+			return nullptr;
+		}
 		if (auto it = configFileNames.find(path);
 		    it != configFileNames.end()) {
 			return new TestConfigFileNamesEntry{
