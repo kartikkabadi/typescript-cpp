@@ -237,6 +237,7 @@ GO_VALUE_TYPES = {
     "::tsc::CheckJsDirective": "::tsc::CheckJsDirective",
     "::tsc::PatternAmbientModule": "::tsc::PatternAmbientModule",
     "tspath.Path": "std::string",
+    "tspath.RootedFilePath": "std::string",
     "xxh3.Uint128": "::tsc::Uint128",
     "core.TextPos": "::tsc::TextPos",
     "::tsc::TextPos": "::tsc::TextPos",
@@ -1018,6 +1019,10 @@ def gen_nodes():
             "\n"
             "\tbool IsBound() const { return isBound.load(); }\n"
             "\n"
+            "\t// IsContentMapped — ast.go:2573. Reports whether this file was produced\n"
+            "\t// by a content mapper.\n"
+            "\tbool IsContentMapped() const { return contentMapperInfo != nullptr; }\n"
+            "\n"
             "\tvoid BindOnce(const std::function<void()>& bind) {\n"
             "\t\tbindOnce.run([&] {\n"
             "\t\t\tbind();\n"
@@ -1340,9 +1345,36 @@ def gen_nodes():
             continue
         out.append(cases)
         if sname == "SourceFile":
-            # SourceFile is never a clone target (mutexes aren't copyable);
-            # keep the case for exhaustive switching.
-            out.append("\t\t{\n\t\t\treturn nullptr;\n\t\t}\n")
+            # SourceFile fields aren't copyable (mutexes), so the generic
+            # arena-copy path can't apply. Mirror Go's getDeepCloneVisitor:
+            # VisitEachChild on a SourceFile visits Statements + EndOfFileToken
+            # and rebuilds via updateSourceFile when a child changed; when
+            # nothing changed the visit callback falls back to node.Clone(f),
+            # i.e. newSourceFile + copyFrom + cloneNode.
+            out.append(
+                "\t\t{\n"
+                "\t\t\t// Go deepclone.go: VisitEachChild on a SourceFile visits Statements +\n"
+                "\t\t\t// EndOfFileToken and rebuilds via updateSourceFile (falling back to\n"
+                "\t\t\t// SourceFile.Clone when nothing changed).\n"
+                "\t\t\tauto* n = static_cast<const SourceFile*>(node);\n"
+                "\t\t\tauto* stmts = deepCloneNodeList(f, n->Statements, syntheticLocation);\n"
+                "\t\t\tauto* eof = deepCloneNode(f, n->EndOfFileToken, syntheticLocation);\n"
+                "\t\t\tNode* c;\n"
+                "\t\t\tif (stmts != n->Statements || eof != n->EndOfFileToken) {\n"
+                "\t\t\t\tc = f.updateSourceFile(const_cast<SourceFile*>(n), stmts, eof);\n"
+                "\t\t\t} else {\n"
+                "\t\t\t\tauto* updated = f.newSourceFile(\n"
+                "\t\t\t\t\tn->parseOptions, n->text,\n"
+                "\t\t\t\t\tconst_cast<NodeList*>(n->Statements),\n"
+                "\t\t\t\t\tconst_cast<Node*>(n->EndOfFileToken));\n"
+                "\t\t\t\tupdated->as<SourceFile>()->copyFrom(\n"
+                "\t\t\t\t\tconst_cast<SourceFile*>(n));\n"
+                "\t\t\t\tc = cloneNode(updated, const_cast<Node*>(node), f.hooks);\n"
+                "\t\t\t}\n"
+                "\t\t\tif (syntheticLocation) c->loc = TextRange{-1, -1};\n"
+                "\t\t\tif (f.hooks.onClone) f.hooks.onClone(c, const_cast<Node*>(node));\n"
+                "\t\t\treturn c;\n"
+                "\t\t}\n")
             continue
         out.append(f"\t\t{{\n\t\t\tauto* n = static_cast<const {sname}*>(node);\n")
         out.append(f"\t\t\tauto* c = f.arena().alloc<{sname}>(*n);\n")
@@ -1535,7 +1567,7 @@ def gen_nodes():
             out.append(kinds_case(sname, seen_kinds))
             if extra:
                 r = f"\t\t\t{{ auto* n = static_cast<const {sname}*>(this); " \
-                    f"return subtreeFacts() & ~{mask}" \
+                    f"return (subtreeFacts() & ~{mask})" \
                     f" | ::tsc::propagateSubtreeFacts(n->{extra}); }}\n"
             else:
                 r = f"\t\t\treturn subtreeFacts() & ~{mask};\n"
@@ -1585,8 +1617,14 @@ def gen_nodes():
     METH_PAT = "|".join(sorted(METHOD_RENAMES, key=len, reverse=True))
 
     # computeSubtreeFacts bodies translated from Go
-    def facts_expr(e):
+    def facts_expr(e, sname):
         e = e.strip()
+        # node.AsX() casts the const receiver itself: Go has no const, but the
+        # emitted function takes `const {sname}* n`, and ->as<T>() on a const
+        # pointer yields `const T*` which can't feed Node*-taking callees
+        # (e.g. isImportCall). const_cast reaches the non-const overload.
+        e = re.sub(r"(?<![\w.])node\.As(\w+)\(\)",
+                   f"const_cast<{sname}*>(n)->as<\\1>()", e)
         e = e.replace("!= nil", "!= nullptr").replace("== nil", "== nullptr")
         e = e.replace("node.ModifierFlags()", "n->modifierFlags()")
         e = e.replace("node.modifiers.ModifierFlags", "(n->modifiers ? n->modifiers->ModifierFlags : ModifierFlags{})")
@@ -1663,52 +1701,52 @@ def gen_nodes():
                 continue
             if ln.startswith("switch "):
                 m2 = re.match(r"switch (.*) \{$", ln)
-                lines_out.append("switch (" + facts_expr(m2.group(1)) + ") {")
+                lines_out.append("switch (" + facts_expr(m2.group(1), sname) + ") {")
                 continue
             if ln.startswith("case ") and ln.endswith(":"):
                 rest = ln[5:-1]
-                labels = [facts_expr(x.strip()) for x in rest.split(",")]
+                labels = [facts_expr(x.strip(), sname) for x in rest.split(",")]
                 lines_out.append(" ".join(f"case {x}:" for x in labels))
                 continue
             if ln.startswith("default"):
-                lines_out.append(facts_expr(ln))
+                lines_out.append(facts_expr(ln, sname))
                 continue
             if ln.startswith("for ") and ln.endswith("{"):
                 m2 = re.match(r"for (?:_, )?(\w+) := range (.*) \{$", ln)
                 if m2:
-                    lines_out.append(f"for (auto* {m2.group(1)} : {facts_expr(m2.group(2))}) {{")
+                    lines_out.append(f"for (auto* {m2.group(1)} : {facts_expr(m2.group(2), sname)}) {{")
                     continue
                 m2 = re.match(r"for (\w+), (\w+) := range (.*) \{$", ln)
                 if m2:
                     lines_out.append(
-                        f"for (auto _r : {facts_expr(m2.group(3))}) {{ "
+                        f"for (auto _r : {facts_expr(m2.group(3), sname)}) {{ "
                         f"auto {m2.group(1)} = _r.first; auto {m2.group(2)} = _r.second;")
                     continue
                 lines_out.append("// TODO for: " + ln)
                 continue
             if ln.startswith("if ") and ln.endswith("{"):
-                lines_out.append("if (" + facts_expr(ln[3:-1].strip()) + ") {")
+                lines_out.append("if (" + facts_expr(ln[3:-1].strip(), sname) + ") {")
                 continue
             if ln.startswith("return "):
-                lines_out.append("return " + facts_expr(ln[7:]) + ";")
+                lines_out.append("return " + facts_expr(ln[7:], sname) + ";")
                 continue
             if ln == "return":
                 lines_out.append("return SubtreeFactsNone;")
                 continue
             m2 = re.match(r"(\w+) := (.*)$", ln)
             if m2:
-                lines_out.append(f"auto {m2.group(1)} = {facts_expr(m2.group(2))};")
+                lines_out.append(f"auto {m2.group(1)} = {facts_expr(m2.group(2), sname)};")
                 continue
             m2 = re.match(r"(\w+) (&\^=|\|=|\^=|&=|=|\+=|-=) (.*)$", ln)
             if m2:
                 op = m2.group(2)
                 op = "&= ~" if op == "&^=" else op
-                lines_out.append(f"{m2.group(1)} {op} {facts_expr(m2.group(3))};")
+                lines_out.append(f"{m2.group(1)} {op} {facts_expr(m2.group(3), sname)};")
                 continue
             if ln.startswith("panic("):
                 lines_out.append("TSC_UNREACHABLE(" + ln[6:-1] + ");")
                 continue
-            lines_out.append(facts_expr(ln) + ";")
+            lines_out.append(facts_expr(ln, sname) + ";")
         return lines_out
 
     # ---- Is* predicates (emitted before computeSubtreeFacts which calls them) ----
