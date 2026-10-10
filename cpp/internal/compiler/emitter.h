@@ -192,7 +192,25 @@ struct emitter {
 	bool forceEmit = false;
 	WriteFile writeFile;
 
+	// State carried from prepareEmit (under the checker checkout) into
+	// flushEmit (after the checkout is released).
+	printer::EmitContext* emitContext_ = nullptr;
+	SourceFile* jsTransformed_ = nullptr;
+	SourceFile* declTransformed_ = nullptr;
+	SourceFile* declContentMapped_ = nullptr;
+	bool printJs_ = false;
+	bool printDecl_ = false;
+	bool declEmitMap_ = false;
+
+	// Go's emit() is split at the checker boundary: prepareEmit runs the
+	// resolver creation and the AST transforms — the only work that calls
+	// back into the file's checker — and must run under an exclusive
+	// checker checkout. flushEmit runs printing and file writes, which
+	// never touch checker state, and may run after the checkout is
+	// released. emit() composes both for callers that emit inline.
 	void emit();
+	void prepareEmit();
+	void flushEmit();
 	std::vector<transformers::declarations::DeclarationTransformer*>
 	getDeclarationTransformers(checker::EmitResolver* emitResolver,
 	                           SourceFile* sourceFile,
@@ -205,13 +223,12 @@ struct emitter {
 	                           SourceFile* sourceFile,
 	                           const std::string& declarationFilePath,
 	                           const std::string& declarationMapPath);
-	void emitJSFile(checker::EmitResolver* emitResolver,
-	                SourceFile* sourceFile, const std::string& jsFilePath,
-	                const std::string& sourceMapFilePath);
-	void emitDeclarationFile(checker::EmitResolver* emitResolver,
-	                         SourceFile* sourceFile,
-	                         const std::string& declarationFilePath,
-	                         const std::string& declarationMapPath);
+	void transformJSFile(checker::EmitResolver* emitResolver,
+	                     SourceFile* sourceFile);
+	void printJSFile();
+	void transformDeclarationFile(checker::EmitResolver* emitResolver,
+	                              SourceFile* sourceFile);
+	void printDeclarationFile();
 	void printSourceFile(printer::EmitContext* emitContext,
 	                     const std::string& jsFilePath,
 	                     const std::string& sourceMapFilePath,

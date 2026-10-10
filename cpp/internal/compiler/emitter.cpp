@@ -16,11 +16,38 @@
 #include "internal/transformers/tstransforms/tstransforms.h"
 
 #include <algorithm>
+#include <atomic>
+#include <chrono>
+#include <cstdio>
+#include <cstdlib>
 #include <memory>
 #include <utility>
 #include <vector>
 
 namespace tsc::compiler {
+
+// TSCPP_EMIT_PROFILING=1 → per-file emit sub-phase counters (perf triage).
+static bool emitProfiling() {
+	static const bool on = std::getenv("TSCPP_EMIT_PROFILING") != nullptr;
+	return on;
+}
+struct emitProfClock {
+	bool on;
+	std::chrono::steady_clock::time_point t;
+	void lap(std::atomic<long long>& acc) {
+		if (on) {
+			auto now = std::chrono::steady_clock::now();
+			acc.fetch_add(std::chrono::duration_cast<std::chrono::nanoseconds>(
+			                  now - t)
+			                  .count());
+			t = now;
+		}
+	}
+};
+std::atomic<long long> emitProfResolverNs{0};
+std::atomic<long long> emitProfJsTransformNs{0};
+std::atomic<long long> emitProfJsPrintNs{0};
+std::atomic<long long> emitProfDeclTransformNs{0};
 
 using ::tsc::transformers::Transformer;
 using ::tsc::transformers::TransformOptions;
@@ -97,6 +124,15 @@ std::pair<std::unique_ptr<emitHost>, std::function<void()>> newEmitHost(
 
 // emitter.go:45 emit
 void emitter::emit() {
+	prepareEmit();
+	flushEmit();
+}
+
+// Go emit() — first half: emit context, emit resolver, and the transforms.
+// Only this half calls back into the file's checker (through the emit
+// resolver and its transformers), so callers running emit on a checked-out
+// checker may release that checkout as soon as this returns.
+void emitter::prepareEmit() {
 	// emitter.go:48 — `defer e.tr.Push(..., "emit", {"path"}, true)()`.
 	tracing::TraceScope traceEmit(
 	    tr, tracing::PhaseEmit, "emit",
@@ -104,11 +140,24 @@ void emitter::emit() {
 	        return tracing::TraceArgs{{"path", std::string(sourceFile->Path())}};
 	    },
 	    true);
-	auto* emitContext = printer::NewEmitContext();
-	auto* emitResolver = host->NewEmitResolver(emitContext);
-	emitJSFile(emitResolver, sourceFile, paths->JsFilePath(), paths->SourceMapFilePath());
-	emitDeclarationFile(emitResolver, sourceFile, paths->DeclarationFilePath(),
-	                    paths->DeclarationMapPath());
+	emitProfClock clk{emitProfiling(), std::chrono::steady_clock::now()};
+	emitContext_ = printer::NewEmitContext();
+	auto* emitResolver = host->NewEmitResolver(emitContext_);
+	clk.lap(emitProfResolverNs);
+	transformJSFile(emitResolver, sourceFile);
+	clk.lap(emitProfJsTransformNs);
+	transformDeclarationFile(emitResolver, sourceFile);
+	clk.lap(emitProfDeclTransformNs);
+}
+
+// Go emit() — second half: printing and file writes. The printer and the
+// sourcemap/writeFile path never call the emit resolver, so this runs
+// correctly after the checker checkout is released.
+void emitter::flushEmit() {
+	emitProfClock clk{emitProfiling(), std::chrono::steady_clock::now()};
+	printJSFile();
+	clk.lap(emitProfJsPrintNs);
+	printDeclarationFile();
 	emitResult.Diagnostics = emitterDiagnostics.GetDiagnostics();
 }
 
@@ -293,12 +342,12 @@ std::vector<Transformer*> getScriptTransformers(
 	return tx;
 }
 
-// emitter.go:184 emitJSFile
-void emitter::emitJSFile(checker::EmitResolver* emitResolver, SourceFile* sourceFile,
-                         const std::string& jsFilePath,
-                         const std::string& sourceMapFilePath) {
-	auto* emitContext = emitResolver->EmitContext();
+// emitter.go:184 emitJSFile — early-outs plus the script transform; the
+// print half is printJSFile so the checker checkout can be released first.
+void emitter::transformJSFile(checker::EmitResolver* emitResolver,
+                              SourceFile* sourceFile) {
 	const CompilerOptions* options = host->Options();
+	const std::string& jsFilePath = paths->JsFilePath();
 
 	if (sourceFile == nullptr ||
 	    (emitOnly != EmitOnly::EmitAll && emitOnly != EmitOnly::EmitOnlyJs) ||
@@ -319,7 +368,18 @@ void emitter::emitJSFile(checker::EmitResolver* emitResolver, SourceFile* source
 	    [&] { return tracing::TraceArgs{{"jsFilePath", jsFilePath}}; },
 	    true);
 
-	sourceFile = runScriptTransformers(emitResolver, sourceFile);
+	jsTransformed_ = runScriptTransformers(emitResolver, sourceFile);
+	printJs_ = true;
+}
+
+// emitter.go:203-216 — the print+write tail of emitJSFile.
+void emitter::printJSFile() {
+	if (!printJs_) {
+		return;
+	}
+	const CompilerOptions* options = host->Options();
+	const std::string& jsFilePath = paths->JsFilePath();
+	const std::string& sourceMapFilePath = paths->SourceMapFilePath();
 
 	printer::PrinterOptions printerOptions;
 	printerOptions.RemoveComments = options->RemoveComments == Tristate::True;
@@ -334,29 +394,30 @@ void emitter::emitJSFile(checker::EmitResolver* emitResolver, SourceFile* source
 	// create a printer to print the nodes
 	printer::Printer* printer_ = printer::NewPrinter(printerOptions,
 	                                               printer::PrintHandlers{},
-	                                               emitContext);
+	                                               emitContext_);
 
-	printSourceFile(emitContext, jsFilePath, sourceMapFilePath, sourceFile, printer_,
-	                options,
-	                shouldEmitSourceMaps(options, sourceFile));
+	printSourceFile(emitContext_, jsFilePath, sourceMapFilePath, jsTransformed_,
+	                printer_, options,
+	                shouldEmitSourceMaps(options, jsTransformed_));
 }
 
-// emitter.go:219 emitDeclarationFile
-void emitter::emitDeclarationFile(checker::EmitResolver* emitResolver,
-                                  SourceFile* sourceFile,
-                                  const std::string& declarationFilePath,
-                                  const std::string& declarationMapPath) {
-	auto* emitContext = emitResolver->EmitContext();
+// emitter.go:219 emitDeclarationFile — early-outs plus the declaration
+// transform; the print half is printDeclarationFile so the checker checkout
+// can be released first.
+void emitter::transformDeclarationFile(checker::EmitResolver* emitResolver,
+                                       SourceFile* sourceFile) {
 	const CompilerOptions* options = host->Options();
+	const std::string& declarationFilePath = paths->DeclarationFilePath();
+	const std::string& declarationMapPath = paths->DeclarationMapPath();
 
 	if (sourceFile == nullptr || emitOnly == EmitOnly::EmitOnlyJs ||
 	    declarationFilePath.empty()) {
 		return;
 	}
-	bool emitDeclarationMap =
+	declEmitMap_ =
 	    emitOnly != EmitOnly::EmitOnlyBuilderSignature &&
 	    options->DeclarationMap == Tristate::True;
-	SourceFile* contentMappedSource = sourceFile;
+	declContentMapped_ = sourceFile;
 
 	// emitter.go:231 — `defer e.tr.Push(..., "emitDeclarationFileOrBundle",
 	// {"declarationFilePath"}, true)()`.
@@ -371,7 +432,7 @@ void emitter::emitDeclarationFile(checker::EmitResolver* emitResolver,
 	auto [sf, diags] =
 	    runDeclarationTransformers(emitResolver, sourceFile,
 	                               declarationFilePath, declarationMapPath);
-	sourceFile = sf;
+	declTransformed_ = sf;
 
 	for (auto* elem : diags) {
 		// Add declaration transform diagnostics to emit diagnostics
@@ -391,6 +452,20 @@ void emitter::emitDeclarationFile(checker::EmitResolver* emitResolver,
 		emitResult.EmitSkipped = true;
 		return;
 	}
+
+	printDecl_ = true;
+}
+
+// emitter.go:258-293 — the print+write tail of emitDeclarationFile.
+void emitter::printDeclarationFile() {
+	if (!printDecl_) {
+		return;
+	}
+	const CompilerOptions* options = host->Options();
+	const std::string& declarationFilePath = paths->DeclarationFilePath();
+	const std::string& declarationMapPath = paths->DeclarationMapPath();
+	SourceFile* contentMappedSource = declContentMapped_;
+	bool emitDeclarationMap = declEmitMap_;
 
 	printer::PrinterOptions printerOptions;
 	printerOptions.RemoveComments = options->RemoveComments == Tristate::True;
@@ -426,7 +501,7 @@ void emitter::emitDeclarationFile(checker::EmitResolver* emitResolver,
 		};
 	}
 	printer::Printer* printer_ =
-	    printer::NewPrinter(printerOptions, printHandlers, emitContext);
+	    printer::NewPrinter(printerOptions, printHandlers, emitContext_);
 
 	CompilerOptions declarationMapOptions;
 	declarationMapOptions.SourceMap =
@@ -435,9 +510,9 @@ void emitter::emitDeclarationFile(checker::EmitResolver* emitResolver,
 	declarationMapOptions.MapRoot = options->MapRoot;
 	// Explicitly do not pass through either inline option.
 
-	printSourceFile(emitContext, declarationFilePath, declarationMapPath, sourceFile,
-	                printer_, &declarationMapOptions,
-	                shouldEmitSourceMaps(&declarationMapOptions, sourceFile));
+	printSourceFile(emitContext_, declarationFilePath, declarationMapPath,
+	                declTransformed_, printer_, &declarationMapOptions,
+	                shouldEmitSourceMaps(&declarationMapOptions, declTransformed_));
 }
 
 // emitter.go:294 printSourceFile

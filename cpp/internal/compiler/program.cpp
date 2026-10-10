@@ -24,11 +24,36 @@
 #include "internal/core/utilities.h"
 
 #include <algorithm>
+#include <chrono>
+#include <cstdio>
 #include <cstring>
 #include <deque>
 #include <functional>
+#include <atomic>
+#include <cstdlib>
+#include <thread>
+#include <vector>
 
 namespace tsc::compiler {
+
+// TSCPP_EMIT_PROFILING=1 → stderr timing breakdown for Emit (perf triage).
+static bool emitProfiling() {
+	static const bool on = std::getenv("TSCPP_EMIT_PROFILING") != nullptr;
+	return on;
+}
+static double emitProfMs(std::chrono::steady_clock::time_point a,
+                         std::chrono::steady_clock::time_point b) {
+	return std::chrono::duration<double, std::milli>(b - a).count();
+}
+static std::atomic<long long> emitProfLockWaitNs{0};
+static std::atomic<long long> emitProfLockedNs{0};
+static std::atomic<long long> emitProfBodyNs{0};
+static std::atomic<int> emitProfTasks{0};
+// emitter.cpp per-file sub-phase counters.
+extern std::atomic<long long> emitProfResolverNs;
+extern std::atomic<long long> emitProfJsTransformNs;
+extern std::atomic<long long> emitProfJsPrintNs;
+extern std::atomic<long long> emitProfDeclTransformNs;
 
 namespace {
 
@@ -1562,8 +1587,14 @@ bool SimpleProgram::SourceFileMayBeEmitted(SourceFile* sourceFile,
 	return sourceFileMayBeEmitted(sourceFile, this, forceDtsEmit, false);
 }
 
-// program.go:1867 Emit — Go runs file emits through a WorkGroup; this port
-// emits sequentially (identical observable results).
+// program.go:1867 Emit — Go queues one emit task per file on a WorkGroup
+// with non-exclusive checker sharing. This port requires exclusive checker
+// ownership during emit (emit mutates checker state — see newEmitHost), so
+// the built-in pool emits grouped by checker (forEachCheckerGroupDo, the
+// same shape as collectCheckerDiagnosticsFromFiles): one worker per
+// checker, files in order, one checkout per checker. External pools keep
+// the Go-shaped per-file queue with an exclusive checkout per task.
+// Identical observable results either way.
 EmitResult* SimpleProgram::Emit(EmitOptions* options) {
 	// program.go:1868 — `defer tr.Push(PhaseEmit, "emit", nil, true)()`.
 	tracing::TraceScope emitTraceGuard(
@@ -1608,7 +1639,6 @@ EmitResult* SimpleProgram::Emit(EmitOptions* options) {
 		}
 	};
 	emitTextWriterPool writerPool{.newLine = &newLine};
-	std::unique_ptr<workGroup> wg(newWorkGroup(SingleThreaded()));
 	std::vector<std::unique_ptr<emitter>> emitters;
 	bool forceDtsEmit =
 	    options->EmitOnly == EmitOnly::EmitOnlyBuilderSignature ||
@@ -1620,6 +1650,8 @@ EmitResult* SimpleProgram::Emit(EmitOptions* options) {
 	                                       : &options->TargetSourceFiles,
 	    forceDtsEmit, forceJsEmit);
 
+	const bool prof = emitProfiling();
+	auto profT0 = std::chrono::steady_clock::now();
 	for (auto* sourceFile : sourceFiles) {
 		auto* e = emitters.emplace_back(new emitter).get();
 		e->sourceFile = sourceFile;
@@ -1627,40 +1659,138 @@ EmitResult* SimpleProgram::Emit(EmitOptions* options) {
 		e->forceEmit = options->ForceEmit;
 		e->writeFile = options->WriteFile;
 		e->tr = tr_; // program.go:1903
-
-		wg->Queue([this, e, sourceFile, &writerPool, forceDtsEmit,
-		          forceJsEmit, options] {
-			auto [host, done] = newEmitHost(this, sourceFile);
-			e->host = host.get();
-
-			// take an unused writer
-			std::unique_ptr<printer::EmitTextWriter> writer(
-			    writerPool.Get());
-			writer->Clear();
-
-			// attach writer and perform emit
-			e->writer = writer.get();
-			e->paths = outputpaths::GetOutputPathsFor(
-			    sourceFile, e->host->Options(), e->host,
-			    outputpaths::ForceEmitPaths{
-			        .Dts = forceDtsEmit,
-			        .Js = forceJsEmit,
-			        .DeclarationMap =
-			            options->ForceEmit &&
-			            options->EmitOnly == EmitOnly::EmitOnlyDts,
-			    });
-			e->emit();
-			e->writer = nullptr;
-
-			// put the writer back in the pool
-			writerPool.Put(writer.release());
-
-			done(); // Go: `defer done()` — release the checker last
-		});
 	}
 
-	// wait for emit to complete
-	wg->RunAndWait();
+	// program.go:1905-1942 — Go queues one emit task per file on a
+	// WorkGroup; its goroutines share each file's checker non-exclusively
+	// (getCheckerForFileNonExclusive), so up to GOMAXPROCS files emit in
+	// parallel even within one checker's set. This port must own a checker
+	// exclusively while emit calls back into it (newEmitHost), which
+	// forbids that sharing — but only resolver creation and the AST
+	// transforms call back; printing and file writes never touch checker
+	// state. Each task therefore checks the checker out exclusively for
+	// prepareEmit (transforms) and releases it before flushEmit
+	// (print+write): per-checker serialization of transforms, Go's
+	// effective overlap of the print tail.
+	//
+	// A bounded pool of hardware_concurrency workers pulls per-file tasks
+	// off an index counter — the faithful equivalent of the Go runtime
+	// multiplexing the per-file queue onto GOMAXPROCS lanes (a detached
+	// thread per task would spawn 500+ threads and convoy on the checker
+	// locks).
+	auto runEmitForFile = [&](emitter* e, SourceFile* sourceFile) {
+		auto t0 = prof ? std::chrono::steady_clock::now()
+		               : std::chrono::steady_clock::time_point{};
+
+		// take an unused writer (program.go:1927)
+		std::unique_ptr<printer::EmitTextWriter> writer(writerPool.Get());
+		writer->Clear();
+		e->writer = writer.get();
+
+		// newEmitHost → GetTypeCheckerForFileExclusive: blocks until the
+		// file's checker is free.
+		auto [host, doneFn] = newEmitHost(this, sourceFile);
+		auto t1 = prof ? std::chrono::steady_clock::now()
+		               : std::chrono::steady_clock::time_point{};
+		// Go `defer done()`: the checkout is released on any exit path —
+		// here before print+write, via release(); the try/catch keeps the
+		// release on a throwing prepareEmit.
+		auto release = [fn = std::move(doneFn)]() mutable {
+			if (fn) {
+				auto f = std::move(fn);
+				fn = nullptr;
+				f();
+			}
+		};
+		e->host = host.get();
+		e->paths = outputpaths::GetOutputPathsFor(
+		    sourceFile, e->host->Options(), e->host,
+		    outputpaths::ForceEmitPaths{
+		        .Dts = forceDtsEmit,
+		        .Js = forceJsEmit,
+		        .DeclarationMap =
+		            options->ForceEmit &&
+		            options->EmitOnly == EmitOnly::EmitOnlyDts,
+		    });
+		try {
+			e->prepareEmit();
+		} catch (...) {
+			release();
+			throw;
+		}
+		release();
+		auto t2 = prof ? std::chrono::steady_clock::now()
+		               : std::chrono::steady_clock::time_point{};
+
+		e->flushEmit();
+		e->writer = nullptr;
+
+		// put the writer back in the pool
+		writerPool.Put(writer.release());
+		auto t3 = prof ? std::chrono::steady_clock::now()
+		               : std::chrono::steady_clock::time_point{};
+
+		if (prof) {
+			emitProfLockWaitNs.fetch_add(
+			    std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0)
+			        .count());
+			emitProfLockedNs.fetch_add(
+			    std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1)
+			        .count());
+			emitProfBodyNs.fetch_add(
+			    std::chrono::duration_cast<std::chrono::nanoseconds>(t3 - t2)
+			        .count());
+			emitProfTasks.fetch_add(1);
+		}
+	};
+
+	const size_t fileCount = sourceFiles.size();
+	if (SingleThreaded() || fileCount <= 1) {
+		// singleThreadedWorkGroup runs queued tasks inline, in order.
+		for (size_t i = 0; i < fileCount; ++i) {
+			runEmitForFile(emitters[i].get(), sourceFiles[i]);
+		}
+	} else {
+		const size_t workers =
+		    std::min(fileCount,
+		             std::max<size_t>(
+		                 1, std::thread::hardware_concurrency()));
+		std::atomic<size_t> nextFile{0};
+		std::vector<std::thread> pool;
+		pool.reserve(workers);
+		for (size_t w = 0; w < workers; ++w) {
+			pool.emplace_back([&] {
+				for (;;) {
+					const size_t i = nextFile.fetch_add(
+					    1, std::memory_order_relaxed);
+					if (i >= fileCount) {
+						break;
+					}
+					runEmitForFile(emitters[i].get(), sourceFiles[i]);
+				}
+			});
+		}
+		for (auto& t : pool) {
+			t.join();
+		}
+	}
+	auto profT1 = std::chrono::steady_clock::now();
+	if (prof) {
+		std::fprintf(stderr,
+		    "EMITPROF files=%d wall_ms=%.1f "
+		    "lockwait_total_ms=%.1f locked_total_ms=%.1f "
+		    "print_total_ms=%.1f\n"
+		    "EMITPROF   resolver_ms=%.1f jstransform_ms=%.1f "
+		    "decltransform_ms=%.1f jsprint_ms=%.1f\n",
+		    emitProfTasks.load(), emitProfMs(profT0, profT1),
+		    emitProfLockWaitNs.load() / 1e6,
+		    emitProfLockedNs.load() / 1e6,
+		    emitProfBodyNs.load() / 1e6,
+		    emitProfResolverNs.load() / 1e6,
+		    emitProfJsTransformNs.load() / 1e6,
+		    emitProfDeclTransformNs.load() / 1e6,
+		    emitProfJsPrintNs.load() / 1e6);
+	}
 
 	// collect results from emit, preserving input order
 	std::vector<EmitResult*> results;
