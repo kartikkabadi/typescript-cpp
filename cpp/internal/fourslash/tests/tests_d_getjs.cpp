@@ -531,6 +531,7 @@ function Person(name, age) {
     this.age = age;
 }
 
+
 Person.getName = 10;
 Person.getNa/**/ = 10;)TS";
 		auto __fsp1 = fourslash::NewFourslash(t, nullptr, content); auto f = __fsp1.first; auto done = __fsp1.second; TSC_DEFER(done());

@@ -1779,6 +1779,7 @@ class /*localClassDefinition*/localClass { }
 interface /*localInterfaceDefinition*/localInterface{ }
 module /*localModuleDefinition*/localModule{ export var foo = 1;}
 
+
 /*localVariableReference*/localVariable = 1;
 /*localFunctionReference*/localFunction();
 var foo = new /*localClassReference*/localClass();

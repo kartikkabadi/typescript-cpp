@@ -133,6 +133,7 @@ static void TestFormatAfterWhitespace(gostd::testing::T* t) {
 {
     var bar;
 
+
 })TS");
 	});
 }
@@ -2061,6 +2062,7 @@ static void TestFormatSelectionWithTrivia2(gostd::testing::T* t) {
 		f->FormatSelection(t, "begin", "end");
 		f->VerifyCurrentFileContent(t, R"TS(;
 
+
     )TS");
 	});
 }
@@ -3309,11 +3311,13 @@ static void TestFormattingFatArrowFunctions(gostd::testing::T* t) {
         false        ?        null     :        (        arg    ?           :    number     = 0 )           =>    67  ;/*49*/
     false        ?        null     :        (                 ...     arg    :    number   [      ]    )           =>    68  ;/*50*/
 
+
 // nested ternary expressions
     ((        a    ?        )           =>    { return a  ;    })     ?            (        b    ?         )           =>    { return b  ;    }     :        (        c    ?         )           =>    { return c  ;    }  ;/*51*/
 
 //multiple levels
     ((        a    ?        )           =>    { return a  ;    })     ?            (        b )          =>       (        c )          =>   81     :        (        c )          =>       (        d )          =>   82  ;/*52*/
+
 
 // In Expressions
     (            (        arg )           =>    90 )     instanceof Function  ;/*53*/
@@ -3334,6 +3338,7 @@ static void TestFormattingFatArrowFunctions(gostd::testing::T* t) {
       (            (                 ...     arg    :   number   [      ]    )           =>    0 )        +    ''    +        ((                 ...     arg    :   number   [      ]    )           =>    107)  ;/*67*/
     (            (        arg1   ,    arg2    ?        )           =>    0 )        +    ''    +        ((        arg1   ,   arg2    ?        )           =>    108)  ;/*68*/
       (            (        arg1   ,             ...     arg2    :   number   [      ]    )           =>    0 )        +    ''    +        ((        arg1   ,             ...     arg2    :   number   [      ]    )           =>    108)  ;/*69*/
+
 
 // Function Parameters
 /*70*/function foo    (                 ...     arg    :    any   [      ]    )     { }
@@ -5016,6 +5021,8 @@ static void TestFormattingOnEmptyInterfaceLiteral(gostd::testing::T* t) {
 
 /*2*/foo    (  {     }   )    ;
 
+
+
 /*3*/            interface    bar    {
 /*4*/                x   :    {     }   ;
 /*5*/       y  :       (         )    =>    {     }   ;
@@ -5187,6 +5194,7 @@ static void TestFormattingOnInvalidCodes(gostd::testing::T* t) {
 /*60*/}
 
 /*61*/    $(document).ready ();
+
 
 /*62*/ function  pageLoad() {
 /*63*/ $('#TextBox1' ) .     unbind   (  ) ;
@@ -5649,6 +5657,8 @@ static void TestFormattingOnStatementsWithNoSemicolon(gostd::testing::T* t) {
 /*59*/x+=2
 /*60*/else
 /*61*/x+=2
+
+
 
 /*62*/;
          do do do do/*63*/

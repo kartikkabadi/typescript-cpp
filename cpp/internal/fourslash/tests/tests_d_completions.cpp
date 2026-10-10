@@ -7568,6 +7568,7 @@ static void TestCompletionsGenericIndexedAccess2(gostd::testing::T* t) {
 		const std::string content = R"TS(export type GetMethodsForType<T, G extends string> = { [K in keyof T]:
   T[K] extends () => any ? { name: K, group: G, } : T[K] extends (s: infer U) => any ? { name: K, group: G, payload: U } : never }[keyof T];
 
+
 class Sample {
   count = 0;
   books: { name: string, year: number }[] = []
@@ -7581,6 +7582,7 @@ class Sample {
   }
 }
 export declare function testIt<T, G extends string>(): (input: any, method: GetMethodsForType<T, G>) => any
+
 
 const t = testIt<Sample, "Sample">()
 
@@ -13628,6 +13630,7 @@ static void TestCompletionListAndMemberListOnCommentedWhiteSpace(gostd::testing:
   export var V = 0;
 }
 
+
 var c = new M.C();
 
 c. // test on c.
@@ -13658,6 +13661,7 @@ static void TestCompletionListAndMemberListOnCommentedDot(gostd::testing::T* t) 
   export class C { public pub = 0; private priv = 1; }
   export var V = 0;
 }
+
 
 var c = new M.C();
 
@@ -14209,6 +14213,7 @@ static void TestCompletionInTernaryConditional(gostd::testing::T* t) {
 		t->Parallel();
 		const std::string content = R"TS(export enum Bar { }
 export enum Foo { }
+
 
 function foo(x: Foo) { return x; }
 function bar(z: string, x: Foo) { return x; }
