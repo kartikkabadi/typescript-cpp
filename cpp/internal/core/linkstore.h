@@ -7,6 +7,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "internal/core/arena.h"
+
 namespace tsc {
 
 // LinkStore: map-like store of lazily-created values keyed by K.
@@ -35,67 +37,53 @@ struct LinkStore {
 	}
 };
 
-// PagedLinkStore: sparse-array-like structure for storing elements keyed by dense
-// uint64 keys. Elements are stored in fixed-size pages of 256 entries; page indices
-// below maxPageCount go into a direct-indexed page list, higher ones into a map.
+inline constexpr int LinkPageShift = 8;
+inline constexpr int LinkPageSize = 1 << LinkPageShift;
+inline constexpr uint64_t LinkPageMask = LinkPageSize - 1;
+
+// PagedLinkStore implements a sparse-array-like structure for storing elements
+// keyed by dense uint64 keys. Elements are allocated in an arena, element
+// references are stored in fixed-size pages of 256 entries, and an index of
+// pages is maintained in a growable list.
 template <class V>
 struct PagedLinkStore {
-	static constexpr int pageShift = 8;
-	static constexpr int pageSize = 1 << pageShift;
-	static constexpr uint64_t pageMask = pageSize - 1;
-	static constexpr uint64_t maxPageCount = 65536;
+	using Page = std::array<V*, LinkPageSize>;
 
-	using Page = std::array<V, pageSize>;
-
-	std::unordered_map<uint64_t, Page*> pageMap;
-	std::vector<Page*> pageList;
-	// Pages are heap-allocated and live as long as the checker (same lifetime
-	// model as Go's arena-backed store).
+	std::vector<Page*> pages;
+	Arena arena;
+	// Pages are heap-allocated and live as long as the store (same lifetime
+	// model as Go's GC-backed store).
 
 	V* Get(uint64_t key) {
-		uint64_t pageIndex = key >> pageShift;
-		Page* page;
-		if (pageIndex < maxPageCount) {
-			if (pageIndex >= pageList.size()) {
-				pageList.resize(pageIndex + 1, nullptr);
-			}
-			page = pageList[pageIndex];
-			if (!page) {
-				page = new Page();
-				pageList[pageIndex] = page;
-			}
-		} else {
-			auto it = pageMap.find(pageIndex);
-			if (it == pageMap.end()) {
-				page = new Page();
-				pageMap.emplace(pageIndex, page);
-			} else {
-				page = it->second;
-			}
+		uint64_t pageIndex = key >> LinkPageShift;
+		if (pageIndex >= pages.size()) {
+			// Grow the length of the list to pageIndex+1
+			pages.resize(pageIndex + 1, nullptr);
 		}
-		return &(*page)[key & pageMask];
-	}
-
-	V* TryGet(uint64_t key) const {
-		uint64_t pageIndex = key >> pageShift;
-		Page* page = nullptr;
-		if (pageIndex < maxPageCount) {
-			if (pageIndex < pageList.size()) {
-				page = pageList[pageIndex];
-			}
-		} else {
-			auto it = pageMap.find(pageIndex);
-			if (it != pageMap.end()) {
-				page = it->second;
-			}
+		Page* page = pages[pageIndex];
+		if (page == nullptr) {
+			page = new Page(); // value-init zeroes every slot
+			pages[pageIndex] = page;
 		}
-		if (!page) {
-			return nullptr;
+		V* link = (*page)[key & LinkPageMask];
+		if (link == nullptr) {
+			link = arena.alloc<V>();
+			(*page)[key & LinkPageMask] = link;
 		}
-		return &(*page)[key & pageMask];
+		return link;
 	}
 
 	bool Has(uint64_t key) const { return TryGet(key) != nullptr; }
+
+	V* TryGet(uint64_t key) const {
+		uint64_t pageIndex = key >> LinkPageShift;
+		if (pageIndex < pages.size()) {
+			if (Page* page = pages[pageIndex]; page != nullptr) {
+				return (*page)[key & LinkPageMask];
+			}
+		}
+		return nullptr;
+	}
 };
 
 } // namespace tsc

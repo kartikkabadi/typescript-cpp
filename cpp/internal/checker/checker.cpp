@@ -6114,8 +6114,12 @@ int Checker::compareSymbolsWorker(Symbol* s1, Symbol* s2) {
 	}
 	// Fall back to symbol IDs. This is a last resort that should happen only
 	// when symbols have no declaration and duplicate names.
-	return static_cast<int>(getSymbolId(s1)) -
-	       static_cast<int>(getSymbolId(s2));
+	// Go computes `int(id1) - int(id2)` in 64 bits; block ids are >= 2^48 so a
+	// 32-bit subtraction would wrap and could flip the ordering. Compare the
+	// full ids — only the sign matters to every caller.
+	int64_t idDiff = static_cast<int64_t>(getSymbolId(s1)) -
+	                 static_cast<int64_t>(getSymbolId(s2));
+	return idDiff < 0 ? -1 : idDiff > 0 ? 1 : 0;
 }
 
 int Checker::compareNodes(Node* n1, Node* n2) {
