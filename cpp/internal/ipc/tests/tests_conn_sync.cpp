@@ -251,9 +251,9 @@ void TestSyncConnAnswersNestedRequestsInStackOrder(T* t) {
 	// serve — conn_sync_test.go:101. For each request the peer writes a
 	// nested "resolve" request back, records the nested response, then
 	// answers the original request with its params.
-	// The lambda must capture peer/answers by value and self-recurse
-	// through a heap-pinned std::function: [&] refs to the test frame
-	// dangle once the detached thread outlives it.
+	// The detached serve thread outlives this frame (Go's closure pins
+	// peer/answers via GC); a heap-held std::function plus by-value
+	// captures gives the same lifetime.
 	auto serve = std::make_shared<std::function<json::Value()>>();
 	*serve = [serve, peer, answers]() -> json::Value {
 		for (;;) {

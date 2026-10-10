@@ -38,8 +38,16 @@ private:
 };
 
 const FileLike* sourceFileLikeFor(SourceFile* file) {
-    static std::unordered_map<SourceFile*, SourceFileLike> adapters;
-    auto [it, inserted] = adapters.try_emplace(file, file);
+    // Adapter memo keyed by file — Go returns the *ast.SourceFile itself
+    // (it implements FileLike). Parallel `tsc -b` workers format
+    // diagnostics concurrently, so guard the cache; the map is leaked
+    // deliberately like Go's GC-held values (detached workers' tails
+    // must never hit an exit-time destructor).
+    static std::mutex adaptersMu;
+    static auto* adapters =
+        new std::unordered_map<SourceFile*, SourceFileLike>();
+    std::lock_guard<std::mutex> lk(adaptersMu);
+    auto [it, inserted] = adapters->try_emplace(file, file);
     return &it->second;
 }
 

@@ -263,9 +263,10 @@ Diagnostic* FileIncludeReason::toDiagnostic(
 	// off the reason into includeProcessor.reasonDiagnostics; ed480721
 	// added the explicit relativeTo root (empty => fileName as-is).
 	includeReasonDiagnosticKey key{this, relativeFileName, relativeTo};
-	if (auto it = program->includeProcessor_.reasonDiagnostics.find(key);
-	    it != program->includeProcessor_.reasonDiagnostics.end()) {
-		return it->second;
+	if (auto [diagnostic, ok] =
+	        program->includeProcessor_.reasonDiagnostics.Load(key);
+	    ok) {
+		return diagnostic;
 	}
 	Diagnostic* diagnostic = computeDiagnostic(
 	    program, [program, relativeFileName, relativeTo](
@@ -276,8 +277,9 @@ Diagnostic* FileIncludeReason::toDiagnostic(
 		}
 		return std::string(fileName);
 	});
-	program->includeProcessor_.reasonDiagnostics.emplace(key, diagnostic);
-	return diagnostic;
+	auto [stored, _] = program->includeProcessor_.reasonDiagnostics
+	                      .LoadOrStore(key, diagnostic);
+	return stored;
 }
 
 Diagnostic* FileIncludeReason::computeDiagnostic(
@@ -756,6 +758,10 @@ Diagnostic* processingDiagnostic::createDiagnosticExplainingFile(
 // includeprocessor.go
 // ===========================================================================
 DiagnosticsCollection* includeProcessor::getDiagnostics(SimpleProgram* p) {
+	// includeprocessor.go:37-38 computedDiagnosticsOnce sync.Once —
+	// reached concurrently from checker workers collecting per-file
+	// diagnostics.
+	std::lock_guard<std::mutex> lock(computedDiagnosticsMu_);
 	if (!computedDiagnostics_) {
 		computedDiagnostics_ =
 		    std::make_unique<DiagnosticsCollection>();
@@ -824,21 +830,21 @@ void includeProcessor::addProcessingDiagnosticsForFileCasing(
 
 referenceFileLocation includeProcessor::getReferenceLocation(
     const FileIncludeReason* r, SimpleProgram* program) {
-	if (auto it = reasonToReferenceLocation.find(r);
-	    it != reasonToReferenceLocation.end())
-		return it->second;
-	auto loc = r->getReferencedLocation(program);
-	reasonToReferenceLocation.emplace(r, loc);
+	if (auto [existing, ok] = reasonToReferenceLocation.Load(r); ok)
+		return existing;
+	// includeprocessor.go:96 — compute eagerly then LoadOrStore.
+	auto [loc, _] =
+	    reasonToReferenceLocation.LoadOrStore(
+	        r, r->getReferencedLocation(program));
 	return loc;
 }
 
 Diagnostic* includeProcessor::getRelatedInfo(const FileIncludeReason* r,
                                              SimpleProgram* program) {
-	if (auto it = includeReasonToRelatedInfo.find(r);
-	    it != includeReasonToRelatedInfo.end())
-		return it->second;
-	Diagnostic* relatedInfo = r->toRelatedInfo(program);
-	includeReasonToRelatedInfo.emplace(r, relatedInfo);
+	if (auto [existing, ok] = includeReasonToRelatedInfo.Load(r); ok)
+		return existing;
+	auto [relatedInfo, _] = includeReasonToRelatedInfo.LoadOrStore(
+	    r, r->toRelatedInfo(program));
 	return relatedInfo;
 }
 
@@ -878,6 +884,8 @@ void updateFileIncludeProcessor(SimpleProgram* p) {
 // once-computed lookup of the config's "compilerOptions" object literal.
 ObjectLiteralExpression*
 includeProcessor::getCompilerOptionsObjectLiteralSyntax(SimpleProgram* p) {
+	// includeprocessor.go:99 compilerOptionsSyntaxOnce sync.Once.
+	std::lock_guard<std::mutex> lock(compilerOptionsSyntaxMu_);
 	if (!compilerOptionsSyntaxComputed) {
 		compilerOptionsSyntaxComputed = true;
 		tsoptions::TsConfigSourceFile* configFile =
@@ -905,9 +913,8 @@ includeProcessor::getCompilerOptionsObjectLiteralSyntax(SimpleProgram* p) {
 std::vector<Diagnostic*> includeProcessor::explainRedirectAndImpliedFormat(
     SimpleProgram* program, const tspath::Path& filePath,
     const std::function<std::string(std::string_view)>& toFileName) {
-	if (auto it = redirectAndFileFormat.find(filePath);
-	    it != redirectAndFileFormat.end())
-		return it->second;
+	if (auto [existing, ok] = redirectAndFileFormat.Load(filePath); ok)
+		return existing;
 	std::vector<Diagnostic*> result;
 	SourceFile* sourceFile = program->GetSourceFileByPath(filePath);
 	auto redirectsIt = program->redirectFilesByPath.find(filePath);
@@ -978,8 +985,8 @@ std::vector<Diagnostic*> includeProcessor::explainRedirectAndImpliedFormat(
 			default: break;
 		}
 	}
-	redirectAndFileFormat.emplace(filePath, result);
-	return result;
+	auto [stored, _] = redirectAndFileFormat.LoadOrStore(filePath, result);
+	return stored;
 }
 
 }  // namespace tsc::compiler

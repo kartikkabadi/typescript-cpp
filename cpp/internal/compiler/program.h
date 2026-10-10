@@ -409,20 +409,28 @@ struct includeProcessor {
 	    SimpleProgram* p, const tspath::Path& filePath,
 	    const std::function<std::string(std::string_view)>& toFileName);
 
+	// includeprocessor.go:25-26 — computedDiagnostics guarded by
+	// computedDiagnosticsOnce sync.Once in Go; checker workers reach
+	// getDiagnostics concurrently per file. A mutex gives the same
+	// once+publish semantics and survives updateFileIncludeProcessor's
+	// field-wise reset (unlike once_flag, which cannot be re-armed).
+	std::mutex computedDiagnosticsMu_;
 	std::unique_ptr<DiagnosticsCollection> computedDiagnostics_;
-	// includeprocessor.go:21 reasonDiagnostics — SyncMap keyed on
-	// (reason, relativeFileName, relativeTo); cleared by
-	// updateFileIncludeProcessor like the other caches.
-	std::unordered_map<includeReasonDiagnosticKey, Diagnostic*,
-	                   includeReasonDiagnosticKeyHash>
+	// includeprocessor.go:21-24 — Go keeps these four caches in
+	// collections.SyncMap; diagnostics production touches them from
+	// parallel checker workers. Cleared by updateFileIncludeProcessor
+	// like the other state.
+	collections::SyncMap<includeReasonDiagnosticKey, Diagnostic*,
+	                     includeReasonDiagnosticKeyHash>
 	    reasonDiagnostics;
-	std::unordered_map<const FileIncludeReason*, referenceFileLocation>
+	collections::SyncMap<const FileIncludeReason*, referenceFileLocation>
 	    reasonToReferenceLocation;
-	std::unordered_map<const FileIncludeReason*, Diagnostic*>
+	collections::SyncMap<const FileIncludeReason*, Diagnostic*>
 	    includeReasonToRelatedInfo;
-	std::unordered_map<tspath::Path, std::vector<Diagnostic*>>
+	collections::SyncMap<tspath::Path, std::vector<Diagnostic*>>
 	    redirectAndFileFormat;
 	// compilerOptionsSyntax + once flag (includeprocessor.go:24-25).
+	std::mutex compilerOptionsSyntaxMu_;
 	ObjectLiteralExpression* compilerOptionsSyntax{};
 	bool compilerOptionsSyntaxComputed{};
 };

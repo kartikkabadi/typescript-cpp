@@ -4321,6 +4321,9 @@ static std::unordered_map<SourceFile*, int> createFileIndexMap(
 static int countGlobalSymbols(const std::vector<SourceFile*>& files) {
 	int count = 0;
 	for (SourceFile* file : files) {
+		// Same ensure as initializeChecker — the file can be mid-bind
+		// via another program's loader. Exactly-once via bindOnce.
+		bindSourceFile(file);
 		if (!isExternalOrCommonJSModule(file)) {
 			count += static_cast<int>(file->Locals.size());
 		}
@@ -4595,6 +4598,12 @@ void Checker::initializeChecker() {
 	std::vector<std::vector<Node*>> augmentations;
 	augmentations.reserve(files.size());
 	for (SourceFile* file : files) {
+		// init's BindSourceFiles only queues files in p.files; a file
+		// shared from another program's loader or resolved later can
+		// still be mid-bind here. bindSourceFile is exactly-once via
+		// bindOnce, so re-ensuring is a no-op when already bound (Go:
+		// the checker binds every file up front for the same reason).
+		bindSourceFile(file);
 		if (!isExternalOrCommonJSModule(file)) {
 			// It is an error for a non-external-module (i.e. script) to declare
 			// its own `globalThis`.
@@ -5521,23 +5530,25 @@ Symbol* Checker::getSpellingSuggestionForName(
 
 static std::unordered_map<std::string, Symbol*>&
 primitiveTypeAliasSuggestions() {
-	// checker.go:1786 — sync.OnceValue: Symbols are plain heap objects that
-	// live for the process lifetime. They MUST NOT be arena-allocated: the
-	// static map outlives any single checker's typeArena, and arena clear /
-	// sweep would leave dangling Symbol* behind.
-	static std::unordered_map<std::string, Symbol*>* result = nullptr;
-	if (result == nullptr) {
-		result = new std::unordered_map<std::string, Symbol*>();
-		for (auto& e : std::vector<std::pair<const char*, const char*>>{
-		         {"string", "String"}, {"number", "Number"},
-		         {"boolean", "Boolean"}, {"object", "Object"},
-		         {"bigint", "BigInt"}, {"symbol", "Symbol"}}) {
-			Symbol* sym = new Symbol();
-			sym->flags = SymbolFlagsTypeAlias | SymbolFlagsTransient;
-			sym->data->name = e.first;
-			(*result)[e.second] = sym;
-		}
-	}
+	// checker.go:1786 — sync.OnceValue: function-local static init is
+	// the C++ equivalent (thread-safe once). Symbols are plain heap
+	// objects that live for the process lifetime. They MUST NOT be
+	// arena-allocated: the static map outlives any single checker's
+	// typeArena, and arena clear / sweep would leave dangling Symbol*.
+	static std::unordered_map<std::string, Symbol*>* result =
+	    [] {
+		    auto* m = new std::unordered_map<std::string, Symbol*>();
+		    for (auto& e : std::vector<std::pair<const char*, const char*>>{
+		             {"string", "String"}, {"number", "Number"},
+		             {"boolean", "Boolean"}, {"object", "Object"},
+		             {"bigint", "BigInt"}, {"symbol", "Symbol"}}) {
+			    Symbol* sym = new Symbol();
+			    sym->flags = SymbolFlagsTypeAlias | SymbolFlagsTransient;
+			    sym->data->name = e.first;
+			    (*m)[e.second] = sym;
+		    }
+		    return m;
+	    }();
 	return *result;
 }
 

@@ -1701,7 +1701,9 @@ void projectReferenceFileMapperBuilder::resolveSymlink(
 struct projectReferenceParser {
 	filesLoader* loader{};
 	std::unique_ptr<workGroup> wg{};
-	std::unordered_map<tspath::Path, projectReferenceParseTask*>
+	// Go: collections.SyncMap[PathKey, *projectReferenceParseTask] —
+	// start() recurses on workgroup workers, so this must be a SyncMap.
+	collections::SyncMap<tspath::Path, projectReferenceParseTask*>
 	    tasksByFileName;
 	// Arena owning every task (Go relies on GC).
 	std::deque<std::unique_ptr<projectReferenceParseTask>> taskArena;
@@ -1770,11 +1772,12 @@ void projectReferenceParser::start(
 	for (size_t i = 0; i < tasks.size(); i++) {
 		projectReferenceParseTask* task = tasks[i];
 		tspath::Path path = loader->toPath(task->configName);
-		auto [it, inserted] = tasksByFileName.try_emplace(path, task);
-		if (!inserted) {
+		auto [storedTask, loaded] =
+		    tasksByFileName.LoadOrStore(path, task);
+		if (loaded) {
 			// dedup tasks to ensure correct file order, regardless of
 			// which task would be started first (projectreferenceparser.go:59).
-			tasks[i] = it->second;
+			tasks[i] = storedTask;
 		} else {
 			wg->Queue([this, task] {
 				task->parse(this);
@@ -1788,7 +1791,7 @@ void projectReferenceParser::start(
 void projectReferenceParser::initMapper(
     std::vector<projectReferenceParseTask*>& tasks) {
 	auto* mapper = loader->projectReferences.mapper.get();
-	size_t totalReferences = tasksByFileName.size() + 1;
+	size_t totalReferences = tasksByFileName.Size() + 1;
 	mapper->configToProjectReference.reserve(totalReferences);
 	mapper->referencesInConfigFile.reserve(totalReferences);
 	collections::Set<projectReferenceParseTask*> seen;
