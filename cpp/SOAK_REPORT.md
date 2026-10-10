@@ -133,13 +133,19 @@ and fourslash.
 
 ### 6. `.d.ts` union member order — excluded per task (oracle-side map-order nondeterminism, documented in `cpp/E2E_REPORT.md`). No order flake observed belongs to this class.
 
-### Harness lesson: wave poisoning
+### Harness lessons
 
-The emit run2 / decl run2 corpus waves overlapped a `ninja` relink of
-`tscpp` while the nondeterminism was being instrumented: 50 emit files
-and 340 decl files contain `timeout: failed to run command … RC 127`.
-Those are excluded from all hash comparisons. Soak rule going forward:
-never rebuild the binary under test while a dump wave is in flight.
+- Wave poisoning: the emit run2 / decl run2 corpus waves overlapped a
+  `ninja` relink of `tscpp` while the nondeterminism was being
+  instrumented: 50 emit files and 340 decl files (run2) plus 340 decl
+  files (run1) contain `timeout: failed to run command … RC 127`.
+  Excluded from all hash comparisons. Rule: never rebuild the binary
+  under test while a dump wave is in flight.
+- `EXIT 2` has two distinct causes — a Go-parity panic
+  (`tscUnreachable`, deterministic per input) and an env signal crash
+  (resource starvation, nondeterministic). Classify by re-running the
+  file unloaded and against `/tmp/emitdump` before treating it as a
+  flake.
 
 ## Corpus determinism hashes
 
@@ -156,7 +162,18 @@ never rebuild the binary under test while a dump wave is in flight.
   resource-pressure crash on `undeclaredBase.js` (flake #5, hardened).
 - emit run4 ≡ run5 (post-Queue-hardening): **26,172/26,172
   byte-identical** — no residual emit nondeterminism.
-- decl run3 (post-fix): in flight; diff vs run1 recorded below if landed.
+- decl run1-vs-run3 (pre-fix vs post-fix): 384 diffs, partitioned as
+  40 whole-W losses (the `written` race in run1) + 340 run1-side RC-127
+  binary-swap artifacts + 4 run3-side env-pressure `EXIT 2` crashes
+  (distinct files each; all 4 verified clean unloaded and on the Go
+  oracle — pure resource flake). **Zero content diffs.**
+- Deterministic-crash class (oracle-faithful, not a flake):
+  `tests/cases/compiler/defaultKeywordWithoutExport1.ts`
+  (`@decorator default class {}`) produces `EXIT 2` on EVERY run in
+  emit and decl modes. Verified against the oracle: `/tmp/emitdump`
+  panics identically — `debug.Assert` in `visitClassDeclaration`
+  (esdecorator.go:1071) inside `parallelWorkGroup.Queue`. Byte-identical
+  across C++ runs ⇒ never appears in a diff.
 
 ## Threaded stress
 
@@ -169,7 +186,8 @@ and `.tsbuildinfo` files byte-identical under concurrency.
 
 - `74ddbb0d3f` soak: fix 2 flake classes found by repeated runs
 - `3274f07dba` soak: fix emitdump WriteFile append race under parallel emit
-- pending: workgroup thread-spawn fallback (flake #5) + final corpus counts
+- `72ecaad01e` soak: run workgroup tasks inline when thread spawn fails
+- pending: final corpus counts for decl + report (this commit)
 
 ## Notes / non-findings
 
@@ -178,3 +196,10 @@ and `.tsbuildinfo` files byte-identical under concurrency.
   `--pretty=false` is TS5023. Harness uses bare `-w`.
 - Unit runs show 1,128 distinct test names: 1,122 pass + 6 faithful SKIPs,
   constant across all runs (no SKIP↔PASS flips).
+- Flake inventory: (a) ipc detached-thread UB — fixed; (b) emitdump
+  `written` append race — fixed; (c) workgroup thread-spawn crash under
+  OOM pressure — hardened with inline fallback; (d) watch-mode extra
+  identical rebuild — oracle-inherent; (e) .d.ts union order — excluded
+  oracle-side class; (f) deterministic oracle-parity panics
+  (e.g. defaultKeywordWithoutExport1.ts) — faithful, not flakes.
+  No remaining nondeterminism observed post-fix.
