@@ -2341,15 +2341,17 @@ Session::toAPISnapshotRequest(gostd::Context ctx,
 			                      {ErrClientError, configFileName})};
 		}
 		if (apiRequest->EnsurePrograms == nullptr) {
-			apiRequest->EnsurePrograms =
-			    collections::newSetWithSizeHint<project::ID>(
-			        changes->OpenProjects.size());
+			apiRequest->EnsurePrograms = apiRequest->own(
+			    std::unique_ptr<collections::Set<project::ID>>(
+			        collections::newSetWithSizeHint<project::ID>(
+			            changes->OpenProjects.size())));
 		}
 		apiRequest->EnsurePrograms->Add(project::ID(configuredProjectID));
 		if (apiRequest->OpenProjects == nullptr) {
-			apiRequest->OpenProjects =
-			    collections::newSetWithSizeHint<std::string>(
-			        changes->OpenProjects.size());
+			apiRequest->OpenProjects = apiRequest->own(
+			    std::unique_ptr<collections::Set<std::string>>(
+			        collections::newSetWithSizeHint<std::string>(
+			            changes->OpenProjects.size())));
 		}
 		apiRequest->OpenProjects->Add(configFileName);
 	}
@@ -2358,9 +2360,10 @@ Session::toAPISnapshotRequest(gostd::Context ctx,
 		tspath::Path configPath =
 		    toPath(p.ToAbsoluteFileName(GetCurrentDirectory()));
 		if (apiRequest->CloseProjects == nullptr) {
-			apiRequest->CloseProjects =
-			    collections::newSetWithSizeHint<tspath::Path>(
-			        changes->CloseProjects.size());
+			apiRequest->CloseProjects = apiRequest->own(
+			    std::unique_ptr<collections::Set<tspath::Path>>(
+			        collections::newSetWithSizeHint<tspath::Path>(
+			            changes->CloseProjects.size())));
 		}
 		apiRequest->CloseProjects->Add(configPath);
 	}
@@ -2371,8 +2374,9 @@ Session::toAPISnapshotRequest(gostd::Context ctx,
 			    f.ToAbsoluteFileName(GetCurrentDirectory());
 			tspath::Path path = toPath(fileName);
 			if (apiRequest->OpenFiles == nullptr) {
-				apiRequest->OpenFiles =
-				    new std::unordered_map<tspath::Path, std::string>();
+				apiRequest->OpenFiles = apiRequest->own(
+				    std::make_unique<
+				        std::unordered_map<tspath::Path, std::string>>());
 			}
 			if (apiRequest->OpenFiles->find(path) ==
 			    apiRequest->OpenFiles->end()) {
@@ -2386,9 +2390,10 @@ Session::toAPISnapshotRequest(gostd::Context ctx,
 		tspath::Path path =
 		    toPath(lsp::lsproto::documentUriFileName(f.ToURI(GetCurrentDirectory())));
 		if (apiRequest->CloseFiles == nullptr) {
-			apiRequest->CloseFiles =
-			    collections::newSetWithSizeHint<tspath::Path>(
-			        changes->CloseFiles.size());
+			apiRequest->CloseFiles = apiRequest->own(
+			    std::unique_ptr<collections::Set<tspath::Path>>(
+			        collections::newSetWithSizeHint<tspath::Path>(
+			            changes->CloseFiles.size())));
 		}
 		apiRequest->CloseFiles->Add(path);
 	}
@@ -2431,11 +2436,12 @@ Session::toAPISnapshotRequest(gostd::Context ctx,
 			if (ferr) {
 				return {nullptr, ferr};
 			}
-			request->ModuleResolverFactory = factory.release();
+			request->ModuleResolverFactory =
+			    request->own(std::move(factory));
 			request->ModuleResolverID =
 			    uint64_t(programParams->Options->ModuleResolver);
 		}
-		apiRequest->CreatePrograms[i] = request.release();
+		apiRequest->CreatePrograms[i] = apiRequest->own(std::move(request));
 	}
 	apiRequest->ReconfigurePrograms.resize(changes->ReconfigurePrograms.size());
 	collections::Set<project::SyntheticProjectID> reconfiguredProgramIDs;
@@ -2488,16 +2494,19 @@ Session::toAPISnapshotRequest(gostd::Context ctx,
 			if (ferr) {
 				return {nullptr, ferr};
 			}
-			request->ModuleResolverFactory = factory.release();
+			request->ModuleResolverFactory =
+			    request->own(std::move(factory));
 			request->ModuleResolverID =
 			    uint64_t(programParams->Options->ModuleResolver);
 		}
-		apiRequest->ReconfigurePrograms[i] = request.release();
+		apiRequest->ReconfigurePrograms[i] =
+		    apiRequest->own(std::move(request));
 	}
 	if (!changes->RemovePrograms.empty()) {
-		apiRequest->RemovePrograms =
-		    collections::newSetWithSizeHint<project::SyntheticProjectID>(
-		        changes->RemovePrograms.size());
+		apiRequest->RemovePrograms = apiRequest->own(
+		    std::unique_ptr<collections::Set<project::SyntheticProjectID>>(
+		        collections::newSetWithSizeHint<project::SyntheticProjectID>(
+		            changes->RemovePrograms.size())));
 	}
 	for (const auto& programID : changes->RemovePrograms) {
 		if (reconfiguredProgramIDs.Has(programID)) {
@@ -2511,9 +2520,10 @@ Session::toAPISnapshotRequest(gostd::Context ctx,
 		apiRequest->EnsureAllPrograms = changes->EnsurePrograms->All;
 		if (!changes->EnsurePrograms->Projects.empty() &&
 		    apiRequest->EnsurePrograms == nullptr) {
-			apiRequest->EnsurePrograms =
-			    collections::newSetWithSizeHint<project::ID>(
-			        changes->EnsurePrograms->Projects.size());
+			apiRequest->EnsurePrograms = apiRequest->own(
+			    std::unique_ptr<collections::Set<project::ID>>(
+			        collections::newSetWithSizeHint<project::ID>(
+			            changes->EnsurePrograms->Projects.size())));
 		}
 		for (const auto& program : changes->EnsurePrograms->Projects) {
 			apiRequest->EnsurePrograms->Add(program);
@@ -2919,17 +2929,21 @@ void Session::releaseLanguageServerRefs() {
 	project::APISnapshotRequest apiRequest;
 	if (openProjects.Size() > 0) {
 		auto cloned = openProjects.Clone();
-		apiRequest.CloseProjects = new collections::Set<tspath::Path>(
-		    std::move(cloned));
+		apiRequest.CloseProjects = apiRequest.own(
+		    std::make_unique<collections::Set<tspath::Path>>(
+		        std::move(cloned)));
 	}
 	if (openFiles.Size() > 0) {
 		auto cloned = openFiles.Clone();
-		apiRequest.CloseFiles = new collections::Set<tspath::Path>(
-		    std::move(cloned));
+		apiRequest.CloseFiles = apiRequest.own(
+		    std::make_unique<collections::Set<tspath::Path>>(
+		        std::move(cloned)));
 	}
 	if (createdPrograms.Size() > 0) {
-		apiRequest.RemovePrograms = collections::newSetWithSizeHint<
-		    project::SyntheticProjectID>(createdPrograms.Size());
+		apiRequest.RemovePrograms = apiRequest.own(
+		    std::unique_ptr<collections::Set<project::SyntheticProjectID>>(
+		        collections::newSetWithSizeHint<
+		            project::SyntheticProjectID>(createdPrograms.Size())));
 		for (const auto& programID : createdPrograms.Keys()) {
 			apiRequest.RemovePrograms->Add(programID);
 		}
@@ -3604,12 +3618,16 @@ Session::createSourceFile(const std::string& fileName,
 std::shared_ptr<project::SourceFileLease> Session::acquireSourceFile(
     SourceFileParseOptions options, const std::string& sourceText,
     ScriptKind scriptKind) {
-	// SnapshotHost returns a raw lease; wrap non-owning (Release() is
-	// explicit, matching Go GC semantics).
+	// SnapshotHost returns a raw lease; Release() is call_once-guarded,
+	// so the last shared_ptr drop can both release the cache ref and
+	// free the lease itself — callers that already released are no-ops.
 	return std::shared_ptr<project::SourceFileLease>(
 	    snapshotHost->AcquireSourceFile(std::move(options), sourceText,
 	                                    scriptKind),
-	    [](project::SourceFileLease*) {});
+	    [](project::SourceFileLease* lease) {
+		    lease->Release();
+		    delete lease;
+	    });
 }
 
 // encodeLeasedSourceFile — session.go:1877.
@@ -3747,7 +3765,11 @@ Session::acquireCachedSourceFile(const SourceFileDescriptor& descriptor) {
 		                      {ErrClientError})};
 	}
 	return {std::shared_ptr<project::SourceFileLease>(
-	            lease, [](project::SourceFileLease*) {}),
+	            lease,
+	            [](project::SourceFileLease* l) {
+		            l->Release();
+		            delete l;
+	            }),
 	        nullptr};
 }
 
