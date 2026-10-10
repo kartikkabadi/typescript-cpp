@@ -21,6 +21,8 @@ namespace tsc {
 
 static std::atomic<NodeId> nextNodeId{0};
 static std::atomic<SymbolId> nextSymbolId{0};
+static std::atomic<uint64_t> nextNodeBlockId{0};
+static std::atomic<uint64_t> nextSymbolBlockId{0};
 
 template <class F>
 static bool someList(std::span<Node* const> ts, F&& f) {
@@ -54,6 +56,45 @@ SymbolId getSymbolId(Symbol* symbol) {
 		}
 	}
 	return id;
+}
+
+// NodeIdGenerator / SymbolIdGenerator (utilities.go): each link store owns a
+// generator that hands out IDs in blocks of BlockIdSize grabbed from the
+// central atomic counters above; IDs are offset by BlockIdOffset so the dense
+// paged store can index them directly.
+
+NodeId NodeIdGenerator::GetNodeId(Node* node) {
+	uint64_t id = node->id.load();
+	if (id == 0) {
+		if (nextId == lastId) {
+			nextId = nextNodeBlockId.fetch_add(BlockIdSize);
+			lastId = nextId + BlockIdSize;
+		}
+		id = nextId + BlockIdOffset;
+		nextId++;
+		uint64_t expected = 0;
+		if (!node->id.compare_exchange_strong(expected, id)) {
+			id = expected;
+		}
+	}
+	return static_cast<NodeId>(id);
+}
+
+SymbolId SymbolIdGenerator::GetSymbolId(Symbol* symbol) {
+	uint64_t id = symbol->id.load();
+	if (id == 0) {
+		if (nextId == lastId) {
+			nextId = nextSymbolBlockId.fetch_add(BlockIdSize);
+			lastId = nextId + BlockIdSize;
+		}
+		id = nextId + BlockIdOffset;
+		nextId++;
+		uint64_t expected = 0;
+		if (!symbol->id.compare_exchange_strong(expected, id)) {
+			id = expected;
+		}
+	}
+	return static_cast<SymbolId>(id);
 }
 
 SymbolTable& getSymbolTable(SymbolTable& data) { return data; }

@@ -1210,34 +1210,62 @@ public:
 	}
 };
 
-// nodeLinkStore / symbolArenaLinkStore (links.go)
+// nodeLinkStore / symbolLinkStore (links.go)
+//
+// When possible these stores keep Node and Symbol links in an efficient,
+// densely packed paged array store. When a Node or Symbol has not yet been
+// assigned an ID, the store's generator provides one from a reserved range of
+// the ID space (blocks of LinkPageSize consecutive IDs), so links pack densely
+// within a single page. IDs outside the block range fall back to the
+// LinkStore map.
+
+inline constexpr uint64_t maxPageLinkCount = 0x100'0000; // 16M
 
 template <class V>
 struct nodeLinkStore {
-	PagedLinkStore<V> store;
-	V* Get(Node* node) { return store.Get(static_cast<uint64_t>(getNodeId(node))); }
-	bool Has(Node* node) { return store.Has(static_cast<uint64_t>(getNodeId(node))); }
-	V* TryGet(Node* node) { return store.TryGet(static_cast<uint64_t>(getNodeId(node))); }
+	NodeIdGenerator gen;
+	Arena linksArena;
+	LinkStore<uint64_t, V> links{&linksArena};
+	PagedLinkStore<V> pages;
+
+	V* Get(Node* node) {
+		uint64_t id = static_cast<uint64_t>(gen.GetNodeId(node));
+		if (id >= BlockIdOffset && id < BlockIdOffset + maxPageLinkCount) {
+			return pages.Get(id - BlockIdOffset);
+		}
+		return links.Get(id);
+	}
+	bool Has(Node* node) { return TryGet(node) != nullptr; }
+	V* TryGet(Node* node) {
+		uint64_t id = static_cast<uint64_t>(gen.GetNodeId(node));
+		if (id >= BlockIdOffset && id < BlockIdOffset + maxPageLinkCount) {
+			return pages.TryGet(id - BlockIdOffset);
+		}
+		return links.TryGet(id);
+	}
 };
 
 template <class V>
-struct symbolArenaLinkStore {
-	PagedLinkStore<V*> store;
-	Arena* arena{};
+struct symbolLinkStore {
+	SymbolIdGenerator gen;
+	Arena linksArena;
+	LinkStore<uint64_t, V> links{&linksArena};
+	PagedLinkStore<V> pages;
 
 	V* Get(Symbol* symbol) {
-		V** link = store.Get(static_cast<uint64_t>(getSymbolId(symbol)));
-		if (*link == nullptr) {
-			*link = arena->alloc<V>();
+		uint64_t id = static_cast<uint64_t>(gen.GetSymbolId(symbol));
+		if (id >= BlockIdOffset && id < BlockIdOffset + maxPageLinkCount) {
+			return pages.Get(id - BlockIdOffset);
 		}
-		return *link;
+		return links.Get(id);
 	}
 	bool Has(Symbol* symbol) { return TryGet(symbol) != nullptr; }
 	V* TryGet(Symbol* symbol) {
-		if (V** link = store.TryGet(static_cast<uint64_t>(getSymbolId(symbol))); link != nullptr) {
-			return *link;
+		uint64_t id = static_cast<uint64_t>(gen.GetSymbolId(symbol));
+		if (id >= BlockIdOffset && id < BlockIdOffset + maxPageLinkCount) {
+			return pages.TryGet(id - BlockIdOffset);
 		}
-		return nullptr;
+		return links.TryGet(id);
 	}
 };
 
@@ -1489,7 +1517,7 @@ public:
 	Arena symbolWithDataArena; // symbolWithDataArena — checker.go:670 (SymbolWithData)
 	Arena signatureArena;
 	Arena indexInfoArena;
-	Arena linksArena; // arena backing symbolArenaLinkStore + link stores
+	Arena linksArena; // arena backing the checker's LinkStore fields
 	Arena typeArena;  // arena backing all Type allocations (types never move)
 	std::unordered_map<Symbol*, Symbol*> mergedSymbols;
 	std::unordered_set<Symbol*> mergedExportsChecked;
@@ -1505,7 +1533,7 @@ public:
 	nodeLinkStore<JsxElementLinks> jsxElementLinks;
 	nodeLinkStore<ComputedNameNodeLinks> computedNameLinks;
 	LinkStore<Symbol*, SymbolReferenceLinks> symbolReferenceLinks{&linksArena};
-	symbolArenaLinkStore<ValueSymbolLinks> valueSymbolLinks{{}, &linksArena};
+	symbolLinkStore<ValueSymbolLinks> valueSymbolLinks;
 	LinkStore<Symbol*, MappedSymbolLinks> mappedSymbolLinks{&linksArena};
 	LinkStore<Symbol*, DeferredSymbolLinks> deferredSymbolLinks{&linksArena};
 	LinkStore<Symbol*, AliasSymbolLinks> aliasSymbolLinks{&linksArena};

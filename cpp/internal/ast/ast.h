@@ -23,6 +23,7 @@
 #include "internal/ast/kind.h"
 #include "internal/ast/symbol.h"
 #include "internal/core/arena.h"
+#include "internal/core/linkstore.h"
 #include "internal/core/text.h"
 #include "internal/core/types.h"
 #include "internal/diagnostics/diagnostics.h"
@@ -117,7 +118,7 @@ struct PatternAmbientModule {
 	Symbol* symbol = nullptr;
 };
 
-using NodeId = uint32_t;
+using NodeId = uint64_t; // ids.go: NodeId uint64 (block ids sit at 2^48)
 using TokenSyntaxKind = Kind;
 using JsxTokenSyntaxKind = Kind;
 using KeywordSyntaxKind = Kind;
@@ -1402,6 +1403,25 @@ inline bool tagNamesAreEquivalent(Node* lhs, Node* rhs) {
 
 NodeId getNodeId(Node* node);
 SymbolId getSymbolId(Symbol* symbol);
+
+// Dense link stores (utilities.go): when a Node or Symbol has not yet been
+// assigned an ID, the link stores provide one from a generator that grabs
+// chunks of LinkPageSize IDs from a central atomic counter, keeping links
+// densely packed within single pages of the paged store.
+inline constexpr uint64_t BlockIdOffset = 0x1'0000'0000'0000;
+inline constexpr uint64_t BlockIdSize = LinkPageSize;
+
+struct NodeIdGenerator {
+	uint64_t nextId = 0;
+	uint64_t lastId = 0;
+	NodeId GetNodeId(Node* node);
+};
+
+struct SymbolIdGenerator {
+	uint64_t nextId = 0;
+	uint64_t lastId = 0;
+	SymbolId GetSymbolId(Symbol* symbol);
+};
 SymbolTable& getMembers(Symbol* symbol);
 SymbolTable& getExports(Symbol* symbol);
 SymbolTable& getLocals(Node* container);
