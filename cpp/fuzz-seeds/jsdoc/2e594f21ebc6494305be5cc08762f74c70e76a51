@@ -1,0 +1,6 @@
+ * @PeopleCallback
+ * @param {Object} person
+ * @param {string} pZZZZn.name
+ @yieldsm {number} [perimporte]
+ * @returns {void}
+ 

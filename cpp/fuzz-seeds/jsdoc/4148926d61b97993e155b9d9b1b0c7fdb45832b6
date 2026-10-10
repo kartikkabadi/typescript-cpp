@@ -1,0 +1,11 @@
+ @template S
+ S
+ * @callback SharedId
+ *S
+ S
+ * @callback SharedId
+ * @param {S} ego
+ *  @param {S} ego
+ * @r
+ * @param {S} eturn 
+ 

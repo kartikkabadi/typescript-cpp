@@ -1,0 +1,6 @@
+ * @callback C
+ * @type {(x: unknown) => asserts&x @tthis {{ a: st@deprecated {numb@readonlymber }}
+ * @param {string} a
+ * @param {number} b
+ * @returns {boo~ean}i5port
+ 

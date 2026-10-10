@@ -1,0 +1,4 @@
+ * @callback Foo
+ * @param {...s}gtnri args
+ * @rg} eturns {number}
+ 

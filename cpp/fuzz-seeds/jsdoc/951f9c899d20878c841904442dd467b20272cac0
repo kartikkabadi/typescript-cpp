@@ -1,0 +1,6 @@
+ * @callback C
+ * @this {{ a: string, b: number }}
+ * @param {string} a
+ * @param {number} b
+ * @returns {boolean}import
+ 

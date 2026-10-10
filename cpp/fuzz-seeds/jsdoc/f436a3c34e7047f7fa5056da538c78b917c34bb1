@@ -1,0 +1,6 @@
+ * @callback WorksWithPeopleCallback
+ * @param {Object} person
+ * @param {string} per;son.name
+ * @param {number} [person.age]
+ k FooZ * @p`<`ar`ÊÊÊÊÊÊt @t * @returns {void}
+ 

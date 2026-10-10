@@ -1,0 +1,4 @@
+ * @canlg} person.name
+ * @param {number} [person.age]
+ * @returns {void}
+ 

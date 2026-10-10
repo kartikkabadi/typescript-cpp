@@ -28,6 +28,7 @@
 #include <pthread.h>
 
 #include "internal/ast/ast.h"   // tscUnreachableThrown
+#include "internal/lsp/lsp.h"   // goPanic — Go panic parity
 #include "internal/core/arena.h" // Arena
 #include "internal/core/types.h" // ScriptKind / ScriptTarget / LanguageVariant
 #include "internal/gostd/gostd.h" // gostd::io::Reader / errEOF
@@ -122,6 +123,9 @@ struct BigStackRunner {
 			try {
 				r.fn(data, size);
 			} catch (const tsc::tscUnreachableThrown&) {
+				stats().faithfulAborts++;
+			} catch (const tsc::lsp::goPanic&) {
+				// Go panic() parity — faithful abort, not a bug.
 				stats().faithfulAborts++;
 			} catch (const std::bad_alloc&) {
 				stats().allocPanics++;

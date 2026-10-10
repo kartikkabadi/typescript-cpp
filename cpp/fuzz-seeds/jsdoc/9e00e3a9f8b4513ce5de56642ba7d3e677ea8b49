@@ -1,0 +1,7 @@
+ * @callback C
+ * @this {{ a: string, b: number }}
+! * @param {strin* @param {string} a
+ * @param {number} b
+ m {strin* @param {string} a
+lean}import
+ 

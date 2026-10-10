@@ -1,0 +1,4 @@
+ @callback Sid
+ * @páram {string} s
+ * @returns {sting} W{?}hat were  expeýting
+ 

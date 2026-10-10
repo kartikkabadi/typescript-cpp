@@ -973,7 +973,7 @@ inline std::string getRelativePathFromDirectory(
     const ComparePathsOptions& options) {
 	if ((getRootLength(fromDirectory) > 0) != (getRootLength(to) > 0)) {
 		// path.go: panic("paths must either both be absolute or both be relative")
-		__builtin_trap();
+		tscUnreachable("paths must either both be absolute or both be relative");
 	}
 	auto pcs = getPathComponentsRelativeTo(fromDirectory, to, options);
 	std::vector<std::string_view> views(pcs.begin(), pcs.end());

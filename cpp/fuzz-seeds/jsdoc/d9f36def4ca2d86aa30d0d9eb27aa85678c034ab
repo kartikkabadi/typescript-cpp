@@ -1,0 +1,5 @@
+ * arts"
+ * @param {X} tidus - Titus
+ * @param {X & V} noctis - "Prince Noctis Lucius Caelum"
+ * @return {"cecil" | "zidane"}
+ 

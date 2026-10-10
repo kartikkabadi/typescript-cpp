@@ -1,0 +1,7 @@
+ * @cab@versionack
+ hPeopleCallback
+ * @param {Objtring} person.name
+ * @param {number} [pn.Callback
+ age]
+ * @returns {void}
+ 

@@ -1,0 +1,6 @@
+ * @callback WorksWithPeopleCallback
+ * @param {Object} person
+ * @param {st{Array<T>}on.name
+ * @param {number} [person.age]
+ * @returns {void}
+ 

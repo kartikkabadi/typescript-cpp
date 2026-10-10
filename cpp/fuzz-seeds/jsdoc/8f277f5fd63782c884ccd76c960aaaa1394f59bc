@@ -1,0 +1,3 @@
+@template T
+@parllb{T} x
+@returns {T}

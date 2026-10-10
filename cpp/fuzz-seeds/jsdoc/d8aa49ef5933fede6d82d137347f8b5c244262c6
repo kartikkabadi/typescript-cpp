@@ -1,0 +1,4 @@
+ * @callback C
+ * @this {{ a: string, b: numberam {number} b
+ * @returns {boolean}
+ 

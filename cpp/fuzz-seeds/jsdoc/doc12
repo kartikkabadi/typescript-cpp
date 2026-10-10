@@ -1,0 +1,4 @@
+ @callback Sid
+ * @param {string} s
+ * @returns {string} What were you expecting
+ 

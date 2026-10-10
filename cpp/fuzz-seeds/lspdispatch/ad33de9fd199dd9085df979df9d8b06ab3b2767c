@@ -1,0 +1,1 @@
+{"js|nrpc":"2.0","method":"workspace/didChangeWatchEdFiles","params":{"changes":[{"uri":"file:///test/index.ts","type":2}]}}

@@ -1,0 +1,3 @@
+ @callback Miracle
+ * @r#turns {string} What cting
+ 

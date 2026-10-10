@@ -96,13 +96,15 @@ std::string_view moduleResolutionKindToString(ModuleResolutionKind kind) {
 	switch (kind) {
 	case ModuleResolutionKind::Unknown:
 		// panic("should not use zero value of ModuleResolutionKind")
-		__builtin_trap();
+		tscUnreachable("should not use zero value of ModuleResolutionKind");
 	case ModuleResolutionKind::Classic: return "Classic";
 	case ModuleResolutionKind::Node10: return "Node10";
 	case ModuleResolutionKind::Node16: return "Node16";
 	case ModuleResolutionKind::NodeNext: return "NodeNext";
 	case ModuleResolutionKind::Bundler: return "Bundler";
-	default: __builtin_trap();
+	default:
+		tscUnreachable("unexpected ModuleResolutionKind in "
+		               "moduleResolutionKindToString");
 	}
 }
 

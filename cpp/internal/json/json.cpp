@@ -5,6 +5,7 @@
 // defaults: strict UTF-8 and unique object names unless relaxed by options).
 
 #include <algorithm>
+#include <cerrno>
 #include <charconv>
 #include <cmath>
 #include <cstdio>
@@ -1141,10 +1142,15 @@ std::pair<double, gostd::Error> asNumber(const Dom& v, const char* goType) {
 	if (v.kind != Dom::K::Number) {
 		return {0, unmarshalError(domKindName(v), v, goType)};
 	}
-	double d;
-	auto r = std::from_chars(v.strVal.data(),
-	                         v.strVal.data() + v.strVal.size(), d);
-	if (r.ec != std::errc()) {
+	// strconv.ParseFloat: strtod matches — error only on malformed input
+	// or magnitude overflow (ERANGE + HUGE_VAL); denormal results are
+	// fine, as in Go.
+	std::string s(v.strVal);
+	char* end = nullptr;
+	errno = 0;
+	double d = std::strtod(s.c_str(), &end);
+	if (end != s.c_str() + s.size() ||
+	    (errno == ERANGE && std::abs(d) == HUGE_VAL)) {
 		return {0, unmarshalError("number", v, goType)};
 	}
 	return {d, nullptr};

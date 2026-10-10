@@ -1,0 +1,5 @@
+ * @callback WorksWithPeopleCallback
+ * @param WorksWithPeopleCallback
+ * @param {Object} person
+ * @param {string} pZZZZn.nam * @returns {void}
+ 

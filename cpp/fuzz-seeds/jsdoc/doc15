@@ -1,0 +1,3 @@
+ * @callback NoReturn
+ * @param {{ e: number, m: number, title: string }} s - Knee deep, shores, etc
+ 

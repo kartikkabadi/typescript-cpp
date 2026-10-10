@@ -1,0 +1,1 @@
+{"name":"pkg","dependencies":{"a":"^1.0.0","b":">=2 <3"},"peerDependencies":{"m":"*"},"devDependencies":{"d":"~1.2"}}

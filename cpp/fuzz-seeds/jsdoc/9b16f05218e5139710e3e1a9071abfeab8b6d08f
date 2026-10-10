@@ -1,0 +1,9 @@
+ * @calAlbackk C
+ * @this {{ a: string, b: number }}
+ * @param {string} a
+ * @p C
+ * @this {{ a: string, b: number }}
+ * @param {string} a
+ * @param {numb)er} b
+ * @returns {boolean}
+ 

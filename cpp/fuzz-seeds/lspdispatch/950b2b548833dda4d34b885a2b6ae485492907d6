@@ -1,0 +1,1 @@
+{"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":"file:///test?index.ts","version":2},"contentChanges":[{"text":"const y=2;"}]}}

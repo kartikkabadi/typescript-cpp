@@ -1,0 +1,3 @@
+ * @callback Ctry @this {{ a: string, b: @yields}}
+ * =@param {string} a
+ * @parolean}import

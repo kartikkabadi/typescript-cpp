@@ -1,0 +1,5 @@
+ * @callback C
+ * @this {{ a: sttring} a
+ * @param {number} b
+ * @re<sactually wante @type {Fturns {boolean}i5port
+ 

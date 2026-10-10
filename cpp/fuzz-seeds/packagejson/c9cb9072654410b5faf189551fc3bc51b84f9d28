@@ -1,0 +1,1 @@
+{"pendencies":{"a":"^10","b":">=2 <3"},"peerDependencies":"imports","devDependencies":{"d":"~1.0"}}

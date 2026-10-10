@@ -1,0 +1,7 @@
+ * @template V,X
+ * @callback Final
+ *!@param {V} barts - "Barts"
+ * @param {X} tidus -  V,X
+ * @callback  & @type {ValueGetter_2} ctis Lucius Caelum"
+ * @return*{"cecil" | "zidane"}
+ 
