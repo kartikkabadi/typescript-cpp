@@ -251,8 +251,11 @@ void TestSyncConnAnswersNestedRequestsInStackOrder(T* t) {
 	// serve — conn_sync_test.go:101. For each request the peer writes a
 	// nested "resolve" request back, records the nested response, then
 	// answers the original request with its params.
-	std::function<json::Value()> serve;
-	serve = [&]() -> json::Value {
+	// The detached serve thread outlives this frame (Go's closure pins
+	// peer/answers via GC); a heap-held std::function plus by-value
+	// captures gives the same lifetime.
+	auto serve = std::make_shared<std::function<json::Value()>>();
+	*serve = [serve, peer, answers]() -> json::Value {
 		for (;;) {
 			auto [m, rerr] = peer->ReadMessage();
 			if (rerr != nullptr) {
@@ -264,11 +267,12 @@ void TestSyncConnAnswersNestedRequestsInStackOrder(T* t) {
 			}
 			auto rid = jsonrpc::NewIDString("resolve");
 			peer->WriteRequest(&rid, "resolve", msg->Params);
-			(*answers)[std::string(msg->Params)] = std::string(serve());
+			(*answers)[std::string(msg->Params)] =
+			    std::string((*serve)());
 			peer->WriteResponse(msgID(msg.get()), msg->Params);
 		}
 	};
-	std::thread([serve] { serve(); }).detach();
+	std::thread([serve] { (*serve)(); }).detach();
 
 	auto ctx = t->Context();
 	auto a = std::make_shared<json::Value>();

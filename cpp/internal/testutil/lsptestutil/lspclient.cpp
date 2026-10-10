@@ -182,19 +182,17 @@ errgroupWithContext(const gostd::Context& ctx) {
 
 namespace {
 
-// discard — io.Discard.
+// discard — io.Discard (per-call stream: a shared static ostream
+// races when the main thread and MessageRouter both marshal).
 struct discardBuf final : std::streambuf {
 	int overflow(int c) override { return c; }
 };
-std::ostream& discardStream() {
-	static discardBuf buf;
-	static std::ostream os(&buf);
-	return os;
-}
 
 // marshalWriteErr — json.MarshalWrite(io.Discard, msg) as a gostd::Error.
 gostd::Error marshalDiscard(const lsproto::Message& msg) {
-	std::string err = json::marshalWrite(discardStream(), msg);
+	discardBuf buf;
+	std::ostream os(&buf);
+	std::string err = json::marshalWrite(os, msg);
 	return err.empty() ? nullptr : gostd::newError(err);
 }
 

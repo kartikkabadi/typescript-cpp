@@ -26,6 +26,15 @@ public:
 	Queue(const Queue&) = delete;
 	Queue& operator=(const Queue&) = delete;
 
+	~Queue() {
+		// Detached workers' doneGuard tails (--wgCount + wgCv
+		// notify) can still be in flight when Wait/Close returns.
+		// The worker's last queue access runs under wgMu, so one
+		// acquisition here is the happens-after edge that makes
+		// destroying the members safe (Go: WaitGroup needs no dtor).
+		std::lock_guard<std::mutex> lk(wgMu);
+	}
+
 	// Enqueue returns false when the task was dropped (queue closed or
 	// the context already cancelled) so callers can unwind any resources
 	// they captured for it.
@@ -63,9 +72,11 @@ public:
 			struct doneGuard {
 				Queue* q;
 				~doneGuard() {
-					std::unique_lock<std::mutex> lk(q->wgMu);
+					// Notify under wgMu so the destructor's lock
+					// acquisition is a happens-after edge for the
+					// worker's last use of wgCv/wgCount.
+					std::lock_guard<std::mutex> lk(q->wgMu);
 					if (--q->wgCount == 0) {
-						lk.unlock();
 						q->wgCv.notify_all();
 					}
 				}

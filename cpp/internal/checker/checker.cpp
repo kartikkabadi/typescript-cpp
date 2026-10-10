@@ -4321,6 +4321,9 @@ static std::unordered_map<SourceFile*, int> createFileIndexMap(
 static int countGlobalSymbols(const std::vector<SourceFile*>& files) {
 	int count = 0;
 	for (SourceFile* file : files) {
+		// Same ensure as initializeChecker — the file can be mid-bind
+		// via another program's loader. Exactly-once via bindOnce.
+		bindSourceFile(file);
 		if (!isExternalOrCommonJSModule(file)) {
 			count += static_cast<int>(file->Locals.size());
 		}
@@ -4595,6 +4598,12 @@ void Checker::initializeChecker() {
 	std::vector<std::vector<Node*>> augmentations;
 	augmentations.reserve(files.size());
 	for (SourceFile* file : files) {
+		// init's BindSourceFiles only queues files in p.files; a file
+		// shared from another program's loader or resolved later can
+		// still be mid-bind here. bindSourceFile is exactly-once via
+		// bindOnce, so re-ensuring is a no-op when already bound (Go:
+		// the checker binds every file up front for the same reason).
+		bindSourceFile(file);
 		if (!isExternalOrCommonJSModule(file)) {
 			// It is an error for a non-external-module (i.e. script) to declare
 			// its own `globalThis`.
