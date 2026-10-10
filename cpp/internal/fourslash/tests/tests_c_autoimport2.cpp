@@ -1518,9 +1518,6 @@ REGISTER_FOURSLASH_TEST(TestAutoImportCrossProject_symlinks_toSrc, TestAutoImpor
 // autoImportCssModule_test.go
 static void TestAutoImportCssModule(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
-		// Known failing: ambient `declare module "./styles"` resolves to
-		// "../types/styles.css" instead of "../types/styles" (runtime gap).
-		t->Skip({"Known failing fourslash test"}); return;
 		t->Parallel();
 		const std::string content = R"TS(
 // @Filename: /tsconfig.json

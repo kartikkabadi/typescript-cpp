@@ -96,11 +96,13 @@ artifact of one of these shapes:
 - `fourslashrunner -run 'TestAutoImport|TestJSDoc'`: **135/135 pass** (4 SKIP — pre-existing known-failures).
 - `fourslashrunner -run 'TestFormat'`: **197/197 pass**.
 
-## Follow-up flagged for parent session
+## Follow-up flagged for parent session — RESOLVED (devin/cpp-cssmodule)
 
-`TestAutoImportCssModule` is faithful to Go but fails on a real runtime bug:
+`TestAutoImportCssModule` is faithful to Go but failed on a real runtime bug:
 auto-import module-specifier resolution for ambient `declare module "./styles"`
-in `/types/augmentations.ts` produces `"../types/styles.css"` (extension picked
+in `/types/augmentations.ts` produced `"../types/styles.css"` (extension picked
 up from the sibling `./styles.css` declare) instead of `"../types/styles"`.
-Marked `t->Skip` with an explanatory comment — the autoImport resolver needs a
-runtime fix before the skip can come off.
+
+Fixed: the `Export.UnresolvedModuleSpecifier` mechanism was restored in the
+autoimport port (extract/specifiers/view). Test un-skipped and passing;
+see `cpp/CSSMODULE_REPORT.md`.

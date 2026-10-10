@@ -155,6 +155,7 @@ std::vector<std::shared_ptr<Export>> exportExtractor::extractFromModule(
 		std::string name = decl->name->as<StringLiteral>()->Text;
 		ModuleID augmentationModuleID = ModuleID(name);
 		std::string moduleFileName;
+		tspath::ModuleSpecifier unresolvedModuleSpecifier;
 		if (tspath::isExternalModuleNameRelative(name)) {
 			auto resolved =
 			    moduleResolver
@@ -166,16 +167,22 @@ std::vector<std::shared_ptr<Export>> exportExtractor::extractFromModule(
 				augmentationModuleID =
 				    ModuleID(extractor->toPath(moduleFileName));
 			} else {
-				// :shrug:
 				moduleFileName = tspath::resolvePath(
 				    tspath::getDirectoryPath(file->FileName()),
 				    {name});
 				augmentationModuleID =
 				    ModuleID(extractor->toPath(moduleFileName));
+				unresolvedModuleSpecifier =
+				    tspath::toModuleSpecifier(name);
 			}
 		}
+		size_t exportStart = exports.size();
 		extractFromModuleDeclaration(decl, file, augmentationModuleID,
 		                             moduleFileName, &exports);
+		for (size_t i = exportStart; i < exports.size(); i++) {
+			exports[i]->UnresolvedModuleSpecifier =
+			    unresolvedModuleSpecifier;
+		}
 	}
 	return exports;
 }

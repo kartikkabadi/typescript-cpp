@@ -40,6 +40,7 @@
 #include "internal/symlinks/knownsymlinks.h"
 #include "internal/tsoptions/tsoptions.h"
 #include "internal/tspath/tspath.h"
+#include "internal/tspath/typed_paths.h"
 #include "internal/vfs/vfs.h"
 #include "internal/vfs/vfsmatch/vfsmatch.h"
 
@@ -86,6 +87,7 @@ std::string_view exportSyntaxString(ExportSyntax i);
 struct Export {
 	ExportID exportID;
 	std::string ModuleFileName;
+	tspath::ModuleSpecifier UnresolvedModuleSpecifier;
 	ExportSyntax Syntax = ExportSyntax::None;
 	SymbolFlags Flags{};
 	// localName is the name of the export in the module, if different from the exported name
