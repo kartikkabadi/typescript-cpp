@@ -598,6 +598,27 @@ if(APPLE)
 	                         "-framework CoreFoundation")
 endif()
 
+# clang<=16's TSan runtime hands each thread a fixed-size shadow-stack
+# buffer (~768KB, 96K entries) that __tsan_func_entry fills with no
+# release-mode bounds check. The parser's recursive descent keeps ~13
+# live frames per nesting level, so deep input (e.g.
+# ls.TestSelectionRangeDepthIsLimited's 12k parens, ~156K live frames)
+# writes return PCs past the buffer into the adjacent MetaMap index
+# pages and corrupts DenseSlabAlloc freelists — a deterministic SIGSEGV
+# inside the runtime (see cpp/TSAN_SR_REPORT.md). Attribute suppression
+# (no_sanitize) does not remove __tsan_func_entry/exit, so the only
+# reliable bound on instrumented-frame depth is compiling this TU
+# uninstrumented. The parse is single-threaded: no coverage is lost.
+string(TOUPPER "${CMAKE_BUILD_TYPE}" _tscpp_cfg)
+if((CMAKE_CXX_FLAGS MATCHES "fsanitize[=:][^ ;]*thread" OR
+		CMAKE_CXX_FLAGS_${_tscpp_cfg} MATCHES "fsanitize[=:][^ ;]*thread") AND
+		CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+	set_source_files_properties(internal/parser/parser.cpp
+		PROPERTIES COMPILE_OPTIONS "-fno-sanitize=thread")
+	message(STATUS "TSan build: compiling internal/parser/parser.cpp "
+		"uninstrumented (shadow-stack overflow workaround)")
+endif()
+
 add_executable(tscpp cmd/tscpp/main.cpp cmd/tscpp/sys.cpp cmd/tscpp/lsp.cpp cmd/tscpp/api.cpp
 	${tsc_alloc_objects})
 target_link_libraries(tscpp PRIVATE tsc)
