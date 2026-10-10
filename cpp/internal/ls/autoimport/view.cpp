@@ -251,6 +251,8 @@ std::vector<std::unique_ptr<FixAndExport>> View::GetCompletions(
 					auto merged_ = std::make_shared<Export>();
 					merged_->exportID = e->exportID;
 					merged_->ModuleFileName = e->ModuleFileName;
+					merged_->UnresolvedModuleSpecifier =
+					    e->UnresolvedModuleSpecifier;
 					merged_->PackageName = e->PackageName;
 					merged_->IsTypeOnly = e->IsTypeOnly || ex->IsTypeOnly;
 					merged_->Syntax =

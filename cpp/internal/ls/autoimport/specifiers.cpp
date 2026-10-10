@@ -7,6 +7,31 @@ namespace tsc::ls::autoimport {
 // View::GetModuleSpecifier — specifiers.go:9
 std::pair<std::string, modulespecifiers::ResultKind> View::GetModuleSpecifier(
     Export* e, const modulespecifiers::UserPreferences& userPreferences) {
+	if (!e->UnresolvedModuleSpecifier.empty()) {
+		tspath::ModuleSpecifier specifier = e->UnresolvedModuleSpecifier;
+		if (specifier.IsRelative()) {
+			auto caseSensitivity =
+			    program->UseCaseSensitiveFileNames()
+			        ? tspath::CaseSensitivity::CaseSensitive()
+			        : tspath::CaseSensitivity::CaseInsensitive();
+			auto [relativePath, ok] =
+			    caseSensitivity.relativePathFromDirectory(
+			        tspath::RootedDirectoryPath(tspath::getDirectoryPath(
+			            importingFile->FileName())),
+			        tspath::RootedFilePath(e->ModuleFileName));
+			if (!ok) {
+				return {"", modulespecifiers::ResultKind::None};
+			}
+			specifier = relativePath.AsModuleSpecifier();
+		}
+		if (modulespecifiers::IsExcludedByRegex(
+		        specifier.AsString(),
+		        userPreferences.AutoImportSpecifierExcludeRegexes)) {
+			return {"", modulespecifiers::ResultKind::None};
+		}
+		return {specifier.AsString(), modulespecifiers::ResultKind::Relative};
+	}
+
 	// Ambient module
 	if (modulespecifiers::PathIsBareSpecifier(e->exportID.ModuleID)) {
 		std::string specifier = e->exportID.ModuleID;
