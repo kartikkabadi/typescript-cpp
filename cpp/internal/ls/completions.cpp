@@ -8270,7 +8270,7 @@ LanguageService::getExhaustiveCaseSnippets(
 			if (t->IsEnumLiteral()) {
 				TSC_ASSERT(t->symbol != nullptr,
 				           "An enum member type should have a symbol");
-				TSC_ASSERT(t->symbol->parent != nullptr,
+				TSC_ASSERT(t->symbol->data->parent != nullptr,
 				           "An enum member type should have a parent "
 				           "symbol (the enum symbol)");
 				// Filter existing enums by their values

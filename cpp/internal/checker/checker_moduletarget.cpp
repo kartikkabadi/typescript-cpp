@@ -575,7 +575,7 @@ Symbol* Checker::combineValueAndTypeSymbols(Symbol* valueSymbol, Symbol* typeSym
 		return valueSymbol;
 	}
 	Symbol* result = newSymbol(valueSymbol->flags | typeSymbol->flags, valueSymbol->data->name);
-	TSC_ASSERT(!valueSymbol->declarations.empty() || !typeSymbol->declarations.empty(),
+	TSC_ASSERT(!valueSymbol->data->declarations.empty() || !typeSymbol->data->declarations.empty(),
 			   "declarations");
 	result->data->declarations = valueSymbol->data->declarations;
 	for (Node* d : typeSymbol->data->declarations) {

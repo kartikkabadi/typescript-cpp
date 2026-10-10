@@ -844,7 +844,7 @@ Type* Checker::getTypeOfVariableOrParameterOrPropertyWorker(Symbol* symbol) {
 	if (symbol == requireSymbol) {
 		return anyType;
 	}
-	TSC_ASSERT(symbol->valueDeclaration != nullptr, "symbol->valueDeclaration != nullptr");
+	TSC_ASSERT(symbol->data->valueDeclaration != nullptr, "symbol->valueDeclaration != nullptr");
 	Node* declaration = symbol->data->valueDeclaration;
 	if (isSourceFile(declaration) && isJsonSourceFile(declaration->as<SourceFile>())) {
 		auto statements = declaration->statements();
