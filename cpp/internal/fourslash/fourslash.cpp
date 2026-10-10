@@ -2059,7 +2059,9 @@ std::string FourslashTest::verifyCompletionItem(
 		}
 		if (actualAutoImportFix->ModuleSpecifier !=
 		    expectedAutoImportFix->ModuleSpecifier) {
-			return "ModuleSpecifier mismatch";
+			return gostd::sprintf("ModuleSpecifier mismatch: got %q want %q",
+			                      {std::string(actualAutoImportFix->ModuleSpecifier),
+			                       std::string(expectedAutoImportFix->ModuleSpecifier)});
 		}
 	} else {
 		if (std::string err = tsc::cmp::diff(actual, expected,

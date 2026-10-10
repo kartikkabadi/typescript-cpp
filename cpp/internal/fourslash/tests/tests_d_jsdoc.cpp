@@ -95,26 +95,19 @@ REGISTER_FOURSLASH_TEST(TestJSDocSnippetCompletionForReturn, TestJSDocSnippetCom
 static void TestJSDocSnippetCompletionPreservesCRLF(gostd::testing::T* t) {
 	tsc::testutil::withRecoverAndFail(t, "Panic on fourslash test", [&] {
 		t->Parallel();
-		const std::string content = R"TS(/*completion*/ */
-function abcdef(x) { return x; }
-)TS";
+		const std::string content = "/*completion*/ */\r\nfunction abcdef(x) { return x; }\r\n";
 		auto capabilities = fourslash::GetDefaultCapabilities();
 		capabilities->TextDocument->Completion->CompletionItem->SnippetSupport = true;
 		auto __fsp1 = fourslash::NewFourslash(t, capabilities, content); auto f = __fsp1.first; auto done = __fsp1.second; TSC_DEFER(done());
 		f->GoToMarker(t, "completion");
 		f->Insert(t, "/**");
 		auto userPreferences = lsutil::NewDefaultUserPreferences();
-		userPreferences.FormatCodeSettings.NewLineCharacter = R"TS(
-)TS";
+		userPreferences.FormatCodeSettings.NewLineCharacter = "\r\n";
 		f->Configure(t, userPreferences);
 		auto list = f->GetCompletions(t, nullptr);
 		tsc::gotest::assert::Assert(t, list != nullptr);
 		tsc::gotest::assert::Equal(t, (int)list->Items->size(), 1);
-		tsc::gotest::assert::Equal(t, (*list->Items)[0]->TextEdit->InsertReplaceEdit->NewText, R"TS(/**
- * $0
- * @param x ${1}
- * @returns ${2}
- */)TS");
+		tsc::gotest::assert::Equal(t, (*list->Items)[0]->TextEdit->InsertReplaceEdit->NewText, "/**\r\n * $0\r\n * @param x ${1}\r\n * @returns ${2}\r\n */");
 	});
 }
 REGISTER_FOURSLASH_TEST(TestJSDocSnippetCompletionPreservesCRLF, TestJSDocSnippetCompletionPreservesCRLF);
