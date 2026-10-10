@@ -546,10 +546,16 @@ static void emitdumpFile(int argc, char** argv) {
 	auto diags = compiler::getDiagnosticsOfAnyProgram(&program, {}, false);
 
 	std::vector<std::pair<std::string, std::string>> written;
+	// Emit workers run on parallel threads (SingleThreaded()==false for a
+	// bare file-args CLI); the WriteFile callback must serialize appends or
+	// the vector drops entries nondeterministically (Go: same race shape,
+	// but goroutine scheduling never observed to lose one — must not lose).
+	std::mutex writtenMu;
 	compiler::EmitOptions emitOptions;
 	emitOptions.WriteFile =
 	    [&](const std::string& fileName, const std::string& text,
 	        compiler::WriteFileData* /*data*/) -> std::optional<std::string> {
+		    std::lock_guard<std::mutex> lock(writtenMu);
 		    written.emplace_back(fileName, text);
 		    return std::nullopt;
 	    };
