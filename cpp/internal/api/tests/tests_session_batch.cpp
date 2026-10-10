@@ -45,7 +45,7 @@ void TestHandleBatchRequests(T* t) {
 	    BatchRequest{"ping", json::Value{}},
 	    BatchRequest{"unknown", json::Value{}},
 	};
-	auto [response, err] = session.handleBatchRequests(
+	auto [response, err] = handleBatchRequests(&session, 
 	    gostd::contextBackground(), &params);
 
 	assert::NilError(t, err);
@@ -80,7 +80,7 @@ void TestHandleBatchRequestsRecoversPerRequestPanics(T* t) {
 	                 json::Value("{\"snapshot\":1,\"project\":\"project\"}")},
 	    BatchRequest{"ping", json::Value{}},
 	};
-	auto [response, err] = session->handleBatchRequests(
+	auto [response, err] = handleBatchRequests(session, 
 	    gostd::contextBackground(), &params);
 
 	assert::NilError(t, err);
@@ -126,7 +126,7 @@ void TestHandleBatchRequestsPaginatesResponses(T* t) {
 	BatchRequestsParams params;
 	params.Requests = requests;
 	params.MaxResponseBytesPerPage = maxResponseBytesPerPage;
-	auto [response0, err0] = session->handleBatchRequests(
+	auto [response0, err0] = handleBatchRequests(session.get(), 
 	    gostd::contextBackground(), &params);
 	assert::NilError(t, err0);
 	std::unique_ptr<BatchRequestsResponse> response = std::move(response0);
@@ -163,7 +163,7 @@ void TestHandleBatchRequestsPaginatesResponses(T* t) {
 		BatchRequestsParams next;
 		next.ContinuationToken = continuationToken;
 		next.MaxResponseBytesPerPage = maxResponseBytesPerPage;
-		auto [nextResp, nextErr] = session->handleBatchRequests(
+		auto [nextResp, nextErr] = handleBatchRequests(session.get(), 
 		    gostd::contextBackground(), &next);
 		assert::NilError(t, nextErr);
 		response = std::move(nextResp);
@@ -191,7 +191,7 @@ void TestHandleBatchRequestsAllowsOversizedSingleResponse(T* t) {
 	BatchRequestsParams params;
 	params.Requests = {BatchRequest{"ping", json::Value{}}};
 	params.MaxResponseBytesPerPage = 1;
-	auto [response, err] = session->handleBatchRequests(
+	auto [response, err] = handleBatchRequests(session.get(), 
 	    gostd::contextBackground(), &params);
 	assert::NilError(t, err);
 	assert::Equal(t, (int)response->Responses.size(), 1);
@@ -218,7 +218,7 @@ void TestHandleBatchRequestsPageLimitIsRequestScoped(T* t) {
 	BatchRequestsParams limitedParams;
 	limitedParams.Requests = requests;
 	limitedParams.MaxResponseBytesPerPage = 1;
-	auto [limited, err1] = session->handleBatchRequests(
+	auto [limited, err1] = handleBatchRequests(session.get(), 
 	    gostd::contextBackground(), &limitedParams);
 	assert::NilError(t, err1);
 	assert::Equal(t, (int)limited->Responses.size(), 1);
@@ -226,7 +226,7 @@ void TestHandleBatchRequestsPageLimitIsRequestScoped(T* t) {
 
 	BatchRequestsParams unlimitedParams;
 	unlimitedParams.Requests = requests;
-	auto [unlimited, err2] = session->handleBatchRequests(
+	auto [unlimited, err2] = handleBatchRequests(session.get(), 
 	    gostd::contextBackground(), &unlimitedParams);
 	assert::NilError(t, err2);
 	assert::Equal(t, (int)unlimited->Responses.size(), (int)requests.size());
@@ -247,7 +247,7 @@ void TestHandleBatchRequestsRejectsInvalidContinuationToken(T* t) {
 
 	BatchRequestsParams params;
 	params.ContinuationToken = "invalid";
-	auto [_r, err] = session->handleBatchRequests(gostd::contextBackground(),
+	auto [_r, err] = handleBatchRequests(session.get(), gostd::contextBackground(),
 	                                            &params);
 	assert::Assert(t, err != nullptr &&
 	                      err->Error().find("invalid batch continuation token") !=
@@ -269,7 +269,7 @@ void TestHandleBatchRequestsRejectsNestedBatch(T* t) {
 	BatchRequestsParams params;
 	params.Requests = {BatchRequest{MethodBatchRequests,
 	                              json::Value("{\"requests\":[]}")}};
-	auto [response, err] = session->handleBatchRequests(
+	auto [response, err] = handleBatchRequests(session.get(), 
 	    gostd::contextBackground(), &params);
 	assert::NilError(t, err);
 	assert::Equal(t, (int)response->Responses.size(), 1);

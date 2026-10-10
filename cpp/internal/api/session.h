@@ -354,13 +354,9 @@ public:
 	    gostd::Context ctx, const std::string& method, const json::Value& params);
 
 	std::pair<std::unique_ptr<BatchRequestsResponse>, gostd::Error>
-	handleBatchRequests(gostd::Context ctx, const BatchRequestsParams* params);
-	std::pair<std::unique_ptr<BatchRequestsResponse>, gostd::Error>
 	paginateBatchResponses(batchResponsePage& page,
 	                       std::vector<BatchResponse>* responses,
 	                       int64_t maxResponseBytesPerPage);
-	BatchResponse handleBatchRequest(gostd::Context ctx,
-	                                 const BatchRequest& request);
 
 	std::pair<ResultValue, gostd::Error> handleStartCPUProfile(
 	    gostd::Context ctx, const ProfileParams* params);
@@ -943,6 +939,18 @@ public:
 	handleGetReferencedSymbolsForNode(
 	    gostd::Context ctx, const GetReferencedSymbolsForNodeParams* params);
 };
+
+// handleBatchRequests / handleBatchRequest — session.go:1061/1142. Free
+// functions (not members): Go tolerates a nil *Session receiver —
+// session_batch_test.go passes `var session *Session` and the batch loop
+// must answer "ping" before the nil check — while a member call on
+// nullptr is UB in C++ and clang folds `this == nullptr` away at -O2
+// (spanmap.cpp precedent).
+std::pair<std::unique_ptr<BatchRequestsResponse>, gostd::Error>
+handleBatchRequests(Session* s, gostd::Context ctx,
+                    const BatchRequestsParams* params);
+BatchResponse handleBatchRequest(Session* s, gostd::Context ctx,
+                                 const BatchRequest& request);
 
 // DefaultMaxResponseBytesPerPage leaves room for base64 expansion beneath V8's
 // maximum string length while rounding down to an even decimal value.

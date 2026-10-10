@@ -1157,7 +1157,7 @@ std::pair<ResultValue, gostd::Error> Session::handleRequest(
 	};
 
 	if (method == MethodBatchRequests) {
-		return call([&] { return handleBatchRequests(ctx, unmarshalParam<BatchRequestsParams>(parsed)); });
+		return call([&] { return handleBatchRequests(this, ctx, unmarshalParam<BatchRequestsParams>(parsed)); });
 	}
 	if (method == MethodRelease) {
 		return handleRelease(ctx, unmarshalParam<ReleaseParams>(parsed));
@@ -1944,28 +1944,36 @@ std::pair<std::any, std::string> unmarshalPayload(std::string_view method,
 	return it->second(payload);
 }
 
-// handleBatchRequests — session.go:1061.
+// handleBatchRequests — session.go:1061. Free function (session.h): Go
+// tolerates a nil *Session receiver — the batch loop must answer "ping"
+// before the receiver is touched; a member call on nullptr is UB in C++
+// and clang folds `this == nullptr` away at -O2 (spanmap.cpp precedent).
 std::pair<std::unique_ptr<BatchRequestsResponse>, gostd::Error>
-Session::handleBatchRequests(gostd::Context ctx,
-                             const BatchRequestsParams* params) {
+handleBatchRequests(Session* s, gostd::Context ctx,
+                    const BatchRequestsParams* params) {
 	if (!params->ContinuationToken.empty()) {
+		if (s == nullptr) {
+			// Go: s.batchResponsePages nil dereference — a panic recovered
+			// upstream like any other nil receiver fault.
+			throw std::runtime_error(
+			    "runtime error: invalid memory address or nil pointer dereference");
+		}
 		auto [value, ok] =
-		    batchResponsePages.LoadAndDelete(params->ContinuationToken);
+		    s->batchResponsePages.LoadAndDelete(params->ContinuationToken);
 		if (!ok) {
 			return {nullptr,
 			        gostd::errorf("%w: invalid batch continuation token",
 			                      {ErrClientError})};
 		}
-		return paginateBatchResponses(value, nullptr,
-		                              params->MaxResponseBytesPerPage);
+		return s->paginateBatchResponses(value, nullptr,
+		                                 params->MaxResponseBytesPerPage);
 	}
 
 	std::vector<BatchResponse> responses(params->Requests.size());
 	for (size_t i = 0; i < params->Requests.size(); ++i) {
-		responses[i] = handleBatchRequest(ctx, params->Requests[i]);
+		responses[i] = handleBatchRequest(s, ctx, params->Requests[i]);
 	}
-	Session* volatile thisCheck = this;
-	if (thisCheck == nullptr) {
+	if (s == nullptr) {
 		// session.go:1076 — a nil *Session skips pagination and returns the
 		// responses as-is.
 		auto response = std::make_unique<BatchRequestsResponse>();
@@ -1976,8 +1984,8 @@ Session::handleBatchRequests(gostd::Context ctx,
 	if (err) {
 		return {nullptr, err};
 	}
-	return paginateBatchResponses(page, &responses,
-	                              params->MaxResponseBytesPerPage);
+	return s->paginateBatchResponses(page, &responses,
+	                                 params->MaxResponseBytesPerPage);
 }
 
 // newBatchResponsePage — session.go:1083.
@@ -2052,9 +2060,11 @@ Session::paginateBatchResponses(batchResponsePage& page,
 	return {std::move(response), nullptr};
 }
 
-// handleBatchRequest — session.go:1142.
-BatchResponse Session::handleBatchRequest(gostd::Context ctx,
-                                          const BatchRequest& request) {
+// handleBatchRequest — session.go:1142. Free function (session.h): same
+// nil-receiver tolerance — "ping" must answer before the receiver is
+// touched.
+BatchResponse handleBatchRequest(Session* s, gostd::Context ctx,
+                                 const BatchRequest& request) {
 	BatchResponse response;
 	response.Method = request.Method;
 	if (request.Method == MethodBatchRequests) {
@@ -2075,21 +2085,17 @@ BatchResponse Session::handleBatchRequest(gostd::Context ctx,
 			response.Result = json::Value("\"pong\"");
 			return response;
 		}
-		{
+		if (s == nullptr) {
 			// Every other path dereferences s; on a nil receiver Go panics
-			// before reaching the handler. (The volatile read keeps the
-			// optimizer from assuming `this` is non-null.)
-			Session* volatile thisCheck = this;
-			if (thisCheck == nullptr) {
-				throw std::runtime_error(
-				    "runtime error: invalid memory address or nil pointer dereference");
-			}
+			// before reaching the handler.
+			throw std::runtime_error(
+			    "runtime error: invalid memory address or nil pointer dereference");
 		}
 		if (request.Method == "echo") {
 			response.Result = json::Value(request.Params);
 			return response;
 		}
-		auto [rv, err] = handleRequest(ctx, request.Method, request.Params);
+		auto [rv, err] = s->handleRequest(ctx, request.Method, request.Params);
 		if (err) {
 			response.Error = err->Error();
 		} else if (rv.isRaw && isSourceFileResponseMethod(request.Method)) {
