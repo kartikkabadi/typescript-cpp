@@ -1583,6 +1583,14 @@ void registerLanguageServiceDocumentRequestHandler(
 			return {nullptr, paramsErr.second};
 		}
 		Req params = std::move(paramsErr.first);
+		if (s->session == nullptr) {
+			// Go panics on a nil-receiver call here (session.go:1095);
+			// the panic escapes dispatchLoop unrecovered, so a
+			// catchable panic is the faithful model (a hardware
+			// SIGSEGV could not be caught at all).
+			throw goPanic{"runtime error: invalid memory address "
+			             "or nil pointer dereference"};
+		}
 		auto lsRes = s->session->GetLanguageService(
 			ctx, params->TextDocumentURI());
 		if (lsRes.second != nullptr) {
@@ -1628,6 +1636,10 @@ void registerLanguageServiceWithAutoImportsRequestHandler(
 			return {nullptr, paramsErr.second};
 		}
 		Req params = std::move(paramsErr.first);
+		if (s->session == nullptr) {
+			throw goPanic{"runtime error: invalid memory address "
+			             "or nil pointer dereference"};
+		}
 		return s->session->WithLanguageServiceAndSnapshot(
 			ctx, params->TextDocumentURI(),
 			[s, ctx, req, params, fn,

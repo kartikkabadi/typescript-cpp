@@ -135,6 +135,9 @@ std::shared_ptr<tsc::lsp::Server> getServer() {
 		    R"({"jsonrpc":"2.0","id":0,"method":"initialize","params":{"processId":null,"rootUri":"file:///test","capabilities":{"workspace":{"didChangeWatchedFiles":{"dynamicRegistration":false}}},"clientInfo":{"name":"fuzz"}}})");
 		dispatchJson(
 		    server.get(),
+		    R"({"jsonrpc":"2.0","method":"initialized","params":{}})");
+		dispatchJson(
+		    server.get(),
 		    R"({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///test/index.ts","languageId":"typescript","version":1,"text":"const x = 1;"}}})");
 		if (server->session != nullptr) {
 			server->session->WaitForBackgroundTasks();

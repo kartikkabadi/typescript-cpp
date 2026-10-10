@@ -1102,8 +1102,17 @@ resolutionState::loadModuleFromTargetExportOrImport(
 		} else {
 			parts = tspath::resolvePathComponents(targetString, "");
 		}
-		std::vector<std::string> partsAfterFirst(parts.begin() + 1,
-		                                         parts.end());
+		std::vector<std::string> partsAfterFirst;
+		if (parts.empty()) {
+			// resolver.go:1000 — `parts[1:]` on an empty parts panics
+			// "slice bounds out of range". A one-component
+			// GetPathComponents result (e.g. a URL root like `ts3://`)
+			// produces that state; model the Go panic rather than
+			// computing null-iterator arithmetic.
+			tscUnreachable(
+			    "slice bounds out of range [1:] with capacity 0");
+		}
+		partsAfterFirst.assign(parts.begin() + 1, parts.end());
 		if (contains(partsAfterFirst, "..") ||
 		    contains(partsAfterFirst, ".") ||
 		    contains(partsAfterFirst, "node_modules")) {
@@ -3170,6 +3179,14 @@ resolutionState::loadEntrypointsFromExportMap(
 			} else {
 				auto pc =
 				    tspath::resolvePathComponents(exports_.AsString(), "");
+				if (pc.size() < 2) {
+					// resolver.go:2560 — `parts[2:]` panics "slice
+					// bounds out of range" when the export path
+					// resolves to fewer than two components.
+					tscUnreachable(
+					    "slice bounds out of range [2:] with "
+					    "capacity <2");
+				}
 				std::vector<std::string> partsAfterFirst(pc.begin() + 2,
 				                                         pc.end());
 				if (contains(partsAfterFirst, "..") ||
