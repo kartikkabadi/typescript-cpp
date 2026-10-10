@@ -1,0 +1,3 @@
+ @@yieldsk Con - some kind of continuation
+ * @param {{Array<T>}object | undefined} erhat this should return
+ 

@@ -1,0 +1,4 @@
+ [* @callback C
+ * @this {{ a: string, btype {number} *: number }}
+ * @param {strean}import
+ 

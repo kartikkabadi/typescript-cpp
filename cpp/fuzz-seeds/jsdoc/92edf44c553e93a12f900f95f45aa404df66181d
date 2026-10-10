@@ -1,0 +1,3 @@
+ @param {import('./mod2').Son} k @template T
+@par@extends
+@retu

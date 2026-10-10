@@ -1,0 +1,1 @@
+{"jsonrpc":"2.0","id":3,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///test/index.ts"},"position":{"line":0,"8character":5}}}

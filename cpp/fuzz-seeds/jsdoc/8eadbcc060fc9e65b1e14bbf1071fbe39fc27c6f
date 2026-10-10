@@ -1,0 +1,4 @@
+ @callback Con - some kind of continuation
+@template {oined} error
+urn
+ 

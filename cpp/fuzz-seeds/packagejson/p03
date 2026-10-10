@@ -1,0 +1,1 @@
+{"imports":{"#*":"./internal/*","#dep":{"node":"./node-dep.js","default":"./dep.js"}}}

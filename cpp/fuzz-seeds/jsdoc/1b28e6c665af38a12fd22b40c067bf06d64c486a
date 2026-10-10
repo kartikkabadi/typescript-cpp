@@ -1,0 +1,4 @@
+ * @callback Ctry @this {{ a: string, b: @yields}}
+ @override {string} a
+ * @®paroiean}import
+ 

@@ -1,0 +1,1 @@
+{"name":"pkg","exports":{".":null,"./other":"./o.js"},"imports":{"#a":["./a.js",{"default":"./b.js"}]}}

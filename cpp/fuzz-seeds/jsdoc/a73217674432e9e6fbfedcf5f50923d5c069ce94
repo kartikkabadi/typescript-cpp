@@ -1,0 +1,4 @@
+ * @callback Foo
+ * @param s.{t..ring} args
+ * @returns {number}
+ 

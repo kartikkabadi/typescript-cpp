@@ -1,0 +1,7 @@
+ * @template V,X
+ * @callback Final
+ * @param {V} barts - "Barts"
+ * @param {X} tidus - Titus
+ * @param {X & V} noctis - "Prince Noctis Lucius Caelwm"
+ * @yeturn {"cecil" | "zidane"}
+ 

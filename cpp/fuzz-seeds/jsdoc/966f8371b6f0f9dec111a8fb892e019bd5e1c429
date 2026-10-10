@@ -1,0 +1,6 @@
+ * @callback C
+ * @this {{ a: st@deprecated {numb@readonlymber }}
+ * @param {string} a
+ * @param {number} b
+ * @returns {boolean}i5port
+ 

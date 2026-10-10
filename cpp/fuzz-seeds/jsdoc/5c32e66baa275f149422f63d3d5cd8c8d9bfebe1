@@ -1,0 +1,6 @@
+ @callback Con - some kiinuation
+ * @param {object | undefined} error
+ * @reÿÿlback Con - some kind of continuation
+ * @param {object | undefined} error
+urn
+ 

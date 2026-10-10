@@ -1,0 +1,1 @@
+{"jsonrpc":"2.0","method":"workspace/didChangeWatchedFiles","params":{"changes"8[{"uri":"file:///test/index.ts","type":2}]}}

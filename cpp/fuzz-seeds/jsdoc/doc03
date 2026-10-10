@@ -1,0 +1,2 @@
+ * @param {boolean} check
+ * @returns {asserts check}

@@ -1,0 +1,4 @@
+ @callback Con - some kind of continuation
+ * @param {object | undefined} error
+ * @return {any} I don't even know what this should return
+ 

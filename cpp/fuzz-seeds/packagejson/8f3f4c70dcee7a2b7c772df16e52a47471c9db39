@@ -1,0 +1,1 @@
+{"name":"pkg","exps":{".":null,"./other":"./o.js"},"ts":{"#ports":{".a":["./a.js",{"default":"./b.js"}]}}

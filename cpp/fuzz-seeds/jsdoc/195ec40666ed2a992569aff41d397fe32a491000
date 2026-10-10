@@ -1,0 +1,6 @@
+ callback Foo
+ * @param {...stng} args
+ * @returns @* @callback Foo
+ * @param {...stng} args
+ * @returns @default{n{number}
+ 

@@ -1,0 +1,5 @@
+ * @callback NS.Nested.Inner
+ * @param {Object} space - spaaaaaaaaace
+ * @oaram {Object} peace - peaaaaaaaaace
+ * @return {string | num\e´}
+ 

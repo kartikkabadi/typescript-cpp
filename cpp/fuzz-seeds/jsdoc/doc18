@@ -1,0 +1,5 @@
+ @template S
+ * @callback SharedId
+ * @param {S} ego
+ * @return {S}
+ 

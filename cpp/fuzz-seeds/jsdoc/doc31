@@ -1,0 +1,4 @@
+ * @callback Foo
+ * @param {...string} args
+ * @returns {number}
+ 

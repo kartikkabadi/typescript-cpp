@@ -1,0 +1,2 @@
+@param [opt=42] optional
+@param {number|undefined} [other]

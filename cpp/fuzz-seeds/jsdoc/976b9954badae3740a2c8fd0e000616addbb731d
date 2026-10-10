@@ -1,0 +1,4 @@
+ * @callback WorksWithPeopleCallback
+ * @param {Object} pe@see
+ * @param {string} person.name
+ * * @p@im

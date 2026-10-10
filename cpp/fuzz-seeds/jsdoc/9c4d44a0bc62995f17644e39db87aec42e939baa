@@ -1,0 +1,6 @@
+ * @callback C
+ * @this {{ a: strin g :b,number }}
+ * @param {string} a
+ * @param {number} b
+ * @returns {boolean}impo@paramrt
+ 

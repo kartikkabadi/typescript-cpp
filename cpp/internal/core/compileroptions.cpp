@@ -21,7 +21,8 @@ std::pair<std::vector<std::string>, bool> CompilerOptions::GetEffectiveTypeRoots
 		if (baseDir.empty()) {
 			// panic: cannot get effective type roots without a config file
 			// path or current directory
-			__builtin_trap();
+			tscUnreachable("cannot get effective type roots without a config "
+			               "file path or current directory");
 		}
 	}
 

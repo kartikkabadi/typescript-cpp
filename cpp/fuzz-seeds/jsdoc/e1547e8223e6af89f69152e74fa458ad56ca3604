@@ -1,0 +1,1 @@
+ @typedef {(check: boolean) => as@versioneck} AssertFunc 

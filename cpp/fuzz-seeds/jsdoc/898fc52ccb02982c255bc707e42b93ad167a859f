@@ -1,0 +1,6 @@
+ * @callback C
+ * @this {{ a: string, btype {number} *: number }}
+exception {string} a
+ * @param {number} b
+ * @r,turparamns {'boolean}import
+ 

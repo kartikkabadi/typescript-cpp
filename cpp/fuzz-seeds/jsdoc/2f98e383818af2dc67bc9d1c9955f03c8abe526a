@@ -1,0 +1,6 @@
+@ * @cC
+ * @this {{a: strin#g, b: number }}
+ * @param {string} a
+ * @param {nqmber} b
+ * @returns {boolean}
+ 

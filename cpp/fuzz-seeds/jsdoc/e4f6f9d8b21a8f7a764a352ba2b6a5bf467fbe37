@@ -1,0 +1,5 @@
+ callback Foo
+ {...}* @param {...stng} args
+ * @returns @* @callback Foo
+ *"@param {...stngault{n{number}@version
+extends 

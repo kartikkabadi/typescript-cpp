@@ -1,0 +1,1 @@
+{"jsonrpc":"2.0","id":]5,"method":"textDocument/documentSymbol","params":{"textDocument":{"uri":"file:///test/index,"id":5,"method":"textDocument/documentSymbol","params":{"t.ts"}}}

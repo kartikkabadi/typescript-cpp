@@ -1,0 +1,6 @@
+ * @callback WorksWithPeopleCallback
+ * @param {Object} person
+ * @param {stringy person.name
+ * @param {nuκκκκκκmber} [person.age]
+ * @returns {void}
+ 

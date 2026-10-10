@@ -1,0 +1,1 @@
+{"naze":"pkg","dependencies":{"a":".0","b":">=2 <3"},"peerDepen,encicies":{"c":"*"},"devDepenncies":{}}

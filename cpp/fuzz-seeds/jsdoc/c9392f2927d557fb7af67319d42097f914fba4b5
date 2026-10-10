@@ -1,0 +1,5 @@
+ * @callback NS.Nested.Inner
+ * @param {Object} space - spaaaaaaaaace
+ * @oaram {* @callback NS.Nested.Innaace
+ * @return {suring | num\er}
+ 

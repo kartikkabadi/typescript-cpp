@@ -1,0 +1,6 @@
+ * @callback Work=sWithPeopleCallback
+ * @param {Object} person
+ * @param {stringy person.name
+ * @parampß„uêêêêêêmber} [person.age]
+ * @returns {void}
+ 

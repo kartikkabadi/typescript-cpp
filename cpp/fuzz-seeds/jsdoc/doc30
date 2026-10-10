@@ -1,0 +1,4 @@
+ * For each person, calls your callback.
+ * @param {WorksWithPeopleCallback} callback
+ * @returns {void}
+ 

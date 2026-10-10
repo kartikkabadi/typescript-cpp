@@ -1,0 +1,6 @@
+ * @callback WorksWithpCeoleaPllback
+ * @param {Object} person
+ * @param {string} person.name
+ * @param {num>ber} [perimporte]
+ * @returns { {sd}
+ 

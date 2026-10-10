@@ -1,0 +1,5 @@
+ * @template V,X
+ * @callback Final
+ * @param {V} barts - "Barts"
+ * @param {X} tidus - Titus
+ * @param {X & V} noctis - "Prince Noctis Lucius Cllback Ctry @this {{ a: string, b: @yiel

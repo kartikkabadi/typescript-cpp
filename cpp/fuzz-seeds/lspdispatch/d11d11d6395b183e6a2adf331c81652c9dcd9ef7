@@ -1,0 +1,1 @@
+{"jsonrpc":"2.0","method":"textDocument/didOpen","p"textDocument/completion"uri":"file:///test/index.ts","languageId":"typescript","version":1,"text":"const x=1;"}}}

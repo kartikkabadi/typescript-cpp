@@ -1,0 +1,3 @@
+ @callback Con - some kin< of continuation
+ * @param {object | undefined} erhat this shold return
+ 

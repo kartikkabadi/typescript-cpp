@@ -34,6 +34,17 @@ namespace tsc::project {
 
 namespace {
 
+// updateSnapshot returns nullptr when a clone hits an apiError
+// (session.go:1398); the caller then dereferences nil, which Go
+// reports as a nil-pointer panic — recoverable upstream. Mirroring
+// that as a catchable panic keeps parity (Go `recover()` catches
+// nil derefs; a hardware SIGSEGV cannot be caught).
+[[noreturn]] void panicOnNilSnapshot() {
+	throw std::runtime_error(
+	    "runtime error: invalid memory address or nil pointer "
+	    "dereference");
+}
+
 // ctxSelectTimeout — Go `select { case <-time.After(d):
 // proceed; case <-ctx.Done(): return }`. Returns true if the delay
 // elapsed, false if the context was cancelled first.
@@ -1061,6 +1072,10 @@ project::Snapshot* Session::getSnapshot(const gostd::Context& ctx,
 	// current snapshot.
 	snapshotMu.lock_shared();
 	auto* snapshot = this->snapshot;
+	if (snapshot == nullptr) {
+		snapshotMu.unlock_shared();
+		panicOnNilSnapshot();
+	}
 	UpdateReason updateReason = UpdateReasonUnknown;
 	if (!request.Projects.empty()) {
 		updateReason =
@@ -1129,6 +1144,9 @@ Session::getSnapshotAndDefaultProject(
 	ResourceRequest request;
 	request.Documents = {uri};
 	auto* snapshot = getSnapshot(ctx, request, callerRef);
+	if (snapshot == nullptr) {
+		panicOnNilSnapshot();
+	}
 	auto* project = snapshot->GetDefaultProject(uri);
 	if (project == nullptr) {
 		if (callerRef) {
@@ -1194,6 +1212,9 @@ Session::GetProjectsForFile(const gostd::Context& ctx,
 	ResourceRequest request;
 	request.ConfiguredProjectDocuments = {uri};
 	auto* snapshot = getSnapshot(ctx, request, false /*callerRef*/);
+	if (snapshot == nullptr) {
+		panicOnNilSnapshot();
+	}
 
 	// !!! TODO: sheetal: Get other projects that contain the file
 	// with symlink
@@ -1212,6 +1233,9 @@ Session::GetLanguageServicesForDocumentsLoadingProjectTree(
 	request.Documents = uris;
 	request.ProjectTree = new ProjectTreeRequest();
 	auto* snapshot = getSnapshot(ctx, request, false /*callerRef*/);
+	if (snapshot == nullptr) {
+		panicOnNilSnapshot();
+	}
 
 	std::string activeFile;
 	if (!uris.empty()) {
@@ -1242,6 +1266,9 @@ ls::LanguageService* Session::GetLanguageServiceForProjectWithFile(
 	ResourceRequest request;
 	request.Projects = {project->ID()};
 	auto* snapshot = getSnapshot(ctx, request, false /*callerRef*/);
+	if (snapshot == nullptr) {
+		panicOnNilSnapshot();
+	}
 	// Ensure we have updated project
 	project = snapshot->ProjectCollection->GetProject(project->ID());
 	if (project == nullptr) {
@@ -1299,6 +1326,9 @@ Session::GetCurrentLanguageServiceWithAutoImports(
 	request.Documents = {uri};
 	request.AutoImports = uri;
 	auto* snapshot = getSnapshot(ctx, request, false /*callerRef*/);
+	if (snapshot == nullptr) {
+		panicOnNilSnapshot();
+	}
 	auto* project = snapshot->GetDefaultProject(uri);
 	if (project == nullptr) {
 		return {nullptr,

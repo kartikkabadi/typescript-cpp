@@ -155,11 +155,13 @@ std::pair<lsproto::InitializeResponse, gostd::Error> Server::handleInitialize(
 	logger->Info({"Resolved client capabilities: " + capabilitiesJSON});
 
 	positionEncoding = lsproto::PositionEncodingKindUTF16;
-	if (std::find(
-	        clientCapabilities.General.PositionEncodings->begin(),
-	        clientCapabilities.General.PositionEncodings->end(),
-	        lsproto::PositionEncodingKindUTF8) !=
-	    clientCapabilities.General.PositionEncodings->end()) {
+	// server.go:1573 — slices.Contains tolerates a nil slice; the
+	// positionEncodings field is optional in InitializeParams.
+	auto& positionEncodings = clientCapabilities.General.PositionEncodings;
+	if (positionEncodings.has_value() &&
+	    std::find(positionEncodings->begin(), positionEncodings->end(),
+	              lsproto::PositionEncodingKindUTF8) !=
+	        positionEncodings->end()) {
 		positionEncoding = lsproto::PositionEncodingKindUTF8;
 	}
 

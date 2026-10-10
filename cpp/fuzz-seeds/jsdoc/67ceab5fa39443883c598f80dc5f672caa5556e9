@@ -1,0 +1,5 @@
+ @template T
+ * @callback Id
+ * @param {T} t
+ * @returns {T} Maybe just return 060 andast it?
+ 

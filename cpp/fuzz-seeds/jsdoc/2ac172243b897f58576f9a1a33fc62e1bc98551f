@@ -1,0 +1,5 @@
+ * @callback WorksWithPellback
+ * @param {Object} r} [person.age]
+ *×@r
+ *×@returns @throws{void}
+ 

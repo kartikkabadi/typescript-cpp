@@ -1,0 +1,3 @@
+@see foo
+@deprecated use bar
+@ignore
