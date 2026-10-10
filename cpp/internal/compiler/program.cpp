@@ -3222,7 +3222,11 @@ std::tuple<SimpleProgram*, SourceFile*, bool> SimpleProgram::ReuseProgram(
 	if (createModuleResolver) {
 		newOpts.CreateModuleResolver = createModuleResolver;
 	}
-	SourceFile* oldFile = filesByPath[changedFilePath];
+	SourceFile* oldFile = nullptr;
+	if (auto it = filesByPath.find(changedFilePath);
+	    it != filesByPath.end()) {
+		oldFile = it->second;
+	}
 	SourceFile* newFile = nullptr;
 	std::vector<SourceFile*> oldSupplementalFiles;
 	std::vector<SourceFile*> newSupplementalFiles;
@@ -3266,7 +3270,10 @@ std::tuple<SimpleProgram*, SourceFile*, bool> SimpleProgram::ReuseProgram(
 	// Cloning does not recompute synthetic helper or JSX-runtime import
 	// bookkeeping. Fall back to a full build whenever either version
 	// requires those imports.
-	if (importHelpersImportSpecifiers[oldFile->Path()] != nullptr ||
+	auto importHelpersIt =
+	    importHelpersImportSpecifiers.find(oldFile->Path());
+	if ((importHelpersIt != importHelpersImportSpecifiers.end() &&
+	     importHelpersIt->second != nullptr) ||
 	    needsImportHelpersImportSpecifier(newFile)) {
 		return {nullptr, newFile, false};
 	}
@@ -3285,8 +3292,11 @@ std::tuple<SimpleProgram*, SourceFile*, bool> SimpleProgram::ReuseProgram(
 		    !canReplaceFileInProgram(oldSupplemental, newSupplemental)) {
 			return {nullptr, newFile, false};
 		}
-		if (importHelpersImportSpecifiers[oldSupplemental->Path()] !=
-		        nullptr ||
+		auto supplementalHelpersIt = importHelpersImportSpecifiers.find(
+		    oldSupplemental->Path());
+		if ((supplementalHelpersIt !=
+		         importHelpersImportSpecifiers.end() &&
+		     supplementalHelpersIt->second != nullptr) ||
 		    needsImportHelpersImportSpecifier(newSupplemental)) {
 			return {nullptr, newFile, false};
 		}
