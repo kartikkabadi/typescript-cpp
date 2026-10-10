@@ -874,6 +874,7 @@ function jsDocSingleLine() {
 }
 jsDocSingleLine(/*3*/);
 
+
 /** this is multiple line jsdoc stule comment
 *New line1
 *New Line2*/
@@ -889,6 +890,7 @@ jsDocMultiLine(/*4*/);
 function jsDocMultiLineMerge() {
 }
 jsDocMultiLineMerge(/*5*/);
+
 
 /// Triple slash comment
 /** jsdoc comment */
@@ -1085,6 +1087,7 @@ function jsDocSingleLine() {
 }
 jsDocSingleLine(/*3*/);
 
+
 /** this is multiple line jsdoc stule comment
 *New line1
 *New Line2*/
@@ -1100,6 +1103,7 @@ jsDocMultiLine(/*4*/);
 function jsDocMultiLineMerge() {
 }
 jsDocMultiLineMerge(/*5*/);
+
 
 /// Triple slash comment
 /** jsdoc comment */

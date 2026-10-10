@@ -533,6 +533,7 @@ static void TestGoToImplementationInterfaceProperty_00(gostd::testing::T* t) {
 
 var bar: Foo = { [|hello|]: 5 };
 
+
 function whatever(x: Foo = { [|hello|]: 5 * 9 }) {
     x.he/*reference*/llo
 }
@@ -1157,6 +1158,7 @@ static void TestGoToImplementationNamespace_06(gostd::testing::T* t) {
 		const std::string content = R"TS(namespace [|F/*declaration*/oo|] {
     declare function hello(): void;
 }
+
 
 let x: typeof Foo = [|{ hello() {} }|];)TS";
 		auto __fsp = fourslash::NewFourslash(t, nullptr, content); auto f = __fsp.first; auto done = __fsp.second; TSC_DEFER(done());

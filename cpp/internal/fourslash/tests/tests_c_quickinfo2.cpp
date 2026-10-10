@@ -1384,6 +1384,7 @@ function jsDocSingleLine() {
 }
 jsDoc/*3q*/SingleLine();
 
+
 /** this is multiple line jsdoc stule comment
 *New line1
 *New Line2*/
@@ -1399,6 +1400,7 @@ jsDocM/*4q*/ultiLine();
 function jsDocMultiLineMerge() {
 }
 jsDocMu/*5q*/ltiLineMerge();
+
 
 /// Triple slash comment
 /** jsdoc comment */
@@ -2713,6 +2715,7 @@ static void TestQuickInfoForJSDocWithHttpLinks(gostd::testing::T* t) {
 * @property {number} /*2*/https://wass
 */
 
+
 /** @callback /*3*/http://vad */
 
 /** @see https://hvad */
@@ -3978,6 +3981,9 @@ abstract class BaseClass {
      */
     public static readonly someProperty: string = 'general value';
 }
+
+
+
 
 class SubClass extends BaseClass {
 
