@@ -5,6 +5,7 @@
 #include <utility>
 
 #include "internal/checker/checker.h"
+#include "internal/core/utilities.h"
 #include "internal/execute/incremental/incremental.h"
 
 namespace tsc::execute::incremental {
@@ -17,8 +18,8 @@ struct emitUpdate {
 };
 
 // emitfileshandler.go:26 emitFilesHandler. Go runs the emit loop through a
-// WorkGroup; this port runs those queues inline (single-threaded) — the
-// mutex-guarded collections remain since they model the Go state layout.
+// WorkGroup — mirrored here; the mutex-guarded collections model the Go
+// state layout.
 struct emitFilesHandler {
 	Program* program;
 	bool isForDtsErrors;
@@ -145,6 +146,10 @@ struct emitFilesHandler {
 		collectAllAffectedFiles(program);
 
 		std::vector<compiler::EmitResult*> pendingEmits;
+		// emitfileshandler.go:124 — Go runs each file's emit on the
+		// workgroup: `wg.Queue(func() { ... program.Emit(...) ... })`.
+		std::unique_ptr<workGroup> wg(
+		    newWorkGroup(program->program_->SingleThreaded()));
 		program->snapshot_->affectedFilesPendingEmit.Range(
 		    [&](const tspath::Path& path, FileEmitKind emitKind) {
 			    auto* affectedFile =
@@ -158,48 +163,59 @@ struct emitFilesHandler {
 			    auto pendingKind =
 			        getPendingEmitKindForEmitOptions(emitKind, options);
 			    if (pendingKind != 0) {
-				    // Determine if we can do partial emit
-				    auto emitOnly = compiler::EmitOnly::EmitAll;
-				    bool emitOnlyJs = false;
-				    if ((pendingKind & FileEmitKindAllJs) != 0) {
-					    emitOnly = compiler::EmitOnly::EmitOnlyJs;
-					    emitOnlyJs = true;
-				    }
-				    if ((pendingKind & FileEmitKindAllDts) != 0) {
-					    if (emitOnlyJs) {
-						    emitOnly = compiler::EmitOnly::EmitAll;
-					    } else {
-						    emitOnly = compiler::EmitOnly::EmitOnlyDts;
+				    wg->Queue([this, path, emitKind, pendingKind,
+				               affectedFile, &options] {
+					    // Determine if we can do partial emit
+					    auto emitOnly = compiler::EmitOnly::EmitAll;
+					    bool emitOnlyJs = false;
+					    if ((pendingKind & FileEmitKindAllJs) != 0) {
+						    emitOnly =
+						        compiler::EmitOnly::EmitOnlyJs;
+						    emitOnlyJs = true;
 					    }
-				    }
-				    compiler::EmitResult* result = nullptr;
-				    if (!isForDtsErrors) {
-					    compiler::EmitOptions emitOptions;
-					    emitOptions.TargetSourceFiles = {affectedFile};
-					    emitOptions.EmitOnly = emitOnly;
-					    emitOptions.WriteFile = options.WriteFile;
-					    auto opts = getEmitOptions(emitOptions);
-					    result =
-					        program->program_->Emit(&opts);
-				    } else {
-					    result = new compiler::EmitResult();
-					    result->EmitSkipped = true;
-					    result->Diagnostics =
-					        program->program_
-					            ->GetDeclarationDiagnostics(
-					                affectedFile);
-				    }
-				    updateHasEmitDiagnostics(result);
+					    if ((pendingKind & FileEmitKindAllDts) != 0) {
+						    if (emitOnlyJs) {
+							    emitOnly =
+							        compiler::EmitOnly::EmitAll;
+						    } else {
+							    emitOnly = compiler::EmitOnly::
+							        EmitOnlyDts;
+						    }
+					    }
+					    compiler::EmitResult* result = nullptr;
+					    if (!isForDtsErrors) {
+						    compiler::EmitOptions emitOptions;
+						    emitOptions.TargetSourceFiles = {
+						        affectedFile};
+						    emitOptions.EmitOnly = emitOnly;
+						    emitOptions.WriteFile =
+						        options.WriteFile;
+						    auto opts =
+						        getEmitOptions(emitOptions);
+						    result =
+						        program->program_->Emit(&opts);
+					    } else {
+						    result = new compiler::EmitResult();
+						    result->EmitSkipped = true;
+						    result->Diagnostics =
+						        program->program_
+						            ->GetDeclarationDiagnostics(
+						                affectedFile);
+					    }
+					    updateHasEmitDiagnostics(result);
 
-				    // Update the pendingEmit for the file
-				    auto* update = new emitUpdate();
-				    update->pendingKind =
-				        getPendingEmitKind(emitKind, pendingKind);
-				    update->result = result;
-				    emitUpdates.Store(path, update);
+					    // Update the pendingEmit for the file
+					    auto* update = new emitUpdate();
+					    update->pendingKind =
+					        getPendingEmitKind(emitKind,
+					                           pendingKind);
+					    update->result = result;
+					    emitUpdates.Store(path, update);
+				    });
 			    }
 			    return true;
 		    });
+		wg->RunAndWait();
 
 		// Get updated errors that were not included in affected files
 		// emit
